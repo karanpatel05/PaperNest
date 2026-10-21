@@ -1,0 +1,3 @@
+/* Valores localizados de Info.plist (iOS/iPadOS). */
+"CFBundleDisplayName" = "PaperNest";
+"NSCameraUsageDescription" = "PaperNest usa la cámara para escanear documentos en papel. Los escaneos se guardan en tu biblioteca en este dispositivo.";

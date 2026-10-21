@@ -1,0 +1,15 @@
+// Shared build settings for the Xcode project generated from project.yml.
+//
+// PLACEHOLDER IDENTITY. `com.example.papernest` is not a registered bundle
+// identifier. Before any signed build, create Config/Signing.local.xcconfig
+// (git-ignored) with your own values; see docs/APPLE_SETUP.md:
+//
+//   PAPERNEST_BUNDLE_ID = com.yourcompany.papernest
+//   PAPERNEST_TEAM_ID = ABCDE12345
+//
+// iOS and macOS use the SAME bundle identifier so App Store Connect can
+// offer them as one universal purchase.
+PAPERNEST_BUNDLE_ID = com.example.papernest
+PAPERNEST_TEAM_ID =
+
+#include? "Signing.local.xcconfig"

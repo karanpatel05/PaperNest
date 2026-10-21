@@ -1,0 +1,35 @@
+# SwiftPM / Xcode build products
+.build/
+.swiftpm/
+build/
+DerivedData/
+*.xcodeproj/
+!*.xcodeproj/project.xcworkspace/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+*.xcuserstate
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.xcarchive
+
+# The Xcode project is generated from project.yml (see README).
+PaperNest.xcodeproj/
+
+# Local tooling output
+dist/
+*.profraw
+*.log
+
+# Credentials and signing material never belong in the repo
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+Config/Signing.local.xcconfig
+.env
+.env.*
+
+# macOS
+.DS_Store

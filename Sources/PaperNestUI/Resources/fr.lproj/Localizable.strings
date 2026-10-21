@@ -1,0 +1,134 @@
+/* PaperNest — français (Canada et France). Traduction à faire relire par un locuteur natif avant publication. */
+
+/* Sidebar */
+"sidebar.library" = "Bibliothèque";
+"sidebar.allDocuments" = "Tous les documents";
+"sidebar.favorites" = "Favoris";
+"sidebar.recentlyDeleted" = "Supprimés récemment";
+
+/* Library */
+"library.empty.title" = "Aucun document pour l’instant";
+"library.empty.message.mac" = "Importez des PDF ou des images avec Fichier > Importer, ou faites glisser des fichiers dans cette fenêtre.";
+"library.empty.message.touch" = "Numérisez un document avec l’appareil photo, ou importez des PDF et des images.";
+"library.empty.favorites.title" = "Aucun favori";
+"library.empty.favorites.message" = "Les documents que vous marquez comme favoris s’affichent ici.";
+"library.empty.deleted.title" = "Aucun élément supprimé récemment";
+"library.empty.deleted.message" = "Les documents supprimés restent ici pendant %d jours, puis ils sont effacés définitivement.";
+"library.search.prompt" = "Rechercher dans les titres";
+"library.search.noResults.title" = "Aucun résultat";
+"library.search.noResults.message" = "Aucun titre de document ne correspond à « %@ ».";
+"library.loading" = "Ouverture de la bibliothèque…";
+"library.importing" = "Importation…";
+"item.deletedOn" = "Supprimé le %@";
+"accessibility.itemSummary" = "%1$@, %2$@";
+
+/* Actions */
+"action.import" = "Importer…";
+"action.scan" = "Numériser";
+"action.paste" = "Coller";
+"action.open" = "Ouvrir";
+"action.rename" = "Renommer…";
+"action.favorite" = "Ajouter aux favoris";
+"action.unfavorite" = "Retirer des favoris";
+"action.delete" = "Supprimer";
+"action.recover" = "Récupérer";
+"action.deletePermanently" = "Supprimer définitivement…";
+"action.cancel" = "Annuler";
+"action.ok" = "OK";
+"action.done" = "Terminé";
+"action.export" = "Exporter…";
+"rename.title" = "Renommer le document";
+"rename.placeholder" = "Nom";
+"deletePermanently.title" = "Supprimer définitivement « %@ » ?";
+"deletePermanently.message" = "Cette action est irréversible.";
+"paste.defaultName" = "Image collée %@";
+"scan.defaultName" = "Numérisation %@";
+"scan.unsupported" = "La numérisation de documents n’est pas disponible sur cet appareil. Vous pouvez toujours importer des photos et des fichiers.";
+"scan.failed" = "Le document n’a pas pu être numérisé. Vérifiez que %@ est autorisé à utiliser l’appareil photo dans Réglages, puis réessayez.";
+
+/* Document */
+"document.pages" = "Pages";
+"document.empty.title" = "Aucune page";
+"document.empty.message" = "Ajoutez des pages en important des PDF ou des images.";
+"page.rotateLeft" = "Faire pivoter à gauche";
+"page.rotateRight" = "Faire pivoter à droite";
+"page.filter" = "Filtre";
+"filter.original" = "Original";
+"filter.grayscale" = "Niveaux de gris";
+"filter.blackAndWhite" = "Noir et blanc";
+"page.adjustments" = "Réglages";
+"page.brightness" = "Luminosité";
+"page.contrast" = "Contraste";
+"page.resetAdjustments" = "Réinitialiser";
+"page.revert" = "Revenir à l’original";
+"page.delete" = "Supprimer la page";
+"page.moveUp" = "Monter la page";
+"page.moveDown" = "Descendre la page";
+"page.addPages" = "Ajouter des pages…";
+"page.label" = "Page %1$lld sur %2$lld";
+"page.unavailable" = "L’original de cette page n’est pas disponible sur cet appareil.";
+"page.loadFailed" = "Impossible d’afficher cette page.";
+"page.zoomIn" = "Agrandir";
+"page.zoomOut" = "Réduire";
+"page.zoomToFit" = "Ajuster à la fenêtre";
+"menu.page" = "Page";
+"undo.rotate" = "Rotation de la page";
+"undo.filter" = "Changement de filtre";
+"undo.adjust" = "Réglage de la page";
+"undo.deletePage" = "Suppression de la page";
+"undo.movePage" = "Déplacement de la page";
+
+/* Export */
+"export.title" = "Exporter";
+"export.format" = "Format";
+"export.pages" = "Pages";
+"export.pages.all" = "Toutes";
+"export.pages.current" = "Page actuelle";
+"export.pages.range" = "Plage";
+"export.pages.from" = "De";
+"export.pages.to" = "À";
+"export.paperSize" = "Format du papier";
+"paper.original" = "Taille d’origine";
+"paper.usLetter" = "Lettre US";
+"paper.a4" = "A4";
+"export.paperSize.note" = "Les pages sont mises à l’échelle pour tenir sur le papier. Rien n’est rogné.";
+"export.quality" = "Qualité des images";
+"quality.best" = "Optimale (fichier le plus lourd)";
+"quality.balanced" = "Équilibrée";
+"quality.compact" = "Fichier plus léger";
+"export.resolution" = "Résolution";
+"export.resolution.dpi" = "%lld ppp";
+"export.jpegQuality" = "Qualité JPEG";
+"export.packaging" = "Plusieurs pages";
+"packaging.zip" = "Une archive ZIP";
+"packaging.separate" = "Fichiers séparés";
+"export.progress" = "Exportation de la page %1$lld sur %2$lld…";
+"export.ready" = "Prêt : %@";
+"export.button" = "Exporter";
+"export.save" = "Enregistrer…";
+"export.share" = "Partager…";
+"export.vectorNote" = "Les pages PDF importées conservent leur texte sélectionnable. Les pages avec un filtre sont exportées en images.";
+"export.failed" = "L’exportation n’a pas pu être effectuée.";
+"export.invalidRange" = "Choisissez une plage de pages comprise dans le document.";
+
+/* Errors */
+"error.import.title" = "Impossible d’importer « %@ »";
+"error.import.multiple.title" = "Certains fichiers n’ont pas pu être importés";
+"error.import.line" = "%1$@ : %2$@";
+"error.import.unsupported" = "Seuls les fichiers PDF, JPEG et PNG peuvent être importés.";
+"error.import.unreadable" = "Le fichier n’a pas pu être lu. Il a peut-être été déplacé, ou vous n’avez pas l’autorisation de l’ouvrir.";
+"error.import.damaged" = "Le fichier semble endommagé ou incomplet.";
+"error.import.empty" = "Le fichier est vide.";
+"error.import.incorrectPassword" = "Le mot de passe est incorrect.";
+"error.import.protectedUnsupported" = "Ce PDF protégé par mot de passe ne peut pas être importé.";
+"error.import.restricted" = "L’auteur de ce PDF a restreint la copie ou l’impression ; il ne peut donc pas être importé.";
+"error.import.tooLarge" = "Cette image est trop grande pour être importée.";
+"password.title" = "« %@ » est protégé par un mot de passe";
+"password.message" = "Saisissez le mot de passe pour l’ouvrir. %@ conserve une copie déverrouillée dans votre bibliothèque et n’enregistre pas le mot de passe.";
+"password.field" = "Mot de passe";
+"password.open" = "Ouvrir";
+"error.generic.title" = "Un problème est survenu";
+"error.save" = "Votre modification n’a pas pu être enregistrée. Veuillez réessayer.";
+"error.library.title" = "Bibliothèque indisponible";
+"error.library.newer" = "Cette bibliothèque a été créée par une version plus récente de %@. Mettez l’app à jour pour l’ouvrir.";
+"error.library.open" = "La bibliothèque n’a pas pu être ouverte.";

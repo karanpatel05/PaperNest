@@ -1,0 +1,134 @@
+/* PaperNest — English (source language). Keys are referenced from Localization.swift. */
+
+/* Sidebar */
+"sidebar.library" = "Library";
+"sidebar.allDocuments" = "All Documents";
+"sidebar.favorites" = "Favorites";
+"sidebar.recentlyDeleted" = "Recently Deleted";
+
+/* Library */
+"library.empty.title" = "No Documents Yet";
+"library.empty.message.mac" = "Import PDFs or images with File > Import, or drag files into this window.";
+"library.empty.message.touch" = "Scan a document with the camera, or import PDFs and images.";
+"library.empty.favorites.title" = "No Favorites";
+"library.empty.favorites.message" = "Documents you mark as favorites appear here.";
+"library.empty.deleted.title" = "Recently Deleted Is Empty";
+"library.empty.deleted.message" = "Deleted documents stay here for %d days, then they’re removed permanently.";
+"library.search.prompt" = "Search titles";
+"library.search.noResults.title" = "No Results";
+"library.search.noResults.message" = "No document titles match “%@”.";
+"library.loading" = "Opening library…";
+"library.importing" = "Importing…";
+"item.deletedOn" = "Deleted %@";
+"accessibility.itemSummary" = "%1$@, %2$@";
+
+/* Actions */
+"action.import" = "Import…";
+"action.scan" = "Scan";
+"action.paste" = "Paste";
+"action.open" = "Open";
+"action.rename" = "Rename…";
+"action.favorite" = "Add to Favorites";
+"action.unfavorite" = "Remove from Favorites";
+"action.delete" = "Delete";
+"action.recover" = "Recover";
+"action.deletePermanently" = "Delete Permanently…";
+"action.cancel" = "Cancel";
+"action.ok" = "OK";
+"action.done" = "Done";
+"action.export" = "Export…";
+"rename.title" = "Rename Document";
+"rename.placeholder" = "Name";
+"deletePermanently.title" = "Delete “%@” permanently?";
+"deletePermanently.message" = "This can’t be undone.";
+"paste.defaultName" = "Pasted Image %@";
+"scan.defaultName" = "Scan %@";
+"scan.unsupported" = "Document scanning isn’t available on this device. You can still import photos and files.";
+"scan.failed" = "The document couldn’t be captured. Make sure %@ is allowed to use the camera in Settings, then try again.";
+
+/* Document */
+"document.pages" = "Pages";
+"document.empty.title" = "No Pages";
+"document.empty.message" = "Add pages by importing PDFs or images.";
+"page.rotateLeft" = "Rotate Left";
+"page.rotateRight" = "Rotate Right";
+"page.filter" = "Filter";
+"filter.original" = "Original";
+"filter.grayscale" = "Grayscale";
+"filter.blackAndWhite" = "Black & White";
+"page.adjustments" = "Adjustments";
+"page.brightness" = "Brightness";
+"page.contrast" = "Contrast";
+"page.resetAdjustments" = "Reset";
+"page.revert" = "Revert to Original";
+"page.delete" = "Delete Page";
+"page.moveUp" = "Move Page Up";
+"page.moveDown" = "Move Page Down";
+"page.addPages" = "Add Pages…";
+"page.label" = "Page %1$lld of %2$lld";
+"page.unavailable" = "This page’s original isn’t available on this device.";
+"page.loadFailed" = "This page couldn’t be displayed.";
+"page.zoomIn" = "Zoom In";
+"page.zoomOut" = "Zoom Out";
+"page.zoomToFit" = "Zoom to Fit";
+"menu.page" = "Page";
+"undo.rotate" = "Rotate Page";
+"undo.filter" = "Change Filter";
+"undo.adjust" = "Adjust Page";
+"undo.deletePage" = "Delete Page";
+"undo.movePage" = "Move Page";
+
+/* Export */
+"export.title" = "Export";
+"export.format" = "Format";
+"export.pages" = "Pages";
+"export.pages.all" = "All Pages";
+"export.pages.current" = "Current Page";
+"export.pages.range" = "Range";
+"export.pages.from" = "From";
+"export.pages.to" = "To";
+"export.paperSize" = "Paper Size";
+"paper.original" = "Original Size";
+"paper.usLetter" = "US Letter";
+"paper.a4" = "A4";
+"export.paperSize.note" = "Pages are scaled to fit the paper. Nothing is cropped.";
+"export.quality" = "Image Quality";
+"quality.best" = "Best (largest file)";
+"quality.balanced" = "Balanced";
+"quality.compact" = "Smaller File";
+"export.resolution" = "Resolution";
+"export.resolution.dpi" = "%lld dpi";
+"export.jpegQuality" = "JPEG Quality";
+"export.packaging" = "Multiple Pages";
+"packaging.zip" = "One ZIP Archive";
+"packaging.separate" = "Separate Files";
+"export.progress" = "Exporting page %1$lld of %2$lld…";
+"export.ready" = "Ready: %@";
+"export.button" = "Export";
+"export.save" = "Save…";
+"export.share" = "Share…";
+"export.vectorNote" = "Imported PDF pages keep their selectable text. Pages with a filter are exported as images.";
+"export.failed" = "The export couldn’t be completed.";
+"export.invalidRange" = "Choose a page range within the document.";
+
+/* Errors */
+"error.import.title" = "Couldn’t Import “%@”";
+"error.import.multiple.title" = "Some Files Couldn’t Be Imported";
+"error.import.line" = "%1$@: %2$@";
+"error.import.unsupported" = "Only PDF, JPEG and PNG files can be imported.";
+"error.import.unreadable" = "The file couldn’t be read. It may have moved, or you may not have permission to open it.";
+"error.import.damaged" = "The file appears to be damaged or incomplete.";
+"error.import.empty" = "The file is empty.";
+"error.import.incorrectPassword" = "The password is incorrect.";
+"error.import.protectedUnsupported" = "This password-protected PDF can’t be imported.";
+"error.import.restricted" = "The author of this PDF restricted copying or printing, so it can’t be imported.";
+"error.import.tooLarge" = "This image is too large to import.";
+"password.title" = "“%@” Is Password-Protected";
+"password.message" = "Enter the password to open it. %@ keeps an unlocked copy in your library and doesn’t store the password.";
+"password.field" = "Password";
+"password.open" = "Open";
+"error.generic.title" = "Something Went Wrong";
+"error.save" = "Your change couldn’t be saved. Please try again.";
+"error.library.title" = "Library Unavailable";
+"error.library.newer" = "This library was created by a newer version of %@. Update the app to open it.";
+"error.library.open" = "The library couldn’t be opened.";

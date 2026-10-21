@@ -1,0 +1,3 @@
+/* Valeurs localisées d’Info.plist (iOS/iPadOS). */
+"CFBundleDisplayName" = "PaperNest";
+"NSCameraUsageDescription" = "PaperNest utilise l’appareil photo pour numériser des documents papier. Les numérisations sont enregistrées dans votre bibliothèque sur cet appareil.";
