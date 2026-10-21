@@ -280,7 +280,7 @@ private extension View {
 
 /// Presents the system save panel (Mac) or document picker (iOS) for the
 /// exported files.
-private struct SaveExportedFiles: ViewModifier {
+struct SaveExportedFiles: ViewModifier {
     @Binding var isPresented: Bool
     let output: ExportOutput?
     let format: ExportFormat

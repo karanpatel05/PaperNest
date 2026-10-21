@@ -118,6 +118,22 @@
 "export.failed" = "No se pudo completar la exportación.";
 "export.invalidRange" = "Elige un intervalo de páginas dentro del documento.";
 
+/* Settings */
+"settings.title" = "Configuración";
+"settings.storage" = "Almacenamiento";
+"settings.documents" = "Documentos";
+"settings.spaceUsed" = "Espacio usado";
+"settings.storage.footer" = "Tu biblioteca se guarda en este dispositivo. Los documentos eliminados permanecen en Eliminados recientemente durante %d días.";
+"settings.exportAll" = "Exportar todos los documentos…";
+"settings.exportAll.footer" = "Crea un archivo ZIP con cada documento en PDF, con tus cambios. Guarda una copia en un lugar seguro como respaldo.";
+"settings.backup.archiveName" = "Respaldo de %1$@ %2$@";
+"settings.language" = "Idioma";
+"settings.language.change" = "Cambiar idioma…";
+"settings.language.mac" = "Para usar otro idioma en %@, elígelo en Configuración del Sistema > General > Idioma y región > Apps.";
+"settings.about" = "Acerca de";
+"settings.version" = "Versión";
+"settings.privacy" = "%@ procesa tus documentos en este dispositivo. Sin anuncios ni seguimiento.";
+
 /* Errors */
 "error.import.title" = "No se pudo importar “%@”";
 "error.import.multiple.title" = "Algunos archivos no se pudieron importar";

@@ -27,6 +27,12 @@ public final class ZipWriter {
         self.date = date
     }
 
+    /// An archive abandoned midway (error or cancellation) must not keep
+    /// its file open; `finish` closes it on the normal path.
+    deinit {
+        try? handle.close()
+    }
+
     public func addFile(named name: String, data: Data) throws {
         let nameData = Data(name.utf8)
         guard data.count < UInt32.max, offset + UInt64(data.count) + 30 + UInt64(nameData.count) < UInt64(UInt32.max) else {
@@ -55,7 +61,6 @@ public final class ZipWriter {
     }
 
     public func finish() throws {
-        defer { try? handle.close() }
         let directoryOffset = offset
         var directory = Data()
         for e in entries {
@@ -93,6 +98,7 @@ public final class ZipWriter {
         try handle.write(contentsOf: directory)
         try handle.write(contentsOf: end)
         try handle.synchronize()
+        try handle.close()
     }
 
     static func dosDateTime(_ date: Date) -> (UInt16, UInt16) {

@@ -3,7 +3,7 @@ import XCTest
 /// Drives the real app in the iOS Simulator. Run with `scripts/ui-test-ios.sh`,
 /// which seeds the library at `libraryPath` with a page named "Crop target".
 @MainActor
-final class CropUITests: XCTestCase {
+final class AppUITests: XCTestCase {
     static let libraryPath = "/tmp/papernest-uitest-library"
 
     private func launch(_ extra: [String]) -> XCUIApplication {
@@ -71,5 +71,24 @@ final class CropUITests: XCTestCase {
 
         document.tap()
         XCTAssertTrue(app.buttons["Crop"].waitForExistence(timeout: 5), "document did not open")
+    }
+
+    func testSettingsShowsTheLibraryAndExportsABackup() throws {
+        continueAfterFailure = false
+        let app = launch([])
+        XCTAssertTrue(app.descendants(matching: .any)["Crop target, 1 page"].waitForExistence(timeout: 15))
+
+        // iPhone: Settings lives in the navigation bar's overflow menu.
+        let more = app.navigationBars.buttons["More"]
+        if more.exists { more.tap() }
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Documents"].exists)
+
+        app.buttons["Export All Documents…"].tap()
+        XCTAssertTrue(app.buttons["Save…"].waitForExistence(timeout: 20), "backup did not finish")
+
+        app.navigationBars["Settings"].buttons["Done"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForNonExistence(timeout: 5))
     }
 }

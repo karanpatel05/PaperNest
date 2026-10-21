@@ -48,6 +48,16 @@ Export never changes the library. Users choose the format, the pages (all, curre
 - Planned: TXT (M4), basic DOCX in an editable-text variant and a page-images variant (M4), and searchable PDF (M4).
 - Known limitation: links, form fields and annotations inside imported PDFs are not guaranteed to survive export.
 
+## Settings
+
+iPhone and iPad open Settings from the library's ⋯ menu; the Mac uses the standard Settings window (⌘,). There is **no login or user profile**. Identity comes from the user's Apple account: iCloud for sync (M2) and the App Store for purchases (M5). The brief rules out a separate account system.
+
+- **Storage:** live documents and pages, space used on this device, and the Recently Deleted retention period.
+- **Export All Documents…:** a ZIP with every document (not Recently Deleted) as a PDF, as shown with edits applied, to save or share as a backup. Empty documents are skipped. Shows progress and can be cancelled.
+- **Language:** the current app language. iPhone/iPad: "Change Language…" opens the app's page in iOS Settings (per-app language). Mac: a note pointing to System Settings > General > Language & Region > Applications.
+- **About:** version and build, and the statement that documents are processed on the device with no ads or tracking. Update it when sync ships.
+- Not shown until real: iCloud sync status (M2), Pro plan / Restore Purchases / Manage Subscription (M5), and support/privacy/terms links (release-blocked until the pages exist).
+
 ## Free and Pro (to be built in M5)
 
 Pro is one subscription covering iPhone, iPad and Mac (universal purchase). Prices are configured in App Store Connect and never hard-coded. The paywall displays prices supplied by StoreKit.

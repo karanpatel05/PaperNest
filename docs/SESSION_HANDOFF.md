@@ -32,6 +32,7 @@
 - **iPhone layout:** the document view now shows the page full width with a thumbnail scroller and bottom-toolbar actions; reordering is in a Pages sheet.
 - **Export sheet:** it was clipped on iPhone, and option values truncated in French and Spanish. It now uses inline option rows on iOS.
 - **Shortcut clash:** ⌘E clashed with "Use Selection for Find", so Export is now ⇧⌘E.
+- **Settings** (2026-10-21): storage figures, Export All Documents (ZIP of PDFs) as a backup, language, version and privacy note. iPhone/iPad open it from the ⋯ menu, the Mac from ⌘,. No login or profile, as the brief requires. 4 new unit tests (107 total) and a UI test (3 UI tests in total, now `AppUITests`).
 - **Crop tool** (2026-10-21): editor sheet, ⌘K, toolbar buttons, undoable `setCrop`, a thumbnail-cache key that includes the transform, dark underlays so the frame shows on white paper, and a VoiceOver value. Review then found that filtered PDF pages with tight crops failed to render or export; they now rasterize only the crop. 15 new unit tests (102 total), plus the first UI-test target (`PaperNest-iOSUITests`, run with `scripts/ui-test-ios.sh`), whose crop drag test passes.
 - **`scripts/test.sh`** failed under Xcode (bash 3.2 empty-array bug).
 - **Build output and built apps** moved out of the iCloud-synced checkout. `codesign` was rejecting test bundles there, iCloud broke app signatures after signing, and it was creating "debug 2" conflict copies.
@@ -62,8 +63,8 @@
 
 ```bash
 git log --oneline | head                     # initial commit on main
-./scripts/test.sh                            # expect 103 tests passing (5 per-target runs under Xcode)
-./scripts/ui-test-ios.sh                     # iOS UI tests, headless in the Simulator (expect CropUITests to pass)
+./scripts/test.sh                            # expect 107 tests passing (5 per-target runs under Xcode)
+./scripts/ui-test-ios.sh                     # iOS UI tests, headless in the Simulator (expect AppUITests to pass)
 xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build
 ./scripts/build-ios-sim-app.sh               # prints the app path; then: xcrun simctl install F5269418-AA12-4CF9-8EE4-6B6B89F228B8 <path>
 ./scripts/run-mac-app.sh /tmp/pn-dev         # dev Mac app with a seeded throwaway library

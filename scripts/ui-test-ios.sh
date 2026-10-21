@@ -21,7 +21,7 @@ print((named or phones)[0]["udid"] if (named or phones) else "")')"
 fi
 [[ -n "$DEVICE" ]] || { echo "no iPhone simulator available" >&2; exit 69; }
 
-# Must match CropUITests.libraryPath.
+# Must match AppUITests.libraryPath.
 LIBRARY="/tmp/papernest-uitest-library"
 rm -rf "$LIBRARY"
 FIXTURES="$(mktemp -d)"

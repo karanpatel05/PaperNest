@@ -14,6 +14,7 @@ struct LibraryView: View {
     @State private var isDropTargeted = false
     #if os(iOS)
     @State private var isShowingScanner = false
+    @State private var isShowingSettings = false
     #endif
 
     static let importableTypes: [UTType] = [.pdf, .jpeg, .png]
@@ -94,6 +95,9 @@ struct LibraryView: View {
                 ExportLoader(itemID: summary.id, currentPageID: nil)
             }
             #if os(iOS)
+            .sheet(isPresented: $isShowingSettings) {
+                SettingsView(session: model.session)
+            }
             .fullScreenCover(isPresented: $isShowingScanner) {
                 DocumentCameraView { outcome in
                     isShowingScanner = false
@@ -206,6 +210,16 @@ struct LibraryView: View {
             }
             .disabled(model.scope == .recentlyDeleted)
         }
+        #if os(iOS)
+        // The Mac uses the standard Settings window (⌘,) instead.
+        ToolbarItem(placement: .secondaryAction) {
+            Button {
+                isShowingSettings = true
+            } label: {
+                Label(L10n.settingsTitle, systemImage: "gearshape")
+            }
+        }
+        #endif
     }
 
     private func paste() {

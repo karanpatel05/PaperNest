@@ -224,6 +224,69 @@ func unzip(_ arguments: [String]) throws -> (status: Int32, output: String) {
     }
 }
 
+@Suite struct LibraryBackupTests {
+    @Test func everyDocumentBecomesAPDFInOneValidZipWithUniqueNames() async throws {
+        let f = try ExportFixture()
+        let (one, onePages) = try await f.importPDF(["First", "Second"])
+        let (two, twoPages) = try await f.importPDF(["Other"])
+        // Two documents that sanitize to the same file name, plus an edit
+        // that must survive into the backup.
+        try await f.store.rename(one.id, to: "Taxes/2026")
+        try await f.store.rename(two.id, to: "Taxes:2026")
+        try await f.store.updateTransform(twoPages[0].id, to: PageTransform(rotation: .clockwise90))
+        let items = [
+            LibraryExportItem(name: "Taxes/2026", pages: try await f.store.pages(of: one.id)),
+            LibraryExportItem(name: "Taxes:2026", pages: try await f.store.pages(of: two.id)),
+            LibraryExportItem(name: "Empty", pages: []),
+        ]
+        #expect(onePages.count == 2)
+
+        let output = try await f.exporter.exportLibrary(items, archiveName: "PaperNest Backup 2026-10-21")
+        defer { output.removeTemporaryFiles() }
+        #expect(output.files.map(\.lastPathComponent) == ["PaperNest Backup 2026-10-21.zip"])
+        #expect(try unzip(["-t", output.files[0].path]).status == 0)
+
+        let extracted = f.url.appendingPathComponent("backup", isDirectory: true)
+        #expect(try unzip(["-q", output.files[0].path, "-d", extracted.path]).status == 0)
+        let names = try FileManager.default.contentsOfDirectory(atPath: extracted.path).sorted()
+        #expect(names == ["Taxes-2026 2.pdf", "Taxes-2026.pdf"])
+        let first = try #require(PDFDocument(url: extracted.appendingPathComponent("Taxes-2026.pdf")))
+        #expect(first.pageCount == 2)
+        #expect(first.page(at: 1)?.string?.contains("Second") == true)
+        let second = try #require(PDFDocument(url: extracted.appendingPathComponent("Taxes-2026 2.pdf")))
+        #expect(second.page(at: 0)?.bounds(for: .mediaBox).size == CGSize(width: 792, height: 612))
+    }
+
+    @Test func nothingToExportIsAnError() async throws {
+        let f = try ExportFixture()
+        await #expect(throws: ExportError.noPages) {
+            try await f.exporter.exportLibrary([LibraryExportItem(name: "Empty", pages: [])], archiveName: "Backup")
+        }
+    }
+
+    @Test func cancellingTheBackupLeavesNothingBehind() async throws {
+        let f = try ExportFixture()
+        var items: [LibraryExportItem] = []
+        for i in 0..<6 {
+            let (item, pages) = try await f.importPDF(Array(repeating: "Page \(i)", count: 8))
+            items.append(LibraryExportItem(name: item.name, pages: pages))
+        }
+        let root = f.url.appendingPathComponent("backup-exports", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let exporter = Exporter(renderer: f.exporter.renderer, temporaryRoot: root)
+        let started = AsyncStream<Void>.makeStream()
+        let task = Task {
+            try await exporter.exportLibrary(items, archiveName: "Backup") { progress in
+                if progress.completedPages == 3 { started.continuation.yield() }
+            }
+        }
+        for await _ in started.stream { break }
+        task.cancel()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
+    }
+}
+
 @Suite struct NamingAndZipTests {
     @Test func unsafeCharactersAreReplacedAndEmptyNamesFallBack() {
         #expect(ExportNaming.baseName("Q3/Q4: \"budget\"?") == "Q3-Q4- -budget--")

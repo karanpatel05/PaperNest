@@ -160,6 +160,22 @@ enum L10n {
     static var exportFailed: String { tr("export.failed") }
     static var exportInvalidRange: String { tr("export.invalidRange") }
 
+    // Settings
+    static var settingsTitle: String { tr("settings.title") }
+    static var settingsStorage: String { tr("settings.storage") }
+    static var settingsDocuments: String { tr("settings.documents") }
+    static var settingsSpaceUsed: String { tr("settings.spaceUsed") }
+    static func settingsStorageFooter(days: Int) -> String { tr("settings.storage.footer", days) }
+    static var settingsExportAll: String { tr("settings.exportAll") }
+    static var settingsExportAllFooter: String { tr("settings.exportAll.footer") }
+    static func backupArchiveName(_ date: String) -> String { tr("settings.backup.archiveName", Brand.displayName, date) }
+    static var settingsLanguage: String { tr("settings.language") }
+    static var settingsChangeLanguage: String { tr("settings.language.change") }
+    static var settingsLanguageMac: String { tr("settings.language.mac", Brand.displayName) }
+    static var settingsAbout: String { tr("settings.about") }
+    static var settingsVersion: String { tr("settings.version") }
+    static var settingsPrivacy: String { tr("settings.privacy", Brand.displayName) }
+
     // Errors
     static func importErrorTitle(_ file: String) -> String { tr("error.import.title", file) }
     static var importErrorsTitle: String { tr("error.import.multiple.title") }

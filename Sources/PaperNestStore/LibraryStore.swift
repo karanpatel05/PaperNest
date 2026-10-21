@@ -249,6 +249,38 @@ public actor LibraryStore {
         return terms.isEmpty ? nil : terms.joined(separator: " ")
     }
 
+    // MARK: - Storage
+
+    public struct StorageUsage: Sendable, Equatable {
+        /// Documents and notebooks not in Recently Deleted.
+        public var documents: Int
+        /// Live pages of those items.
+        public var pages: Int
+        /// Everything the library occupies on disk: database, originals and
+        /// anything still kept for Recently Deleted or undo.
+        public var bytes: Int64
+    }
+
+    public func storageUsage() throws -> StorageUsage {
+        let documents = try db.query("SELECT count(*) FROM items WHERE deleted_at IS NULL") { $0.int(0) }.first ?? 0
+        let pages = try db.query("""
+            SELECT count(*) FROM pages p JOIN items i ON i.id = p.item_id
+            WHERE p.deleted_at IS NULL AND i.deleted_at IS NULL
+            """) { $0.int(0) }.first ?? 0
+        return StorageUsage(documents: documents, pages: pages, bytes: Self.diskSize(of: directoryURL))
+    }
+
+    static func diskSize(of directory: URL) -> Int64 {
+        let keys: [URLResourceKey] = [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey]
+        guard let files = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: keys) else { return 0 }
+        var total: Int64 = 0
+        for case let url as URL in files {
+            guard let values = try? url.resourceValues(forKeys: Set(keys)), values.isRegularFile == true else { continue }
+            total += Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? 0)
+        }
+        return total
+    }
+
     // MARK: - Folders
 
     public func createFolder(named name: String, parentID: FolderID? = nil) throws -> Folder {

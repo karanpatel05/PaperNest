@@ -18,6 +18,11 @@ struct PaperNestMacApp: App {
         .commands {
             PaperNestCommands()
         }
+
+        // PaperNest > Settings… (⌘,)
+        Settings {
+            SettingsView(session: session)
+        }
     }
 }
 

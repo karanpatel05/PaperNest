@@ -118,6 +118,22 @@
 "export.failed" = "L’exportation n’a pas pu être effectuée.";
 "export.invalidRange" = "Choisissez une plage de pages comprise dans le document.";
 
+/* Settings */
+"settings.title" = "Réglages";
+"settings.storage" = "Stockage";
+"settings.documents" = "Documents";
+"settings.spaceUsed" = "Espace utilisé";
+"settings.storage.footer" = "Votre bibliothèque est stockée sur cet appareil. Les documents supprimés restent dans Supprimés récemment pendant %d jours.";
+"settings.exportAll" = "Exporter tous les documents…";
+"settings.exportAll.footer" = "Crée un fichier ZIP contenant chaque document au format PDF, avec vos modifications. Conservez-en une copie en lieu sûr comme sauvegarde.";
+"settings.backup.archiveName" = "Sauvegarde %1$@ %2$@";
+"settings.language" = "Langue";
+"settings.language.change" = "Changer de langue…";
+"settings.language.mac" = "Pour utiliser une autre langue dans %@, choisissez-la dans Réglages Système > Général > Langue et région > Applications.";
+"settings.about" = "À propos";
+"settings.version" = "Version";
+"settings.privacy" = "%@ traite vos documents sur cet appareil. Aucune publicité, aucun pistage.";
+
 /* Errors */
 "error.import.title" = "Impossible d’importer « %@ »";
 "error.import.multiple.title" = "Certains fichiers n’ont pas pu être importés";

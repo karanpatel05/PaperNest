@@ -343,6 +343,29 @@ func samplePages(_ asset: AssetFileStore.StagedAsset, count: Int) -> [LibrarySto
     }
 }
 
+@Suite struct StorageUsageTests {
+    @Test func countsLiveDocumentsAndPagesAndTheSpaceTheLibraryUses() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let empty = try await store.storageUsage()
+        #expect(empty.documents == 0 && empty.pages == 0)
+
+        let asset = try store.assets.store(Data(repeating: 7, count: 50_000), kind: .pdf, originalFilename: nil)
+        let a = try await store.createItem(kind: .document, name: "A", pages: samplePages(asset, count: 3), assets: [asset])
+        _ = try await store.createItem(kind: .document, name: "B", pages: samplePages(asset, count: 2), assets: [asset])
+        let usage = try await store.storageUsage()
+        #expect(usage.documents == 2 && usage.pages == 5)
+        #expect(usage.bytes >= 50_000) // the original plus the database
+
+        // Recently Deleted and deleted pages are not counted as documents/pages.
+        try await store.moveToRecentlyDeleted([a.id])
+        let b = try await store.items(in: .all)[0]
+        try await store.deletePages([try await store.pages(of: b.id)[0].id])
+        let after = try await store.storageUsage()
+        #expect(after.documents == 1 && after.pages == 1)
+    }
+}
+
 @Suite struct NamingAndSearchTests {
     @Test func duplicateNamesAreNumberedPerFolder() async throws {
         let dir = TempDirectory()

@@ -46,6 +46,7 @@ Remaining (in order):
 5. Continuity Camera import on Mac (`ImportFromDevices` services menu), if feasible.
 6. Adaptive black-and-white threshold for unevenly lit scans (the current Otsu threshold is global).
 7. Folders UI (the model and store already exist and are tested).
+8. ~~Settings screen~~ **done** (2026-10-21): storage, export-all backup, language, about; no login by design. Mac Settings window not yet viewed.
 
 ## Later milestones (summary)
 
