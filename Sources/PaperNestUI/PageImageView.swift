@@ -24,7 +24,7 @@ struct PageImageView: View {
     private var pageSize: CGSize { page.geometry.pageSize }
 
     private var loadKey: ThumbnailCache.Key {
-        ThumbnailCache.Key(page: page.id, revision: page.revision, pixelSize: ThumbnailCache.bucket(pixelSize))
+        ThumbnailCache.Key(page, pixelSize: pixelSize)
     }
 
     var body: some View {

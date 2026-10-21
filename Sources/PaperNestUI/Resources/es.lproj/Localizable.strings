@@ -61,6 +61,12 @@
 "page.contrast" = "Contraste";
 "page.resetAdjustments" = "Restablecer";
 "page.revert" = "Volver al original";
+"page.crop" = "Recortar";
+"page.cropMenuItem" = "Recortar…";
+"crop.reset" = "Restablecer";
+"crop.area" = "Área de recorte";
+"crop.hint" = "Arrastra las esquinas o los bordes para elegir lo que se conserva. Arrastra el interior para moverla.";
+"crop.kept" = "%1$@ de ancho por %2$@ de alto";
 "page.delete" = "Eliminar página";
 "page.moveUp" = "Subir página";
 "page.moveDown" = "Bajar página";
@@ -75,6 +81,7 @@
 "undo.rotate" = "Girar página";
 "undo.filter" = "Cambiar filtro";
 "undo.adjust" = "Ajustar página";
+"undo.crop" = "Recortar página";
 "undo.deletePage" = "Eliminar página";
 "undo.movePage" = "Mover página";
 

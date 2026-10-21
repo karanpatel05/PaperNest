@@ -53,6 +53,32 @@ public struct PageGeometry: Hashable, Sendable {
         r.denormalized(in: sourceSize).applying(sourceToPage)
     }
 
+    // MARK: - Crop editing
+
+    /// The same page with no crop: what a crop editor shows, rotated as the
+    /// user sees it.
+    public var uncropped: PageGeometry {
+        PageGeometry(sourceSize: sourceSize, crop: .full, rotation: rotation)
+    }
+
+    /// The current crop as a rectangle on the uncropped, rotated page
+    /// (points, y-down).
+    public var cropRectInUncroppedPage: CGRect {
+        cropRect.applying(uncropped.sourceToPage)
+    }
+
+    /// Converts a rectangle drawn on the uncropped, rotated page back into a
+    /// crop of the upright source, the space crops are stored in.
+    public func crop(fromUncroppedPageRect rect: CGRect) -> NormalizedRect {
+        let source = rect.applying(uncropped.pageToSource)
+        return NormalizedRect(
+            x: source.minX / sourceSize.width,
+            y: source.minY / sourceSize.height,
+            width: source.width / sourceSize.width,
+            height: source.height / sourceSize.height
+        )
+    }
+
     // MARK: - Native content spaces
 
     /// The upright size of a PDF page whose box is `box` and whose `/Rotate`
@@ -78,11 +104,11 @@ public struct PageGeometry: Hashable, Sendable {
         return toOrigin.concatenating(flip).concatenating(rotate)
     }
 
-    /// Core Graphics draws images y-up into a rect. In a y-down space of
-    /// height `height`, concatenate this before drawing an image into
-    /// `CGRect(origin: .zero, size:)` so it appears upright.
-    public static func yUpToYDown(height: CGFloat) -> CGAffineTransform {
-        CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: height)
+    /// Core Graphics draws images y-up into a rect. In a y-down space,
+    /// concatenate this before drawing an image into `rect` so it appears
+    /// upright there (a flip about the rectangle's horizontal midline).
+    public static func yUpToYDown(in rect: CGRect) -> CGAffineTransform {
+        CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: rect.minY + rect.maxY)
     }
 }
 

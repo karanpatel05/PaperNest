@@ -2,8 +2,7 @@
 #   brew install xcodegen   # https://github.com/yonaskolb/XcodeGen
 #   xcodegen generate       # writes PaperNest.xcodeproj (git-ignored)
 #
-# STATUS: written without Xcode available; not yet generated or built.
-# The first session with Xcode must verify it (docs/SESSION_HANDOFF.md).
+# Verified with XcodeGen 2.46.0 and Xcode 27.1 (see docs/TEST_MATRIX.md).
 name: PaperNest
 options:
   developmentLanguage: en
@@ -45,6 +44,20 @@ targets:
     dependencies:
       - package: PaperNestKit
         product: PaperNestUI
+  PaperNest-iOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Apps/iOS/UITests
+    dependencies:
+      - target: PaperNest-iOS
+    settings:
+      base:
+        PRODUCT_NAME: PaperNestUITests
+        PRODUCT_BUNDLE_IDENTIFIER: $(PAPERNEST_BUNDLE_ID).uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: PaperNest-iOS
+        TARGETED_DEVICE_FAMILY: "1,2"
   PaperNest-macOS:
     type: application
     platform: macOS
@@ -69,6 +82,10 @@ schemes:
         PaperNest-iOS: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - PaperNest-iOSUITests
     archive:
       config: Release
   PaperNest-macOS:

@@ -64,8 +64,10 @@ public struct PageRenderer: Sendable {
 
     /// Original content prepared for drawing at a given resolution.
     public enum PreparedSource: @unchecked Sendable {
-        /// Upright raster, filters already applied.
-        case image(CGImage)
+        /// Upright raster, filters already applied, covering `covering` (a
+        /// rectangle of the source in points): the whole source for images,
+        /// just the crop for rasterized PDF pages.
+        case image(CGImage, covering: CGRect)
         /// Vector PDF page. `CGPDFDocument` is created per preparation, so it
         /// is never shared across concurrent draws.
         case pdf(CGPDFDocument, pageNumber: Int)
@@ -73,8 +75,9 @@ public struct PageRenderer: Sendable {
     }
 
     /// Loads and prepares a page's original. Raster sources are decoded at
-    /// no more than the resolution needed; PDF pages that need pixel filters
-    /// are rasterized at that resolution, otherwise they stay vector.
+    /// no more than the resolution needed. PDF pages stay vector unless they
+    /// need pixel filters; then only the cropped region is rasterized, so a
+    /// tight crop shown large never needs a huge whole-page bitmap.
     public func prepareSource(for page: Page, pixelsPerPoint: CGFloat) async throws -> PreparedSource {
         switch page.content {
         case .template(let template):
@@ -82,26 +85,32 @@ public struct PageRenderer: Sendable {
         case .image(let assetID):
             let needed = Int((max(page.sourceSize.width, page.sourceSize.height) * pixelsPerPoint).rounded(.up))
             let image = try await cache.uprightImage(assetID, maxPixelSize: needed, store: store)
-            return .image(ImageAdjustments.apply(page.transform, to: image))
+            return .image(ImageAdjustments.apply(page.transform, to: image), covering: CGRect(origin: .zero, size: page.sourceSize))
         case .pdfPage(let assetID, let index):
             let data = try await cache.pdfData(assetID, store: store)
             guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider),
                   index + 1 <= document.numberOfPages else { throw RenderError.sourceDamaged }
             guard page.transform.needsPixelProcessing else { return .pdf(document, pageNumber: index + 1) }
-            let raster = try Self.rasterizePDFPage(document, pageNumber: index + 1, sourceSize: page.sourceSize, pixelsPerPoint: pixelsPerPoint)
-            return .image(ImageAdjustments.apply(page.transform, to: raster))
+            let region = page.geometry.cropRect
+            let raster = try Self.rasterizePDFPage(document, pageNumber: index + 1, sourceSize: page.sourceSize,
+                                                   region: region, pixelsPerPoint: pixelsPerPoint)
+            return .image(ImageAdjustments.apply(page.transform, to: raster), covering: region)
         }
     }
 
-    static func rasterizePDFPage(_ document: CGPDFDocument, pageNumber: Int, sourceSize: CGSize, pixelsPerPoint: CGFloat) throws -> CGImage {
-        let width = max(1, Int((sourceSize.width * pixelsPerPoint).rounded()))
-        let height = max(1, Int((sourceSize.height * pixelsPerPoint).rounded()))
+    /// Rasterizes `region` (source points) of a PDF page onto white.
+    static func rasterizePDFPage(_ document: CGPDFDocument, pageNumber: Int, sourceSize: CGSize,
+                                 region: CGRect, pixelsPerPoint: CGFloat) throws -> CGImage {
+        let width = max(1, Int((region.width * pixelsPerPoint).rounded()))
+        let height = max(1, Int((region.height * pixelsPerPoint).rounded()))
         guard width * height <= maxPixelCount else { throw RenderError.outputTooLarge }
         return try bitmap(width: width, height: height) { ctx in
             ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
             ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
-            ctx.concatenate(CGAffineTransform(a: CGFloat(width) / sourceSize.width, b: 0, c: 0, d: -CGFloat(height) / sourceSize.height,
-                                              tx: 0, ty: CGFloat(height)))
+            let sx = CGFloat(width) / region.width
+            let sy = CGFloat(height) / region.height
+            // Source space (y-down) → bitmap (y-up), with `region` filling it.
+            ctx.concatenate(CGAffineTransform(a: sx, b: 0, c: 0, d: -sy, tx: -region.minX * sx, ty: CGFloat(height) + region.minY * sy))
             drawPDFContent(document, pageNumber: pageNumber, sourceSize: sourceSize, in: ctx)
         }
     }
@@ -123,11 +132,11 @@ public struct PageRenderer: Sendable {
         ctx.concatenate(geometry.sourceToPage)
 
         switch source {
-        case .image(let image):
+        case .image(let image, let covering):
             ctx.saveGState()
-            ctx.concatenate(PageGeometry.yUpToYDown(height: page.sourceSize.height))
+            ctx.concatenate(PageGeometry.yUpToYDown(in: covering))
             ctx.interpolationQuality = .high
-            ctx.draw(image, in: CGRect(origin: .zero, size: page.sourceSize))
+            ctx.draw(image, in: covering)
             ctx.restoreGState()
         case .pdf(let document, let pageNumber):
             drawPDFContent(document, pageNumber: pageNumber, sourceSize: page.sourceSize, in: ctx)

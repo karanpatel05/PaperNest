@@ -147,6 +147,13 @@ public struct NormalizedRect: Hashable, Codable, Sendable {
 
     public static let full = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
 
+    /// Equal within floating-point rounding, so a crop that maps back to
+    /// where it started isn't recorded as an edit.
+    public func isApproximately(_ other: NormalizedRect, tolerance: Double = 1e-6) -> Bool {
+        abs(x - other.x) <= tolerance && abs(y - other.y) <= tolerance
+            && abs(width - other.width) <= tolerance && abs(height - other.height) <= tolerance
+    }
+
     public func denormalized(in size: CGSize) -> CGRect {
         CGRect(x: x * size.width, y: y * size.height, width: width * size.width, height: height * size.height)
     }

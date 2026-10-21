@@ -61,6 +61,12 @@
 "page.contrast" = "Contrast";
 "page.resetAdjustments" = "Reset";
 "page.revert" = "Revert to Original";
+"page.crop" = "Crop";
+"page.cropMenuItem" = "Crop…";
+"crop.reset" = "Reset";
+"crop.area" = "Crop area";
+"crop.hint" = "Drag the corners or edges to change what’s kept. Drag inside to move it.";
+"crop.kept" = "%1$@ wide by %2$@ tall";
 "page.delete" = "Delete Page";
 "page.moveUp" = "Move Page Up";
 "page.moveDown" = "Move Page Down";
@@ -75,6 +81,7 @@
 "undo.rotate" = "Rotate Page";
 "undo.filter" = "Change Filter";
 "undo.adjust" = "Adjust Page";
+"undo.crop" = "Crop Page";
 "undo.deletePage" = "Delete Page";
 "undo.movePage" = "Move Page";
 

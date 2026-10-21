@@ -65,7 +65,15 @@ This regenerates the synthetic sample documents.
 scripts/swift.sh run papernest-seed /tmp/papernest-dev-library Samples/*.pdf Samples/*.png Samples/*.jpg --password sample
 ```
 
-This imports files into a library folder through the real importer, so a dev app or Simulator run starts with content.
+This imports files into a library folder through the real importer, so a dev app or Simulator run starts with content. Add `--crop x,y,w,h` (fractions of the original) to crop every imported page.
+
+### iOS UI tests
+
+```bash
+./scripts/ui-test-ios.sh
+```
+
+This seeds `/tmp/papernest-uitest-library`, regenerates the Xcode project and runs the `PaperNest-iOSUITests` XCUITests headless in the Simulator. Pass a simulator UDID to choose the device.
 
 ### iOS Simulator (without the Xcode project)
 
@@ -73,7 +81,7 @@ This imports files into a library folder through the real importer, so a dev app
 ./scripts/build-ios-sim-app.sh
 ```
 
-This builds a Simulator `PaperNest.app` and prints its path. Install and launch it with `xcrun simctl install <device> <printed path>` and `xcrun simctl launch <device> com.example.papernest.dev`. Debug builds accept `-PaperNestDebugOpenItem <document name>` and `-PaperNestDebugShowExport YES` to open screens without tapping, and `-AppleLanguages "(fr)"` to switch language. Screenshots of a dual-display simulator need `--display=primary`.
+This builds a Simulator `PaperNest.app` and prints its path. Install and launch it with `xcrun simctl install <device> <printed path>` and `xcrun simctl launch <device> com.example.papernest.dev`. Debug builds accept `-PaperNestDebugOpenItem <document name>`, `-PaperNestDebugShowExport YES` and `-PaperNestDebugShowCrop YES` to open screens without tapping, and `-AppleLanguages "(fr)"` to switch language. Screenshots of a dual-display simulator need `--display=primary`.
 
 ## Xcode project
 

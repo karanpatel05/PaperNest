@@ -102,6 +102,12 @@ enum L10n {
     static var contrast: String { tr("page.contrast") }
     static var resetAdjustments: String { tr("page.resetAdjustments") }
     static var revertToOriginal: String { tr("page.revert") }
+    static var crop: String { tr("page.crop") }
+    static var cropMenuItem: String { tr("page.cropMenuItem") }
+    static var cropReset: String { tr("crop.reset") }
+    static var cropArea: String { tr("crop.area") }
+    static var cropHint: String { tr("crop.hint") }
+    static func cropKept(width: String, height: String) -> String { tr("crop.kept", width, height) }
     static var deletePage: String { tr("page.delete") }
     static var movePageUp: String { tr("page.moveUp") }
     static var movePageDown: String { tr("page.moveDown") }
@@ -117,6 +123,7 @@ enum L10n {
     static var undoRotate: String { tr("undo.rotate") }
     static var undoFilter: String { tr("undo.filter") }
     static var undoAdjust: String { tr("undo.adjust") }
+    static var undoCrop: String { tr("undo.crop") }
     static var undoDeletePage: String { tr("undo.deletePage") }
     static var undoMovePage: String { tr("undo.movePage") }
 

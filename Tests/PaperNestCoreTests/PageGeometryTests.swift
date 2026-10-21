@@ -96,6 +96,14 @@ import Testing
         assertClose(CGPoint(x: 0, y: 792).applying(t), CGPoint(x: 792, y: 0))
     }
 
+    @Test func imageFlipKeepsTheRectangleAndSwapsItsTopAndBottom() {
+        let r = CGRect(x: 10, y: 100, width: 50, height: 40)
+        let t = PageGeometry.yUpToYDown(in: r)
+        assertClose(CGPoint(x: 10, y: 100).applying(t), CGPoint(x: 10, y: 140))
+        assertClose(CGPoint(x: 60, y: 140).applying(t), CGPoint(x: 60, y: 100))
+        #expect(r.applying(t) == r)
+    }
+
     @Test func normalizedRectClampsToValidCrop() {
         let r = NormalizedRect(x: -1, y: 2, width: 5, height: 0)
         #expect(r.x == 0)
@@ -147,5 +155,54 @@ import Testing
         let size = ImageResolutionPolicy.pointSize(pixelSize: CGSize(width: 3024, height: 4032), dpi: CGSize(width: 72, height: 72))
         #expect(abs(size.height - 792) < 0.01)
         #expect(abs(size.width - 594) < 0.01)
+    }
+}
+
+/// The crop editor shows the page rotated but uncropped; these mappings
+/// convert between that view and the stored source-space crop.
+@Suite struct CropMappingTests {
+    let source = CGSize(width: 600, height: 800)
+
+    @Test(arguments: QuarterTurns.allCases)
+    func cropRoundTripsThroughTheEditorSpace(rotation: QuarterTurns) {
+        let crop = NormalizedRect(x: 0.1, y: 0.2, width: 0.5, height: 0.6)
+        let g = PageGeometry(sourceSize: source, crop: crop, rotation: rotation)
+        let editorRect = g.cropRectInUncroppedPage
+        let back = g.crop(fromUncroppedPageRect: editorRect)
+        #expect(abs(back.x - crop.x) < 1e-9 && abs(back.y - crop.y) < 1e-9)
+        #expect(abs(back.width - crop.width) < 1e-9 && abs(back.height - crop.height) < 1e-9)
+        // The editor rectangle has the cropped page's (rotated) size.
+        #expect(abs(editorRect.width - g.pageSize.width) < 1e-9 && abs(editorRect.height - g.pageSize.height) < 1e-9)
+    }
+
+    @Test func topLeftQuarterOfTheSourceIsTopRightAfterAClockwiseTurn() {
+        let g = PageGeometry(sourceSize: source, crop: NormalizedRect(x: 0, y: 0, width: 0.5, height: 0.5), rotation: .clockwise90)
+        // Uncropped rotated page is 800×600; the source's top-left quarter
+        // (300×400) sits in its top-right corner as 400×300.
+        let r = g.cropRectInUncroppedPage
+        #expect(abs(r.minX - 400) < 1e-9 && abs(r.minY - 0) < 1e-9)
+        #expect(abs(r.width - 400) < 1e-9 && abs(r.height - 300) < 1e-9)
+    }
+
+    @Test func aRectangleDrawnOnTheRotatedPageBecomesTheMatchingSourceCrop() {
+        // Drawing the bottom half of a page shown upside down selects the
+        // top half of the source.
+        let g = PageGeometry(sourceSize: source, rotation: .half)
+        let crop = g.crop(fromUncroppedPageRect: CGRect(x: 0, y: 400, width: 600, height: 400))
+        #expect(abs(crop.x) < 1e-9 && abs(crop.y) < 1e-9)
+        #expect(abs(crop.width - 1) < 1e-9 && abs(crop.height - 0.5) < 1e-9)
+    }
+
+    @Test func fullCropMapsToTheWholeRotatedPage() {
+        for rotation in QuarterTurns.allCases {
+            let g = PageGeometry(sourceSize: source, rotation: rotation)
+            #expect(g.cropRectInUncroppedPage.size == g.uncropped.pageSize)
+            #expect(g.crop(fromUncroppedPageRect: CGRect(origin: .zero, size: g.uncropped.pageSize)).isApproximately(.full))
+        }
+    }
+
+    @Test func approximateEqualityToleratesRoundingOnly() {
+        #expect(NormalizedRect(x: 1e-12, y: 0, width: 1 - 1e-12, height: 1).isApproximately(.full))
+        #expect(!NormalizedRect(x: 0.01, y: 0, width: 0.99, height: 1).isApproximately(.full))
     }
 }

@@ -31,6 +31,9 @@ public struct PaperNestCommands: Commands {
             Button(L10n.rotateRight) { run { await $0.model.rotate(clockwise: true, undoManager: $0.undoManager) } }
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(document?.model.selectedPage == nil)
+            Button(L10n.cropMenuItem) { document?.showCrop() }
+                .keyboardShortcut("k", modifiers: .command)
+                .disabled(document?.model.selectedPage == nil)
             Divider()
             Button(L10n.movePageUp) { run { await $0.model.moveSelected(by: -1, undoManager: $0.undoManager) } }
                 .keyboardShortcut(.upArrow, modifiers: [.command, .option])

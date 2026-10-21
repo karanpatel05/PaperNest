@@ -9,7 +9,19 @@ import PaperNestStore
 @MainActor @Observable
 public final class LibraryModel {
     public let session: LibrarySession
-    var scope: LibraryStore.Scope = .all
+    /// What the library grid shows.
+    private(set) var scope: LibraryStore.Scope = .all
+    /// The sidebar's selection. On iPhone, NavigationSplitView sets this to
+    /// nil when the user goes back to the sidebar, and a non-nil value is
+    /// what shows the library again, so it must be allowed to be nil.
+    /// `scope` keeps the last real choice for loading data.
+    var sidebarSelection: LibraryStore.Scope? = .all {
+        didSet {
+            guard let selected = sidebarSelection, selected != scope else { return }
+            scope = selected
+            path = []
+        }
+    }
     var path: [ItemID] = []
     private(set) var items: [LibraryStore.ItemSummary] = []
     private(set) var hasLoaded = false

@@ -8,10 +8,20 @@ import PaperNestRender
 /// a few pages at a time so scrolling a 100-page document stays responsive.
 @MainActor
 final class ThumbnailCache {
+    /// The transform is part of the key, not just the revision: the crop
+    /// editor renders an uncropped copy of a page with the same revision.
     struct Key: Hashable {
         let page: PageID
         let revision: Int
+        let transform: PageTransform
         let pixelSize: Int
+
+        init(_ page: Page, pixelSize: CGFloat) {
+            self.page = page.id
+            revision = page.revision
+            transform = page.transform
+            self.pixelSize = ThumbnailCache.bucket(pixelSize)
+        }
     }
 
     private var images: [Key: CGImage] = [:]
@@ -20,20 +30,20 @@ final class ThumbnailCache {
     private let gate = AsyncGate(limit: 4)
 
     /// Rounds requested sizes up so small layout changes reuse renders.
-    static func bucket(_ pixels: CGFloat) -> Int {
+    nonisolated static func bucket(_ pixels: CGFloat) -> Int {
         let steps = [96, 160, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096]
         return steps.first { CGFloat($0) >= pixels } ?? 4096
     }
 
     func cached(_ page: Page, pixelSize: CGFloat) -> CGImage? {
-        let key = Key(page: page.id, revision: page.revision, pixelSize: Self.bucket(pixelSize))
+        let key = Key(page, pixelSize: pixelSize)
         guard let image = images[key] else { return nil }
         touch(key)
         return image
     }
 
     func image(for page: Page, pixelSize: CGFloat, renderer: PageRenderer) async throws -> CGImage {
-        let key = Key(page: page.id, revision: page.revision, pixelSize: Self.bucket(pixelSize))
+        let key = Key(page, pixelSize: pixelSize)
         if let hit = images[key] {
             touch(key)
             return hit

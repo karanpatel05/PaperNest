@@ -63,6 +63,15 @@ final class DocumentModel {
         await apply(t, to: page.id, actionName: L10n.undoAdjust, undoManager: undoManager)
     }
 
+    /// Applies a crop drawn in the crop editor. A crop that only differs by
+    /// rounding from the current one is not recorded as an edit.
+    func setCrop(_ crop: NormalizedRect, undoManager: UndoManager?) async {
+        guard let page = selectedPage, !page.transform.crop.isApproximately(crop) else { return }
+        var t = page.transform
+        t.crop = crop.isApproximately(.full) ? .full : crop
+        await apply(t, to: page.id, actionName: L10n.undoCrop, undoManager: undoManager)
+    }
+
     func revertToOriginal(undoManager: UndoManager?) async {
         guard let page = selectedPage else { return }
         await apply(.identity, to: page.id, actionName: L10n.revertToOriginal, undoManager: undoManager)

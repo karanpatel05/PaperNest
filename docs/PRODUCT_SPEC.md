@@ -35,7 +35,8 @@ Launch markets are the United States and Canada. English, French and Spanish shi
 - Reorder by dragging thumbnails or with ⌥⌘↑/↓. Delete pages. Add pages from files after the selected page.
 - Every edit can be undone and redone, and is saved before it appears in the UI. The original file is never changed, and the history of previous transforms is kept.
 - Deleted pages can be restored with Undo until the app quits. They are removed permanently at the next launch.
-- Crop and rescan are planned (M1 remainder).
+- **Crop:** a rectangle drawn over the page as it is shown (rotated, uncropped), with corner and edge handles, drag-to-move, a thirds guide and Reset. It's stored relative to the original, so it stays right if the page is rotated later, and export matches the editor. Crops smaller than 5% of a side aren't possible. Mac: Page > Crop… (⌘K) and the toolbar; iPhone: the bottom toolbar. Undoable like every edit. VoiceOver reads the crop as "70% wide by 75% tall" and offers Reset. Resizing with VoiceOver isn't supported yet.
+- Rescan is planned (M1 remainder).
 
 ## Export
 

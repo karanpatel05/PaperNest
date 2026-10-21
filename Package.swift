@@ -44,7 +44,7 @@ let package = Package(
         // importer (used to seed Simulator and dev-app libraries).
         .executableTarget(
             name: "papernest-seed",
-            dependencies: ["PaperNestImport"],
+            dependencies: ["PaperNestCore", "PaperNestImport", "PaperNestStore"],
             path: "Tools/LibrarySeeder"
         ),
         // Synthetic fixtures shared by tests and the sample generator. Never

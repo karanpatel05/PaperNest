@@ -40,7 +40,7 @@ Done:
 
 Remaining (in order):
 1. **Visual check of the Mac UI.** The owner declined Claude's control of the app, so the owner should run the manual checklist in TEST_MATRIX.md. The iPhone screens were checked in the Simulator, which led to fixes in the compact document layout, the export sheet and a shortcut clash.
-2. **Crop UI:** draggable crop rectangle over the page, saved as `PageTransform.crop` (model, render and export already support crop and have tests).
+2. **Crop UI: done on iPhone.** Automated tests cover the mapping (all rotations), the drag math, crop → undo/redo → relaunch → export, tight crops on filtered PDFs, and a Simulator UI test that drags a corner and checks the saved crop. Still open: a manual check of the Mac drag. VoiceOver users can reset a crop but not resize it (known limitation).
 3. **Rescan a page** (iOS): replace a page's source with a new capture and keep the old original until the change commits.
 4. Real-device camera capture for the M1 gate (needs signing). Simulator imports don't count as camera tests. Also: exercise taps in the Simulator (Pages sheet reorder, filters, export/save) and check iPad once an iPad runtime is installed.
 5. Continuity Camera import on Mac (`ImportFromDevices` services menu), if feasible.

@@ -29,20 +29,9 @@ public struct RootView: View {
         .task { await model.session.bootstrap() }
     }
 
-    private var scopeSelection: Binding<LibraryStore.Scope?> {
-        Binding(
-            get: { model.scope },
-            set: { newValue in
-                guard let newValue, newValue != model.scope else { return }
-                model.scope = newValue
-                model.path = []
-            }
-        )
-    }
-
     private var splitView: some View {
         NavigationSplitView {
-            List(selection: scopeSelection) {
+            List(selection: $model.sidebarSelection) {
                 Section(L10n.sidebarLibrary) {
                     Label(L10n.allDocuments, systemImage: "doc.on.doc").tag(LibraryStore.Scope.all)
                     Label(L10n.favorites, systemImage: "star").tag(LibraryStore.Scope.favorites)
@@ -94,6 +83,7 @@ struct DocumentCommandContext {
     let undoManager: UndoManager?
     let showExport: () -> Void
     let showAddPages: () -> Void
+    let showCrop: () -> Void
 }
 
 extension FocusedValues {

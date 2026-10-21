@@ -121,6 +121,25 @@ func unzip(_ arguments: [String]) throws -> (status: Int32, output: String) {
         #expect(sizes[.compact]! < sizes[.balanced]!)
     }
 
+    @Test func tightlyCroppedFilteredPDFPageExportsToPaper() async throws {
+        let f = try ExportFixture()
+        let (item, pages) = try await f.importPDF(["Crop me"])
+        try await f.store.updateTransform(pages[0].id, to: PageTransform(
+            crop: NormalizedRect(x: 0, y: 0, width: 0.25, height: 0.25), filter: .grayscale))
+        let current = try await f.store.pages(of: item.id)
+        for paper in [PaperSize.usLetter, .a4] {
+            let output = try await f.exporter.export(itemName: item.name, pages: current,
+                                                     options: ExportOptions(format: .pdf, paperSize: paper, pdfImageQuality: .balanced))
+            defer { output.removeTemporaryFiles() }
+            let data = try Data(contentsOf: output.files[0])
+            let rendered = try #require(PixelProbe.renderPDFPage(data, index: 0, scale: 1))
+            // The crop (a square) is fitted to the paper's width; its top-left
+            // quarter-ish holds the gray marker.
+            let marker = PixelProbe.pixel(rendered, x: 0.2, y: 0.3)
+            #expect(marker.isDark && marker.isGray, "\(paper): \(marker)")
+        }
+    }
+
     @Test func cancellationStopsAndRemovesPartialOutput() async throws {
         let f = try ExportFixture()
         let (item, pages) = try await f.importPDF(Array(repeating: "Page", count: 40))

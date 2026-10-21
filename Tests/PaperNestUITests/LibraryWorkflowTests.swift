@@ -133,6 +133,63 @@ import PaperNestTestSupport
         #expect(receiptPage.geometry.pageSize.height > receiptPage.geometry.pageSize.width)
     }
 
+    @Test func cropOfARotatedPageIsUndoableSurvivesRelaunchAndExportsAsShown() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        // 600×900 px portrait photo, red marker in its top-left corner.
+        let photo = try writeSample(SyntheticDocuments.image(width: 600, height: 900, type: .png), "Photo.png")
+        var session: LibrarySession? = try await readySession()
+        let library = LibraryModel(session: session!)
+        await library.importFiles([photo])
+        await library.reload()
+        let itemID = try #require(library.items.first?.id)
+
+        let undo = UndoManager()
+        let document = DocumentModel(itemID: itemID, session: session!)
+        await document.load()
+        await document.rotate(clockwise: true, undoManager: undo)
+        let rotated = try #require(document.selectedPage)
+
+        // Draw what the editor would: the source's top-left quarter, which
+        // on the clockwise-turned page sits in the top-right corner.
+        let quarter = NormalizedRect(x: 0, y: 0, width: 0.5, height: 0.5)
+        let drawn = PageGeometry(sourceSize: rotated.sourceSize, crop: quarter, rotation: rotated.transform.rotation).cropRectInUncroppedPage
+        #expect(drawn.minX > 0 && drawn.minY == 0)
+        await document.setCrop(rotated.geometry.crop(fromUncroppedPageRect: drawn), undoManager: undo)
+        let cropped = try #require(document.selectedPage)
+        #expect(cropped.transform.crop.isApproximately(quarter))
+        #expect(cropped.transform.rotation == .clockwise90)
+
+        // Re-applying the same crop is not a new edit.
+        await document.setCrop(cropped.geometry.crop(fromUncroppedPageRect: cropped.geometry.cropRectInUncroppedPage), undoManager: undo)
+        #expect(document.selectedPage?.revision == cropped.revision)
+
+        undo.undo()
+        #expect(undo.canRedo)
+        try await eventually { document.selectedPage?.transform.crop == .full }
+        undo.redo()
+        try await eventually { document.selectedPage?.transform.crop.isApproximately(quarter) == true }
+
+        // Quit, relaunch, reopen, export.
+        session = nil
+        let relaunched = try await readySession()
+        let reopened = DocumentModel(itemID: itemID, session: relaunched)
+        await reopened.load()
+        let page = try #require(reopened.pages.first)
+        #expect(page.transform.crop.isApproximately(quarter) && page.transform.rotation == .clockwise90)
+
+        let env = try #require(relaunched.environment)
+        let output = try await env.exporter.export(itemName: "Photo", pages: reopened.pages, options: ExportOptions(format: .pdf))
+        defer { output.removeTemporaryFiles() }
+        let data = try Data(contentsOf: output.files[0])
+        let pdfPage = try #require(PDFDocument(data: data)?.page(at: 0))
+        let box = pdfPage.bounds(for: .mediaBox).size
+        #expect(abs(box.width - page.geometry.pageSize.width) < 0.01 && abs(box.height - page.geometry.pageSize.height) < 0.01)
+        #expect(box.width > box.height) // a portrait quarter turned clockwise is landscape
+        let rendered = try #require(PixelProbe.renderPDFPage(data, index: 0, scale: 1))
+        #expect(PixelProbe.pixel(rendered, x: 0.9, y: 0.1).isRed)
+        #expect(PixelProbe.pixel(rendered, x: 0.1, y: 0.9).isWhite)
+    }
+
     @Test func recentlyDeletedRecoverAndPermanentDelete() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let session = try await readySession()
@@ -144,20 +201,40 @@ import PaperNestTestSupport
         await library.moveToRecentlyDeleted([id])
         await library.reload()
         #expect(library.items.isEmpty)
-        library.scope = .recentlyDeleted
+        library.sidebarSelection = .recentlyDeleted
         await library.reload()
         #expect(library.items.map(\.id) == [id])
 
         await library.recover([id])
-        library.scope = .all
+        library.sidebarSelection = .all
         await library.reload()
         #expect(library.items.map(\.id) == [id])
 
         await library.moveToRecentlyDeleted([id])
         await library.deletePermanently([id])
-        library.scope = .recentlyDeleted
+        library.sidebarSelection = .recentlyDeleted
         await library.reload()
         #expect(library.items.isEmpty)
+    }
+
+    /// On iPhone the split view clears the sidebar selection when the user
+    /// goes back to it; that must not change what the library shows, and
+    /// choosing a scope again must work (regression: the old non-optional
+    /// binding swallowed nil and left navigation stuck).
+    @Test func clearingTheSidebarSelectionKeepsTheScopeAndReselectingWorks() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = try await readySession()
+        let library = LibraryModel(session: session)
+        library.path = [ItemID.make()]
+        library.sidebarSelection = nil
+        #expect(library.scope == .all)
+        #expect(library.path.count == 1)
+        library.sidebarSelection = .favorites
+        #expect(library.scope == .favorites)
+        #expect(library.path.isEmpty)
+        library.sidebarSelection = nil
+        library.sidebarSelection = .all
+        #expect(library.scope == .all)
     }
 
     @Test func searchFiltersByTitleIgnoringAccents() async throws {

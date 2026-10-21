@@ -245,6 +245,22 @@ final class TestLibrary: @unchecked Sendable {
         }
     }
 
+    /// A filter forces a PDF page to be rasterized; with a tight crop that
+    /// raster must cover only the crop, or large renders exceed the pixel cap.
+    @Test func tightlyCroppedFilteredPDFPageRendersAtLargeSizes() async throws {
+        let lib = try TestLibrary()
+        let item = try await lib.importer.importItem(.data(SyntheticDocuments.textPDF(pages: ["Crop me"]), name: "P"))
+        let page = try #require(try await lib.store.pages(of: item.id).first)
+        let edited = try await lib.store.updateTransform(page.id, to: PageTransform(
+            crop: NormalizedRect(x: 0, y: 0, width: 0.25, height: 0.25), filter: .grayscale))
+        let image = try await lib.renderer.renderThumbnail(edited, maxPixelSize: 3072)
+        #expect(max(image.width, image.height) == 3072)
+        // The source's top-left marker fills the crop's top-left, in gray.
+        let marker = PixelProbe.pixel(image, x: 0.3, y: 0.3)
+        #expect(marker.isDark && marker.isGray)
+        #expect(PixelProbe.pixel(image, x: 0.9, y: 0.9).isWhite)
+    }
+
     @Test func missingOriginalIsReportedNotDrawnBlank() async throws {
         let lib = try TestLibrary()
         let item = try await lib.importer.importItem(.data(SyntheticDocuments.image(width: 100, height: 100, type: .png), name: "Gone"))

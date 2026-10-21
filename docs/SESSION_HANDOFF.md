@@ -32,6 +32,7 @@
 - **iPhone layout:** the document view now shows the page full width with a thumbnail scroller and bottom-toolbar actions; reordering is in a Pages sheet.
 - **Export sheet:** it was clipped on iPhone, and option values truncated in French and Spanish. It now uses inline option rows on iOS.
 - **Shortcut clash:** ⌘E clashed with "Use Selection for Find", so Export is now ⇧⌘E.
+- **Crop tool** (2026-10-21): editor sheet, ⌘K, toolbar buttons, undoable `setCrop`, a thumbnail-cache key that includes the transform, dark underlays so the frame shows on white paper, and a VoiceOver value. Review then found that filtered PDF pages with tight crops failed to render or export; they now rasterize only the crop. 15 new unit tests (102 total), plus the first UI-test target (`PaperNest-iOSUITests`, run with `scripts/ui-test-ios.sh`), whose crop drag test passes.
 - **`scripts/test.sh`** failed under Xcode (bash 3.2 empty-array bug).
 - **Build output and built apps** moved out of the iCloud-synced checkout. `codesign` was rejecting test bundles there, iCloud broke app signatures after signing, and it was creating "debug 2" conflict copies.
 
@@ -55,27 +56,30 @@
 
 ### Simulator used
 
-"PaperNest iPhone Duo", UDID `AF21A6E2-14AE-4E73-AE95-B016FBC54A5B` (iOS 27.1), created for this project. Its library is seeded with `Samples/`. Delete it with `xcrun simctl delete AF21A6E2-14AE-4E73-AE95-B016FBC54A5B` when it's no longer needed. The device has two displays; screenshot with `--display=primary`.
+"PaperNest iPhone Duo", UDID `F5269418-AA12-4CF9-8EE4-6B6B89F228B8` (iOS 27.1), created for this project on 2026-10-21. The first one, and every other iOS 27.1 simulator, disappeared overnight for reasons outside this session. Its library is seeded with `Samples/` plus a cropped "Cropped-whiteboard". Delete it with `xcrun simctl delete F5269418-AA12-4CF9-8EE4-6B6B89F228B8` when it's no longer needed. The device has two displays; screenshot with `--display=primary`.
 
 ### Next commands
 
 ```bash
 git log --oneline | head                     # initial commit on main
-./scripts/test.sh                            # expect 87 tests passing (5 per-target runs under Xcode)
+./scripts/test.sh                            # expect 103 tests passing (5 per-target runs under Xcode)
+./scripts/ui-test-ios.sh                     # iOS UI tests, headless in the Simulator (expect CropUITests to pass)
 xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build
-./scripts/build-ios-sim-app.sh               # prints the app path; then: xcrun simctl install AF21A6E2-14AE-4E73-AE95-B016FBC54A5B <path>
+./scripts/build-ios-sim-app.sh               # prints the app path; then: xcrun simctl install F5269418-AA12-4CF9-8EE4-6B6B89F228B8 <path>
 ./scripts/run-mac-app.sh /tmp/pn-dev         # dev Mac app with a seeded throwaway library
 ```
 
 ### Next work, in order
 
-1. Crop UI: a draggable crop rectangle stored as `PageTransform.crop`. Model, render and export already support crop, with tests.
+1. Crop: **done on iPhone** (UI test passes). Remaining: a manual check of the Mac drag, and VoiceOver resizing (it can only reset today).
 2. Rescan a page (iOS), then a real-device camera test. That completes the M1 gate.
 3. Exercise taps in the Simulator: the Pages sheet reorder, filters, the adjustments sheet, export and save.
 4. Polish: on iOS, inline option rows show their label as a plain row; consider section headers.
 5. Start M2: the v3 migration (`sync_state`, `outbox`, `tombstones`), then the CKSyncEngine adapter.
 
 ### Open risk
+
+- A one-off iPhone navigation glitch (thumbnail tap → Favorites, then stuck). The sidebar binding was corrected, but the fix is unproven and the glitch didn't reproduce (TEST_MATRIX.md).
 
 - One unexplained SIGSEGV in one test run, on an intermediate build (TEST_MATRIX.md, "Open issue"). Not reproduced in 11 later runs or under the sanitizers.
 

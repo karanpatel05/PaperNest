@@ -25,6 +25,7 @@ The first public release is iOS, iPadOS and macOS together, in English, French a
 - Links, form fields and annotations inside imported PDFs may not survive export.
 - PDFs whose author restricted copying or printing can't be imported.
 - Black & White uses a global threshold, so unevenly lit photos may lose detail.
+- Crop is rectangular (perspective correction happens at capture). VoiceOver users can reset a crop but not resize it.
 - Images without trustworthy resolution metadata are sized as 11-inch documents.
 - Sync (when built) is eventual and uses the customer's iCloud storage. It isn't a backup.
 

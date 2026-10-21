@@ -11,8 +11,9 @@ Start each session by reading `docs/SESSION_HANDOFF.md` and `docs/IMPLEMENTATION
 ```
 
 - Build output and built `.app` bundles live in `~/Library/Caches/PaperNest/build-<hash>` (`scripts/env.sh`), because the checkout is on an iCloud-synced Desktop. iCloud re-tags bundles after signing, which breaks `codesign --verify`. Use `scripts/swift.sh <cmd>` instead of bare `swift build`/`swift run`, and never commit or sync `.build`.
-- iOS: `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`, and `scripts/build-ios-sim-app.sh` for a Simulator app. `scripts/swift.sh run papernest-seed <lib> <files…>` seeds a library. Debug launch args: `-PaperNestDebugOpenItem <name>`, `-PaperNestDebugShowExport YES`.
+- iOS: `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`, and `scripts/build-ios-sim-app.sh` for a Simulator app. `scripts/swift.sh run papernest-seed <lib> <files…>` seeds a library. Debug launch args: `-PaperNestDebugOpenItem <name>`, `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`.
 - Sanitizers: `./scripts/test.sh --sanitize=thread` (Xcode only).
+- iOS UI tests: `./scripts/ui-test-ios.sh` (XCUITest, headless). Use it to verify interactions; static screenshots don't count as interaction tests. Give interactive views an `accessibilityIdentifier` and an `accessibilityValue` that tests can assert.
 - If Xcode is installed but its license isn't accepted, prefix the commands with `DEVELOPER_DIR=/Library/Developer/CommandLineTools`.
 - Under Command Line Tools only, `scripts/test.sh` adds `-F`/rpath flags and `-disable-cross-import-overlays`. Without them Swift Testing fails to import.
 - Record real command outcomes in `docs/TEST_MATRIX.md`. Never mark unrun checks as passed.

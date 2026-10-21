@@ -81,14 +81,14 @@ public struct Exporter: Sendable {
         let pageScale = layout.contentRect.width / page.geometry.pageSize.width
         let pixelsPerPoint = quality.maxDPI / 72 * pageScale
         let source = try await renderer.prepareSource(for: page, pixelsPerPoint: pixelsPerPoint)
-        guard case .image(let image) = source, let jpegQuality = quality.jpegQuality else { return source }
-        let maxPixels = Int((max(page.sourceSize.width, page.sourceSize.height) * pixelsPerPoint).rounded(.up))
+        guard case .image(let image, let covering) = source, let jpegQuality = quality.jpegQuality else { return source }
+        let maxPixels = Int((max(covering.width, covering.height) * pixelsPerPoint).rounded(.up))
         let limited = try Self.downsample(image, maxPixelSize: maxPixels)
         guard let data = Self.encode(limited, type: .jpeg, quality: jpegQuality, dpi: nil),
               let provider = CGDataProvider(data: data as CFData),
               let jpeg = CGImage(jpegDataProviderSource: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
         else { return source }
-        return .image(jpeg)
+        return .image(jpeg, covering: covering)
     }
 
     static func downsample(_ image: CGImage, maxPixelSize: Int) throws -> CGImage {

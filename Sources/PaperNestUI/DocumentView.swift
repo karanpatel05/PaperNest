@@ -17,6 +17,7 @@ struct DocumentView: View {
     @State private var isShowingAddPages = false
     @State private var isShowingAdjustments = false
     @State private var isShowingPageOrganizer = false
+    @State private var isShowingCrop = false
     @State private var zoom: CGFloat = 1
 
     init(itemID: ItemID, session: LibrarySession) {
@@ -66,8 +67,11 @@ struct DocumentView: View {
         .toolbar { toolbar }
         .task(id: model.session.changeToken) { await model.load() }
         #if DEBUG
-        // Dev/screenshot hook: `-PaperNestDebugShowExport YES`.
-        .task { isShowingExport = UserDefaults.standard.bool(forKey: "PaperNestDebugShowExport") }
+        // Dev/screenshot hooks: `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`.
+        .task {
+            isShowingExport = UserDefaults.standard.bool(forKey: "PaperNestDebugShowExport")
+            isShowingCrop = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCrop")
+        }
         #endif
         .alert(model.presentedError?.title ?? "", isPresented: errorBinding, presenting: model.presentedError) { _ in
             Button(L10n.ok, role: .cancel) {}
@@ -76,6 +80,13 @@ struct DocumentView: View {
         }
         .sheet(isPresented: $isShowingExport) {
             ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID)
+        }
+        .sheet(isPresented: $isShowingCrop) {
+            if let page = model.selectedPage {
+                CropEditor(page: page) { crop in
+                    Task { await model.setCrop(crop, undoManager: undoManager) }
+                }
+            }
         }
         #if os(iOS)
         .sheet(isPresented: $isShowingPageOrganizer) {
@@ -96,7 +107,8 @@ struct DocumentView: View {
         .focusedSceneValue(\.documentCommands, DocumentCommandContext(
             model: model, undoManager: undoManager,
             showExport: { isShowingExport = true },
-            showAddPages: { isShowingAddPages = true }
+            showAddPages: { isShowingAddPages = true },
+            showCrop: { isShowingCrop = true }
         ))
     }
 
@@ -108,6 +120,8 @@ struct DocumentView: View {
                 rotateLeftButton
                 Spacer()
                 rotateRightButton
+                Spacer()
+                cropButton
                 Spacer()
                 filterMenu
                 Spacer()
@@ -135,6 +149,7 @@ struct DocumentView: View {
     private var allActions: some View {
         rotateLeftButton
         rotateRightButton
+        cropButton
         filterMenu
         deleteButton
         addPagesButton
@@ -155,6 +170,15 @@ struct DocumentView: View {
             Task { await model.rotate(clockwise: true, undoManager: undoManager) }
         } label: {
             Label(L10n.rotateRight, systemImage: "rotate.right")
+        }
+        .disabled(model.selectedPage == nil)
+    }
+
+    private var cropButton: some View {
+        Button {
+            isShowingCrop = true
+        } label: {
+            Label(L10n.crop, systemImage: "crop")
         }
         .disabled(model.selectedPage == nil)
     }
