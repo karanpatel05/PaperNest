@@ -12,4 +12,7 @@ public enum StoreError: Error, Equatable, Sendable {
     case assetChecksumMismatch(String)
     case invalidOrder
     case io(String)
+    /// A migration left dangling references behind; the library is rolled
+    /// back to its previous, consistent version.
+    case migrationBrokeReferences(String)
 }

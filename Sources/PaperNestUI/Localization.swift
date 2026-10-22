@@ -244,3 +244,69 @@ enum L10n {
     static var libraryNewer: String { tr("error.library.newer", Brand.displayName) }
     static var libraryOpenFailed: String { tr("error.library.open") }
 }
+
+// File tools: selection, composition and labels.
+extension L10n {
+    static var mergeTitle: String { tr("tools.mergeTitle") }
+    static var extractTitle: String { tr("tools.extractTitle") }
+    static var selectItems: String { tr("tools.select") }
+    static var selectAll: String { tr("tools.selectAll") }
+    static var deselectAll: String { tr("tools.deselectAll") }
+    static var duplicate: String { tr("tools.duplicate") }
+    static var mergeDocuments: String { tr("tools.merge") }
+    static var extractPages: String { tr("tools.extract") }
+    static var createDocument: String { tr("tools.create") }
+    static var documentName: String { tr("tools.name") }
+    static var mergedDocumentName: String { tr("tools.mergedName") }
+    static var mergeOrder: String { tr("tools.order") }
+    static var toolsPreserveOriginals: String { tr("tools.preserve") }
+    static var extractChoosePages: String { tr("tools.choosePages") }
+    static var colorLabel: String { tr("tools.colorLabel") }
+    static var noColorLabel: String { tr("tools.color.none") }
+    static var colorRed: String { tr("tools.color.red") }
+    static var colorOrange: String { tr("tools.color.orange") }
+    static var colorYellow: String { tr("tools.color.yellow") }
+    static var colorGreen: String { tr("tools.color.green") }
+    static var colorBlue: String { tr("tools.color.blue") }
+    static var colorPurple: String { tr("tools.color.purple") }
+    static var colorGray: String { tr("tools.color.gray") }
+    static var selectionOn: String { tr("tools.selected") }
+    static var selectionOff: String { tr("tools.notSelected") }
+    static func selectionCount(_ count: Int) -> String { tr("tools.selectionCount", count) }
+    static func extractedDocumentName(_ name: String) -> String { tr("tools.extractedName", name) }
+    static func moveDocumentUp(_ name: String) -> String { tr("tools.moveUp", name) }
+    static func moveDocumentDown(_ name: String) -> String { tr("tools.moveDown", name) }
+}
+
+// Document tools follow-up: splitting one document into one document per page.
+extension L10n {
+    static var splitPages: String { tr("tools.split") }
+    static func splitPageName(_ name: String, _ page: Int) -> String { tr("tools.splitName", name, page) }
+}
+
+// Document tools follow-up: exporting a selection as one ZIP of PDFs.
+extension L10n {
+    static var exportAsZip: String { tr("tools.exportZip") }
+    static var exportZipTitle: String { tr("tools.exportZip.title") }
+    static var exportZipFooter: String { tr("tools.exportZip.footer") }
+    static func exportZipArchiveName(_ date: String) -> String { tr("tools.exportZip.archiveName", Brand.displayName, date) }
+}
+
+// The Tools screen: one home for the tools that work today.
+extension L10n {
+    static var toolsTitle: String { tr("tools.screen.title") }
+    static var toolsCreate: String { tr("tools.screen.create") }
+    static var toolsDocuments: String { tr("tools.screen.documents") }
+    static var toolsNoDocuments: String { tr("tools.screen.empty") }
+    static var toolsContinue: String { tr("tools.screen.continue") }
+    static var pickForMerge: String { tr("tools.pick.merge") }
+    static var pickForExtract: String { tr("tools.pick.extract") }
+    static var pickForSplit: String { tr("tools.pick.split") }
+    static var pickForArchive: String { tr("tools.pick.archive") }
+}
+
+// F4: reading the printed text on a page.
+extension L10n {
+    static var recognizeText: String { tr("document.recognizeText") }
+    static func recognizeProgress(_ page: Int, _ total: Int) -> String { tr("document.recognizeProgress", page, total) }
+}

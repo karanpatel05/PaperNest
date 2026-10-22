@@ -1,10 +1,17 @@
 import Foundation
 
 public enum ItemKind: String, Codable, Sendable, CaseIterable {
+    /// A file kept as it was given to us, with no pages of its own.
+    case file
     /// Scanned or imported pages.
     case document
     /// Pages created for writing; may also hold scans and PDF pages.
     case notebook
+}
+
+/// Stable library labels; their display names and colors belong to the UI.
+public enum ItemColor: String, Codable, Sendable, CaseIterable {
+    case red, orange, yellow, green, blue, purple, gray
 }
 
 /// A document or notebook in the library. Pages are stored separately so a
@@ -19,6 +26,7 @@ public struct LibraryItem: Identifiable, Hashable, Codable, Sendable {
     public var name: String
     public var folderID: FolderID?
     public var isFavorite: Bool
+    public var colorLabel: ItemColor?
     public var createdAt: Date
     public var modifiedAt: Date
     /// Set when the item is moved to Recently Deleted. The item is kept,
@@ -32,6 +40,7 @@ public struct LibraryItem: Identifiable, Hashable, Codable, Sendable {
         name: String,
         folderID: FolderID? = nil,
         isFavorite: Bool = false,
+        colorLabel: ItemColor? = nil,
         createdAt: Date,
         modifiedAt: Date,
         deletedAt: Date? = nil,
@@ -42,6 +51,7 @@ public struct LibraryItem: Identifiable, Hashable, Codable, Sendable {
         self.name = name
         self.folderID = folderID
         self.isFavorite = isFavorite
+        self.colorLabel = colorLabel
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
         self.deletedAt = deletedAt

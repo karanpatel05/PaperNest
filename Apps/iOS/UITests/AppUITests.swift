@@ -6,9 +6,9 @@ import XCTest
 final class AppUITests: XCTestCase {
     static let libraryPath = "/tmp/papernest-uitest-library"
 
-    private func launch(_ extra: [String]) -> XCUIApplication {
+    private func launch(_ extra: [String], libraryPath: String = AppUITests.libraryPath, language: String = "en") -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-PaperNestLibraryPath", Self.libraryPath, "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-libraryLayout", "grid"] + extra
+        app.launchArguments = ["-PaperNestLibraryPath", libraryPath, "-AppleLanguages", "(\(language))", "-AppleLocale", "en_US", "-libraryLayout", "grid"] + extra
         app.launch()
         return app
     }
@@ -323,5 +323,249 @@ final class AppUITests: XCTestCase {
         let canvasAgain = app.descendants(matching: .any)["ink-canvas"]
         XCTAssertTrue(canvasAgain.waitForExistence(timeout: 5))
         XCTAssertEqual(canvasAgain.value as? String, "1 stroke", "the stroke did not survive a relaunch")
+    }
+
+    func testDocumentToolsDuplicateMergeExtractAndKeepOriginals() throws {
+        continueAfterFailure = false
+        let library = "/tmp/papernest-file-tools-uitest-library"
+        var app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        let select = app.buttons["library-select"]
+        XCTAssertTrue(select.waitForExistence(timeout: 15))
+        app.buttons["item-more"].firstMatch.tap()
+        app.buttons["Duplicate"].tap()
+        let copy = app.descendants(matching: .any)["Crop target 2, 1 page"].firstMatch
+        XCTAssertTrue(copy.waitForExistence(timeout: 10))
+
+        select.tap()
+        app.buttons["Select All"].tap()
+        app.buttons["selection-actions"].tap()
+        app.buttons["Color Label"].tap()
+        app.buttons["Blue"].tap()
+        // The label is saved on both items, exposed separately from selection.
+        let selectedOriginal = app.descendants(matching: .any)["Crop target, 1 page"].firstMatch
+        wait(for: [expectation(for: NSPredicate(format: "value CONTAINS %@", "Blue"), evaluatedWith: selectedOriginal)], timeout: 5)
+        app.buttons["selection-actions"].tap()
+        app.buttons["Merge Documents"].tap()
+        let name = app.textFields["document-tools-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (name.value as? String)?.count ?? 0))
+        name.typeText("Combined test")
+        app.buttons["document-tools-create"].tap()
+        // The merged document opens. Assert the document itself: `page-thumbnail-…`
+        // belongs to the compact-width page strip and doesn't exist on iPad.
+        XCTAssertTrue(app.navigationBars["Combined test"].waitForExistence(timeout: 10))
+
+        app.terminate()
+        app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        XCTAssertTrue(app.descendants(matching: .any)["Combined test, 2 pages"].firstMatch.waitForExistence(timeout: 10))
+        // Newest item is first. Extract just its second page.
+        app.buttons["item-more"].firstMatch.tap()
+        app.buttons["Extract Pages"].tap()
+        let secondPage = app.buttons["extract-page-2"]
+        XCTAssertTrue(secondPage.waitForExistence(timeout: 5))
+        secondPage.tap()
+        app.buttons["document-tools-create"].tap()
+        XCTAssertTrue(app.navigationBars["Combined test — Pages"].waitForExistence(timeout: 10))
+        app.terminate()
+        app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        XCTAssertTrue(app.descendants(matching: .any)["Combined test — Pages, 1 page"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["Combined test, 2 pages"].firstMatch.exists)
+        let original = app.descendants(matching: .any)["Crop target, 1 page"].firstMatch
+        XCTAssertTrue(original.exists)
+        XCTAssertEqual(original.value as? String, "Blue")
+
+        // Emptying the current scope must still let the user leave selection.
+        app.buttons["library-select"].tap()
+        app.buttons["Select All"].tap()
+        app.buttons["selection-actions"].tap()
+        app.buttons["Delete"].tap()
+        XCTAssertTrue(original.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["library-select"].exists)
+        app.buttons["library-select"].tap()
+        XCTAssertFalse(app.buttons["selection-actions"].exists)
+    }
+
+
+    func testDocumentToolsLocalizedSelectionOrderAndCancellation() throws {
+        continueAfterFailure = false
+        let library = "/tmp/papernest-file-tools-layout-library"
+        var app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        XCTAssertTrue(app.buttons["item-more"].firstMatch.waitForExistence(timeout: 10))
+        app.buttons["item-more"].firstMatch.tap()
+        app.buttons["Duplicate"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["Crop target 2, 1 page"].firstMatch.waitForExistence(timeout: 10))
+        app.terminate()
+
+        for (language, all, selectAll, merge, cancel, extract) in [
+            ("en", "All Documents", "Select All", "Merge Documents", "Cancel", "Extract Pages"),
+            ("fr", "Tous les documents", "Tout sélectionner", "Fusionner des documents", "Annuler", "Extraire des pages"),
+            ("es", "Todos los documentos", "Seleccionar todo", "Combinar documentos", "Cancelar", "Extraer páginas")
+        ] {
+            app = launch([], libraryPath: library, language: language)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                XCTAssertTrue(app.staticTexts[all].waitForExistence(timeout: 15))
+                app.staticTexts[all].tap()
+            }
+            XCTAssertTrue(app.buttons["library-select"].waitForExistence(timeout: 10))
+            app.buttons["library-select"].tap()
+            app.buttons[selectAll].tap()
+            sleep(1) // Let the native selection-label transition settle for the screenshot.
+            let selectionShot = XCTAttachment(screenshot: app.screenshot())
+            selectionShot.name = "file-tools-selection-\(language)"
+            selectionShot.lifetime = .keepAlways
+            add(selectionShot)
+            app.buttons["selection-actions"].tap()
+            app.buttons[merge].tap()
+            XCTAssertTrue(app.textFields["document-tools-name"].waitForExistence(timeout: 5))
+            // Reordering changes the snapshot, not the underlying library. The rows
+            // are matched by their own identifiers: an iPad form sheet leaves the
+            // library grid visible, so matching a name alone finds the tile behind it.
+            XCTAssertEqual(app.staticTexts["merge-row-0"].label, "Crop target 2")
+            XCTAssertEqual(app.staticTexts["merge-row-1"].label, "Crop target")
+            app.buttons["merge-down-0"].tap()
+            XCTAssertEqual(app.staticTexts["merge-row-0"].label, "Crop target")
+            XCTAssertEqual(app.staticTexts["merge-row-1"].label, "Crop target 2")
+            let mergeShot = XCTAttachment(screenshot: app.screenshot())
+            mergeShot.name = "file-tools-merge-\(language)"
+            mergeShot.lifetime = .keepAlways
+            add(mergeShot)
+            app.buttons[cancel].tap()
+            XCTAssertTrue(app.buttons["library-select"].waitForExistence(timeout: 5))
+            app.buttons["library-select"].tap()
+            app.buttons["item-more"].firstMatch.tap()
+            app.buttons[extract].tap()
+            let create = app.buttons["document-tools-create"]
+            XCTAssertTrue(create.waitForExistence(timeout: 5))
+            XCTAssertFalse(create.isEnabled)
+            app.buttons["extract-page-1"].tap()
+            XCTAssertTrue(create.isEnabled)
+            let extractShot = XCTAttachment(screenshot: app.screenshot())
+            extractShot.name = "file-tools-extract-\(language)"
+            extractShot.lifetime = .keepAlways
+            add(extractShot)
+            app.buttons[cancel].tap()
+            XCTAssertTrue(app.buttons["library-select"].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.buttons.matching(identifier: "item-more").count, 2)
+            app.terminate()
+        }
+    }
+
+    func testDocumentToolsSplitMakesOneDocumentPerPageAndKeepsTheSource() throws {
+        continueAfterFailure = false
+        let library = "/tmp/papernest-file-tools-split-library"
+        var app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        let source = app.descendants(matching: .any)["Split target, 3 pages"].firstMatch
+        XCTAssertTrue(source.waitForExistence(timeout: 15))
+        app.buttons["item-more"].firstMatch.tap()
+        app.buttons["Split into Pages"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["Split target \u{2014} Page 1, 1 page"]
+            .firstMatch.waitForExistence(timeout: 10))
+
+        app.terminate()
+        app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        for page in 1...3 {
+            XCTAssertTrue(app.descendants(matching: .any)["Split target \u{2014} Page \(page), 1 page"]
+                .firstMatch.waitForExistence(timeout: 10), "page \(page) did not survive the relaunch")
+        }
+        XCTAssertTrue(source.exists, "splitting must keep the original")
+        // The newest item is first, and a one-page document cannot be split again.
+        app.buttons["item-more"].firstMatch.tap()
+        let split = app.buttons["Split into Pages"]
+        XCTAssertTrue(split.waitForExistence(timeout: 5))
+        XCTAssertFalse(split.isEnabled)
+    }
+
+    func testDocumentToolsBulkExportMakesOneArchiveFromTheSelection() throws {
+        continueAfterFailure = false
+        // Exporting only reads the library, so this test shares the split
+        // test's library without changing what that test finds.
+        let app = launch([], libraryPath: "/tmp/papernest-file-tools-split-library")
+        showAllDocuments(app)
+        XCTAssertTrue(app.buttons["library-select"].waitForExistence(timeout: 15))
+        app.buttons["library-select"].tap()
+        app.buttons["Select All"].tap()
+        app.buttons["selection-actions"].tap()
+        app.buttons["Export as ZIP\u{2026}"].tap()
+        let status = app.descendants(matching: .any)["bulk-export-status"].firstMatch
+        XCTAssertTrue(status.waitForExistence(timeout: 30), "the archive never became ready")
+        XCTAssertTrue(status.label.hasPrefix("Ready"), "unexpected status: \(status.label)")
+        XCTAssertTrue(app.buttons["bulk-export-save"].exists)
+        app.buttons["bulk-export-done"].tap()
+        XCTAssertTrue(app.buttons["library-select"].waitForExistence(timeout: 5))
+    }
+
+    func testToolsScreenPicksTwoDocumentsAndMergesThem() throws {
+        continueAfterFailure = false
+        let library = "/tmp/papernest-tools-screen-library"
+        var app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        let tools = app.buttons["library-tools"]
+        XCTAssertTrue(tools.waitForExistence(timeout: 15))
+        tools.tap()
+
+        let merge = app.buttons["tool-merge"]
+        XCTAssertTrue(merge.waitForExistence(timeout: 5))
+        merge.tap()
+        let continueButton = app.buttons["pick-continue"]
+        XCTAssertTrue(continueButton.waitForExistence(timeout: 5))
+        // Merging needs two documents, so one pick is not enough.
+        app.buttons["pick-Tools A"].tap()
+        XCTAssertFalse(continueButton.isEnabled)
+        app.buttons["pick-Tools B"].tap()
+        XCTAssertTrue(continueButton.isEnabled)
+        continueButton.tap()
+
+        let name = app.textFields["document-tools-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (name.value as? String)?.count ?? 0))
+        name.typeText("Tools merged")
+        app.buttons["document-tools-create"].tap()
+        XCTAssertTrue(app.navigationBars["Tools merged"].waitForExistence(timeout: 10),
+                      "the merged document should open once the Tools sheet closes")
+
+        app.terminate()
+        app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        XCTAssertTrue(app.descendants(matching: .any)["Tools merged, 2 pages"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["Tools A, 1 page"].firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["Tools B, 1 page"].firstMatch.exists)
+    }
+
+    func testRecognizeTextMakesAWordOnThePageSearchable() throws {
+        continueAfterFailure = false
+        let app = launch(["-PaperNestDebugOpenItem", "OCR target"], libraryPath: "/tmp/papernest-ocr-library")
+        // Document-level actions live in the title menu on every platform;
+        // the compact toolbar has no overflow menu.
+        XCTAssertTrue(app.navigationBars["OCR target"].waitForExistence(timeout: 15), "document did not open")
+        // Overflow lives in the bottom bar on iPhone and in the toolbar on
+        // iPad and Mac; menu items are matched by label, as elsewhere here.
+        let more = app.buttons["More"].firstMatch
+        if more.waitForExistence(timeout: 5) {
+            more.tap()
+        } else {
+            app.buttons["editor-more"].tap()
+        }
+        let recognize = app.buttons["Recognize Text"]
+        XCTAssertTrue(recognize.waitForExistence(timeout: 5), "no Recognize Text in the overflow menu")
+        recognize.tap()
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        showAllDocuments(app)
+        let document = app.descendants(matching: .any)["OCR target, 3 pages"].firstMatch
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap()
+        // "Quarterly" is printed on page 1 and is not part of the title.
+        search.typeText("Quarterly")
+        XCTAssertTrue(document.waitForExistence(timeout: 30),
+                      "the document should be found by a word only its page carries")
     }
 }

@@ -280,11 +280,28 @@ struct DocumentView: View {
         Menu {
             addPagesItems
             Divider()
+            recognizeTextButton
+            Divider()
             deleteButton
         } label: {
             Label(L10n.more, systemImage: "ellipsis.circle")
         }
         .accessibilityIdentifier("editor-more")
+    }
+
+    @ViewBuilder
+    private var recognizeTextButton: some View {
+        if let progress = model.recognitionProgress {
+            Text(L10n.recognizeProgress(min(progress.done + 1, max(progress.total, 1)), max(progress.total, 1)))
+        } else {
+            Button {
+                Task { await model.recognizeText() }
+            } label: {
+                Label(L10n.recognizeText, systemImage: "text.viewfinder")
+            }
+            .disabled(model.pages.isEmpty)
+            .accessibilityIdentifier("editor-recognize")
+        }
     }
 
     private var pageNavigation: some View {
@@ -332,6 +349,8 @@ struct DocumentView: View {
             Label(L10n.pages, systemImage: "square.grid.2x2")
         }
         Menu {
+            recognizeTextButton
+            Divider()
             deleteButton
         } label: {
             Label(L10n.more, systemImage: "ellipsis.circle")

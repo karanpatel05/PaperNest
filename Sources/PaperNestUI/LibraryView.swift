@@ -14,6 +14,12 @@ struct LibraryView: View {
     @State private var confirmingDelete: LibraryStore.ItemSummary?
     @State private var exporting: LibraryStore.ItemSummary?
     @State private var isDropTargeted = false
+    @State private var isSelecting = false
+    @State private var selection: Set<ItemID> = []
+    @State private var isComposing = false
+    @State private var toolsRequest: DocumentToolsRequest?
+    @State private var createdItemID: ItemID?
+    @State private var bulkExport: BulkExportRequest?
 
     static let importableTypes: [UTType] = [.pdf, .jpeg, .png]
 
@@ -37,6 +43,12 @@ struct LibraryView: View {
             .searchable(text: $model.searchText, prompt: L10n.searchPrompt)
             #endif
             .toolbar { toolbar }
+            .safeAreaInset(edge: .bottom) {
+                if isSelecting { selectionBar }
+            }
+            .onChange(of: model.scope) { _, _ in endSelection() }
+            .onChange(of: model.searchText) { _, _ in endSelection() }
+            .onChange(of: model.items.map(\.id)) { _, ids in selection.formIntersection(ids) }
             .dropDestination(for: URL.self) { urls, _ in
                 let files = urls.filter(\.isFileURL)
                 guard !files.isEmpty, model.scope != .recentlyDeleted else { return false }
@@ -82,6 +94,18 @@ struct LibraryView: View {
             }
             .sheet(item: $exporting) { summary in
                 ExportLoader(itemID: summary.id, currentPageID: nil)
+            }
+            .sheet(item: $toolsRequest, onDismiss: {
+                if let id = createdItemID {
+                    createdItemID = nil
+                    endSelection()
+                    model.open(id)
+                }
+            }) { request in
+                DocumentToolsSheet(request: request) { createdItemID = $0 }
+            }
+            .sheet(item: $bulkExport) { request in
+                BulkExportSheet(request: request)
             }
     }
 
@@ -177,7 +201,23 @@ struct LibraryView: View {
     @ViewBuilder
     private func cell(for summary: LibraryStore.ItemSummary) -> some View {
         Group {
-            if model.scope == .recentlyDeleted {
+            if isSelecting {
+                Button {
+                    if !selection.insert(summary.id).inserted { selection.remove(summary.id) }
+                } label: {
+                    ItemCell(summary: summary, showsDeletionDate: false, layout: layout, isSelected: selection.contains(summary.id))
+                        .overlay(alignment: .topTrailing) {
+                            Image(systemName: selection.contains(summary.id) ? "checkmark.circle.fill" : "circle")
+                                .font(.title2)
+                                .foregroundStyle(Theme.accent)
+                                .background(.background, in: Circle()).padding(8)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityValue([selection.contains(summary.id) ? L10n.selectionOn : L10n.selectionOff,
+                                     summary.item.colorLabel?.title].compactMap { $0 }.joined(separator: ", "))
+                .accessibilityAddTraits(selection.contains(summary.id) ? [.isSelected] : [])
+            } else if model.scope == .recentlyDeleted {
                 ItemCell(summary: summary, showsDeletionDate: true, layout: layout)
             } else {
                 NavigationLink(value: summary.id) {
@@ -186,8 +226,9 @@ struct LibraryView: View {
                 .buttonStyle(.plain)
             }
         }
-        .contextMenu { itemActions(for: summary) }
+        .contextMenu { if !isSelecting { itemActions(for: summary) } }
         .overlay(alignment: layout == .grid ? .bottomTrailing : .trailing) {
+            if !isSelecting {
             Menu {
                 itemActions(for: summary)
             } label: {
@@ -203,6 +244,7 @@ struct LibraryView: View {
             .padding(.trailing, layout == .grid ? 0 : 6)
             .accessibilityLabel(L10n.more)
             .accessibilityIdentifier("item-more")
+            }
         }
     }
 
@@ -233,6 +275,14 @@ struct LibraryView: View {
             }
             Button(L10n.export) { exporting = summary }
                 .disabled(summary.pageCount == 0)
+            Button(L10n.duplicate) { duplicate([summary.id]) }
+                .disabled(isComposing)
+            Button(L10n.extractPages) { toolsRequest = DocumentToolsRequest(operation: .extract(summary)) }
+                .disabled(summary.pageCount == 0)
+            // One page is already its own document.
+            Button(L10n.splitPages) { split(summary) }
+                .disabled(summary.pageCount < 2 || isComposing)
+            ColorLabelMenu { color in Task { await model.setColorLabel(color, for: [summary.id]) } }
             Divider()
             Button(L10n.delete, role: .destructive) { Task { await model.moveToRecentlyDeleted([summary.id]) } }
         }
@@ -278,6 +328,15 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            if isSelecting || (model.scope != .recentlyDeleted && !model.items.isEmpty) {
+                Button(isSelecting ? L10n.done : L10n.selectItems) {
+                    if isSelecting { endSelection() } else { isSelecting = true }
+                }
+                .accessibilityIdentifier("library-select")
+                .disabled(isComposing)
+            }
+        }
         #if os(macOS)
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
@@ -288,6 +347,14 @@ struct LibraryView: View {
             .disabled(model.scope == .recentlyDeleted)
         }
         #endif
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                model.isShowingTools = true
+            } label: {
+                Label(L10n.toolsTitle, systemImage: "wrench.and.screwdriver")
+            }
+            .accessibilityIdentifier("library-tools")
+        }
         #if os(iOS)
         // The Mac uses the standard Settings window (⌘,) instead.
         ToolbarItem(placement: .primaryAction) {
@@ -312,6 +379,95 @@ struct LibraryView: View {
         }
     }
 
+    private var selectedItems: [LibraryStore.ItemSummary] {
+        model.items.filter { selection.contains($0.id) }
+    }
+
+    private var selectionBar: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack {
+                selectionSummary
+                Spacer(minLength: 8)
+                selectionControls
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                selectionSummary
+                selectionControls
+            }.frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding().background(.regularMaterial)
+        .disabled(isComposing)
+    }
+
+    private var selectionSummary: some View {
+        Text(L10n.selectionCount(selection.count)).font(.subheadline)
+            .accessibilityIdentifier("selection-count")
+    }
+
+    @ViewBuilder
+    private var selectionControls: some View {
+        Button(selection.count == model.items.count ? L10n.deselectAll : L10n.selectAll) {
+            selection = selection.count == model.items.count ? [] : Set(model.items.map(\.id))
+        }
+        Menu {
+            Button(L10n.duplicate) { duplicate(selectedItems.map(\.id)) }
+            Button(L10n.mergeDocuments) {
+                toolsRequest = DocumentToolsRequest(operation: .merge(selectedItems, model.currentFolderID))
+            }.disabled(selectedItems.count < 2 || selectedItems.contains { $0.pageCount == 0 })
+            Menu(L10n.moveToFolder) {
+                Button(L10n.noFolder) {
+                    let ids = selectedItems.map(\.id)
+                    Task { await model.move(ids, to: nil) }
+                }
+                ForEach(model.folders) { folder in
+                    Button(folder.name) {
+                        let ids = selectedItems.map(\.id)
+                        Task { await model.move(ids, to: folder.id) }
+                    }
+                }
+            }
+            // Page-less documents are skipped by the archive writer, so the
+            // action is offered as long as one selected document has pages.
+            Button(L10n.exportAsZip) { bulkExport = BulkExportRequest(ids: selectedItems.map(\.id)) }
+                .disabled(!selectedItems.contains { $0.pageCount > 0 })
+            ColorLabelMenu { color in
+                let ids = selectedItems.map(\.id)
+                Task { await model.setColorLabel(color, for: ids) }
+            }
+            Button(L10n.delete, role: .destructive) {
+                let ids = selectedItems.map(\.id)
+                Task { await model.moveToRecentlyDeleted(ids) }
+            }
+        } label: {
+            if isComposing { ProgressView() } else { Label(L10n.more, systemImage: "ellipsis.circle") }
+        }
+        .accessibilityIdentifier("selection-actions")
+        .disabled(selection.isEmpty)
+    }
+
+    private func duplicate(_ ids: [ItemID]) {
+        guard !isComposing else { return }
+        isComposing = true
+        Task {
+            if await model.duplicate(ids) { endSelection() }
+            isComposing = false
+        }
+    }
+
+    private func split(_ summary: LibraryStore.ItemSummary) {
+        guard !isComposing else { return }
+        isComposing = true
+        Task {
+            _ = await model.split(summary)
+            isComposing = false
+        }
+    }
+
+    private func endSelection() {
+        selection.removeAll()
+        isSelecting = false
+    }
+
     private var renameBinding: Binding<Bool> {
         Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
     }
@@ -329,6 +485,7 @@ struct ItemCell: View {
     let summary: LibraryStore.ItemSummary
     let showsDeletionDate: Bool
     var layout: LibraryLayout = .grid
+    var isSelected = false
     /// Leaves room for the ⋯ button that `LibraryView` overlays.
     var reservesMenuSpace = true
     /// Gray on the white library; white on the gray iPhone home.
@@ -341,6 +498,9 @@ struct ItemCell: View {
                     preview
                         .frame(height: reservesMenuSpace ? 190 : 150)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay {
+                            if isSelected { RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.accent, lineWidth: 2) }
+                        }
                     metadata
                         .padding(.trailing, reservesMenuSpace ? 36 : 0)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -354,11 +514,15 @@ struct ItemCell: View {
                 .padding(.trailing, 36)
                 .background(Theme.preview)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    if isSelected { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent, lineWidth: 2) }
+                }
             }
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L10n.itemAccessibilityLabel(name: summary.item.name, pages: L10n.pageCount(summary.pageCount)))
+        .accessibilityValue(summary.item.colorLabel?.title ?? "")
         .accessibilityAddTraits(showsDeletionDate ? [] : .isButton)
     }
 
@@ -383,6 +547,10 @@ struct ItemCell: View {
                     .foregroundStyle(.primary).lineLimit(2)
                 if summary.item.isFavorite {
                     Image(systemName: "star.fill").font(.caption).foregroundStyle(Theme.accent)
+                }
+                if let color = summary.item.colorLabel {
+                    Image(systemName: "circle.fill").font(.caption2).foregroundStyle(color.tint)
+                        .accessibilityLabel(color.title)
                 }
             }
             Text(verbatim: "\(secondaryText) · \(L10n.pageCount(summary.pageCount))")
@@ -468,6 +636,7 @@ struct CaptureActions: View {
         .buttonStyle(.bordered)
         .tint(.secondary)
         .accessibilityIdentifier("library-import")
+
     }
 }
 
@@ -492,6 +661,9 @@ struct LibraryPresentations: ViewModifier {
                 Text(error.message)
             }
             .modifier(PasswordPrompt(model: model))
+            .sheet(isPresented: $model.isShowingTools) {
+                ToolsSheet(model: model)
+            }
             #if os(iOS)
             .sheet(isPresented: $model.isShowingSettings) {
                 SettingsView(session: model.session)

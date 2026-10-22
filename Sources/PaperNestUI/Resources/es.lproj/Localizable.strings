@@ -202,3 +202,59 @@
 "undo.ink" = "Tinta";
 "page.markup" = "Anotar";
 "page.drawWithFinger" = "Dibujar con el dedo";
+
+/* File tools */
+"tools.select" = "Seleccionar";
+"tools.selectAll" = "Seleccionar todo";
+"tools.deselectAll" = "Deseleccionar todo";
+"tools.duplicate" = "Duplicar";
+"tools.merge" = "Combinar documentos";
+"tools.extract" = "Extraer páginas";
+"tools.create" = "Crear";
+"tools.name" = "Nombre del documento";
+"tools.mergedName" = "Documento combinado";
+"tools.order" = "Orden de los documentos";
+"tools.preserve" = "Se creará un documento editable nuevo. Los originales se conservarán sin cambios.";
+"tools.choosePages" = "Selecciona las páginas que quieras copiar. Se conservará su orden original.";
+"tools.colorLabel" = "Etiqueta de color";
+"tools.color.none" = "Sin etiqueta";
+"tools.color.red" = "Rojo";
+"tools.color.orange" = "Naranja";
+"tools.color.yellow" = "Amarillo";
+"tools.color.green" = "Verde";
+"tools.color.blue" = "Azul";
+"tools.color.purple" = "Morado";
+"tools.color.gray" = "Gris";
+"tools.selected" = "Seleccionado";
+"tools.notSelected" = "Sin seleccionar";
+"tools.selectionCount" = "Selección: %d";
+"tools.extractedName" = "%@ — Páginas";
+"tools.moveUp" = "Subir %@";
+"tools.moveDown" = "Bajar %@";
+"tools.mergeTitle" = "Combinar";
+/* Text recognition */
+"document.recognizeText" = "Reconocer texto";
+"document.recognizeProgress" = "Leyendo la página %1$lld de %2$lld…";
+
+/* Tools screen */
+"tools.screen.title" = "Herramientas";
+"tools.screen.create" = "Crear";
+"tools.screen.documents" = "Documentos";
+"tools.screen.empty" = "Todavía no hay documentos.";
+"tools.screen.continue" = "Continuar";
+"tools.pick.merge" = "Elige dos o más documentos. Podrás ordenarlos después.";
+"tools.pick.extract" = "Elige el documento del que extraer páginas.";
+"tools.pick.split" = "Elige un documento con más de una página.";
+"tools.pick.archive" = "Elige los documentos que quieras poner en el archivo ZIP.";
+
+/* Document tools: export a selection as one ZIP */
+"tools.exportZip" = "Exportar como ZIP…";
+"tools.exportZip.title" = "Exportar la selección";
+"tools.exportZip.footer" = "Cada documento seleccionado se convierte en un PDF dentro de un único archivo ZIP. Los documentos sin páginas se omiten.";
+"tools.exportZip.archiveName" = "%1$@ Documentos %2$@";
+
+/* Document tools: split */
+"tools.split" = "Dividir en páginas";
+"tools.splitName" = "%@ — Página %d";
+
+"tools.extractTitle" = "Extraer";

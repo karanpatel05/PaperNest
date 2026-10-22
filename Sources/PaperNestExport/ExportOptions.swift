@@ -59,6 +59,10 @@ public struct ExportOptions: Hashable, Sendable {
     public var jpegQuality: Double
     /// JPEG/PNG with more than one page.
     public var packaging: ImagePackaging
+    /// PDF only. Writes each page's recognized text as an invisible layer, so
+    /// a scan can be searched and selected outside PaperNest. Only text that
+    /// is current for the page is written; nothing is invented.
+    public var includesRecognizedText: Bool
 
     public init(
         format: ExportFormat = .pdf,
@@ -66,7 +70,8 @@ public struct ExportOptions: Hashable, Sendable {
         pdfImageQuality: PDFImageQuality = .balanced,
         imageDPI: Int = 200,
         jpegQuality: Double = 0.85,
-        packaging: ImagePackaging = .zip
+        packaging: ImagePackaging = .zip,
+        includesRecognizedText: Bool = true
     ) {
         self.format = format
         self.paperSize = paperSize
@@ -74,6 +79,7 @@ public struct ExportOptions: Hashable, Sendable {
         self.imageDPI = min(max(imageDPI, 36), 600)
         self.jpegQuality = min(max(jpegQuality, 0.1), 1)
         self.packaging = packaging
+        self.includesRecognizedText = includesRecognizedText
     }
 
     public static let imageDPIChoices = [72, 150, 200, 300]

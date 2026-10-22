@@ -7,6 +7,14 @@ enum Schema {
     struct Migration {
         let version: Int
         let sql: String
+        /// SQLite cannot alter a CHECK constraint, so such a change rebuilds
+        /// the table. With foreign keys enforced, `DROP TABLE items` performs
+        /// an implicit delete that **cascades into `pages`** and empties the
+        /// library — verified, not assumed. These migrations therefore run
+        /// with foreign keys disabled and are checked with
+        /// `PRAGMA foreign_key_check` before they commit, which is SQLite's
+        /// documented procedure for this.
+        var rebuildsTables = false
     }
 
     static var latestVersion: Int { migrations.last!.version }
@@ -140,5 +148,54 @@ enum Schema {
         );
         CREATE INDEX page_content_history_by_asset ON page_content_history(asset_id);
         """),
+        Migration(version: 4, sql: """
+        ALTER TABLE items ADD COLUMN color_label TEXT
+            CHECK (color_label IN ('red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'));
+        """),
+        // F2a: a library item can be a file rather than a sequence of pages.
+        // Both CHECK constraints have to be widened, which means rebuilding
+        // the two tables; see `Migration.rebuildsTables`.
+        Migration(version: 5, sql: """
+        CREATE TABLE items_v5 (
+            id TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('document', 'notebook', 'file')),
+            name TEXT NOT NULL,
+            folder_id TEXT REFERENCES folders(id),
+            is_favorite INTEGER NOT NULL DEFAULT 0,
+            created_at REAL NOT NULL,
+            modified_at REAL NOT NULL,
+            deleted_at REAL,
+            schema_version INTEGER NOT NULL,
+            color_label TEXT CHECK (color_label IN ('red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'))
+        );
+        INSERT INTO items_v5 (id, kind, name, folder_id, is_favorite, created_at, modified_at, deleted_at, schema_version, color_label)
+            SELECT id, kind, name, folder_id, is_favorite, created_at, modified_at, deleted_at, schema_version, color_label FROM items;
+        DROP TABLE items;
+        ALTER TABLE items_v5 RENAME TO items;
+        CREATE INDEX items_by_folder ON items(folder_id, deleted_at);
+
+        CREATE TABLE assets_v5 (
+            id TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('pdf', 'jpeg', 'png', 'file')),
+            byte_count INTEGER NOT NULL,
+            original_filename TEXT,
+            availability TEXT NOT NULL CHECK (availability IN ('local', 'remoteOnly')),
+            created_at REAL NOT NULL
+        );
+        INSERT INTO assets_v5 (id, kind, byte_count, original_filename, availability, created_at)
+            SELECT id, kind, byte_count, original_filename, availability, created_at FROM assets;
+        DROP TABLE assets;
+        ALTER TABLE assets_v5 RENAME TO assets;
+
+        -- One row per file item: the bytes it holds, and what they are.
+        CREATE TABLE file_items (
+            item_id TEXT PRIMARY KEY NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            asset_id TEXT NOT NULL REFERENCES assets(id),
+            uti TEXT NOT NULL,
+            original_filename TEXT NOT NULL,
+            byte_count INTEGER NOT NULL
+        );
+        CREATE INDEX file_items_by_asset ON file_items(asset_id);
+        """, rebuildsTables: true),
     ]
 }

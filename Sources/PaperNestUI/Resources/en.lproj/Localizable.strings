@@ -202,3 +202,59 @@
 "undo.ink" = "Ink";
 "page.markup" = "Markup";
 "page.drawWithFinger" = "Draw with Finger";
+
+/* File tools */
+"tools.select" = "Select";
+"tools.selectAll" = "Select All";
+"tools.deselectAll" = "Deselect All";
+"tools.duplicate" = "Duplicate";
+"tools.merge" = "Merge Documents";
+"tools.extract" = "Extract Pages";
+"tools.create" = "Create";
+"tools.name" = "Document Name";
+"tools.mergedName" = "Merged Document";
+"tools.order" = "Document Order";
+"tools.preserve" = "A new editable document is created. Your originals stay unchanged.";
+"tools.choosePages" = "Select pages to copy. They keep their original order.";
+"tools.colorLabel" = "Color Label";
+"tools.color.none" = "No Label";
+"tools.color.red" = "Red";
+"tools.color.orange" = "Orange";
+"tools.color.yellow" = "Yellow";
+"tools.color.green" = "Green";
+"tools.color.blue" = "Blue";
+"tools.color.purple" = "Purple";
+"tools.color.gray" = "Gray";
+"tools.selected" = "Selected";
+"tools.notSelected" = "Not selected";
+"tools.selectionCount" = "%d selected";
+"tools.extractedName" = "%@ — Pages";
+"tools.moveUp" = "Move %@ up";
+"tools.moveDown" = "Move %@ down";
+"tools.mergeTitle" = "Merge";
+/* Text recognition */
+"document.recognizeText" = "Recognize Text";
+"document.recognizeProgress" = "Reading page %1$lld of %2$lld…";
+
+/* Tools screen */
+"tools.screen.title" = "Tools";
+"tools.screen.create" = "Create";
+"tools.screen.documents" = "Documents";
+"tools.screen.empty" = "No documents yet.";
+"tools.screen.continue" = "Continue";
+"tools.pick.merge" = "Choose two or more documents. You can put them in order next.";
+"tools.pick.extract" = "Choose the document to take pages from.";
+"tools.pick.split" = "Choose a document with more than one page.";
+"tools.pick.archive" = "Choose the documents to put in the ZIP file.";
+
+/* Document tools: export a selection as one ZIP */
+"tools.exportZip" = "Export as ZIP…";
+"tools.exportZip.title" = "Export Selected";
+"tools.exportZip.footer" = "Every selected document becomes a PDF inside one ZIP file. Documents without pages are left out.";
+"tools.exportZip.archiveName" = "%1$@ Documents %2$@";
+
+/* Document tools: split */
+"tools.split" = "Split into Pages";
+"tools.splitName" = "%@ — Page %d";
+
+"tools.extractTitle" = "Extract";

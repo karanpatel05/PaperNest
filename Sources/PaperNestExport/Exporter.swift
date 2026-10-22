@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreText
 import Foundation
 import ImageIO
 import PaperNestCore
@@ -44,6 +45,46 @@ public struct Exporter: Sendable {
 
     // MARK: - PDF
 
+    /// Writes recognized text invisibly over the page, so the exported PDF can
+    /// be searched and its words selected in any reader. The glyphs are never
+    /// painted: only their positions matter, and they come from the same
+    /// source-space boxes recognition stored.
+    private static func drawSearchableText(_ lines: [RecognizedLine], geometry: PageGeometry,
+                                           pageToContext: CGAffineTransform, in ctx: CGContext) {
+        guard !lines.isEmpty else { return }
+        let size = geometry.sourceSize
+        // Draw in source space and let the page's own transform carry the
+        // crop and rotation. Placing a rotated line by its bounding box
+        // instead would squeeze it into a sliver.
+        ctx.saveGState()
+        ctx.concatenate(geometry.sourceToPage.concatenating(pageToContext))
+        ctx.setTextDrawingMode(.invisible)
+        for line in lines where !line.text.isEmpty {
+            let box = CGRect(x: line.box.x * size.width, y: line.box.y * size.height,
+                             width: line.box.width * size.width, height: line.box.height * size.height)
+            guard box.width > 0.5, box.height > 0.5 else { continue }
+            let font = CTFontCreateWithName("Helvetica" as CFString, box.height * 0.8, nil)
+            let attributed = NSAttributedString(string: line.text, attributes: [
+                NSAttributedString.Key(kCTFontAttributeName as String): font,
+            ])
+            let ctLine = CTLineCreateWithAttributedString(attributed)
+            var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+            let width = CGFloat(CTLineGetTypographicBounds(ctLine, &ascent, &descent, &leading))
+            guard width > 0 else { continue }
+            ctx.saveGState()
+            // Source space is y-down; text is drawn y-up from its baseline.
+            // The horizontal stretch goes on the CTM, not the text matrix,
+            // which `CTLineDraw` overrides from the line's own runs: it makes
+            // a word's position in the PDF match where it sits on the page.
+            ctx.translateBy(x: box.minX, y: box.maxY)
+            ctx.scaleBy(x: box.width / width, y: -1)
+            ctx.textPosition = CGPoint(x: 0, y: descent)
+            CTLineDraw(ctLine, ctx)
+            ctx.restoreGState()
+        }
+        ctx.restoreGState()
+    }
+
     private func writePDF(_ pages: [Page], title: String, to url: URL, options: ExportOptions,
                           progress: @Sendable (ExportProgress) -> Void) async throws -> URL {
         var defaultBox = CGRect(x: 0, y: 0, width: 612, height: 792)
@@ -67,6 +108,10 @@ public struct Exporter: Sendable {
             let pageToContext = layout.pageToPaper(pageSize: pageSize)
                 .concatenating(CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: layout.paperSize.height))
             PageRenderer.draw(page, source: source, ink: ink, in: ctx, pageToContext: pageToContext)
+            if options.includesRecognizedText {
+                let lines = try await renderer.recognizedLines(for: page)
+                Self.drawSearchableText(lines, geometry: page.geometry, pageToContext: pageToContext, in: ctx)
+            }
             ctx.endPDFPage()
             progress(ExportProgress(completedPages: index + 1, totalPages: pages.count))
         }

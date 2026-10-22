@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import PaperNestCore
 import PaperNestImport
+import PaperNestRender
 import PaperNestStore
 
 /// State and edits for one open document. Every edit commits to the store
@@ -16,6 +17,8 @@ final class DocumentModel {
     private(set) var hasLoaded = false
     var selectedPageID: PageID?
     var presentedError: PresentedError?
+    /// Pages finished, pages in total, while text recognition runs.
+    private(set) var recognitionProgress: (done: Int, total: Int)?
 
     init(itemID: ItemID, session: LibrarySession) {
         self.itemID = itemID
@@ -23,6 +26,37 @@ final class DocumentModel {
     }
 
     private var store: LibraryStore? { session.environment?.store }
+
+    var isRecognizing: Bool { recognitionProgress != nil }
+
+    /// Reads the printed text on every page and saves it, which is what makes
+    /// a scan findable. Each page is saved as it finishes, so a long document
+    /// is useful before the last page is done, and a failure on one page does
+    /// not discard the others.
+    func recognizeText() async {
+        guard let store, let renderer = session.environment?.renderer, recognitionProgress == nil else { return }
+        let recognizer = TextRecognizer()
+        let languages = TextRecognizer.supportedLanguages(from: TextRecognizer.preferredLanguages)
+        let pages = self.pages
+        recognitionProgress = (0, pages.count)
+        defer { recognitionProgress = nil }
+        for (index, page) in pages.enumerated() {
+            do {
+                var result = PageRecognition(pageID: page.id, sourceRevision: page.revision,
+                                             engineVersion: TextRecognizer.engineVersion, status: .failed,
+                                             languages: languages, lines: [])
+                if let image = try await renderer.renderSourceForRecognition(page, pixelsPerPoint: 2) {
+                    result.lines = try recognizer.recognize(image)
+                    result.status = .completed
+                }
+                try await store.saveRecognition(result)
+            } catch {
+                presentedError = .saveFailed()
+            }
+            recognitionProgress = (index + 1, pages.count)
+        }
+        session.didChange()
+    }
 
     var selectedPage: Page? { pages.first { $0.id == selectedPageID } }
     var selectedIndex: Int? { pages.firstIndex { $0.id == selectedPageID } }

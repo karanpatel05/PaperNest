@@ -83,6 +83,24 @@ public enum SyntheticDocuments {
         return data as Data
     }
 
+    /// White page carrying `lines` of black text, the first line near the
+    /// top. Used to check text recognition against known words and places.
+    public static func textImage(lines: [String], width: Int = 1000, height: Int = 1400,
+                                 type: UTType = .png, fontSize: CGFloat = 48) -> Data {
+        let ctx = bitmapContext(width: width, height: height, transparent: false)
+        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        // y-up bitmap: the first baseline sits a tenth from the top.
+        drawText(lines.joined(separator: "\n"), in: ctx,
+                 at: CGPoint(x: CGFloat(width) / 12, y: CGFloat(height) * 0.9), size: fontSize)
+        let image = ctx.makeImage()!
+        let data = NSMutableData()
+        let dest = CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, image, [kCGImagePropertyOrientation: 1] as CFDictionary)
+        CGImageDestinationFinalize(dest)
+        return data as Data
+    }
+
     private static func drawUpright(width: Int, height: Int, transparent: Bool) -> CGImage {
         let ctx = bitmapContext(width: width, height: height, transparent: transparent)
         if !transparent {

@@ -119,6 +119,14 @@ public struct RootView: View {
                 if showsHome {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
+                            model.isShowingTools = true
+                        } label: {
+                            Label(L10n.toolsTitle, systemImage: "wrench.and.screwdriver")
+                        }
+                        .accessibilityIdentifier("library-tools")
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
                             model.isShowingSettings = true
                         } label: {
                             Label(L10n.settingsTitle, systemImage: "gearshape")
@@ -181,7 +189,10 @@ public struct RootView: View {
     #if DEBUG
     /// Dev/screenshot hook, debug builds only: `-PaperNestDebugOpenItem <name>`
     /// opens that document as if it had been tapped.
+    /// Screenshot hook: `-PaperNestDebugShowTools YES` opens the Tools sheet
+    /// at launch, so the screen can be captured in each language without taps.
     private func openDebugItemIfRequested() async {
+        if UserDefaults.standard.bool(forKey: "PaperNestDebugShowTools") { model.isShowingTools = true }
         guard let name = UserDefaults.standard.string(forKey: "PaperNestDebugOpenItem"),
               let store = model.session.environment?.store,
               let match = try? await store.items(in: .all).first(where: { $0.item.name == name })

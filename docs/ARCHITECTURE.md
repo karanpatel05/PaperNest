@@ -62,9 +62,9 @@ Library/
 
 Tests cover each step: `DurabilityTests`, `LibraryStoreTests`, `DeletionTests`.
 
-### Schema (v3)
+### Schema (v4)
 
-`folders`, `items`, `tags`/`item_tags`, `assets` (keyed by SHA-256, with `availability` local or remoteOnly), `pages`, `page_transform_history`, `page_objects` (ink/text/image JSON payloads), `page_recognition` (OCR, stale when `source_revision` is older than the page's revision), and `search_index` (FTS5, `unicode61 remove_diacritics 2`, derived and rebuildable). v2 adds `pages.deleted_at` (soft delete until next launch). v3 adds `page_content_history`: a rescanned page's previous content, whose original stays referenced (so it can't be swept) until the next launch. See `Sources/PaperNestStore/Schema.swift`. Migrations are ordered and each runs in its own transaction with its `user_version` bump.
+`folders`, `items`, `tags`/`item_tags`, `assets` (keyed by SHA-256, with `availability` local or remoteOnly), `pages`, `page_transform_history`, `page_objects` (ink/text/image JSON payloads), `page_recognition` (OCR, stale when `source_revision` is older than the page's revision), and `search_index` (FTS5, `unicode61 remove_diacritics 2`, derived and rebuildable). v2 adds `pages.deleted_at` (soft delete until next launch). v3 adds `page_content_history`: a rescanned page's previous content, whose original stays referenced (so it can't be swept) until the next launch. v4 adds nullable `items.color_label` with seven stable color values. See `Sources/PaperNestStore/Schema.swift`. Migrations are ordered and each runs in its own transaction with its `user_version` bump.
 
 ### Ordering
 
@@ -116,7 +116,7 @@ Image handling:
 
 ## Sync design (M2, not yet implemented)
 
-- **Engine:** `CKSyncEngine` on the private database, in a custom zone. Its serialized state is persisted in a `sync_state` table (a v4 migration) and restored at launch.
+- **Engine:** `CKSyncEngine` on the private database, in a custom zone. Its serialized state is persisted in a `sync_state` table (a planned v5-or-later migration) and restored at launch.
 - **Single owner:** an `outbox` table is written *in the same transaction* as each edit (record name and change kind). The engine's "next batch" is built from the outbox, so a crash can't lose a pending change or double-apply one. IDs are stable UUIDs and SHA-256 hashes, so retries are idempotent.
 - **Records:** `Item`, `Folder`, `Page`, `PageObject` (one record per stroke or text box), and `Asset` (CKAsset keyed by SHA-256). OCR and thumbnails are derived and not synced.
 - **Ordering of arrival:** a page whose asset hasn't arrived gets `availability = remoteOnly` and is shown as downloading, never as available offline.
@@ -133,3 +133,10 @@ Image handling:
 - Entitlement is derived from `Transaction.currentEntitlements`, with `Transaction.updates` listened to from launch. Only `.verified` results count. Revocation, expiry and grace periods are evaluated from the transaction itself.
 - No user-editable `isPro` flag is authoritative. A cached hint may exist for offline display and is re-evaluated against StoreKit.
 - The StoreKit purchase identity is kept separate from the iCloud document account.
+
+
+### Document composition (F1, 2026-10-22)
+
+`LibraryComposition.swift` provides atomic duplicate, merge and extraction operations on the existing LibraryStore actor. Nested store calls use SQLite savepoints beneath one outer transaction. Sources must be live and local assets readable; invalid selections or failures leave no partial output. New item/page/object identities preserve independent editing while sharing immutable asset files. Current transforms and object paint order are retained, but undo/history is not cloned. Duplicate/extract preserve the source label; merge starts unlabeled. Extraction follows source page order; merge follows the explicit document order reviewed in the sheet.
+
+Current completed OCR is remapped to the new page revision; stale or unfinished results become pending with no copied text. Derived text/OCR index rows refer only to the new identities. This preserves recognition metadata when present; it does not introduce an OCR engine.

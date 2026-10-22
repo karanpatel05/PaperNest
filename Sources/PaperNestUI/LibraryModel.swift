@@ -37,6 +37,7 @@ public final class LibraryModel {
         }
     }
     private(set) var hasLoaded = false
+    @ObservationIgnored private var reloadGeneration = 0
     var searchText = ""
     private(set) var isImporting = false
     var presentedError: PresentedError?
@@ -45,6 +46,7 @@ public final class LibraryModel {
     var isShowingFileImporter = false
     var isShowingScanner = false
     var isShowingSettings = false
+    var isShowingTools = false
     /// The newest documents, for the iPhone home's Recent row.
     private(set) var recentItems: [LibraryStore.ItemSummary] = []
 
@@ -93,22 +95,34 @@ public final class LibraryModel {
     // MARK: - Loading
 
     func reload() async {
-        guard let env = environment else { return }
+        guard let env = environment, !Task.isCancelled else { return }
+        reloadGeneration &+= 1
+        let generation = reloadGeneration
+        let requestedScope = scope
+        let requestedSearch = searchText
         do {
-            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-            var summaries = try await env.store.items(in: scope)
-            if !query.isEmpty, scope != .recentlyDeleted {
+            let query = requestedSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+            var summaries = try await env.store.items(in: requestedScope)
+            if !query.isEmpty, requestedScope != .recentlyDeleted {
                 let matches = Set(try await env.store.search(query))
                 summaries = summaries.filter { matches.contains($0.id) }
             }
+            let loadedFolders = try await env.store.folders()
+            let loadedCounts = try await env.store.scopeCounts()
+            // A canceled or older read must not publish rows that would
+            // prune the user's selection in a newer search or scope.
+            guard !Task.isCancelled, generation == reloadGeneration,
+                  requestedScope == scope, requestedSearch == searchText else { return }
             items = sorted(summaries)
-            folders = try await env.store.folders()
-            counts = try await env.store.scopeCounts()
+            folders = loadedFolders
+            counts = loadedCounts
             if case .folder(let id?) = scope, !folders.contains(where: { $0.id == id }) {
                 stopShowingFolder()
             }
             hasLoaded = true
         } catch {
+            guard !Task.isCancelled, generation == reloadGeneration,
+                  requestedScope == scope, requestedSearch == searchText else { return }
             presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.libraryOpenFailed)
         }
     }
@@ -322,6 +336,38 @@ public final class LibraryModel {
     }
 
     // MARK: - Item actions
+
+    func duplicate(_ ids: [ItemID]) async -> Bool {
+        guard let env = environment else { return false }
+        do {
+            _ = try await env.store.duplicateItems(ids)
+            session.didChange()
+            await reload()
+            return true
+        } catch {
+            presentedError = .saveFailed()
+            return false
+        }
+    }
+
+    /// One document per live page, named after the source. The source is kept.
+    func split(_ summary: LibraryStore.ItemSummary) async -> Bool {
+        guard let env = environment else { return false }
+        do {
+            let name = summary.item.name
+            _ = try await env.store.splitItem(summary.id) { page, _ in L10n.splitPageName(name, page) }
+            session.didChange()
+            await reload()
+            return true
+        } catch {
+            presentedError = .saveFailed()
+            return false
+        }
+    }
+
+    func setColorLabel(_ color: ItemColor?, for ids: [ItemID]) async {
+        await mutate { try await $0.store.setColorLabel(color, for: ids) }
+    }
 
     func rename(_ id: ItemID, to name: String) async {
         await mutate { try await $0.store.rename(id, to: name) }

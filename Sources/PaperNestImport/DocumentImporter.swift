@@ -53,6 +53,10 @@ public struct DocumentImporter: Sendable {
         guard !data.isEmpty else { throw ImportError.empty(filename: name) }
         guard let kind = FileTypeSniffer.kind(of: data) else { throw ImportError.unsupportedType(filename: name) }
         switch kind {
+        case .file:
+            // This path builds page-based documents. Bytes we do not
+            // interpret become file items, which have their own import.
+            throw ImportError.unsupportedType(filename: name)
         case .pdf:
             let facts = try PDFInspector.open(data, password: password, filename: name)
             let staged = try store.assets.store(facts.storedData, kind: .pdf, originalFilename: name)

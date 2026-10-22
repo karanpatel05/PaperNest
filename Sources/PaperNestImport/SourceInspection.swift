@@ -85,6 +85,10 @@ extension ImageInspector {
             return lastIndex(of: Array("IEND".utf8), in: bytes) != nil
         case .pdf:
             return true
+        case .file:
+            // Bytes we do not interpret have no structure to check. A file
+            // item keeps whatever it was given.
+            return true
         }
     }
 

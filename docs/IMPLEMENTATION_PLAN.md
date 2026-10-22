@@ -2,7 +2,7 @@
 
 Status labels: **Implemented** (code exists), **Automated tests passed**, **Simulator verified**, **Device verified**, **Blocked**, **Not started**. "Implemented" alone means unverified.
 
-Last updated: 2026-10-20 (session 1).
+Last updated: 2026-10-22 (expanded document tools; earlier milestone history retained).
 
 ## Milestone status
 
@@ -21,7 +21,7 @@ Last updated: 2026-10-20 (session 1).
 - [x] Inspected the environment: macOS 26.6.2, CLT 26.2 / Swift 6.2.3, no Xcode at the start. Xcode 27.1 appeared mid-session with its license not accepted.
 - [x] Recorded architecture, storage/sync and platform decisions (ARCHITECTURE.md)
 - [x] Swift package with Core/Store/Import/Render/Export/UI modules, test targets and a synthetic-fixture support target
-- [x] Versioned SQLite schema (now v2) with migrations and refusal of newer schemas. Round-trip, interrupted-write, rollback and v1→v2 migration tests pass.
+- [x] Versioned SQLite schema (now v4) with migrations and refusal of newer schemas. Round-trip, interrupted-write, rollback and v1→v2 migration tests pass.
 - [x] Localized adaptive shell (NavigationSplitView, en/fr/es) with a key-parity test
 - [x] Native Mac app builds with CLT (`scripts/build-mac-app.sh`), launches and opens a library
 - [x] `project.yml` (XcodeGen) for iOS and macOS targets, xcconfig signing placeholders, Info.plists, entitlements, privacy manifest
@@ -50,9 +50,9 @@ Remaining (in order):
 
 ## Later milestones (summary)
 
-- **M2:** CKSyncEngine adapter, v4 migration (`sync_state`, `outbox`, `tombstones`), asset upload/download with `remoteOnly` availability, conflict copies, account-change flow, sync status UI driven by real state. Two-device test plan in TEST_MATRIX.md.
+- **M2:** CKSyncEngine adapter, v5-or-later migration (`sync_state`, `outbox`, `tombstones`), asset upload/download with `remoteOnly` availability, conflict copies, account-change flow, sync status UI driven by real state. Two-device test plan in TEST_MATRIX.md.
 - **M3:** notebook creation, templates (rendering exists), PencilKit adapter on iPad, mouse/trackpad ink on Mac, text boxes, image objects, the 3-notebook free limit hook. **First slice, owner request (2026-10-21): Apple Pencil on iPad** (ink rendering + export on all platforms, then the iPad PencilKit canvas). Spec: `CLEAN_NATIVE_DESIGN.md` → "Apple Pencil on iPad".
-- **M4:** Vision OCR (`VNRecognizeTextRequest`, automatic language detection plus user override), recognition status UI, search over OCR text and typed notes, searchable PDF (invisible text layer aligned through `PageGeometry`), TXT with page separators and empty-content warnings, a DOCX writer (both variants) validated by `unzip`/XML checks and opening in an external editor.
+- **M4:** **First slice done 2026-10-22** — Vision `VNRecognizeTextRequest` for en/fr/es, boxes in upright uncropped source space, FTS search over recognized text, and a Recognize Text action in the document. **Searchable PDF landed the same day** (invisible text layer aligned through `PageGeometry`, `ExportOptions.includesRecognizedText`). Remaining: recognition status UI outside the menu, automatic recognition after a scan, a user language override, TXT with page separators and empty-content warnings, a DOCX writer (both variants) validated by `unzip`/XML checks and opening in an external editor.
 - **M5:** StoreKit 2 entitlement service, paywall with StoreKit-supplied prices, restore and manage, expiry behavior, local `.storekit` tests.
 - **M6:** accessibility audit (VoiceOver, Dynamic Type, keyboard focus), 1/20/100-page performance runs with recorded numbers, storage-full handling, release docs.
 
@@ -62,3 +62,10 @@ Remaining (in order):
 - Black & White uses a global threshold.
 - Localization uses `.strings`/`.stringsdict`. Migrate to String Catalogs once Xcode tooling is available. French and Spanish need review by a native speaker.
 - Page objects (ink and text) are stored as JSON. A compact binary encoding may be needed for very dense notebooks; measure in M3.
+
+
+## Owner-requested feature expansion (2026-10-21 / 22)
+
+The nine reference screenshots extend the original brief. Full capability coverage and delivery order: [FEATURE_EXPANSION.md](FEATURE_EXPANSION.md). The brief itself is unchanged. A further ten reference screenshots (App Store listing, Tools/Files/Notes/Media/Browser/VPN screens, paywall) are inventoried screen by screen, with a 48-row capability checklist, in [REFERENCE_FEATURE_INVENTORY.md](REFERENCE_FEATURE_INVENTORY.md).
+
+**F1 initial slice is implemented; unit-tested on macOS and UI-tested on iPhone and iPad (Claude, 2026-10-22: 144 unit tests, 11 iPhone UI tests, the two document-tools tests on iPad, 0-warning Mac and iOS builds, en/fr/es screenshots inspected on both devices). The Mac UI has still never been viewed — see TEST_MATRIX:** select multiple documents, batch move/delete/label/duplicate, explicit-order merge, page extraction into new editable documents, and seven persistent color labels. See [the implementation checklist](superpowers/plans/2026-10-21-file-tools.md). Schema v4 is allocated to labels; future sync must use the next unused migration. **F1 is complete** as scoped: per-page splitting and selection-wide ZIP export both landed on 2026-10-22 (see TEST_MATRIX). Explicit compression presets with before/after sizes were never part of F1 and remain F2/F4. F2–F9 are planned, not implemented by this change.

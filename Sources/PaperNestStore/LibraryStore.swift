@@ -12,7 +12,8 @@ public actor LibraryStore {
     public nonisolated let directoryURL: URL
     public nonisolated let assets: AssetFileStore
 
-    private let db: SQLiteDatabase
+    // Internal so focused store extensions share this actor's transaction boundary.
+    let db: SQLiteDatabase
     private let now: @Sendable () -> Date
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
@@ -41,8 +42,18 @@ public actor LibraryStore {
             throw StoreError.newerSchema(found: current, supported: Schema.latestVersion)
         }
         for migration in Schema.migrations where migration.version > current {
+            // `PRAGMA foreign_keys` is a no-op inside a transaction, so it is
+            // toggled around it, and restored even if the migration throws.
+            if migration.rebuildsTables { try db.execute("PRAGMA foreign_keys = OFF") }
+            defer { try? db.execute("PRAGMA foreign_keys = ON") }
             try db.transaction {
                 try db.execute(migration.sql)
+                if migration.rebuildsTables {
+                    let dangling = try db.query("PRAGMA foreign_key_check") { $0.text(0) }
+                    guard dangling.isEmpty else {
+                        throw StoreError.migrationBrokeReferences(dangling.joined(separator: ", "))
+                    }
+                }
                 try db.setUserVersion(migration.version)
             }
         }
@@ -132,6 +143,8 @@ public actor LibraryStore {
         public var item: LibraryItem
         public var pageCount: Int
         public var coverPage: Page?
+        /// Set only for `file` items, which have bytes instead of pages.
+        public var file: FilePayload?
         public var id: ItemID { item.id }
     }
 
@@ -154,8 +167,57 @@ public actor LibraryStore {
                                      [.text(item.id.rawValue)]) { $0.int(0) }.first ?? 0
             let cover = try db.query("SELECT \(Self.pageColumns) FROM pages WHERE item_id = ? AND deleted_at IS NULL ORDER BY sort_key, id LIMIT 1",
                                      [.text(item.id.rawValue)], map: decodePage).first
-            return ItemSummary(item: item, pageCount: count, coverPage: cover)
+            return ItemSummary(item: item, pageCount: count, coverPage: cover,
+                               file: item.kind == .file ? try filePayload(item.id) : nil)
         }
+    }
+
+    /// Stores `staged` as a library item in its own right: a file, not a
+    /// sequence of pages. The bytes are already durable when this is called.
+    @discardableResult
+    public func createFileItem(named name: String, folderID: FolderID? = nil,
+                               asset staged: AssetFileStore.StagedAsset,
+                               uti: String, originalFilename: String) throws -> LibraryItem {
+        let timestamp = now()
+        return try db.transaction {
+            if let folderID {
+                guard try folders().contains(where: { $0.id == folderID }) else { throw StoreError.folderNotFound }
+            }
+            let item = LibraryItem(kind: .file, name: NameDeduplicator.uniqueName(name, existing: try namesInFolder(folderID)),
+                                   folderID: folderID, createdAt: timestamp, modifiedAt: timestamp)
+            try db.run("""
+                INSERT INTO items (id, kind, name, folder_id, is_favorite, created_at, modified_at, deleted_at, schema_version)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)
+                """, [
+                    .text(item.id.rawValue), .text(item.kind.rawValue), .text(item.name),
+                    .optionalText(item.folderID?.rawValue), .bool(item.isFavorite),
+                    .date(item.createdAt), .date(item.modifiedAt), .int(Int64(item.schemaVersion)),
+                ])
+            try insertAssetRows([staged], at: timestamp)
+            try insertFileRow(item.id, FilePayload(assetID: staged.id, uti: uti,
+                                                   originalFilename: originalFilename, byteCount: staged.byteCount))
+            try reindexTitle(item)
+            return item
+        }
+    }
+
+    /// What a `file` item holds, or nil for a page-based item.
+    public func filePayload(_ id: ItemID) throws -> FilePayload? {
+        try db.query("SELECT asset_id, uti, original_filename, byte_count FROM file_items WHERE item_id = ?",
+                     [.text(id.rawValue)]) {
+            FilePayload(assetID: AssetID(sha256: $0.text(0)), uti: $0.text(1),
+                        originalFilename: $0.text(2), byteCount: $0.int64(3))
+        }.first
+    }
+
+    func insertFileRow(_ itemID: ItemID, _ payload: FilePayload) throws {
+        try db.run("""
+            INSERT INTO file_items (item_id, asset_id, uti, original_filename, byte_count)
+            VALUES (?, ?, ?, ?, ?)
+            """, [
+                .text(itemID.rawValue), .text(payload.assetID.sha256), .text(payload.uti),
+                .text(payload.originalFilename), .int(payload.byteCount),
+            ])
     }
 
     @discardableResult
@@ -175,6 +237,19 @@ public actor LibraryStore {
     public func setFavorite(_ id: ItemID, _ isFavorite: Bool) throws {
         let changed = try db.run("UPDATE items SET is_favorite = ? WHERE id = ?", [.bool(isFavorite), .text(id.rawValue)])
         guard changed == 1 else { throw StoreError.itemNotFound }
+    }
+
+    /// Apply a label to live documents atomically. A stale selection must
+    /// never leave just part of the batch changed.
+    public func setColorLabel(_ color: ItemColor?, for ids: [ItemID]) throws {
+        let timestamp = now()
+        try db.transaction {
+            for id in ids {
+                guard let item = try item(id), !item.isDeleted else { throw StoreError.itemNotFound }
+                try db.run("UPDATE items SET color_label = ?, modified_at = ? WHERE id = ?",
+                           [.optionalText(color?.rawValue), .date(timestamp), .text(id.rawValue)])
+            }
+        }
     }
 
     /// Soft delete: the item stays restorable in Recently Deleted.
@@ -601,6 +676,10 @@ public actor LibraryStore {
                     new.pdfIndex, .optionalText(new.template), .text(try json(page.transform)), .int(Int64(page.revision)),
                     .date(timestamp), .text(pageID.rawValue),
                 ])
+            // The page now shows different paper. Whatever was read off the
+            // old content must stop answering searches at once; a rotation or
+            // a crop does not do this, because the words are still there.
+            try db.run("DELETE FROM search_index WHERE page_id = ? AND field = 'ocr'", [.text(pageID.rawValue)])
             try touchItem(page.itemID, at: timestamp)
             return (previous, page)
         }
@@ -706,8 +785,23 @@ public actor LibraryStore {
         }.first
     }
 
+    /// Saves a recognition result and keeps the page's searchable text in
+    /// step with it, in one transaction: a result that is not current must
+    /// never leave old words findable.
     public func saveRecognition(_ recognition: PageRecognition) throws {
-        try db.transaction { try upsertRecognitionRow(recognition) }
+        try db.transaction {
+            guard let page = try page(recognition.pageID) else { throw StoreError.pageNotFound }
+            try upsertRecognitionRow(recognition)
+            try db.run("DELETE FROM search_index WHERE page_id = ? AND field = 'ocr'", [.text(recognition.pageID.rawValue)])
+            let text = recognition.text
+            // Only a finished result for the page *as it is now* is findable.
+            // A result from an older revision stays stored, so it can be shown
+            // as stale and refreshed, but it must not answer searches.
+            guard recognition.status == .completed, recognition.sourceRevision == page.revision,
+                  !text.isEmpty else { return }
+            try db.run("INSERT INTO search_index (item_id, page_id, field, content) VALUES (?, ?, 'ocr', ?)",
+                       [.text(page.itemID.rawValue), .text(recognition.pageID.rawValue), .text(text)])
+        }
     }
 
     private func upsertObjectRow(_ object: PageObject) throws {
@@ -763,12 +857,13 @@ public actor LibraryStore {
 
     // MARK: - Private helpers
 
-    private static let itemColumns = "id, kind, name, folder_id, is_favorite, created_at, modified_at, deleted_at, schema_version"
+    private static let itemColumns = "id, kind, name, folder_id, is_favorite, created_at, modified_at, deleted_at, schema_version, color_label"
     private static let pageColumns = "id, item_id, sort_key, source_width, source_height, content_kind, asset_id, pdf_page_index, template, transform_json, revision, created_at, modified_at"
 
     private static func decodeItem(_ s: Statement) -> LibraryItem {
         LibraryItem(id: ItemID(rawValue: s.text(0)), kind: ItemKind(rawValue: s.text(1)) ?? .document, name: s.text(2),
-                    folderID: s.optionalText(3).map(FolderID.init(rawValue:)), isFavorite: s.bool(4), createdAt: s.date(5),
+                    folderID: s.optionalText(3).map(FolderID.init(rawValue:)), isFavorite: s.bool(4),
+                    colorLabel: s.optionalText(9).flatMap(ItemColor.init(rawValue:)), createdAt: s.date(5),
                     modifiedAt: s.date(6), deletedAt: s.optionalDate(7), schemaVersion: s.int(8))
     }
 
@@ -831,6 +926,7 @@ public actor LibraryStore {
             SELECT a.id, a.kind FROM assets a
             WHERE NOT EXISTS (SELECT 1 FROM pages p WHERE p.asset_id = a.id)
               AND NOT EXISTS (SELECT 1 FROM page_content_history h WHERE h.asset_id = a.id)
+              AND NOT EXISTS (SELECT 1 FROM file_items f WHERE f.asset_id = a.id)
             """) { (AssetID(sha256: $0.text(0)), AssetKind(rawValue: $0.text(1)) ?? .pdf) }
             .filter { !placed.contains($0.0) }
         for (id, _) in unreferenced {

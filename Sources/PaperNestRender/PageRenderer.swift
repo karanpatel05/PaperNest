@@ -52,6 +52,15 @@ public struct PageRenderer: Sendable {
         return try await renderImage(page, pixelsPerPoint: maxPixelSize / max(size.width, size.height), includingInk: includingInk)
     }
 
+    /// The page's recognized text, but only when it still describes the page:
+    /// a result from an older revision is stale and must not be exported or
+    /// searched. Mirrors the rule `LibraryStore.saveRecognition` indexes by.
+    public func recognizedLines(for page: Page) async throws -> [RecognizedLine] {
+        guard let recognition = try await store.recognition(for: page.id),
+              recognition.status == .completed, recognition.sourceRevision == page.revision else { return [] }
+        return recognition.lines
+    }
+
     /// The page's ink, in paint order.
     public func inkStrokes(for page: Page) async throws -> [InkStroke] {
         try await store.objects(on: page.id).compactMap { object in
@@ -82,6 +91,27 @@ public struct PageRenderer: Sendable {
         /// is never shared across concurrent draws.
         case pdf(CGPDFDocument, pageNumber: Int)
         case template(PageTemplate)
+    }
+
+    /// The page's original, upright and uncropped, with no adjustments or
+    /// ink: the space text recognition stores its boxes in. Deliberately not
+    /// `prepareSource`, which applies the user's crop and filters — text must
+    /// be read from the paper, not from the current view of it.
+    public func renderSourceForRecognition(_ page: Page, pixelsPerPoint: CGFloat) async throws -> CGImage? {
+        switch page.content {
+        case .template:
+            return nil
+        case .image(let assetID):
+            let needed = Int((max(page.sourceSize.width, page.sourceSize.height) * pixelsPerPoint).rounded(.up))
+            return try await cache.uprightImage(assetID, maxPixelSize: needed, store: store)
+        case .pdfPage(let assetID, let index):
+            let data = try await cache.pdfData(assetID, store: store)
+            guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider),
+                  index + 1 <= document.numberOfPages else { throw RenderError.sourceDamaged }
+            return try Self.rasterizePDFPage(document, pageNumber: index + 1, sourceSize: page.sourceSize,
+                                             region: CGRect(origin: .zero, size: page.sourceSize),
+                                             pixelsPerPoint: pixelsPerPoint)
+        }
     }
 
     /// Loads and prepares a page's original. Raster sources are decoded at

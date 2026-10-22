@@ -29,6 +29,30 @@ rm -rf "$LIBRARY"
 FIXTURES="$(mktemp -d)"
 cp Samples/whiteboard-300dpi.png "$FIXTURES/Crop target.png"
 swift run --scratch-path "$SCRATCH" papernest-seed "$LIBRARY" "$FIXTURES/Crop target.png"
+# Document-tools tests use separate disposable libraries, so their copies
+# cannot change the counts and ordering expected by existing UI tests.
+for TOOLS_LIBRARY in /tmp/papernest-file-tools-uitest-library /tmp/papernest-file-tools-layout-library; do
+    rm -rf "$TOOLS_LIBRARY"
+    swift run --scratch-path "$SCRATCH" papernest-seed "$TOOLS_LIBRARY" "$FIXTURES/Crop target.png"
+done
+# The text-recognition test reads words printed on a real sample page.
+cp Samples/multilingual-letter.pdf "$FIXTURES/OCR target.pdf"
+OCR_LIBRARY=/tmp/papernest-ocr-library
+rm -rf "$OCR_LIBRARY"
+swift run --scratch-path "$SCRATCH" papernest-seed "$OCR_LIBRARY" "$FIXTURES/OCR target.pdf"
+
+# The Tools screen test merges two documents of its own.
+cp Samples/whiteboard-300dpi.png "$FIXTURES/Tools A.png"
+cp Samples/whiteboard-300dpi.png "$FIXTURES/Tools B.png"
+TOOLS_SCREEN_LIBRARY=/tmp/papernest-tools-screen-library
+rm -rf "$TOOLS_SCREEN_LIBRARY"
+swift run --scratch-path "$SCRATCH" papernest-seed "$TOOLS_SCREEN_LIBRARY" "$FIXTURES/Tools A.png" "$FIXTURES/Tools B.png"
+
+# The split test needs one document with several pages.
+cp Samples/multilingual-letter.pdf "$FIXTURES/Split target.pdf"
+SPLIT_LIBRARY=/tmp/papernest-file-tools-split-library
+rm -rf "$SPLIT_LIBRARY"
+swift run --scratch-path "$SCRATCH" papernest-seed "$SPLIT_LIBRARY" "$FIXTURES/Split target.pdf"
 rm -rf "$FIXTURES"
 
 xcodegen generate --quiet

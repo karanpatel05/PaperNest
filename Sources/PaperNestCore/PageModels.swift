@@ -145,6 +145,18 @@ public struct NormalizedRect: Hashable, Codable, Sendable {
         self.height = min(max(height, minSide), 1 - cy)
     }
 
+    /// Keeps the rectangle exactly as given. A line of recognized text is
+    /// often thinner than the minimum crop side, and OCR boxes are not crops:
+    /// inflating them would misplace a text layer or a highlight.
+    public static func exact(x: Double, y: Double, width: Double, height: Double) -> NormalizedRect {
+        var rect = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
+        rect.x = x
+        rect.y = y
+        rect.width = width
+        rect.height = height
+        return rect
+    }
+
     public static let full = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
 
     /// Equal within floating-point rounding, so a crop that maps back to
@@ -161,13 +173,34 @@ public struct NormalizedRect: Hashable, Codable, Sendable {
 
 public enum AssetKind: String, Codable, Sendable {
     case pdf, jpeg, png
+    /// Bytes we keep but do not interpret. The real name and type live on the
+    /// item, because one asset can be shared by items that name it
+    /// differently.
+    case file
 
     public var fileExtension: String {
         switch self {
         case .pdf: "pdf"
         case .jpeg: "jpg"
         case .png: "png"
+        case .file: "bin"
         }
+    }
+}
+
+/// What a `file` item holds. The bytes are immutable and shared by hash; the
+/// name shown in the library is the item's, not this one.
+public struct FilePayload: Hashable, Codable, Sendable {
+    public var assetID: AssetID
+    public var uti: String
+    public var originalFilename: String
+    public var byteCount: Int64
+
+    public init(assetID: AssetID, uti: String, originalFilename: String, byteCount: Int64) {
+        self.assetID = assetID
+        self.uti = uti
+        self.originalFilename = originalFilename
+        self.byteCount = byteCount
     }
 }
 

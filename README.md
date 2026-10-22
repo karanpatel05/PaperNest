@@ -33,6 +33,12 @@ A native document scanner and notebook app for iPhone, iPad and Mac: scan paper 
 
 No third-party dependencies. Everything uses Apple frameworks and the system SQLite.
 
+## Document tools
+
+In **All Documents** or a folder, use **Select** to choose several documents, then **More** for merge, duplicate, color label, move or delete. Merge opens a sheet where you name the new document and arrange the source documents. A document’s **⋯** menu also offers **Duplicate**, **Extract Pages**, and **Color Label**. Extraction copies the pages you select in their original order. The source documents remain unchanged and the new documents remain editable.
+
+The broader feature request from the nine reference photos is tracked in [the expansion roadmap](docs/FEATURE_EXPANSION.md). General file storage, archives, richer PDF editing, OCR/conversions, cloud providers, media, browser and VPN are future workstreams.
+
 ## Build and test
 
 The scripts keep build output in `~/Library/Caches/PaperNest/build-<hash>`, not in the checkout (`scripts/env.sh`). This checkout lives on an iCloud-synced Desktop, where iCloud adds attributes that make `codesign` fail and syncs hundreds of MB of build output. For ad-hoc SwiftPM commands use `scripts/swift.sh <command> …`, for example `scripts/swift.sh build`.

@@ -46,6 +46,35 @@ import PaperNestTestSupport
         #expect(condition())
     }
 
+    @Test func composedDocumentsExportInOrderAfterTheSourcesAreDeleted() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let a = try writeSample(SyntheticDocuments.textPDF(pages: ["Alpha", "Beta"]), "A.pdf")
+        let b = try writeSample(SyntheticDocuments.textPDF(pages: ["Gamma"]), "B.pdf")
+        let session = try await readySession()
+        let library = LibraryModel(session: session)
+        await library.importFiles([a, b])
+        await library.reload()
+        let aID = try #require(library.items.first { $0.item.name == "A" }?.id)
+        let bID = try #require(library.items.first { $0.item.name == "B" }?.id)
+        let env = try #require(session.environment)
+        let merged = try await env.store.mergeItems([bID, aID], named: "Merged", folderID: nil)
+        let pages = try await env.store.pages(of: merged.id)
+        let extracted = try await env.store.extractPages([pages[2].id, pages[0].id], from: merged.id, named: "Extracted")
+        #expect(await library.duplicate([extracted.id]))
+        let copy = try #require(library.items.first { $0.item.name == "Extracted 2" })
+        await library.moveToRecentlyDeleted([aID, bID, merged.id, extracted.id])
+        await library.deletePermanently([aID, bID, merged.id, extracted.id])
+        let reopened = try await readySession()
+        let reopenedEnv = try #require(reopened.environment)
+        let copiedPages = try await reopenedEnv.store.pages(of: copy.id)
+        let output = try await reopenedEnv.exporter.export(itemName: copy.item.name, pages: copiedPages, options: ExportOptions(format: .pdf))
+        defer { output.removeTemporaryFiles() }
+        let pdf = try #require(PDFDocument(url: output.files[0]))
+        #expect(pdf.pageCount == 2)
+        #expect(pdf.page(at: 0)?.string?.contains("Gamma") == true)
+        #expect(pdf.page(at: 1)?.string?.contains("Beta") == true)
+    }
+
     @Test func importEditRelaunchAndExportKeepsPagesAndOrientation() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let letter = try writeSample(SyntheticDocuments.textPDF(pages: ["Alpha page", "Bêta page", "Gamma página"]), "Letter.pdf")
