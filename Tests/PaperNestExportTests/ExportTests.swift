@@ -274,14 +274,25 @@ func unzip(_ arguments: [String]) throws -> (status: Int32, output: String) {
         let root = f.url.appendingPathComponent("backup-exports", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let exporter = Exporter(renderer: f.exporter.renderer, temporaryRoot: root)
-        let started = AsyncStream<Void>.makeStream()
+        // The export is held at page 3 until the cancel has been issued.
+        // Merely observing progress and then cancelling is a race: a small
+        // library can finish first, and this test used to fail that way
+        // roughly one run in two.
+        let reachedPageThree = AsyncStream<Void>.makeStream()
+        // Signalled from the test, waited on inside the synchronous progress
+        // callback, which is where blocking is allowed.
+        let cancelIssued = DispatchSemaphore(value: 0)
         let task = Task {
             try await exporter.exportLibrary(items, archiveName: "Backup") { progress in
-                if progress.completedPages == 3 { started.continuation.yield() }
+                if progress.completedPages == 3 {
+                    reachedPageThree.continuation.yield()
+                    cancelIssued.wait()
+                }
             }
         }
-        for await _ in started.stream { break }
+        for await _ in reachedPageThree.stream { break }
         task.cancel()
+        cancelIssued.signal()
         await #expect(throws: CancellationError.self) { try await task.value }
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
     }

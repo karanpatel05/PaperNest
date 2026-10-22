@@ -50,7 +50,7 @@ Remaining (in order):
 
 ## Later milestones (summary)
 
-- **M2:** CKSyncEngine adapter, v5-or-later migration (`sync_state`, `outbox`, `tombstones`), asset upload/download with `remoteOnly` availability, conflict copies, account-change flow, sync status UI driven by real state. Two-device test plan in TEST_MATRIX.md.
+- **M2:** CKSyncEngine adapter, v7-or-later migration (`sync_state`, `outbox`, `tombstones`), asset upload/download with `remoteOnly` availability, conflict copies, account-change flow, sync status UI driven by real state. Two-device test plan in TEST_MATRIX.md.
 - **M3:** notebook creation, templates (rendering exists), PencilKit adapter on iPad, mouse/trackpad ink on Mac, text boxes, image objects, the 3-notebook free limit hook. **First slice, owner request (2026-10-21): Apple Pencil on iPad** (ink rendering + export on all platforms, then the iPad PencilKit canvas). Spec: `CLEAN_NATIVE_DESIGN.md` → "Apple Pencil on iPad".
 - **M4:** **First slice done 2026-10-22** — Vision `VNRecognizeTextRequest` for en/fr/es, boxes in upright uncropped source space, FTS search over recognized text, and a Recognize Text action in the document. **Searchable PDF landed the same day** (invisible text layer aligned through `PageGeometry`, `ExportOptions.includesRecognizedText`). Remaining: recognition status UI outside the menu, automatic recognition after a scan, a user language override, TXT with page separators and empty-content warnings, a DOCX writer (both variants) validated by `unzip`/XML checks and opening in an external editor.
 - **M5:** StoreKit 2 entitlement service, paywall with StoreKit-supplied prices, restore and manage, expiry behavior, local `.storekit` tests.

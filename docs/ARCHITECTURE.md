@@ -116,7 +116,7 @@ Image handling:
 
 ## Sync design (M2, not yet implemented)
 
-- **Engine:** `CKSyncEngine` on the private database, in a custom zone. Its serialized state is persisted in a `sync_state` table (a planned v5-or-later migration) and restored at launch.
+- **Engine:** `CKSyncEngine` on the private database, in a custom zone. Its serialized state is persisted in a `sync_state` table (a planned v7-or-later migration; v5 took file items and v6 took HEIC) and restored at launch.
 - **Single owner:** an `outbox` table is written *in the same transaction* as each edit (record name and change kind). The engine's "next batch" is built from the outbox, so a crash can't lose a pending change or double-apply one. IDs are stable UUIDs and SHA-256 hashes, so retries are idempotent.
 - **Records:** `Item`, `Folder`, `Page`, `PageObject` (one record per stroke or text box), and `Asset` (CKAsset keyed by SHA-256). OCR and thumbnails are derived and not synced.
 - **Ordering of arrival:** a page whose asset hasn't arrived gets `availability = remoteOnly` and is shown as downloading, never as available offline.

@@ -251,6 +251,7 @@
 "document.recognizeProgress" = "Lecture de la page %1$lld sur %2$lld…";
 
 /* Tools screen */
+"tools.photos" = "Photos…";
 "tools.screen.title" = "Outils";
 "tools.screen.create" = "Créer";
 "tools.screen.documents" = "Documents";

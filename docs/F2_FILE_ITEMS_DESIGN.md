@@ -85,7 +85,7 @@ Notes:
 - **`pages_by_asset` and asset retention already work.** Permanent deletion sweeps assets no row references; `file_items.asset_id` must be included in that sweep's "still referenced" check, or deleting a document would delete a file's bytes. This is the single most dangerous line in the whole change and needs a test that imports the same bytes as both a page and a file.
 - **Dedup is automatic and correct.** `assets.id` is the SHA-256, so importing the same file twice stores one copy and two items.
 - **`byte_count` is denormalized** only so the library listing does not join `assets` per row. `assets.byte_count` stays the authority; a test asserts they agree.
-- **v5 is now spent on files.** Sync (M2) must take v6 or later. The plan already says sync takes the next unused number.
+- **v5 is now spent on files, and v6 on HEIC.** Sync (M2) must take v7 or later. The plan says sync takes the next unused number, whatever it is by then.
 
 ## 5. The asset store and the file-extension problem
 

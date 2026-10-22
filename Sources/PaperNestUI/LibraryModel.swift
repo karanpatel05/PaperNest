@@ -183,6 +183,28 @@ public final class LibraryModel {
         }
     }
 
+    /// Photos picked from the system library, each becoming its own
+    /// document — a photo of a receipt is a document, not a page of some
+    /// other one. Failures are reported per photo and the rest still land.
+    func importPhotos(_ photos: [(data: Data, name: String)]) async {
+        guard let env = environment, !photos.isEmpty else { return }
+        isImporting = true
+        defer { isImporting = false }
+        var failures: [ImportError] = []
+        for photo in photos {
+            do {
+                _ = try await env.importer.importItem(.data(photo.data, name: photo.name), folderID: currentFolderID)
+            } catch let error as ImportError {
+                failures.append(error)
+            } catch {
+                failures.append(.unreadable(filename: photo.name))
+            }
+        }
+        session.didChange()
+        await reload()
+        report(failures)
+    }
+
     func submitPassword(_ password: String, for pending: PendingPassword) async {
         guard let env = environment else { return }
         passwordQueue.removeAll { $0.id == pending.id }

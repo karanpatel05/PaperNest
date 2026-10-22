@@ -173,6 +173,9 @@ public struct NormalizedRect: Hashable, Codable, Sendable {
 
 public enum AssetKind: String, Codable, Sendable {
     case pdf, jpeg, png
+    /// Verified against ImageIO on this platform before being offered: it
+    /// encodes, decodes and keeps dpi. See the TEST_MATRIX row for F2c.
+    case heic
     /// Bytes we keep but do not interpret. The real name and type live on the
     /// item, because one asset can be shared by items that name it
     /// differently.
@@ -183,6 +186,7 @@ public enum AssetKind: String, Codable, Sendable {
         case .pdf: "pdf"
         case .jpeg: "jpg"
         case .png: "png"
+        case .heic: "heic"
         case .file: "bin"
         }
     }

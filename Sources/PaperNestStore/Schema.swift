@@ -197,5 +197,22 @@ enum Schema {
         );
         CREATE INDEX file_items_by_asset ON file_items(asset_id);
         """, rebuildsTables: true),
+        // F2c: photos from the system library are HEIC. Verified against
+        // ImageIO before being offered, so this is a format we can actually
+        // read, not one we hope to.
+        Migration(version: 6, sql: """
+        CREATE TABLE assets_v6 (
+            id TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('pdf', 'jpeg', 'png', 'heic', 'file')),
+            byte_count INTEGER NOT NULL,
+            original_filename TEXT,
+            availability TEXT NOT NULL CHECK (availability IN ('local', 'remoteOnly')),
+            created_at REAL NOT NULL
+        );
+        INSERT INTO assets_v6 (id, kind, byte_count, original_filename, availability, created_at)
+            SELECT id, kind, byte_count, original_filename, availability, created_at FROM assets;
+        DROP TABLE assets;
+        ALTER TABLE assets_v6 RENAME TO assets;
+        """, rebuildsTables: true),
     ]
 }

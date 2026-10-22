@@ -1,5 +1,6 @@
 import PaperNestCore
 import PaperNestStore
+import PhotosUI
 import SwiftUI
 
 /// One home for the document tools, instead of hunting through a ⋯ menu.
@@ -14,6 +15,7 @@ struct ToolsSheet: View {
     @State private var composing: DocumentToolsRequest?
     @State private var archiving: BulkExportRequest?
     @State private var createdItemID: ItemID?
+    @State private var photoSelection: [PhotosPickerItem] = []
 
     /// The tools that can start from the library, with the selection each needs.
     enum Tool: String, CaseIterable, Identifiable, Hashable {
@@ -72,6 +74,12 @@ struct ToolsSheet: View {
             Form {
                 Section(L10n.toolsCreate) {
                     tiles(createTiles)
+                    // A picker brings its own presentation, so it sits beside
+                    // the tiles rather than inside the grid.
+                    PhotosPicker(selection: $photoSelection, maxSelectionCount: 20, matching: .images) {
+                        Label(L10n.importPhotos, systemImage: "photo.on.rectangle")
+                    }
+                    .accessibilityIdentifier("tool-photos")
                 }
                 Section(L10n.toolsDocuments) {
                     tiles(Tool.allCases.map { tool in
@@ -91,6 +99,12 @@ struct ToolsSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.done) { dismiss() }.accessibilityIdentifier("tools-done")
                 }
+            }
+            .onChange(of: photoSelection) { _, picked in
+                guard !picked.isEmpty else { return }
+                photoSelection = []
+                dismiss()
+                Task { await importPhotos(picked) }
             }
             .navigationDestination(item: $picking) { pick in
                 DocumentPicker(tool: pick.tool) { chosen in
@@ -133,6 +147,18 @@ struct ToolsSheet: View {
             ForEach(Array(tiles.enumerated()), id: \.offset) { _, tile in tile }
         }
         .listRowInsets(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
+    }
+
+    /// Photos are loaded one at a time: the picker hands back whole images,
+    /// and a selection of twenty should not sit in memory at once.
+    private func importPhotos(_ picked: [PhotosPickerItem]) async {
+        var loaded: [(data: Data, name: String)] = []
+        for (index, item) in picked.enumerated() {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            let suggested = item.itemIdentifier.map { String($0.prefix(8)) } ?? "\(index + 1)"
+            loaded.append((data, "Photo \(suggested)"))
+        }
+        await model.importPhotos(loaded)
     }
 
     private func run(_ tool: Tool, on chosen: [LibraryStore.ItemSummary]) {

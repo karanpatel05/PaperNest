@@ -299,6 +299,7 @@ extension L10n {
     static var toolsDocuments: String { tr("tools.screen.documents") }
     static var toolsNoDocuments: String { tr("tools.screen.empty") }
     static var toolsContinue: String { tr("tools.screen.continue") }
+    static var importPhotos: String { tr("tools.photos") }
     static var pickForMerge: String { tr("tools.pick.merge") }
     static var pickForExtract: String { tr("tools.pick.extract") }
     static var pickForSplit: String { tr("tools.pick.split") }

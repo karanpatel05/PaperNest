@@ -64,7 +64,7 @@ public struct DocumentImporter: Sendable {
                 LibraryStore.NewPage(sourceSize: size, content: .pdfPage(staged.id, index: index))
             }
             return Prepared(suggestedName: source.suggestedItemName, pages: pages, assets: [staged])
-        case .jpeg, .png:
+        case .jpeg, .png, .heic:
             let facts = try ImageInspector.inspect(data, expected: kind, filename: name)
             let staged = try store.assets.store(data, kind: kind, originalFilename: name)
             return Prepared(suggestedName: source.suggestedItemName,

@@ -7,10 +7,20 @@ import PDFKit
 /// Detects file types from their leading bytes. Extensions are not trusted:
 /// a renamed file must not be stored under the wrong type.
 public enum FileTypeSniffer {
+    /// ISO base media format: a `ftyp` box at offset 4, then a brand that
+    /// says the payload is HEIF-with-HEVC. Brands outside this list (`avif`,
+    /// for instance) are deliberately not claimed.
+    static func isHEIC(_ bytes: [UInt8]) -> Bool {
+        guard bytes.count >= 12, Array(bytes[4..<8]) == Array("ftyp".utf8) else { return false }
+        let brand = String(decoding: bytes[8..<12], as: UTF8.self)
+        return ["heic", "heix", "heim", "heis", "hevc", "hevm", "hevs", "mif1", "msf1"].contains(brand)
+    }
+
     public static func kind(of data: Data) -> AssetKind? {
         let bytes = [UInt8](data.prefix(1024))
         if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) { return .png }
         if bytes.starts(with: [0xFF, 0xD8, 0xFF]) { return .jpeg }
+        if isHEIC(bytes) { return .heic }
         // "%PDF-" may be preceded by junk bytes; readers accept it within the first 1 KB.
         let pdfMarker: [UInt8] = Array("%PDF-".utf8)
         if bytes.count >= pdfMarker.count {
@@ -83,6 +93,10 @@ extension ImageInspector {
             return lastIndex(of: [0xFF, 0xD9], in: bytes).map { $0 > lastScan } ?? false
         case .png:
             return lastIndex(of: Array("IEND".utf8), in: bytes) != nil
+        case .heic:
+            // ISO-BMFF has no end marker. The boxes are walked instead: a
+            // truncated file runs past its own last box.
+            return boxChainIsComplete(bytes)
         case .pdf:
             return true
         case .file:
@@ -90,6 +104,27 @@ extension ImageInspector {
             // item keeps whatever it was given.
             return true
         }
+    }
+
+    /// Walks the top-level box chain. Each box is a 4-byte big-endian size
+    /// then a 4-byte type; the last one must end exactly at the end of the
+    /// file.
+    static func boxChainIsComplete(_ bytes: [UInt8]) -> Bool {
+        var offset = 0
+        while offset + 8 <= bytes.count {
+            var size = 0
+            for byte in bytes[offset..<(offset + 4)] { size = size << 8 | Int(byte) }
+            if size == 0 { return offset + 8 == bytes.count }   // "to end of file"
+            if size == 1 {
+                guard offset + 16 <= bytes.count else { return false }
+                var large = 0
+                for byte in bytes[(offset + 8)..<(offset + 16)] { large = large << 8 | Int(byte) }
+                size = large
+            }
+            guard size >= 8 else { return false }
+            offset += size
+        }
+        return offset == bytes.count
     }
 
     private static func lastIndex(of pattern: [UInt8], in bytes: [UInt8]) -> Int? {

@@ -512,6 +512,10 @@ final class AppUITests: XCTestCase {
 
         let merge = app.buttons["tool-merge"]
         XCTAssertTrue(merge.waitForExistence(timeout: 5))
+        // Importing from Photos is offered here; the picker itself is the
+        // system's and is not driven by this test.
+        XCTAssertTrue(app.descendants(matching: .any)["tool-photos"].firstMatch.exists,
+                      "the Tools screen should offer Photos")
         merge.tap()
         let continueButton = app.buttons["pick-continue"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 5))

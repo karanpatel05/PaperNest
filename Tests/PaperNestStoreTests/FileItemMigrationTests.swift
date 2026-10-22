@@ -46,7 +46,7 @@ import PaperNestCore
         try makeV4Library(at: dir.url)
 
         let store = try LibraryStore(directory: dir.url)
-        #expect(try await store.schemaVersion() == 5)
+        #expect(try await store.schemaVersion() == Schema.latestVersion)
 
         let item = try #require(try await store.item(ItemID(rawValue: "i1")))
         #expect(item.name == "Lease")
