@@ -170,6 +170,14 @@ enum L10n {
     static var exportVectorNote: String { tr("export.vectorNote") }
     static var exportFailed: String { tr("export.failed") }
     static var exportInvalidRange: String { tr("export.invalidRange") }
+    // Design pass 3: export sheet
+    static var exportDestination: String { tr("export.destination") }
+    static var exportToFiles: String { tr("export.destination.files") }
+    static var exportToDisk: String { tr("export.destination.disk") }
+    static var exportCopy: String { tr("export.destination.copy") }
+    static var exportShareTile: String { tr("export.destination.share") }
+    static var exportCopyUnavailable: String { tr("export.copy.unavailable") }
+    static var exportCopied: String { tr("export.copied") }
 
     // Settings
     static var settingsTitle: String { tr("settings.title") }

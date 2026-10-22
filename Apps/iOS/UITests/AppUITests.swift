@@ -118,7 +118,8 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.buttons["editor-export"].waitForExistence(timeout: 5))
         app.buttons["editor-export"].tap()
         XCTAssertTrue(app.staticTexts["Export"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.segmentedControls.buttons["PDF"].exists)
+        XCTAssertTrue(app.buttons["export-format-pdf"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["export-format-pdf"].isSelected)
     }
 
     /// Design pass 2: a folder made from the sidebar, filled from a
@@ -173,5 +174,54 @@ final class AppUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()   // back to the home
         app.buttons["home-see-all"].tap()
         XCTAssertTrue(app.segmentedControls["library-layout"].waitForExistence(timeout: 5), "See All did not show the grid")
+    }
+
+    /// Design pass 3: each tile in a Form row takes its own tap, and Copy
+    /// confirms once the export is on the clipboard.
+    func testExportTilesSelectOneAtATimeAndCopyConfirms() throws {
+        continueAfterFailure = false
+        let app = launch(["-PaperNestDebugOpenItem", "Crop target", "-PaperNestDebugShowExport", "YES"])
+        let pdf = app.buttons["export-format-pdf"], jpeg = app.buttons["export-format-jpeg"]
+        XCTAssertTrue(pdf.waitForExistence(timeout: 15), "export sheet did not open")
+        XCTAssertTrue(pdf.isSelected)
+
+        jpeg.tap()
+        XCTAssertTrue(jpeg.isSelected)
+        XCTAssertFalse(pdf.isSelected)
+        let all = app.buttons["export-pages-all"], range = app.buttons["export-pages-range"]
+        range.tap()
+        XCTAssertTrue(range.isSelected)
+        XCTAssertFalse(all.isSelected)
+        XCTAssertTrue(jpeg.isSelected, "a pages tap changed the format")
+        all.tap()
+
+        app.swipeUp()
+        let copy = app.buttons["export-destination-copy"]
+        XCTAssertTrue(copy.waitForExistence(timeout: 5))
+        copy.tap()
+        XCTAssertTrue(copy.isSelected)
+        XCTAssertFalse(app.buttons["export-destination-save"].isSelected)
+        app.buttons["export-start"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["export-copied"].waitForExistence(timeout: 20), "no copy confirmation")
+    }
+
+    /// Design pass 3: with Save chosen, Export opens the system save dialog;
+    /// closing it keeps the exported file with Save and Share still offered.
+    func testExportSaveOpensTheSaveDialogAndClosingItKeepsTheExport() throws {
+        continueAfterFailure = false
+        let app = launch(["-PaperNestDebugOpenItem", "Crop target", "-PaperNestDebugShowExport", "YES"])
+        let start = app.buttons["export-start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15), "export sheet did not open")
+        app.swipeUp()   // the destination tiles are below the fold
+        XCTAssertTrue(app.buttons["export-destination-save"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["export-destination-save"].isSelected)
+        start.tap()
+        XCTAssertTrue(app.staticTexts["Save as"].waitForExistence(timeout: 20), "save dialog did not open")
+
+        // Drag the dialog down from its middle (not from its buttons).
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
+        XCTAssertTrue(app.buttons["Save…"].waitForExistence(timeout: 10), "no fallback after closing the save dialog")
+        XCTAssertTrue(app.descendants(matching: .any)["export-share"].exists)
     }
 }

@@ -7,7 +7,7 @@ import AppKit
 import UIKit
 #endif
 
-/// Reads importable content from the system clipboard.
+/// Reads importable content from the system clipboard, and writes exports to it.
 enum Clipboard {
     enum Content {
         case files([URL])
@@ -34,6 +34,27 @@ enum Clipboard {
         if let jpeg = board.data(forPasteboardType: UTType.jpeg.identifier) { return .image(jpeg) }
         if let image = board.image, let png = image.pngData() { return .image(png) }
         return nil
+        #endif
+    }
+
+    /// Puts exported files on the clipboard, one item per file. It copies
+    /// their contents, not their URLs: export files are temporary and are
+    /// deleted when the export sheet closes.
+    @MainActor
+    static func write(files: [URL]) throws {
+        let items = try files.map { url in
+            (type: UTType(filenameExtension: url.pathExtension) ?? .data, data: try Data(contentsOf: url))
+        }
+        #if canImport(AppKit)
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.writeObjects(items.map { item in
+            let entry = NSPasteboardItem()
+            entry.setData(item.data, forType: NSPasteboard.PasteboardType(item.type.identifier))
+            return entry
+        })
+        #elseif canImport(UIKit)
+        UIPasteboard.general.setItems(items.map { [$0.type.identifier: $0.data] })
         #endif
     }
 

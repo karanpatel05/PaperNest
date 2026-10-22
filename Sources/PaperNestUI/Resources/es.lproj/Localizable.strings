@@ -188,3 +188,12 @@
 "library.home.title" = "Documentos";
 "library.home.recent" = "Recientes";
 "library.home.seeAll" = "Ver todo";
+
+// Design pass 3: export sheet
+"export.destination" = "Exportar a";
+"export.destination.files" = "Guardar en Archivos";
+"export.destination.disk" = "Guardar en el disco";
+"export.destination.copy" = "Copiar";
+"export.destination.share" = "Compartir";
+"export.copy.unavailable" = "Un archivo ZIP no se puede copiar. Guárdalo o compártelo.";
+"export.copied" = "Copiado en el portapapeles.";

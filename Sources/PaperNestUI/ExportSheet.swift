@@ -38,6 +38,11 @@ struct ExportLoader: View {
     }
 }
 
+/// Export, laid out as in the owner's mockup (`ipad-notebook-export.png`):
+/// the document, Format tiles, Pages tiles, format options, where the
+/// export goes, then one Export button. Choosing the destination first
+/// means one tap does the work: Save opens the save dialog, Copy puts the
+/// file on the clipboard, Share offers the share sheet.
 struct ExportSheet: View {
     let itemName: String
     let pages: [Page]
@@ -49,73 +54,162 @@ struct ExportSheet: View {
     @State private var pageChoice: PageChoice = .all
     @State private var rangeStart = 1
     @State private var rangeEnd = 1
+    @State private var destination: Destination = .save
     @State private var phase: Phase = .configuring
     @State private var exportTask: Task<Void, Never>?
     @State private var isShowingSaver = false
 
     enum PageChoice: Hashable { case all, current, range }
 
+    /// No "More" tile (the mockup has one): the share sheet already is
+    /// "more". Claude's call, see CLEAN_NATIVE_DESIGN.md.
+    enum Destination: Hashable { case save, copy, share }
+
     enum Phase {
         case configuring
         case exporting(ExportProgress)
         case ready(ExportOutput)
+        case copied
         case failed(String)
     }
 
     var body: some View {
+        #if os(iOS)
+        NavigationStack {
+            form
+                .navigationTitle(L10n.exportTitle)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(L10n.cancel) { dismiss() }
+                    }
+                }
+                .safeAreaInset(edge: .bottom) {
+                    footer
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(.bar)
+                }
+        }
+        .modifier(lifecycle)
+        #else
         VStack(alignment: .leading, spacing: 0) {
             Text(L10n.exportTitle)
                 .font(.headline)
                 .padding([.horizontal, .top])
-            Form {
-                optionsSection
-            }
-            .formStyle(.grouped)
-            .disabled(isBusyOrReady)
+            form
             footer
                 .padding()
         }
-        #if os(macOS)
-        // Sheets on macOS size to their content; on iOS they take the
-        // screen width, which can be narrower than this.
-        .frame(minWidth: 440, idealWidth: 480, minHeight: 420)
+        // Sheets on macOS size to their content.
+        .frame(minWidth: 460, idealWidth: 500, minHeight: 520)
+        .modifier(lifecycle)
         #endif
-        .onAppear { rangeEnd = pages.count }
-        .onDisappear {
+    }
+
+    private var lifecycle: ExportLifecycle {
+        ExportLifecycle(onAppear: { rangeEnd = pages.count }, onDisappear: {
             exportTask?.cancel()
             if case .ready(let output) = phase { output.removeTemporaryFiles() }
-        }
-        .modifier(SaveExportedFiles(isPresented: $isShowingSaver, output: readyOutput, format: options.format) {
+        }, saver: SaveExportedFiles(isPresented: $isShowingSaver, output: readyOutput, format: options.format) {
             dismiss()
         })
     }
 
-    @ViewBuilder
-    private var optionsSection: some View {
-        Section {
-            Picker(L10n.exportFormat, selection: $options.format) {
-                Text(verbatim: "PDF").tag(ExportFormat.pdf)
-                Text(verbatim: "JPEG").tag(ExportFormat.jpeg)
-                Text(verbatim: "PNG").tag(ExportFormat.png)
+    private var form: some View {
+        Form {
+            Section {
+                documentRow
             }
-            .pickerStyle(.segmented)
-
-            Picker(L10n.exportPages, selection: $pageChoice) {
-                Text(L10n.exportAllPages).tag(PageChoice.all)
-                if currentPageID != nil { Text(L10n.exportCurrentPage).tag(PageChoice.current) }
-                Text(L10n.exportRange).tag(PageChoice.range)
-            }
-            .choicePickerStyle()
-            if pageChoice == .range {
-                Stepper(value: $rangeStart, in: 1...max(pages.count, 1)) {
-                    LabeledContent(L10n.exportFrom, value: rangeStart.formatted())
+            Section(L10n.exportFormat) {
+                tileRow {
+                    ChoiceTile(title: "PDF", systemImage: "doc.richtext", iconColor: .red,
+                               isSelected: options.format == .pdf, identifier: "export-format-pdf") { options.format = .pdf }
+                    ChoiceTile(title: "JPEG", systemImage: "photo",
+                               isSelected: options.format == .jpeg, identifier: "export-format-jpeg") { options.format = .jpeg }
+                    ChoiceTile(title: "PNG", systemImage: "photo.artframe",
+                               isSelected: options.format == .png, identifier: "export-format-png") { options.format = .png }
                 }
-                Stepper(value: $rangeEnd, in: 1...max(pages.count, 1)) {
-                    LabeledContent(L10n.exportTo, value: rangeEnd.formatted())
+            }
+            Section(L10n.exportPages) {
+                tileRow {
+                    ChoiceTile(title: L10n.exportAllPages, subtitle: L10n.pageCount(pages.count),
+                               isSelected: pageChoice == .all, identifier: "export-pages-all") { pageChoice = .all }
+                    if let currentIndex {
+                        ChoiceTile(title: L10n.exportCurrentPage, subtitle: L10n.pageLabel(currentIndex + 1, of: pages.count),
+                                   isSelected: pageChoice == .current, identifier: "export-pages-current") { pageChoice = .current }
+                    }
+                    ChoiceTile(title: L10n.exportRange, subtitle: "\(rangeStart)–\(rangeEnd)",
+                               isSelected: pageChoice == .range, identifier: "export-pages-range") { pageChoice = .range }
+                }
+                if pageChoice == .range {
+                    Stepper(value: $rangeStart, in: 1...max(pages.count, 1)) {
+                        LabeledContent(L10n.exportFrom, value: rangeStart.formatted())
+                    }
+                    Stepper(value: $rangeEnd, in: 1...max(pages.count, 1)) {
+                        LabeledContent(L10n.exportTo, value: rangeEnd.formatted())
+                    }
+                }
+            }
+            formatOptions
+            Section {
+                tileRow {
+                    #if os(iOS)
+                    ChoiceTile(title: L10n.exportToFiles, systemImage: "folder",
+                               isSelected: effectiveDestination == .save, identifier: "export-destination-save") { destination = .save }
+                    #else
+                    ChoiceTile(title: L10n.exportToDisk, systemImage: "square.and.arrow.down",
+                               isSelected: effectiveDestination == .save, identifier: "export-destination-save") { destination = .save }
+                    #endif
+                    ChoiceTile(title: L10n.exportCopy, systemImage: "doc.on.doc",
+                               isSelected: effectiveDestination == .copy, isEnabled: !producesArchive,
+                               identifier: "export-destination-copy") { destination = .copy }
+                    ChoiceTile(title: L10n.exportShareTile, systemImage: "square.and.arrow.up",
+                               isSelected: effectiveDestination == .share, identifier: "export-destination-share") { destination = .share }
+                }
+            } header: {
+                Text(L10n.exportDestination)
+            } footer: {
+                if producesArchive {
+                    Text(L10n.exportCopyUnavailable)
                 }
             }
         }
+        .formStyle(.grouped)
+        .disabled(isBusyOrDone)
+    }
 
+    private var documentRow: some View {
+        HStack(spacing: 12) {
+            if let cover = pages.first {
+                PageImageView(page: cover, pixelSize: 120)
+                    .frame(width: 34, height: 44)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(itemName).font(.headline).lineLimit(2)
+                Text(L10n.pageCount(pages.count)).font(.subheadline).foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Tiles side by side, or stacked when their labels don't fit (long
+    /// French and Spanish labels on a phone).
+    private func tileRow(@ViewBuilder _ tiles: () -> some View) -> some View {
+        ViewThatFits(in: .horizontal) {
+            // Tiles in a row share the tallest one's height.
+            HStack(spacing: 10) { tiles() }
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 8) { tiles() }
+        }
+        .listRowBackground(Color.clear)
+        // Inset from the row's edges: rows clip to large rounded corners,
+        // which would cut into the tiles' borders.
+        .listRowInsets(EdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8))
+    }
+
+    @ViewBuilder
+    private var formatOptions: some View {
         if options.format == .pdf {
             Section {
                 Picker(L10n.paperSize, selection: $options.paperSize) {
@@ -165,16 +259,29 @@ struct ExportSheet: View {
     private var footer: some View {
         switch phase {
         case .configuring:
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 if !rangeIsValid {
                     Text(L10n.exportInvalidRange).font(.caption).foregroundStyle(.red)
                 }
-                Spacer()
-                Button(L10n.cancel, role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button(L10n.exportButton) { startExport() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!rangeIsValid)
+                #if os(iOS)
+                Button { startExport() } label: {
+                    Text(L10n.exportButton).font(.headline).frame(maxWidth: .infinity, minHeight: 30)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(!rangeIsValid)
+                .accessibilityIdentifier("export-start")
+                #else
+                HStack {
+                    Spacer()
+                    Button(L10n.cancel, role: .cancel) { dismiss() }
+                        .keyboardShortcut(.cancelAction)
+                    Button(L10n.exportButton) { startExport() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(!rangeIsValid)
+                        .accessibilityIdentifier("export-start")
+                }
+                #endif
             }
         case .exporting(let progress):
             HStack {
@@ -188,19 +295,40 @@ struct ExportSheet: View {
                 }
             }
         case .ready(let output):
+            // Also where a cancelled save dialog lands: the files are kept,
+            // so Save and Share still work without exporting again.
             // Two rows so long French/Spanish labels fit on a phone.
             VStack(alignment: .leading, spacing: 10) {
                 Text(L10n.exportReady(ByteCountFormatter.string(fromByteCount: output.totalByteCount, countStyle: .file)))
                     .font(.callout)
                 HStack {
                     Spacer()
-                    ShareLink(items: output.files) {
-                        Label(L10n.exportShare, systemImage: "square.and.arrow.up")
+                    if destination == .share {
+                        ShareLink(items: output.files) {
+                            Label(L10n.exportShare, systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("export-share")
+                        Button(L10n.exportSave) { isShowingSaver = true }
+                    } else {
+                        ShareLink(items: output.files) {
+                            Label(L10n.exportShare, systemImage: "square.and.arrow.up")
+                        }
+                        .accessibilityIdentifier("export-share")
+                        Button(L10n.exportSave) { isShowingSaver = true }
+                            .keyboardShortcut(.defaultAction)
                     }
-                    Button(L10n.exportSave) { isShowingSaver = true }
-                        .keyboardShortcut(.defaultAction)
                     Button(L10n.done) { dismiss() }
                 }
+            }
+        case .copied:
+            HStack {
+                Label(L10n.exportCopied, systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .accessibilityIdentifier("export-copied")
+                Spacer()
+                Button(L10n.done) { dismiss() }
+                    .keyboardShortcut(.defaultAction)
             }
         case .failed(let message):
             HStack {
@@ -211,7 +339,7 @@ struct ExportSheet: View {
         }
     }
 
-    private var isBusyOrReady: Bool {
+    private var isBusyOrDone: Bool {
         if case .configuring = phase { return false }
         return true
     }
@@ -221,8 +349,22 @@ struct ExportSheet: View {
         return nil
     }
 
+    private var currentIndex: Int? {
+        currentPageID.flatMap { id in pages.firstIndex { $0.id == id } }
+    }
+
     private var rangeIsValid: Bool {
         pageChoice != .range || (1...pages.count).contains(rangeStart) && (rangeStart...pages.count).contains(rangeEnd)
+    }
+
+    /// Several image pages packed as one ZIP, which the clipboard can't
+    /// usefully hold.
+    private var producesArchive: Bool {
+        options.format != .pdf && selectedPages.count > 1 && options.packaging == .zip
+    }
+
+    private var effectiveDestination: Destination {
+        destination == .copy && producesArchive ? .save : destination
     }
 
     /// Selected pages in document order.
@@ -243,6 +385,7 @@ struct ExportSheet: View {
         let selection = selectedPages
         let options = options
         let name = itemName
+        let target = effectiveDestination
         phase = .exporting(ExportProgress(completedPages: 0, totalPages: selection.count))
         exportTask = Task {
             do {
@@ -253,8 +396,18 @@ struct ExportSheet: View {
                 }
                 if Task.isCancelled {
                     output.removeTemporaryFiles()
-                } else {
+                    return
+                }
+                switch target {
+                case .save:
                     phase = .ready(output)
+                    isShowingSaver = true
+                case .share:
+                    phase = .ready(output)
+                case .copy:
+                    try Clipboard.write(files: output.files)
+                    output.removeTemporaryFiles()
+                    phase = .copied
                 }
             } catch is CancellationError {
                 phase = .configuring
@@ -262,6 +415,91 @@ struct ExportSheet: View {
                 phase = .failed(L10n.exportFailed)
             }
         }
+    }
+}
+
+/// One choice in a row of tiles: an optional icon, a title and an optional
+/// detail line; the selected tile has an accent border and a checkmark.
+/// Its own button style keeps each tile's tap separate inside a Form row.
+struct ChoiceTile: View {
+    /// Already localized (format names are the same in every language).
+    let title: String
+    var subtitle: String?
+    var systemImage: String?
+    var iconColor: Color = .secondary
+    let isSelected: Bool
+    var isEnabled = true
+    let identifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.title2)
+                        .foregroundStyle(iconColor)
+                }
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let subtitle {
+                    Text(verbatim: subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, minHeight: 68, maxHeight: .infinity)
+        }
+        .buttonStyle(ChoiceTileStyle(isSelected: isSelected))
+        .disabled(!isEnabled)
+        .overlay(alignment: .topTrailing) {
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.body)
+                    .foregroundStyle(.white, Theme.accent)
+                    .offset(x: 6, y: -6)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityLabel(subtitle.map { "\(title), \($0)" } ?? title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+private struct ChoiceTileStyle: ButtonStyle {
+    let isSelected: Bool
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.primary)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(isSelected ? Theme.accent : Theme.separator, lineWidth: isSelected ? 2 : 1)
+            }
+            .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.4)
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+/// Appear/disappear handling and the save dialog, shared by the iOS and
+/// Mac layouts of the sheet.
+private struct ExportLifecycle: ViewModifier {
+    let onAppear: () -> Void
+    let onDisappear: () -> Void
+    let saver: SaveExportedFiles
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear(perform: onAppear)
+            .onDisappear(perform: onDisappear)
+            .modifier(saver)
     }
 }
 

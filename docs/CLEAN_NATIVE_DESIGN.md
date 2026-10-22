@@ -115,11 +115,11 @@ A custom camera: Cancel, "Auto ▾", flash and `⋯` at the top; detected page c
 | OCR button, "Searchable text (OCR)" toggle | Leave out | M4 |
 | Thumbnail column with page numbers and `+` | **Build now** (Mac and iPad) | `+` = Add Pages… |
 | Labeled **Export** button | **Build now** | |
-| Export: PDF / JPEG / PNG tiles | **Build now** | |
+| Export: PDF / JPEG / PNG tiles | **Built** (pass 3) | |
 | Export: Word, Plain text tiles | Leave out | DOCX/TXT export (M4/M5, Pro) |
-| Export: All / Current / Custom range | **Build now** | The current sheet supports a contiguous range; "2–5, 8" lists are a later enhancement |
+| Export: All / Current / Custom range | **Built** (pass 3): tiles with a detail line (page count, "Page n of m", the range) | Contiguous range with From/To steppers; "2–5, 8" lists are a later enhancement |
 | Export: "Include images" | Leave out | No meaning today |
-| Export to: Save to Files / Copy / Share / More | **Build now** | Destination first, then Export. See the risk notes below |
+| Export to: Save to Files / Copy / Share / More | **Built** (pass 3) as Save to Files (Mac: Save to Disk) / Copy / Share. **"More" dropped (Claude's call):** the share sheet already is "more". The mockup's ✕ next to Cancel was dropped too (one way to close; Claude's call) | Save opens the save dialog right after Export; closing it keeps the files (ready footer: Save… / Share… / Done). Copy puts the file **contents** on the clipboard (one item per file) and is off for ZIP output. Share shows a prominent Share… button once ready (`ShareLink` can't be opened from code; auto-presenting `UIActivityViewController` would need an iPad popover anchor that can't be tested without an iPad runtime) |
 | iPhone "Scan document" (filled blue) | **Build now** (restyle) | |
 | iPhone "New note" | Leave out; **Import** takes that slot until M3 | |
 | iPhone Recent row + See All | **Built** (pass 2) | See All = All Documents. A document opened from Recent pushes over the home, so Back returns there |
@@ -136,7 +136,7 @@ A custom camera: Cancel, "Auto ▾", flash and `⋯` at the top; detected page c
 |---|---|---|---|
 | 1 | Theme, Scan/Import buttons, grid/list, labeled phone tools | Codex | Done 17:42. Verified on the combined tree: 115 unit tests and 4 UI tests pass |
 | 2 | **Library + sidebar + iPhone home:** counts; Folders (create, rename, delete, Move to Folder, import into the shown folder); title + "N items"; sort menu; tiles with `⋯`; iPhone home (Scan/Import, Recent + See All, library, folders) | Claude | **Done 20:30** (see TEST_MATRIX.md). Follow-ups: home search field, `⋯` on Recent cards, drag to folders, folder colors, Mac/iPad visual check |
-| 3 | **Export sheet** redesign, all platforms | Codex (suggested) | Open |
+| 3 | **Export sheet** redesign, all platforms | Claude | **Done 21:00**: document row, Format and Pages tiles, Export To tiles, one Export button (iOS: pinned full-width; Mac: Cancel/Export at the bottom right). Verified on iPhone (UI tests, en/fr/es, dark, largest text). **Mac sheet not viewed** |
 | 4 | **Document view:** Mac/iPad thumbnail column with `+`, title `▾` menu, labeled Export, `⋯` menu; iPhone filter strip | open | Open |
 | 5 | Continuity Camera "Scan from iPhone" on Mac | open | Needs hardware to verify |
 | 6 | Post-scan review (Edit) screen on iPhone | open | After pass 4 |

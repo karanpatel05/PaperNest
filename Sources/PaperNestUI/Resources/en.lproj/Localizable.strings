@@ -188,3 +188,12 @@
 "library.home.title" = "Documents";
 "library.home.recent" = "Recent";
 "library.home.seeAll" = "See All";
+
+// Design pass 3: export sheet
+"export.destination" = "Export To";
+"export.destination.files" = "Save to Files";
+"export.destination.disk" = "Save to Disk";
+"export.destination.copy" = "Copy";
+"export.destination.share" = "Share";
+"export.copy.unavailable" = "A ZIP archive can’t be copied. Save or share it instead.";
+"export.copied" = "Copied to the clipboard.";
