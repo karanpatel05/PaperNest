@@ -8,15 +8,18 @@ import UIKit
 /// finished gesture (a stroke, an erase, a lasso move) is turned into stored
 /// `InkStroke` objects and handed to `onChange` as one change.
 ///
-/// Undo: PencilKit registers each stroke with the canvas's undo manager, so
-/// the canvas has its own (`InkCanvasView`). Palette undo/redo and ⌘Z work
-/// while marking up; the history ends whenever the drawing is reloaded (another
-/// page, a zoom or rotation, an outside change) and with the Markup session.
+/// Undo: each change is one step in the document's undo history
+/// (`DocumentModel.changeInk` registers its exact inverse), so ⌘Z, the Edit
+/// menu and the tool palette's buttons all undo ink, also after zooming,
+/// switching pages or leaving Markup. PencilKit's own per-stroke undo is
+/// switched off (`InkCanvasView`); undoing reloads the canvas from the store.
 struct InkCanvas: UIViewRepresentable {
     let pageID: PageID
     let objects: [PageObject]
     let sourceToView: CGAffineTransform
     let fingerDrawing: Bool
+    /// The document's undo manager, for the tool palette's Undo and Redo.
+    let documentUndoManager: UndoManager?
     let onChange: (_ saving: [PageObject], _ deleting: [PageObject]) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -43,6 +46,7 @@ struct InkCanvas: UIViewRepresentable {
     func updateUIView(_ canvas: InkCanvasView, context: Context) {
         let coordinator = context.coordinator
         coordinator.onChange = onChange
+        canvas.paletteUndoManager.document = documentUndoManager
         canvas.drawingPolicy = fingerDrawing ? .anyInput : .pencilOnly
         coordinator.show(pageID: pageID, objects: objects, sourceToView: sourceToView)
         canvas.accessibilityLabel = L10n.markup
@@ -52,7 +56,6 @@ struct InkCanvas: UIViewRepresentable {
     static func dismantleUIView(_ canvas: InkCanvasView, coordinator: Coordinator) {
         coordinator.toolPicker.setVisible(false, forFirstResponder: canvas)
         coordinator.toolPicker.removeObserver(canvas)
-        canvas.ownUndoManager.removeAllActions()
         canvas.resignFirstResponder()
     }
 
@@ -82,7 +85,6 @@ struct InkCanvas: UIViewRepresentable {
         func show(pageID: PageID, objects: [PageObject], sourceToView: CGAffineTransform) {
             let incoming = Dictionary(objects.map { ($0.id, $0.payload) }, uniquingKeysWith: { a, _ in a })
             if pageID == self.pageID, sourceToView == conversion.sourceToView {
-                if incoming == modelState { return }   // nothing saved yet
                 if let caughtUp = pending.firstIndex(of: incoming) {
                     pending.removeFirst(caughtUp + 1)
                     modelState = incoming
@@ -95,12 +97,8 @@ struct InkCanvas: UIViewRepresentable {
             load(objects)
         }
 
-        /// Replaces the drawing. PencilKit's undo steps describe the drawing
-        /// being replaced (other seeds, another page or zoom), so undoing one
-        /// afterwards would save strokes in the wrong place: they go too.
         private func load(_ objects: [PageObject]) {
             guard let canvas else { return }
-            canvas.ownUndoManager.removeAllActions()
             known = [:]
             var strokes: [PKStroke] = []
             for object in objects {
@@ -170,10 +168,54 @@ struct InkCanvas: UIViewRepresentable {
     }
 }
 
-/// A canvas with an undo manager of its own (see `InkCanvas`).
+/// A canvas whose undo manager takes no registrations: PencilKit records
+/// each stroke there, but every change is already one step in the
+/// document's history (see `InkCanvas`). The tool palette's Undo and Redo
+/// ask the canvas's undo manager, so they are passed on to the document's.
 final class InkCanvasView: PKCanvasView {
-    let ownUndoManager = UndoManager()
-    override var undoManager: UndoManager? { ownUndoManager }
+    let paletteUndoManager = PaletteUndoManager()
+    override var undoManager: UndoManager? { paletteUndoManager }
+}
+
+final class PaletteUndoManager: UndoManager {
+    /// The document's undo manager. The palette enables its buttons when
+    /// this manager announces a change, so the document's announcements are
+    /// passed on.
+    weak var document: UndoManager? {
+        didSet { if document !== oldValue { relayNotifications() } }
+    }
+    /// Touched on the main thread, and in `deinit` once nothing else can.
+    nonisolated(unsafe) private var relays: [NSObjectProtocol] = []
+
+    override init() {
+        super.init()
+        disableUndoRegistration()
+    }
+
+    deinit {
+        relays.forEach(NotificationCenter.default.removeObserver)
+    }
+
+    override var canUndo: Bool { document?.canUndo ?? false }
+    override var canRedo: Bool { document?.canRedo ?? false }
+    override func undo() { document?.undo() }
+    override func redo() { document?.redo() }
+
+    private func relayNotifications() {
+        relays.forEach(NotificationCenter.default.removeObserver)
+        relays = []
+        guard let document else { return }
+        let names: [Notification.Name] = [.NSUndoManagerCheckpoint, .NSUndoManagerDidCloseUndoGroup,
+                                          .NSUndoManagerDidUndoChange, .NSUndoManagerDidRedoChange]
+        for name in names {
+            relays.append(NotificationCenter.default.addObserver(forName: name, object: document, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    NotificationCenter.default.post(name: name, object: self)
+                }
+            })
+        }
+    }
 }
 
 /// What identifies a stroke's current shape: PencilKit moves strokes by

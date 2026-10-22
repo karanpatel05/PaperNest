@@ -85,7 +85,7 @@ struct DocumentView: View {
                         .frame(width: 168)
                     Divider()
                     PageViewer(model: model, zoom: $zoom, showsZoomButtons: true, isMarkingUp: isMarkingUp,
-                               fingerDrawing: isFingerDrawing)
+                               fingerDrawing: isFingerDrawing, undoManager: undoManager)
                 }
             }
         }
@@ -678,6 +678,7 @@ private struct PageViewer: View {
     let showsZoomButtons: Bool
     var isMarkingUp = false
     var fingerDrawing = false
+    var undoManager: UndoManager?
     @Environment(\.displayScale) private var displayScale
     @State private var pinchBase: CGFloat?
 
@@ -702,8 +703,8 @@ private struct PageViewer: View {
                                 InkCanvas(pageID: page.id, objects: model.selectedPageObjects.filter { $0.pageID == page.id },
                                           sourceToView: page.geometry.sourceToPage.concatenating(
                                               CGAffineTransform(scaleX: size.width / pageSize.width, y: size.height / pageSize.height)),
-                                          fingerDrawing: fingerDrawing) { saving, deleting in
-                                    Task { await model.changeInk(on: page.id, saving: saving, deleting: deleting, undoManager: nil) }
+                                          fingerDrawing: fingerDrawing, documentUndoManager: undoManager) { saving, deleting in
+                                    Task { await model.changeInk(on: page.id, saving: saving, deleting: deleting, undoManager: undoManager) }
                                 }
                             }
                         }
@@ -723,7 +724,9 @@ private struct PageViewer: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if showsZoomButtons {
+            // Hidden while marking up: the tool palette covers this spot
+            // (pinch still zooms).
+            if showsZoomButtons, !isMarkingUp {
                 HStack(spacing: 18) {
                     Button { step(-1) } label: { Label(L10n.zoomOut, systemImage: "minus.magnifyingglass") }
                         .keyboardShortcut("-", modifiers: .command)

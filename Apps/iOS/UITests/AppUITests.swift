@@ -287,19 +287,28 @@ final class AppUITests: XCTestCase {
         let none = NSPredicate(format: "value == %@", "0 strokes")
         wait(for: [expectation(for: one, evaluatedWith: canvas)], timeout: 10)
 
-        // Undo and redo while marking up (the canvas's own history), saved each time.
-        app.typeKey("z", modifierFlags: .command)
+        // Undo and redo from the tool palette: the stroke is one step in the
+        // document's undo history. (A ⌘Z injected by XCUITest never reached
+        // the app's undo in the Simulator; see TEST_MATRIX.)
+        let undoButton = app.buttons["Undo"].firstMatch, redoButton = app.buttons["Redo"].firstMatch
+        XCTAssertTrue(undoButton.waitForExistence(timeout: 5), "no Undo in the tool palette")
+        undoButton.tap()
         wait(for: [expectation(for: none, evaluatedWith: canvas)], timeout: 10)
-        app.typeKey("z", modifierFlags: [.command, .shift])
+        redoButton.tap()
         wait(for: [expectation(for: one, evaluatedWith: canvas)], timeout: 10)
 
-        // Zooming reloads the canvas and ends that history, so an undo can't
-        // bring back strokes drawn at the old scale.
-        app.buttons["Zoom In"].tap()
+        // Undo works on saved ink, so it still works after a zoom reloads
+        // the canvas at another scale. (The zoom buttons are hidden under
+        // the palette while marking up; fingers pinch once they don't draw.)
+        app.descendants(matching: .any)["editor-finger-drawing"].tap()
+        let before = canvas.frame
+        canvas.pinch(withScale: 1.8, velocity: 1)
         sleep(1)
-        app.typeKey("z", modifierFlags: .command)
-        sleep(1)
-        XCTAssertEqual(strokes(), "1 stroke", "undo after a zoom changed the ink")
+        XCTAssertNotEqual(canvas.frame.size, before.size, "the pinch did not zoom")
+        undoButton.tap()
+        wait(for: [expectation(for: none, evaluatedWith: canvas)], timeout: 10)
+        redoButton.tap()
+        wait(for: [expectation(for: one, evaluatedWith: canvas)], timeout: 10)
 
         markup.tap()   // off
         markup.tap()   // on again: reloaded from the library
