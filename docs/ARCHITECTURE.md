@@ -57,14 +57,14 @@ Library/
 2. **Metadata:** a single `BEGIN IMMEDIATE … COMMIT` inserts the asset row, item and pages. Inserting a row whose file is missing throws, so the database never references a missing file.
 3. A crash between 1 and 2 leaves an unreferenced file. `sweepOrphanAssets` (run at launch, with a 1-hour grace period) removes it, along with unreferenced rows and stale staging files.
 4. Every mutating `LibraryStore` method commits before returning. View models update `pages` and `items` only from committed results.
-5. Deleting a page only sets `pages.deleted_at`. The page, its objects and OCR, and its original stay put, so in-session undo always works. At the next launch, housekeeping runs in this order: `purgeDeletedPages`, then `purgeExpiredDeletions` (Recently Deleted older than 30 days), then `sweepOrphanAssets`. Permanent deletion of items therefore never removes an original that a deleted-but-undoable page still references.
+5. Deleting a page only sets `pages.deleted_at`. The page, its objects and OCR, and its original stay put, so in-session undo always works. At the next launch, housekeeping runs in this order: `purgeDeletedPages`, `purgeReplacedPageContent`, `purgeExpiredDeletions` (Recently Deleted older than 30 days), then `sweepOrphanAssets`. A rescan (`replacePage`) replaces the content and inserts any extra captured pages in one transaction (`SQLiteDatabase.transaction` nests as savepoints, so store operations compose atomically). Rescans use the same principle as page deletion: the previous content stays referenced in `page_content_history` until the next launch. Permanent deletion of items therefore never removes an original that a deleted-but-undoable page still references.
 6. A library written by a newer schema (`user_version` above the supported version) is refused untouched, and the UI explains it.
 
 Tests cover each step: `DurabilityTests`, `LibraryStoreTests`, `DeletionTests`.
 
-### Schema (v2)
+### Schema (v3)
 
-`folders`, `items`, `tags`/`item_tags`, `assets` (keyed by SHA-256, with `availability` local or remoteOnly), `pages`, `page_transform_history`, `page_objects` (ink/text/image JSON payloads), `page_recognition` (OCR, stale when `source_revision` is older than the page's revision), and `search_index` (FTS5, `unicode61 remove_diacritics 2`, derived and rebuildable). v2 adds `pages.deleted_at` (soft delete until next launch). See `Sources/PaperNestStore/Schema.swift`. Migrations are ordered and each runs in its own transaction with its `user_version` bump.
+`folders`, `items`, `tags`/`item_tags`, `assets` (keyed by SHA-256, with `availability` local or remoteOnly), `pages`, `page_transform_history`, `page_objects` (ink/text/image JSON payloads), `page_recognition` (OCR, stale when `source_revision` is older than the page's revision), and `search_index` (FTS5, `unicode61 remove_diacritics 2`, derived and rebuildable). v2 adds `pages.deleted_at` (soft delete until next launch). v3 adds `page_content_history`: a rescanned page's previous content, whose original stays referenced (so it can't be swept) until the next launch. See `Sources/PaperNestStore/Schema.swift`. Migrations are ordered and each runs in its own transaction with its `user_version` bump.
 
 ### Ordering
 
@@ -116,7 +116,7 @@ Image handling:
 
 ## Sync design (M2, not yet implemented)
 
-- **Engine:** `CKSyncEngine` on the private database, in a custom zone. Its serialized state is persisted in a `sync_state` table (a v3 migration) and restored at launch.
+- **Engine:** `CKSyncEngine` on the private database, in a custom zone. Its serialized state is persisted in a `sync_state` table (a v4 migration) and restored at launch.
 - **Single owner:** an `outbox` table is written *in the same transaction* as each edit (record name and change kind). The engine's "next batch" is built from the outbox, so a crash can't lose a pending change or double-apply one. IDs are stable UUIDs and SHA-256 hashes, so retries are idempotent.
 - **Records:** `Item`, `Folder`, `Page`, `PageObject` (one record per stroke or text box), and `Asset` (CKAsset keyed by SHA-256). OCR and thumbnails are derived and not synced.
 - **Ordering of arrival:** a page whose asset hasn't arrived gets `availability = remoteOnly` and is shown as downloading, never as available offline.

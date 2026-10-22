@@ -2,6 +2,8 @@
 
 Start each session by reading `docs/SESSION_HANDOFF.md` and `docs/IMPLEMENTATION_PLAN.md`. The product brief is `CLAUDE_CODE_PROMPT.md`. Leave it unchanged.
 
+Design work: follow `docs/CLEAN_NATIVE_DESIGN.md` and the owner's mockups in `docs/design/mockups/`. Claude and Codex share this working tree; check "Who is editing what" at the top of `docs/SESSION_HANDOFF.md` before editing UI files.
+
 ## Verify
 
 ```bash

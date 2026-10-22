@@ -24,6 +24,18 @@ public final class LibraryModel {
     }
     var path: [ItemID] = []
     private(set) var items: [LibraryStore.ItemSummary] = []
+    /// Folders for the sidebar, by name.
+    private(set) var folders: [Folder] = []
+    /// Item counts shown next to each sidebar entry.
+    private(set) var counts = LibraryStore.ScopeCounts()
+    /// Applies to every scope except Recently Deleted (always newest
+    /// deletion first). Remembered across launches.
+    var sortOrder: LibrarySort = LibrarySort(rawValue: UserDefaults.standard.string(forKey: "librarySort") ?? "") ?? .dateModified {
+        didSet {
+            UserDefaults.standard.set(sortOrder.rawValue, forKey: "librarySort")
+            items = sorted(items)
+        }
+    }
     private(set) var hasLoaded = false
     var searchText = ""
     private(set) var isImporting = false
@@ -31,6 +43,10 @@ public final class LibraryModel {
     /// PDFs waiting for a password, shown one at a time.
     private(set) var passwordQueue: [PendingPassword] = []
     var isShowingFileImporter = false
+    var isShowingScanner = false
+    var isShowingSettings = false
+    /// The newest documents, for the iPhone home's Recent row.
+    private(set) var recentItems: [LibraryStore.ItemSummary] = []
 
     struct PendingPassword: Identifiable {
         let id = UUID()
@@ -38,13 +54,39 @@ public final class LibraryModel {
         let filename: String
         /// Set after a wrong attempt so the prompt can say so.
         var lastAttemptFailed = false
-        /// When non-nil, pages are added to this item instead of a new one.
-        var targetItem: ItemID?
+        var destination: Destination
     }
 
-    public init(session: LibrarySession) {
-        self.session = session
+    /// Where an import goes once its password is known.
+    enum Destination {
+        case newItem(folder: FolderID?)
+        case pages(into: ItemID, after: PageID?)
+        /// Validated pages handed to an action, e.g. replacing a page.
+        case prepared(@MainActor (DocumentImporter.Prepared) async -> Void)
     }
+
+    /// `startsAtHome`: iPhone opens on the home (the sidebar column) rather
+    /// than on All Documents.
+    public init(session: LibrarySession, startsAtHome: Bool = false) {
+        self.session = session
+        if startsAtHome { sidebarSelection = nil }
+    }
+
+    /// Opens a document from anywhere: over the iPhone home when that is
+    /// showing (no selection), otherwise over All Documents.
+    func open(_ id: ItemID) {
+        if sidebarSelection == nil {
+            homeDocument = id
+        } else {
+            sidebarSelection = .all
+            path = [id]
+        }
+    }
+
+    /// A document pushed directly over the iPhone home (Recent row).
+    /// Setting the split view's selection and the library's path together
+    /// loses the path on iPhone, so the home pushes the document itself.
+    var homeDocument: ItemID?
 
     var environment: AppEnvironment? { session.environment }
 
@@ -59,7 +101,12 @@ public final class LibraryModel {
                 let matches = Set(try await env.store.search(query))
                 summaries = summaries.filter { matches.contains($0.id) }
             }
-            items = summaries
+            items = sorted(summaries)
+            folders = try await env.store.folders()
+            counts = try await env.store.scopeCounts()
+            if case .folder(let id?) = scope, !folders.contains(where: { $0.id == id }) {
+                stopShowingFolder()
+            }
             hasLoaded = true
         } catch {
             presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.libraryOpenFailed)
@@ -82,11 +129,12 @@ public final class LibraryModel {
                     let added = try await env.importer.insertPages(from: .file(url), into: target, after: insertAfter)
                     insertAfter = added.last?.id ?? insertAfter
                 } else {
-                    _ = try await env.importer.importItem(.file(url))
+                    _ = try await env.importer.importItem(.file(url), folderID: currentFolderID)
                 }
             } catch ImportError.passwordRequired(let filename) {
                 if let data = try? env.importer.loadData(.file(url)) {
-                    passwordQueue.append(PendingPassword(data: data, filename: filename, targetItem: target))
+                    let destination: Destination = target.map { .pages(into: $0, after: insertAfter) } ?? .newItem(folder: currentFolderID)
+                    passwordQueue.append(PendingPassword(data: data, filename: filename, destination: destination))
                 } else {
                     failures.append(.unreadable(filename: filename))
                 }
@@ -106,7 +154,7 @@ public final class LibraryModel {
         isImporting = true
         defer { isImporting = false }
         do {
-            _ = try await env.importer.importScan(images: images, name: name)
+            _ = try await env.importer.importScan(images: images, name: name, folderID: currentFolderID)
             session.didChange()
         } catch let error as ImportError {
             report([error])
@@ -120,10 +168,13 @@ public final class LibraryModel {
         passwordQueue.removeAll { $0.id == pending.id }
         let source = DocumentImporter.Source.data(pending.data, name: pending.filename)
         do {
-            if let target = pending.targetItem {
-                try await env.importer.insertPages(from: source, password: password, into: target, after: nil)
-            } else {
-                _ = try await env.importer.importItem(source, password: password)
+            switch pending.destination {
+            case .newItem(let folder):
+                _ = try await env.importer.importItem(source, password: password, folderID: folder)
+            case .pages(let target, let after):
+                try await env.importer.insertPages(from: source, password: password, into: target, after: after)
+            case .prepared(let use):
+                await use(try await env.importer.prepareInBackground(source, password: password))
             }
             session.didChange()
         } catch ImportError.incorrectPassword, ImportError.passwordRequired {
@@ -137,8 +188,50 @@ public final class LibraryModel {
         }
     }
 
+    /// Validates and stores originals without creating pages, then hands
+    /// them to `use` (rescan, replace). Password prompts and errors are
+    /// handled like any other import.
+    func prepareFile(_ url: URL, then use: @escaping @MainActor (DocumentImporter.Prepared) async -> Void) async {
+        guard let env = environment else { return }
+        isImporting = true
+        defer { isImporting = false }
+        do {
+            await use(try await env.importer.prepareInBackground(.file(url)))
+        } catch ImportError.passwordRequired(let filename) {
+            if let data = try? env.importer.loadData(.file(url)) {
+                passwordQueue.append(PendingPassword(data: data, filename: filename, destination: .prepared(use)))
+            } else {
+                report([.unreadable(filename: filename)])
+            }
+        } catch let error as ImportError {
+            report([error])
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
+    /// Camera pages for an existing document (add or rescan).
+    func prepareImages(_ images: [Data], name: String, then use: @escaping @MainActor (DocumentImporter.Prepared) async -> Void) async {
+        guard let env = environment, !images.isEmpty else { return }
+        isImporting = true
+        defer { isImporting = false }
+        do {
+            await use(try await env.importer.prepareAll(images.enumerated().map { .data($1, name: "\(name) \($0 + 1)") }))
+        } catch let error as ImportError {
+            report([error])
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
     func cancelPassword(_ pending: PendingPassword) {
         passwordQueue.removeAll { $0.id == pending.id }
+    }
+
+    /// The system file picker itself failed (not a cancel, which reports
+    /// nothing): say so instead of silently doing nothing.
+    func reportPickerFailure() {
+        presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.importUnreadable)
     }
 
     private func report(_ failures: [ImportError]) {
@@ -151,6 +244,81 @@ public final class LibraryModel {
                 message: failures.map { L10n.importErrorLine($0.filename, $0.localizedReason) }.joined(separator: "\n")
             )
         }
+    }
+
+    private func sorted(_ summaries: [LibraryStore.ItemSummary]) -> [LibraryStore.ItemSummary] {
+        guard scope != .recentlyDeleted else { return summaries }
+        return switch sortOrder {
+        case .dateModified: summaries   // the store's order
+        case .dateAdded: summaries.sorted { $0.item.createdAt > $1.item.createdAt }
+        case .name: summaries.sorted { $0.item.name.localizedStandardCompare($1.item.name) == .orderedAscending }
+        }
+    }
+
+    /// The name of what the library shows.
+    var scopeTitle: String {
+        switch scope {
+        case .all, .folder(nil): L10n.allDocuments
+        case .favorites: L10n.favorites
+        case .recentlyDeleted: L10n.recentlyDeleted
+        case .folder(let id?): folders.first { $0.id == id }?.name ?? L10n.allDocuments
+        }
+    }
+
+    // MARK: - Folders
+
+    /// New documents go into the folder being shown; from the iPhone home
+    /// (no selection) they go to the library root.
+    var currentFolderID: FolderID? {
+        guard sidebarSelection != nil, case .folder(let id) = scope else { return nil }
+        return id
+    }
+
+    /// Refreshes only what the sidebar shows.
+    func reloadSidebar() async {
+        guard let env = environment else { return }
+        folders = (try? await env.store.folders()) ?? folders
+        counts = (try? await env.store.scopeCounts()) ?? counts
+        if let all = try? await env.store.items(in: .all) { recentItems = Array(all.prefix(10)) }
+    }
+
+    /// Creates a folder and shows it.
+    func createFolder(named name: String) async {
+        guard let env = environment else { return }
+        do {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let folder = try await env.store.createFolder(named: trimmed.isEmpty ? L10n.newFolder : trimmed)
+            folders = try await env.store.folders()
+            sidebarSelection = .folder(folder.id)
+            session.didChange()
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
+    func renameFolder(_ id: FolderID, to name: String) async {
+        await mutate { try await $0.store.renameFolder(id, to: name) }
+    }
+
+    /// Deletes the folder only; what was in it moves up (see `LibraryStore.deleteFolder`).
+    func deleteFolder(_ id: FolderID) async {
+        if scope == .folder(id) { stopShowingFolder() }
+        await mutate { try await $0.store.deleteFolder(id) }
+    }
+
+    /// Falls back to All Documents. On iPhone, when the sidebar is the
+    /// screen showing (selection nil), this doesn't push the library.
+    private func stopShowingFolder() {
+        if sidebarSelection == nil {
+            scope = .all
+            path = []
+        } else {
+            sidebarSelection = .all
+        }
+    }
+
+    func move(_ ids: [ItemID], to folderID: FolderID?) async {
+        await mutate { try await $0.store.move(ids, to: folderID) }
     }
 
     // MARK: - Item actions
@@ -186,4 +354,8 @@ public final class LibraryModel {
             presentedError = .saveFailed()
         }
     }
+}
+
+enum LibrarySort: String, CaseIterable {
+    case dateModified, dateAdded, name
 }

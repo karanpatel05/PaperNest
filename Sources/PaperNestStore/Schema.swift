@@ -122,5 +122,23 @@ enum Schema {
         ALTER TABLE pages ADD COLUMN deleted_at REAL;
         CREATE INDEX pages_live ON pages(item_id, deleted_at, sort_key, id);
         """),
+        // v3: a rescanned/replaced page's previous content, kept (with its
+        // original referenced) until the next launch so undo can restore it.
+        Migration(version: 3, sql: """
+        CREATE TABLE page_content_history (
+            page_id TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+            revision INTEGER NOT NULL,
+            source_width REAL NOT NULL,
+            source_height REAL NOT NULL,
+            content_kind TEXT NOT NULL CHECK (content_kind IN ('image', 'pdfPage', 'template')),
+            asset_id TEXT REFERENCES assets(id),
+            pdf_page_index INTEGER,
+            template TEXT,
+            transform_json TEXT NOT NULL,
+            replaced_at REAL NOT NULL,
+            PRIMARY KEY (page_id, revision)
+        );
+        CREATE INDEX page_content_history_by_asset ON page_content_history(asset_id);
+        """),
     ]
 }

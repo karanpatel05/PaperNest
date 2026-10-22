@@ -71,6 +71,7 @@ public final class LibrarySession {
                 // session (their undo is gone), expired Recently Deleted
                 // items, then originals nothing references any more.
                 try await env.store.purgeDeletedPages()
+                try await env.store.purgeReplacedPageContent()
                 try await env.store.purgeExpiredDeletions()
                 try await env.store.sweepOrphanAssets()
                 return env

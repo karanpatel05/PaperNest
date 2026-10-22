@@ -1,15 +1,52 @@
 import PaperNestCore
 import PaperNestStore
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 /// The app's main window: a sidebar of library scopes and a navigation
 /// stack from the library grid into documents. Adapts from iPhone (stacked)
 /// to iPad and Mac (side by side).
 public struct RootView: View {
     @State private var model: LibraryModel
+    @State private var folderPrompt: FolderPrompt?
+    @State private var folderName = ""
+    @State private var deletingFolder: Folder?
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
+    /// The name prompt for creating or renaming a folder.
+    enum FolderPrompt: Identifiable {
+        case create
+        case rename(Folder)
+
+        var id: String {
+            switch self {
+            case .create: "create"
+            case .rename(let folder): folder.id.rawValue
+            }
+        }
+    }
 
     public init(session: LibrarySession) {
-        _model = State(initialValue: LibraryModel(session: session))
+        #if os(iOS)
+        let startsAtHome = UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        let startsAtHome = false
+        #endif
+        _model = State(initialValue: LibraryModel(session: session, startsAtHome: startsAtHome))
+    }
+
+    /// iPhone (compact width) shows a home in the sidebar column: capture
+    /// buttons and recent documents above the library and folders.
+    private var showsHome: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .compact
+        #else
+        false
+        #endif
     }
 
     public var body: some View {
@@ -32,16 +69,85 @@ public struct RootView: View {
     private var splitView: some View {
         NavigationSplitView {
             List(selection: $model.sidebarSelection) {
+                if showsHome {
+                    LibraryHomeSections(model: model)
+                }
                 Section(L10n.sidebarLibrary) {
-                    Label(L10n.allDocuments, systemImage: "doc.on.doc").tag(LibraryStore.Scope.all)
-                    Label(L10n.favorites, systemImage: "star").tag(LibraryStore.Scope.favorites)
-                    Label(L10n.recentlyDeleted, systemImage: "trash").tag(LibraryStore.Scope.recentlyDeleted)
+                    Label(L10n.allDocuments, systemImage: "doc.on.doc").badge(model.counts.all).tag(LibraryStore.Scope.all)
+                    Label(L10n.favorites, systemImage: "star").badge(model.counts.favorites).tag(LibraryStore.Scope.favorites)
+                    Label(L10n.recentlyDeleted, systemImage: "trash").badge(model.counts.recentlyDeleted)
+                        .tag(LibraryStore.Scope.recentlyDeleted)
+                }
+                Section {
+                    ForEach(model.folders) { folder in
+                        Label(folder.name, systemImage: "folder")
+                            .badge(model.counts.folders[folder.id, default: 0])
+                            .tag(LibraryStore.Scope.folder(folder.id))
+                            .contextMenu {
+                                Button(L10n.rename) {
+                                    folderName = folder.name
+                                    folderPrompt = .rename(folder)
+                                }
+                                Button(L10n.deleteFolder, role: .destructive) { deletingFolder = folder }
+                            }
+                            .accessibilityIdentifier("sidebar-folder")
+                    }
+                } header: {
+                    HStack {
+                        Text(L10n.folders)
+                        Spacer()
+                        Button {
+                            folderName = ""
+                            folderPrompt = .create
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(L10n.newFolder)
+                        .accessibilityLabel(L10n.newFolder)
+                        .accessibilityIdentifier("sidebar-new-folder")
+                    }
                 }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 210)
-            #if os(macOS)
-            .navigationTitle(Brand.displayName)
+            .listStyle(.sidebar)
+            .task(id: model.session.changeToken) { await model.reloadSidebar() }
+            .navigationDestination(item: $model.homeDocument) { id in
+                DocumentView(itemID: id, session: model.session)
+            }
+            #if os(iOS)
+            .toolbar {
+                if showsHome {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            model.isShowingSettings = true
+                        } label: {
+                            Label(L10n.settingsTitle, systemImage: "gearshape")
+                        }
+                        .accessibilityIdentifier("library-settings")
+                    }
+                }
+            }
             #endif
+            .alert(folderPromptTitle, isPresented: folderPromptBinding, presenting: folderPrompt) { prompt in
+                TextField(L10n.renamePlaceholder, text: $folderName)
+                Button(L10n.cancel, role: .cancel) {}
+                Button(L10n.ok) {
+                    let name = folderName
+                    switch prompt {
+                    case .create: Task { await model.createFolder(named: name) }
+                    case .rename(let folder): Task { await model.renameFolder(folder.id, to: name) }
+                    }
+                }
+            }
+            .confirmationDialog(deletingFolder.map { L10n.deleteFolderTitle($0.name) } ?? "",
+                                isPresented: deleteFolderBinding, titleVisibility: .visible, presenting: deletingFolder) { folder in
+                Button(L10n.deleteFolderConfirm, role: .destructive) { Task { await model.deleteFolder(folder.id) } }
+                Button(L10n.cancel, role: .cancel) {}
+            } message: { _ in
+                Text(L10n.deleteFolderMessage)
+            }
+            .navigationSplitViewColumnWidth(min: 200, ideal: 240)
+            .navigationTitle(showsHome ? L10n.homeTitle : Brand.displayName)
         } detail: {
             NavigationStack(path: $model.path) {
                 LibraryView(model: model)
@@ -50,10 +156,26 @@ public struct RootView: View {
                     }
             }
         }
+        .modifier(LibraryPresentations(model: model))
         .focusedSceneValue(\.libraryModel, model)
         #if DEBUG
         .task { await openDebugItemIfRequested() }
         #endif
+    }
+
+    private var folderPromptTitle: String {
+        switch folderPrompt {
+        case .rename: L10n.renameFolderTitle
+        case .create, nil: L10n.newFolder
+        }
+    }
+
+    private var folderPromptBinding: Binding<Bool> {
+        Binding(get: { folderPrompt != nil }, set: { if !$0 { folderPrompt = nil } })
+    }
+
+    private var deleteFolderBinding: Binding<Bool> {
+        Binding(get: { deletingFolder != nil }, set: { if !$0 { deletingFolder = nil } })
     }
 
     #if DEBUG
@@ -64,7 +186,7 @@ public struct RootView: View {
               let store = model.session.environment?.store,
               let match = try? await store.items(in: .all).first(where: { $0.item.name == name })
         else { return }
-        model.path = [match.id]
+        model.open(match.id)
     }
     #endif
 }
@@ -83,6 +205,7 @@ struct DocumentCommandContext {
     let undoManager: UndoManager?
     let showExport: () -> Void
     let showAddPages: () -> Void
+    let showReplacePage: () -> Void
     let showCrop: () -> Void
 }
 

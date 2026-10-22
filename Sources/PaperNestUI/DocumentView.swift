@@ -14,7 +14,16 @@ struct DocumentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
     @State private var isShowingExport = false
-    @State private var isShowingAddPages = false
+    /// Why the file picker was opened. Kept apart from the presented flag:
+    /// SwiftUI clears the flag when the picker closes, before calling the
+    /// completion, so a purpose stored in the flag would already be gone
+    /// (that turned a replace into an add).
+    @State private var filePurpose: PageSourcePurpose = .add
+    @State private var isShowingFilePicker = false
+    #if os(iOS)
+    /// Why the document camera is open.
+    @State private var cameraPurpose: PageSourcePurpose?
+    #endif
     @State private var isShowingAdjustments = false
     @State private var isShowingPageOrganizer = false
     @State private var isShowingCrop = false
@@ -43,13 +52,12 @@ struct DocumentView: View {
                 } description: {
                     Text(L10n.emptyDocumentMessage)
                 } actions: {
-                    Button(L10n.addPages) { isShowingAddPages = true }
+                    Button(L10n.addPages) { openFilePicker(.add) }
                 }
             } else if isCompact {
                 VStack(spacing: 0) {
                     PageViewer(model: model, zoom: $zoom, showsZoomButtons: false)
-                    Divider()
-                    PageScroller(model: model)
+                    pageNavigation
                 }
             } else {
                 HStack(spacing: 0) {
@@ -63,6 +71,9 @@ struct DocumentView: View {
         .navigationTitle(model.item?.name ?? "")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isCompact, !model.pages.isEmpty { compactTools }
+        }
         #endif
         .toolbar { toolbar }
         .task(id: model.session.changeToken) { await model.load() }
@@ -93,11 +104,50 @@ struct DocumentView: View {
             PageOrganizer(model: model, undoManager: undoManager)
         }
         #endif
-        .fileImporter(isPresented: $isShowingAddPages, allowedContentTypes: LibraryView.importableTypes, allowsMultipleSelection: true) { result in
-            guard case .success(let urls) = result else { return }
-            let after = model.selectedPageID
-            Task { await importModel.importFiles(urls, into: model.itemID, after: after) }
+        .fileImporter(isPresented: $isShowingFilePicker, allowedContentTypes: LibraryView.importableTypes,
+                      allowsMultipleSelection: filePurpose != .replace) { result in
+            let purpose = filePurpose
+            guard case .success(let urls) = result else {
+                importModel.reportPickerFailure()
+                return
+            }
+            guard !urls.isEmpty else { return }
+            switch purpose {
+            case .replace:
+                Task {
+                    await importModel.prepareFile(urls[0]) { prepared in
+                        await model.replaceSelectedPage(with: prepared, undoManager: undoManager)
+                    }
+                }
+            case .add:
+                let after = model.selectedPageID
+                Task { await importModel.importFiles(urls, into: model.itemID, after: after) }
+            }
         }
+        #if os(iOS)
+        .fullScreenCover(item: $cameraPurpose) { purpose in
+            DocumentCameraView { outcome in
+                cameraPurpose = nil
+                switch outcome {
+                case .scanned(let images):
+                    let name = model.item?.name ?? ""
+                    Task {
+                        await importModel.prepareImages(images, name: name) { prepared in
+                            switch purpose {
+                            case .add: await model.insertPages(prepared)
+                            case .replace: await model.replaceSelectedPage(with: prepared, undoManager: undoManager)
+                            }
+                        }
+                    }
+                case .cancelled:
+                    break
+                case .failed:
+                    model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.scanFailed)
+                }
+            }
+            .ignoresSafeArea()
+        }
+        #endif
         .alert(importModel.presentedError?.title ?? "", isPresented: importErrorBinding, presenting: importModel.presentedError) { _ in
             Button(L10n.ok, role: .cancel) {}
         } message: { error in
@@ -107,7 +157,8 @@ struct DocumentView: View {
         .focusedSceneValue(\.documentCommands, DocumentCommandContext(
             model: model, undoManager: undoManager,
             showExport: { isShowingExport = true },
-            showAddPages: { isShowingAddPages = true },
+            showAddPages: { openFilePicker(.add) },
+            showReplacePage: { openFilePicker(.replace) },
             showCrop: { isShowingCrop = true }
         ))
     }
@@ -116,23 +167,6 @@ struct DocumentView: View {
     private var toolbar: some ToolbarContent {
         #if os(iOS)
         if isCompact {
-            ToolbarItemGroup(placement: .bottomBar) {
-                rotateLeftButton
-                Spacer()
-                rotateRightButton
-                Spacer()
-                cropButton
-                Spacer()
-                filterMenu
-                Spacer()
-                Button {
-                    isShowingPageOrganizer = true
-                } label: {
-                    Label(L10n.pages, systemImage: "square.grid.2x2")
-                }
-                Spacer()
-                deleteButton
-            }
             ToolbarItemGroup(placement: .primaryAction) {
                 addPagesButton
                 exportButton
@@ -145,15 +179,68 @@ struct DocumentView: View {
         #endif
     }
 
+    private var pageNavigation: some View {
+        VStack(spacing: 0) {
+            if let index = model.selectedIndex {
+                Text(L10n.pageLabel(index + 1, of: model.pages.count))
+                    .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                    .padding(.top, 10)
+            }
+            PageScroller(model: model)
+        }
+        .background(Theme.surface)
+    }
+
+    #if os(iOS)
+    private var compactTools: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 0) { compactToolButtons }
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: 12) { compactToolButtons }
+            }
+        }
+        .labelStyle(EditorToolLabelStyle())
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.accent)
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(Theme.surface)
+        .overlay(alignment: .top) { Divider() }
+    }
+
     @ViewBuilder
-    private var allActions: some View {
-        rotateLeftButton
-        rotateRightButton
+    private var compactToolButtons: some View {
+        rotateMenu
         cropButton
         filterMenu
-        deleteButton
+        Button { isShowingPageOrganizer = true } label: {
+            Label(L10n.pages, systemImage: "square.grid.2x2")
+        }
+        Menu {
+            deleteButton
+        } label: {
+            Label(L10n.more, systemImage: "ellipsis.circle")
+        }
+    }
+    #endif
+
+    @ViewBuilder
+    private var allActions: some View {
+        rotateMenu
+        cropButton
+        filterMenu
         addPagesButton
         exportButton
+        Menu { deleteButton } label: { Label(L10n.more, systemImage: "ellipsis.circle") }
+    }
+
+    private var rotateMenu: some View {
+        Menu {
+            rotateLeftButton
+            rotateRightButton
+        } label: {
+            Label(L10n.rotate, systemImage: "rotate.right")
+        }
+        .disabled(model.selectedPage == nil)
     }
 
     private var rotateLeftButton: some View {
@@ -181,6 +268,7 @@ struct DocumentView: View {
             Label(L10n.crop, systemImage: "crop")
         }
         .disabled(model.selectedPage == nil)
+        .accessibilityIdentifier("editor-crop")
     }
 
     private var filterMenu: some View {
@@ -216,12 +304,46 @@ struct DocumentView: View {
         .disabled(model.selectedPage == nil)
     }
 
+    /// Add pages (camera on iPhone/iPad, files everywhere) or replace the
+    /// selected page with a new capture.
     private var addPagesButton: some View {
-        Button {
-            isShowingAddPages = true
+        Menu {
+            #if os(iOS)
+            Button {
+                cameraPurpose = .add
+            } label: {
+                Label(L10n.scanPages, systemImage: "doc.viewfinder")
+            }
+            .disabled(!DocumentCameraView.isSupported)
+            #endif
+            Button {
+                openFilePicker(.add)
+            } label: {
+                Label(L10n.addPages, systemImage: "doc.badge.plus")
+            }
+            Divider()
+            #if os(iOS)
+            Button {
+                cameraPurpose = .replace
+            } label: {
+                Label(L10n.rescanPage, systemImage: "arrow.triangle.2.circlepath.camera")
+            }
+            .disabled(!DocumentCameraView.isSupported || model.selectedPage == nil)
+            #endif
+            Button {
+                openFilePicker(.replace)
+            } label: {
+                Label(L10n.replacePageWithFile, systemImage: "arrow.triangle.2.circlepath.doc.on.clipboard")
+            }
+            .disabled(model.selectedPage == nil)
         } label: {
-            Label(L10n.addPages, systemImage: "doc.badge.plus")
+            Label(L10n.addOrReplacePages, systemImage: "doc.badge.plus")
         }
+    }
+
+    private func openFilePicker(_ purpose: PageSourcePurpose) {
+        filePurpose = purpose
+        isShowingFilePicker = true
     }
 
     private var exportButton: some View {
@@ -231,6 +353,7 @@ struct DocumentView: View {
             Label(L10n.export, systemImage: "square.and.arrow.up")
         }
         .disabled(model.pages.isEmpty)
+        .accessibilityIdentifier("editor-export")
     }
 
     private var filterBinding: Binding<PageFilter> {
@@ -247,6 +370,27 @@ struct DocumentView: View {
     private var importErrorBinding: Binding<Bool> {
         Binding(get: { importModel.presentedError != nil }, set: { if !$0 { importModel.presentedError = nil } })
     }
+}
+
+/// Text stays visible below each tool on phones. At larger type sizes the
+/// row scrolls instead of squeezing the translated labels into tiny targets.
+private struct EditorToolLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(spacing: 6) {
+            configuration.icon.font(.title3).frame(height: 24)
+            configuration.title.font(.caption2.weight(.medium)).fixedSize(horizontal: true, vertical: false)
+        }
+        .frame(minWidth: 60, minHeight: 48)
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+    }
+}
+
+/// What a picked file or camera capture is for.
+enum PageSourcePurpose: Hashable, Identifiable {
+    case add
+    case replace
+    var id: Self { self }
 }
 
 /// Thumbnails of every page in a vertical list; drag to reorder.
@@ -273,6 +417,8 @@ private struct PageStrip: View {
                 Task { await model.movePages(from: offsets, to: destination, undoManager: undoManager) }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.surface)
         .accessibilityLabel(L10n.pages)
     }
 }
@@ -280,31 +426,36 @@ private struct PageStrip: View {
 /// Compact-width page picker: a horizontal row of thumbnails.
 private struct PageScroller: View {
     @Bindable var model: DocumentModel
+    @ScaledMetric(relativeTo: .caption2) private var numberSpace: CGFloat = 22
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal) {
-                LazyHStack(spacing: 12) {
+                LazyHStack(spacing: 14) {
                     ForEach(Array(model.pages.enumerated()), id: \.element.id) { index, page in
                         let isSelected = page.id == model.selectedPageID
                         Button {
                             model.selectedPageID = page.id
                         } label: {
-                            VStack(spacing: 2) {
+                            VStack(spacing: 5) {
                                 PageImageView(page: page, pixelSize: 200, accessibilityLabel: L10n.pageLabel(index + 1, of: model.pages.count))
                                     .frame(height: 72)
                                     .overlay {
                                         if isSelected {
-                                            Rectangle().strokeBorder(Theme.accent, lineWidth: 3)
+                                            Rectangle().strokeBorder(Theme.accent, lineWidth: 2)
                                         }
                                     }
                                 Text(verbatim: "\(index + 1)")
-                                    .font(.caption2.monospacedDigit())
+                                    .font(.caption2.monospacedDigit().weight(isSelected ? .bold : .regular))
                                     .foregroundStyle(isSelected ? Theme.accent : .secondary)
                                     .accessibilityHidden(true)
                             }
                         }
                         .buttonStyle(.plain)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(L10n.pageLabel(index + 1, of: model.pages.count))
+                        .accessibilityValue(isSelected ? L10n.selectedPage : "")
+                        .accessibilityIdentifier("page-thumbnail-\(index + 1)")
                         .accessibilityAddTraits(isSelected ? .isSelected : [])
                         .id(page.id)
                     }
@@ -312,8 +463,8 @@ private struct PageScroller: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
-            .frame(height: 104)
-            .background(.bar)
+            .frame(height: 88 + numberSpace)
+            .background(Theme.surface)
             .onChange(of: model.selectedPageID) { _, id in
                 withAnimation { proxy.scrollTo(id, anchor: .center) }
             }
@@ -367,7 +518,7 @@ private struct PageViewer: View {
                         .frame(width: size.width, height: size.height)
                         .frame(minWidth: proxy.size.width, minHeight: proxy.size.height)
                 }
-                .background(Color.secondary.opacity(0.08))
+                .background(Theme.canvas)
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
@@ -379,9 +530,9 @@ private struct PageViewer: View {
                 )
             }
         }
-        .toolbar {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if showsZoomButtons {
-                ToolbarItemGroup {
+                HStack(spacing: 18) {
                     Button { step(-1) } label: { Label(L10n.zoomOut, systemImage: "minus.magnifyingglass") }
                         .keyboardShortcut("-", modifiers: .command)
                         .disabled(zoom <= Self.zoomSteps.first!)
@@ -391,6 +542,11 @@ private struct PageViewer: View {
                         .keyboardShortcut("+", modifiers: .command)
                         .disabled(zoom >= Self.zoomSteps.last!)
                 }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.bordered)
+                .padding(10)
+                .frame(maxWidth: .infinity)
+                .background(Theme.canvas)
             }
         }
         .onChange(of: model.selectedPageID) { zoom = 1 }

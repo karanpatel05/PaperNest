@@ -6,6 +6,7 @@ public enum StoreError: Error, Equatable, Sendable {
     /// rather than risk damaging data this version does not understand.
     case newerSchema(found: Int, supported: Int)
     case itemNotFound
+    case folderNotFound
     case pageNotFound
     case assetMissing(String)
     case assetChecksumMismatch(String)

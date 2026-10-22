@@ -1,42 +1,22 @@
 #!/usr/bin/env bash
-# Builds an iOS Simulator PaperNest.app from the Swift package, for running
-# in the iOS Simulator without the generated Xcode project. Needs full Xcode.
-# Release and device builds come from the Xcode project (project.yml).
+# Builds the real iPhone/iPad app (PaperNest-iOS from the XcodeGen project)
+# for the iOS Simulator and prints its path. The Xcode build carries the
+# Simulator entitlements that iOS requires before it hands picked files to
+# the app; a hand-assembled bundle does not, and file picking then fails.
 #
 # Usage: scripts/build-ios-sim-app.sh
-# Then, for example (the script prints the app's path):
-#   xcrun simctl install booted <printed path>
-#   xcrun simctl launch booted com.example.papernest.dev
+# Then: xcrun simctl install <device> <printed path>
+#       xcrun simctl launch <device> com.example.papernest
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/env.sh
 
-DERIVED="$SCRATCH/xcode"
-xcodebuild -scheme PaperNestPhone -destination 'generic/platform=iOS Simulator' \
-    -derivedDataPath "$DERIVED" -configuration Debug build -quiet
-PRODUCTS="$DERIVED/Build/Products/Debug-iphonesimulator"
+xcodegen generate --quiet
+xcodebuild -project PaperNest.xcodeproj -scheme PaperNest-iOS -destination 'generic/platform=iOS Simulator' \
+    -derivedDataPath "$SCRATCH/xcodeproj" -configuration Debug build -quiet
 
 APP="$DIST/ios-simulator/PaperNest.app"
 rm -rf "$APP"
-mkdir -p "$APP"
-cp "$PRODUCTS/PaperNestPhone" "$APP/PaperNest"
-# iOS bundles are flat: resource bundles sit at the app root, where both
-# SwiftPM's accessor and PaperNestUI's ResourceBundle look.
-cp -R "$PRODUCTS/PaperNest_PaperNestUI.bundle" "$APP/"
-cp -R Apps/iOS/Resources/*.lproj "$APP/"
-
-# Expand the Xcode build variables in the real Info.plist; placeholder
-# identifier as in Config/Base.xcconfig, with a .dev suffix.
-sed -e 's/$(EXECUTABLE_NAME)/PaperNest/' \
-    -e 's/$(PRODUCT_BUNDLE_IDENTIFIER)/com.example.papernest.dev/' \
-    -e 's/$(PRODUCT_NAME)/PaperNest/' \
-    -e 's/$(MARKETING_VERSION)/0.1.0/' \
-    -e 's/$(CURRENT_PROJECT_VERSION)/1/' \
-    Apps/iOS/Info.plist > "$APP/Info.plist"
-plutil -insert MinimumOSVersion -string 17.0 "$APP/Info.plist"
-plutil -insert UIDeviceFamily -json '[1,2]' "$APP/Info.plist"
-plutil -insert CFBundleSupportedPlatforms -json '["iPhoneSimulator"]' "$APP/Info.plist"
-
-xattr -cr "$APP"
-codesign --force --sign - --timestamp=none "$APP"
-echo "Built $APP"
+mkdir -p "$(dirname "$APP")"
+cp -R "$SCRATCH/xcodeproj/Build/Products/Debug-iphonesimulator/PaperNest.app" "$APP"
+echo "Built $APP (bundle id $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"))"

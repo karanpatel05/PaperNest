@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import PaperNestCore
+import PaperNestImport
 import PaperNestStore
 
 /// State and edits for one open document. Every edit commits to the store
@@ -206,6 +207,79 @@ final class DocumentModel {
             try await store.restorePages(deleted)
             pages = try await store.pages(of: itemID)
             selectedPageID = deleted.first?.page.id
+            session.didChange()
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
+    // MARK: - Adding and replacing pages (scan, rescan)
+
+    /// Adds validated pages after the selected page and selects the first.
+    func insertPages(_ prepared: DocumentImporter.Prepared) async {
+        guard let store else { return }
+        do {
+            let inserted = try await store.insertPages(prepared.pages, into: itemID, after: selectedPageID, assets: prepared.assets)
+            pages = try await store.pages(of: itemID)
+            selectedPageID = inserted.first?.id ?? selectedPageID
+            session.didChange()
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
+    /// Rescan/replace: the selected page keeps its place and identity and
+    /// shows the first new page; further new pages go right after it. The
+    /// chosen look (filter, brightness, contrast) carries over; crop and
+    /// rotation described the old capture, so they reset.
+    func replaceSelectedPage(with prepared: DocumentImporter.Prepared, undoManager: UndoManager?) async {
+        guard let store, let page = selectedPage, let first = prepared.pages.first else { return }
+        let look = page.transform
+        let replacement = LibraryStore.PageContentSnapshot(
+            sourceSize: first.sourceSize, content: first.content,
+            transform: PageTransform(filter: look.filter, brightness: look.brightness, contrast: look.contrast))
+        do {
+            let change = try await store.replacePage(page.id, with: replacement, inserting: Array(prepared.pages.dropFirst()),
+                                                     assets: prepared.assets)
+            registerReplacementUndo(change, undoManager: undoManager)
+            pages = try await store.pages(of: itemID)
+            selectedPageID = page.id
+            session.didChange()
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
+    private func registerReplacementUndo(_ change: LibraryStore.PageReplacement, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                model.registerReplacementRedo(change, undoManager: undoManager)
+                _ = Task { await model.commitReplacement(change, undoing: true) }
+            }
+        }
+        undoManager?.setActionName(L10n.undoReplacePage)
+    }
+
+    private func registerReplacementRedo(_ change: LibraryStore.PageReplacement, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                model.registerReplacementUndo(change, undoManager: undoManager)
+                _ = Task { await model.commitReplacement(change, undoing: false) }
+            }
+        }
+        undoManager?.setActionName(L10n.undoReplacePage)
+    }
+
+    private func commitReplacement(_ change: LibraryStore.PageReplacement, undoing: Bool) async {
+        guard let store else { return }
+        do {
+            if undoing {
+                try await store.revertPageReplacement(change)
+            } else {
+                try await store.reapplyPageReplacement(change)
+            }
+            pages = try await store.pages(of: itemID)
+            selectedPageID = change.pageID
             session.didChange()
         } catch {
             presentedError = .saveFailed()

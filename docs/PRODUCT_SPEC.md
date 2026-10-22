@@ -36,7 +36,8 @@ Launch markets are the United States and Canada. English, French and Spanish shi
 - Every edit can be undone and redone, and is saved before it appears in the UI. The original file is never changed, and the history of previous transforms is kept.
 - Deleted pages can be restored with Undo until the app quits. They are removed permanently at the next launch.
 - **Crop:** a rectangle drawn over the page as it is shown (rotated, uncropped), with corner and edge handles, drag-to-move, a thirds guide and Reset. It's stored relative to the original, so it stays right if the page is rotated later, and export matches the editor. Crops smaller than 5% of a side aren't possible. Mac: Page > Crop… (⌘K) and the toolbar; iPhone: the bottom toolbar. Undoable like every edit. VoiceOver reads the crop as "70% wide by 75% tall" and offers Reset. Resizing with VoiceOver isn't supported yet.
-- Rescan is planned (M1 remainder).
+- **Rescan / replace a page:** "Rescan Page" (iPhone/iPad camera) or "Replace Page with File…" (all platforms; Mac: Page menu). The page keeps its place and identity. If the new capture has several pages, the first replaces the page and the rest are inserted right after it. The chosen look (filter, brightness, contrast) carries over; crop and rotation reset because they described the old capture. Undo/redo restore the previous scan until the app quits; replaced scans are removed at the next launch. Password-protected PDFs prompt as usual.
+- **Scan Pages** (iPhone/iPad) adds camera pages after the selected page. Without a document camera (e.g. the Simulator), the camera items are disabled.
 
 ## Export
 

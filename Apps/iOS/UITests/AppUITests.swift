@@ -8,9 +8,16 @@ final class AppUITests: XCTestCase {
 
     private func launch(_ extra: [String]) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-PaperNestLibraryPath", Self.libraryPath, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + extra
+        app.launchArguments = ["-PaperNestLibraryPath", Self.libraryPath, "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-libraryLayout", "grid"] + extra
         app.launch()
         return app
+    }
+
+    /// iPhone opens on the home (Scan/Import, Recent, library, folders).
+    /// Tests that need the full grid go to All Documents first.
+    private func showAllDocuments(_ app: XCUIApplication) {
+        let row = app.staticTexts["All Documents"]
+        if UIDevice.current.userInterfaceIdiom == .phone, row.waitForExistence(timeout: 15) { row.tap() }
     }
 
     /// "70% wide by 75% tall" → (70, 75)
@@ -59,9 +66,8 @@ final class AppUITests: XCTestCase {
         let app = launch([])
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("compact-width behaviour") }
         let document = app.descendants(matching: .any)["Crop target, 1 page"]
-        XCTAssertTrue(document.waitForExistence(timeout: 15), "library did not open")
+        XCTAssertTrue(document.waitForExistence(timeout: 15), "home did not open")
 
-        app.navigationBars.buttons.element(boundBy: 0).tap()
         app.staticTexts["Favorites"].tap()
         XCTAssertTrue(app.staticTexts["No Favorites"].waitForExistence(timeout: 5))
 
@@ -78,10 +84,7 @@ final class AppUITests: XCTestCase {
         let app = launch([])
         XCTAssertTrue(app.descendants(matching: .any)["Crop target, 1 page"].waitForExistence(timeout: 15))
 
-        // iPhone: Settings lives in the navigation bar's overflow menu.
-        let more = app.navigationBars.buttons["More"]
-        if more.exists { more.tap() }
-        app.buttons["Settings"].tap()
+        app.buttons["library-settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Documents"].exists)
 
@@ -90,5 +93,85 @@ final class AppUITests: XCTestCase {
 
         app.navigationBars["Settings"].buttons["Done"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForNonExistence(timeout: 5))
+    }
+
+    func testLibraryLayoutSwitchStillOpensDocumentsAndEditingTools() throws {
+        continueAfterFailure = false
+        let app = launch([])
+        showAllDocuments(app)
+        let document = app.descendants(matching: .any)["Crop target, 1 page"]
+        XCTAssertTrue(document.waitForExistence(timeout: 15))
+        let layouts = app.segmentedControls["library-layout"]
+        layouts.buttons["List"].tap()
+        XCTAssertTrue(layouts.buttons["List"].isSelected)
+        XCTAssertTrue(document.isHittable)
+        layouts.buttons["Grid"].tap()
+        XCTAssertTrue(layouts.buttons["Grid"].isSelected)
+        layouts.buttons["List"].tap()
+        document.tap()
+        XCTAssertTrue(app.buttons["editor-crop"].waitForExistence(timeout: 5))
+        app.buttons["Rotate"].tap()
+        app.buttons["Rotate Right"].tap()
+        app.buttons["editor-crop"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["crop-area"].waitForExistence(timeout: 5))
+        app.buttons["crop-done"].tap()
+        XCTAssertTrue(app.buttons["editor-export"].waitForExistence(timeout: 5))
+        app.buttons["editor-export"].tap()
+        XCTAssertTrue(app.staticTexts["Export"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.segmentedControls.buttons["PDF"].exists)
+    }
+
+    /// Design pass 2: a folder made from the sidebar, filled from a
+    /// document's ⋯ menu, then deleted without losing the document.
+    func testAFolderMadeInTheSidebarHoldsAMovedDocument() throws {
+        continueAfterFailure = false
+        let app = launch([])
+        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("compact-width behaviour") }
+        let document = app.descendants(matching: .any)["Crop target, 1 page"]
+        XCTAssertTrue(document.waitForExistence(timeout: 15), "home did not open")
+
+        app.buttons["sidebar-new-folder"].tap()
+        let name = app.alerts.textFields.firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.typeText("Receipts UI")
+        app.alerts.buttons["OK"].tap()
+        XCTAssertTrue(app.staticTexts["This Folder Is Empty"].waitForExistence(timeout: 5), "new folder not shown")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.staticTexts["All Documents"].tap()
+        XCTAssertTrue(document.waitForExistence(timeout: 5))
+        app.buttons["item-more"].firstMatch.tap()
+        app.buttons["Move to Folder"].tap()
+        app.buttons["Receipts UI"].tap()
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.staticTexts["Receipts UI"].tap()
+        XCTAssertTrue(document.waitForExistence(timeout: 5), "document not in the folder")
+        XCTAssertEqual(app.staticTexts["library-count"].label, "1 item")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.staticTexts["Receipts UI"].press(forDuration: 1.2)
+        app.buttons["Delete Folder…"].tap()
+        app.buttons["Delete Folder"].tap()
+        XCTAssertTrue(app.staticTexts["Receipts UI"].waitForNonExistence(timeout: 5), "folder not deleted")
+        app.staticTexts["All Documents"].tap()
+        XCTAssertTrue(document.waitForExistence(timeout: 5), "document lost with the folder")
+    }
+
+    /// iPhone home: Recent opens a document; See All shows the full grid.
+    func testHomeRecentOpensADocumentAndSeeAllShowsTheGrid() throws {
+        continueAfterFailure = false
+        let app = launch([])
+        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("compact-width behaviour") }
+        let recent = app.descendants(matching: .any)["home-recent"]
+        XCTAssertTrue(recent.waitForExistence(timeout: 15), "home has no Recent row")
+        XCTAssertTrue(app.buttons["library-scan"].exists && app.buttons["library-import"].exists)
+
+        recent.descendants(matching: .any)["Crop target, 1 page"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["editor-crop"].waitForExistence(timeout: 5), "document did not open from Recent")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()   // back to the home
+        app.buttons["home-see-all"].tap()
+        XCTAssertTrue(app.segmentedControls["library-layout"].waitForExistence(timeout: 5), "See All did not show the grid")
     }
 }

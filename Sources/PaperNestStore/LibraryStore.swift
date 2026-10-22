@@ -317,6 +317,71 @@ public actor LibraryStore {
         }
     }
 
+    @discardableResult
+    public func renameFolder(_ id: FolderID, to proposed: String) throws -> Folder {
+        try db.transaction {
+            guard var folder = try folders().first(where: { $0.id == id }) else { throw StoreError.folderNotFound }
+            let siblings = try db.query("SELECT name FROM folders WHERE parent_id IS ? AND deleted_at IS NULL AND id IS NOT ?",
+                                        [.optionalText(folder.parentID?.rawValue), .text(id.rawValue)]) { $0.text(0) }
+            folder.name = NameDeduplicator.uniqueName(proposed, existing: siblings)
+            folder.modifiedAt = now()
+            try db.run("UPDATE folders SET name = ?, modified_at = ? WHERE id = ?",
+                       [.text(folder.name), .date(folder.modifiedAt), .text(id.rawValue)])
+            return folder
+        }
+    }
+
+    /// Removes a folder without deleting anything in it: its documents
+    /// (including any in Recently Deleted) and subfolders move up to its
+    /// parent, renamed if a name is taken there. The row is kept, marked
+    /// deleted, as a tombstone for sync.
+    public func deleteFolder(_ id: FolderID) throws {
+        let timestamp = now()
+        try db.transaction {
+            guard let folder = try folders().first(where: { $0.id == id }) else { throw StoreError.folderNotFound }
+            let contained = try db.query("SELECT id FROM items WHERE folder_id = ?", [.text(id.rawValue)]) { ItemID(rawValue: $0.text(0)) }
+            try move(contained, to: folder.parentID)
+            let destinationNames = try db.query("SELECT name FROM folders WHERE parent_id IS ? AND deleted_at IS NULL AND id IS NOT ?",
+                                                [.optionalText(folder.parentID?.rawValue), .text(id.rawValue)]) { $0.text(0) }
+            var taken = destinationNames
+            for child in try folders().filter({ $0.parentID == id }) {
+                let name = NameDeduplicator.uniqueName(child.name, existing: taken)
+                taken.append(name)
+                try db.run("UPDATE folders SET parent_id = ?, name = ?, modified_at = ? WHERE id = ?",
+                           [.optionalText(folder.parentID?.rawValue), .text(name), .date(timestamp), .text(child.id.rawValue)])
+            }
+            try db.run("UPDATE folders SET deleted_at = ?, modified_at = ? WHERE id = ?", [.date(timestamp), .date(timestamp), .text(id.rawValue)])
+        }
+    }
+
+    /// How many items each sidebar entry shows. Folder counts are direct
+    /// members only and exclude Recently Deleted.
+    public struct ScopeCounts: Sendable, Equatable {
+        public var all = 0
+        public var favorites = 0
+        public var recentlyDeleted = 0
+        public var folders: [FolderID: Int] = [:]
+
+        public init() {}
+    }
+
+    public func scopeCounts() throws -> ScopeCounts {
+        var counts = ScopeCounts()
+        let row = try db.query("""
+            SELECT
+                count(*) FILTER (WHERE deleted_at IS NULL),
+                count(*) FILTER (WHERE deleted_at IS NULL AND is_favorite = 1),
+                count(*) FILTER (WHERE deleted_at IS NOT NULL)
+            FROM items
+            """) { ($0.int(0), $0.int(1), $0.int(2)) }.first
+        (counts.all, counts.favorites, counts.recentlyDeleted) = row ?? (0, 0, 0)
+        for (id, count) in try db.query("SELECT folder_id, count(*) FROM items WHERE deleted_at IS NULL AND folder_id IS NOT NULL GROUP BY folder_id",
+                                        map: { (FolderID(rawValue: $0.text(0)), $0.int(1)) }) {
+            counts.folders[id] = count
+        }
+        return counts
+    }
+
     // MARK: - Pages
 
     public func pages(of itemID: ItemID) throws -> [Page] {
@@ -420,6 +485,10 @@ public actor LibraryStore {
     /// A deleted page, as needed to undo the deletion.
     public struct DeletedPage: Sendable, Hashable {
         public var page: Page
+
+        public init(page: Page) {
+            self.page = page
+        }
     }
 
     /// Marks pages deleted. They disappear from every query but stay in the
@@ -464,6 +533,125 @@ public actor LibraryStore {
             try db.run("DELETE FROM search_index WHERE page_id IN (SELECT id FROM pages WHERE deleted_at IS NOT NULL)")
             return try db.run("DELETE FROM pages WHERE deleted_at IS NOT NULL")
         }
+    }
+
+    // MARK: - Replacing a page's content (rescan)
+
+    /// What a page shows: its original and how it is processed. Swapping
+    /// snapshots replaces a page's content without changing its identity,
+    /// position, objects or anything that refers to it.
+    public struct PageContentSnapshot: Sendable, Hashable {
+        public var sourceSize: CGSize
+        public var content: PageContent
+        public var transform: PageTransform
+
+        public init(sourceSize: CGSize, content: PageContent, transform: PageTransform) {
+            self.sourceSize = sourceSize
+            self.content = content
+            self.transform = transform
+        }
+
+        public init(page: Page) {
+            self.init(sourceSize: page.sourceSize, content: page.content, transform: page.transform)
+        }
+    }
+
+    /// Replaces a live page's content in place (same ID and position) and
+    /// returns what it showed before. The previous content, and the
+    /// original it uses, is kept until `purgeReplacedPageContent` runs at the
+    /// next launch, so undo can always restore it. OCR for the page becomes
+    /// stale through the revision bump.
+    @discardableResult
+    public func replacePageContent(
+        _ pageID: PageID,
+        with snapshot: PageContentSnapshot,
+        assets staged: [AssetFileStore.StagedAsset]
+    ) throws -> (previous: PageContentSnapshot, page: Page) {
+        let timestamp = now()
+        return try db.transaction {
+            guard var page = try page(pageID) else { throw StoreError.pageNotFound }
+            try insertAssetRows(staged, at: timestamp)
+            if let assetID = snapshot.content.assetID {
+                let present = try db.query("SELECT count(*) FROM assets WHERE id = ?", [.text(assetID.sha256)]) { $0.int(0) }.first ?? 0
+                guard present == 1 else { throw StoreError.assetMissing(assetID.sha256) }
+            }
+            let previous = PageContentSnapshot(page: page)
+            let old = Self.contentColumns(previous.content)
+            try db.run("""
+                INSERT OR REPLACE INTO page_content_history
+                    (page_id, revision, source_width, source_height, content_kind, asset_id, pdf_page_index, template, transform_json, replaced_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, [
+                    .text(pageID.rawValue), .int(Int64(page.revision)), .double(previous.sourceSize.width), .double(previous.sourceSize.height),
+                    .text(old.kind), .optionalText(old.assetID), old.pdfIndex, .optionalText(old.template),
+                    .text(try json(previous.transform)), .date(timestamp),
+                ])
+            let new = Self.contentColumns(snapshot.content)
+            page.sourceSize = snapshot.sourceSize
+            page.content = snapshot.content
+            page.transform = snapshot.transform
+            page.revision += 1
+            page.modifiedAt = timestamp
+            try db.run("""
+                UPDATE pages SET source_width = ?, source_height = ?, content_kind = ?, asset_id = ?, pdf_page_index = ?,
+                    template = ?, transform_json = ?, revision = ?, modified_at = ?
+                WHERE id = ?
+                """, [
+                    .double(page.sourceSize.width), .double(page.sourceSize.height), .text(new.kind), .optionalText(new.assetID),
+                    new.pdfIndex, .optionalText(new.template), .text(try json(page.transform)), .int(Int64(page.revision)),
+                    .date(timestamp), .text(pageID.rawValue),
+                ])
+            try touchItem(page.itemID, at: timestamp)
+            return (previous, page)
+        }
+    }
+
+    /// One rescan: the page that kept its place, what it showed before and
+    /// after, and the further pages the new capture added right after it.
+    public struct PageReplacement: Sendable, Hashable {
+        public var pageID: PageID
+        public var previous: PageContentSnapshot
+        public var replacement: PageContentSnapshot
+        public var inserted: [Page]
+    }
+
+    /// Rescan: replaces a page's content and inserts `extras` right after
+    /// it, in one transaction. If anything fails, nothing changes.
+    public func replacePage(
+        _ pageID: PageID,
+        with snapshot: PageContentSnapshot,
+        inserting extras: [NewPage],
+        assets staged: [AssetFileStore.StagedAsset]
+    ) throws -> PageReplacement {
+        try db.transaction {
+            let (previous, page) = try replacePageContent(pageID, with: snapshot, assets: staged)
+            let inserted = extras.isEmpty ? [] : try insertPages(extras, into: page.itemID, after: pageID, assets: [])
+            return PageReplacement(pageID: pageID, previous: previous, replacement: snapshot, inserted: inserted)
+        }
+    }
+
+    /// Undoes `replacePage` in one transaction: the added pages go (soft
+    /// delete, as for any page) and the page shows its previous content.
+    public func revertPageReplacement(_ change: PageReplacement) throws {
+        try db.transaction {
+            if !change.inserted.isEmpty { try deletePages(change.inserted.map(\.id)) }
+            try replacePageContent(change.pageID, with: change.previous, assets: [])
+        }
+    }
+
+    /// Redoes a reverted `replacePage` in one transaction.
+    public func reapplyPageReplacement(_ change: PageReplacement) throws {
+        try db.transaction {
+            if !change.inserted.isEmpty { try restorePages(change.inserted.map(DeletedPage.init(page:))) }
+            try replacePageContent(change.pageID, with: change.replacement, assets: [])
+        }
+    }
+
+    /// Launch housekeeping: forgets content replaced in a previous session
+    /// (no undo stack survives a relaunch). Run before `sweepOrphanAssets`.
+    @discardableResult
+    public func purgeReplacedPageContent() throws -> Int {
+        try db.transaction { try db.run("DELETE FROM page_content_history") }
     }
 
     // MARK: - Page objects and recognition
@@ -578,13 +766,16 @@ public actor LibraryStore {
                     createdAt: s.date(11), modifiedAt: s.date(12))
     }
 
-    private func insertPage(_ page: Page) throws {
-        let kind: String, assetID: String?, pdfIndex: SQLValue, template: String?
-        switch page.content {
-        case .image(let id): (kind, assetID, pdfIndex, template) = ("image", id.sha256, .null, nil)
-        case .pdfPage(let id, let index): (kind, assetID, pdfIndex, template) = ("pdfPage", id.sha256, .int(Int64(index)), nil)
-        case .template(let t): (kind, assetID, pdfIndex, template) = ("template", nil, .null, t.rawValue)
+    private static func contentColumns(_ content: PageContent) -> (kind: String, assetID: String?, pdfIndex: SQLValue, template: String?) {
+        switch content {
+        case .image(let id): ("image", id.sha256, .null, nil)
+        case .pdfPage(let id, let index): ("pdfPage", id.sha256, .int(Int64(index)), nil)
+        case .template(let t): ("template", nil, .null, t.rawValue)
         }
+    }
+
+    private func insertPage(_ page: Page) throws {
+        let (kind, assetID, pdfIndex, template) = Self.contentColumns(page.content)
         try db.run("""
             INSERT INTO pages (id, item_id, sort_key, source_width, source_height, content_kind, asset_id, pdf_page_index, template, transform_json, revision, created_at, modified_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -620,6 +811,7 @@ public actor LibraryStore {
         let unreferenced = try db.query("""
             SELECT a.id, a.kind FROM assets a
             WHERE NOT EXISTS (SELECT 1 FROM pages p WHERE p.asset_id = a.id)
+              AND NOT EXISTS (SELECT 1 FROM page_content_history h WHERE h.asset_id = a.id)
             """) { (AssetID(sha256: $0.text(0)), AssetKind(rawValue: $0.text(1)) ?? .pdf) }
             .filter { !placed.contains($0.0) }
         for (id, _) in unreferenced {

@@ -3,12 +3,6 @@ import PaperNestCore
 import PaperNestRender
 import SwiftUI
 
-enum Theme {
-    /// Brand accent: a deep ink teal, used sparingly for selection and tint.
-    static let accent = Color(red: 0.10, green: 0.42, blue: 0.46)
-    static let paperShadow = Color.black.opacity(0.16)
-}
-
 /// Shows a rendered page, keeping the page's aspect ratio while it loads so
 /// layouts don't jump. Errors are shown in place rather than as a blank page.
 struct PageImageView: View {

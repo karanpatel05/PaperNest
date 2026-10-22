@@ -3,6 +3,7 @@ import PDFKit
 import Testing
 import PaperNestCore
 import PaperNestExport
+import PaperNestImport
 import PaperNestStore
 import PaperNestTestSupport
 @testable import PaperNestUI
@@ -188,6 +189,154 @@ import PaperNestTestSupport
         let rendered = try #require(PixelProbe.renderPDFPage(data, index: 0, scale: 1))
         #expect(PixelProbe.pixel(rendered, x: 0.9, y: 0.1).isRed)
         #expect(PixelProbe.pixel(rendered, x: 0.1, y: 0.9).isWhite)
+    }
+
+    @Test func rescanReplacesThePageInPlaceWithUndoRedoAndSurvivesRelaunch() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let letter = try writeSample(SyntheticDocuments.textPDF(pages: ["Old one", "Old two", "Old three"]), "Letter.pdf")
+        var session: LibrarySession? = try await readySession()
+        let library = LibraryModel(session: session!)
+        await library.importFiles([letter])
+        await library.reload()
+        let itemID = try #require(library.items.first?.id)
+
+        let undo = UndoManager()
+        let document = DocumentModel(itemID: itemID, session: session!)
+        await document.load()
+        let original = document.pages
+        document.selectedPageID = original[1].id
+        await document.setFilter(.grayscale, undoManager: undo)
+        await document.rotate(clockwise: true, undoManager: undo)
+
+        // A two-page "rescan" of page 2.
+        let env = try #require(session?.environment)
+        let capture = try await env.importer.prepareInBackground(.data(SyntheticDocuments.textPDF(pages: ["New A", "New B"]), name: "Rescan.pdf"))
+        await document.replaceSelectedPage(with: capture, undoManager: undo)
+
+        let pages = document.pages
+        #expect(pages.count == 4)
+        #expect(pages[0].id == original[0].id && pages[1].id == original[1].id && pages[3].id == original[2].id)
+        #expect(pages[1].content == capture.pages[0].content && pages[2].content == capture.pages[1].content)
+        #expect(pages[1].transform.filter == .grayscale)     // the chosen look carries over
+        #expect(pages[1].transform.rotation == .none)        // geometry of the old capture does not
+        #expect(document.selectedPageID == original[1].id)
+
+        undo.undo()
+        #expect(undo.canRedo)
+        try await eventually { document.pages.map(\.id) == original.map(\.id) && document.pages[1].content == original[1].content }
+        #expect(document.pages[1].transform.rotation == .clockwise90)
+        undo.redo()
+        try await eventually { document.pages.count == 4 && document.pages[1].content == capture.pages[0].content }
+
+        // Quit, relaunch, export.
+        session = nil
+        let relaunched = try await readySession()
+        let reopened = DocumentModel(itemID: itemID, session: relaunched)
+        await reopened.load()
+        #expect(reopened.pages.map(\.id).first == original[0].id && reopened.pages.count == 4)
+        let relaunchedEnv = try #require(relaunched.environment)
+        let output = try await relaunchedEnv.exporter.export(itemName: "Letter", pages: reopened.pages, options: ExportOptions(format: .pdf))
+        defer { output.removeTemporaryFiles() }
+        let pdf = try #require(PDFDocument(url: output.files[0]))
+        #expect(pdf.pageCount == 4)
+        let texts = (0..<pdf.pageCount).map { pdf.page(at: $0)?.string ?? "" }
+        #expect(texts[0].contains("Old one") && texts[2].contains("New B") && texts[3].contains("Old three"))
+        // The rescanned page kept the grayscale filter, so it is exported as
+        // an image (no selectable text), and the old content is gone.
+        #expect(!texts[1].contains("Old two") && !texts[1].contains("New A"))
+    }
+
+    @Test func replacingWithALockedPDFAsksAgainAfterAWrongPassword() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let letter = try writeSample(SyntheticDocuments.textPDF(pages: ["Old one", "Old two"]), "Letter.pdf")
+        let locked = try writeSample(SyntheticDocuments.encryptedPDF(text: "Locked text", password: "sample"), "Locked.pdf")
+        let session = try await readySession()
+        let library = LibraryModel(session: session)
+        await library.importFiles([letter])
+        await library.reload()
+        let undo = UndoManager()
+        let document = DocumentModel(itemID: try #require(library.items.first?.id), session: session)
+        await document.load()
+        let original = document.pages
+        document.selectedPageID = original[0].id
+
+        await library.prepareFile(locked) { await document.replaceSelectedPage(with: $0, undoManager: undo) }
+        #expect(library.passwordQueue.map(\.filename) == ["Locked.pdf"])
+        await library.submitPassword("wrong", for: library.passwordQueue[0])
+        #expect(library.passwordQueue.first?.lastAttemptFailed == true)
+        #expect(document.pages == original)
+
+        await library.submitPassword("sample", for: library.passwordQueue[0])
+        #expect(library.passwordQueue.isEmpty && library.presentedError == nil)
+        #expect(document.pages.map(\.id) == original.map(\.id))
+        #expect(document.pages[0].content != original[0].content && document.pages[1] == original[1])
+        #expect(undo.canUndo)
+    }
+
+    @Test func aLockedPDFAddedAfterAPageLandsThereOnceUnlocked() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let letter = try writeSample(SyntheticDocuments.textPDF(pages: ["One", "Two"]), "Letter.pdf")
+        let extra = try writeSample(SyntheticDocuments.textPDF(pages: ["Extra"]), "Extra.pdf")
+        let locked = try writeSample(SyntheticDocuments.encryptedPDF(text: "Locked text", password: "sample"), "Locked.pdf")
+        let session = try await readySession()
+        let library = LibraryModel(session: session)
+        await library.importFiles([letter])
+        await library.reload()
+        let itemID = try #require(library.items.first?.id)
+        let store = try #require(session.environment?.store)
+        let original = try await store.pages(of: itemID)
+
+        // Both go after page one, in the order picked: Extra, then Locked.
+        await library.importFiles([extra, locked], into: itemID, after: original[0].id)
+        let afterExtra = try await store.pages(of: itemID)
+        #expect(afterExtra.count == 3 && afterExtra[2].id == original[1].id)
+        await library.submitPassword("sample", for: try #require(library.passwordQueue.first))
+
+        let pages = try await store.pages(of: itemID)
+        #expect(pages.count == 4)
+        #expect(pages.map(\.id) == [original[0].id, afterExtra[1].id, pages[2].id, original[1].id])
+        #expect(!Set(afterExtra.map(\.id)).contains(pages[2].id))
+    }
+
+    @Test func foldersSortingAndImportingIntoTheShownFolder() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = try await readySession()
+        let library = LibraryModel(session: session)
+        library.sortOrder = .dateModified
+        defer { library.sortOrder = .dateModified }
+        let banana = try writeSample(SyntheticDocuments.textPDF(pages: ["B"]), "banana.pdf")
+        let apple = try writeSample(SyntheticDocuments.textPDF(pages: ["A"]), "Apple.pdf")
+        let cherry = try writeSample(SyntheticDocuments.textPDF(pages: ["C"]), "cherry.pdf")
+        await library.importFiles([banana, apple])
+
+        await library.createFolder(named: "  ")
+        let folder = try #require(library.folders.first)
+        #expect(folder.name == "New Folder")
+        #expect(library.sidebarSelection == .folder(folder.id) && library.scopeTitle == "New Folder")
+        await library.importFiles([cherry])
+        await library.reload()
+        #expect(library.items.map(\.item.name) == ["cherry"])
+        #expect(library.counts.folders[folder.id] == 1 && library.counts.all == 3)
+
+        library.sidebarSelection = .all
+        await library.reload()
+        library.sortOrder = .name
+        #expect(library.items.map(\.item.name) == ["Apple", "banana", "cherry"])
+        library.sortOrder = .dateAdded
+        #expect(library.items.map(\.item.name) == ["cherry", "Apple", "banana"])
+
+        let appleID = try #require(library.items.first { $0.item.name == "Apple" }?.id)
+        await library.move([appleID], to: folder.id)
+        await library.renameFolder(folder.id, to: "Fruit")
+        await library.reload()
+        #expect(library.folders.map(\.name) == ["Fruit"] && library.counts.folders[folder.id] == 2)
+
+        // Deleting the folder while it's shown goes back to All Documents and keeps both documents.
+        library.sidebarSelection = .folder(folder.id)
+        await library.deleteFolder(folder.id)
+        await library.reload()
+        #expect(library.sidebarSelection == .all && library.folders.isEmpty)
+        #expect(library.items.count == 3)
     }
 
     @Test func recentlyDeletedRecoverAndPermanentDelete() async throws {

@@ -41,7 +41,7 @@ Done:
 Remaining (in order):
 1. **Visual check of the Mac UI.** The owner declined Claude's control of the app, so the owner should run the manual checklist in TEST_MATRIX.md. The iPhone screens were checked in the Simulator, which led to fixes in the compact document layout, the export sheet and a shortcut clash.
 2. **Crop UI: done on iPhone.** Automated tests cover the mapping (all rotations), the drag math, crop → undo/redo → relaunch → export, tight crops on filtered PDFs, and a Simulator UI test that drags a corner and checks the saved crop. Still open: a manual check of the Mac drag. VoiceOver users can reset a crop but not resize it (known limitation).
-3. **Rescan a page** (iOS): replace a page's source with a new capture and keep the old original until the change commits.
+3. **Rescan a page: implemented** (2026-10-21). Replace in place, extra pages inserted after, look kept and geometry reset, undo/redo, v3 history so undo survives other deletions. Store and workflow tests pass. **Camera path: needs a device** (the Simulator has no document camera). **File path: verified in the Simulator** (replace in place, extras after, cancel is silent), after fixing replace-became-add and building the Simulator app from the Xcode project. Replace and insert are one transaction. **M3 note:** a rescanned page keeps its page objects (and transform history) in the old capture's source coordinates; when ink/text arrive, decide whether to keep, rescale or flag them on rescan.
 4. Real-device camera capture for the M1 gate (needs signing). Simulator imports don't count as camera tests. Also: exercise taps in the Simulator (Pages sheet reorder, filters, export/save) and check iPad once an iPad runtime is installed.
 5. Continuity Camera import on Mac (`ImportFromDevices` services menu), if feasible.
 6. Adaptive black-and-white threshold for unevenly lit scans (the current Otsu threshold is global).
@@ -50,7 +50,7 @@ Remaining (in order):
 
 ## Later milestones (summary)
 
-- **M2:** CKSyncEngine adapter, v3 migration (`sync_state`, `outbox`, `tombstones`), asset upload/download with `remoteOnly` availability, conflict copies, account-change flow, sync status UI driven by real state. Two-device test plan in TEST_MATRIX.md.
+- **M2:** CKSyncEngine adapter, v4 migration (`sync_state`, `outbox`, `tombstones`), asset upload/download with `remoteOnly` availability, conflict copies, account-change flow, sync status UI driven by real state. Two-device test plan in TEST_MATRIX.md.
 - **M3:** notebook creation, templates (rendering exists), PencilKit adapter on iPad, mouse/trackpad ink on Mac, text boxes, image objects, the 3-notebook free limit hook.
 - **M4:** Vision OCR (`VNRecognizeTextRequest`, automatic language detection plus user override), recognition status UI, search over OCR text and typed notes, searchable PDF (invisible text layer aligned through `PageGeometry`), TXT with page separators and empty-content warnings, a DOCX writer (both variants) validated by `unzip`/XML checks and opening in an external editor.
 - **M5:** StoreKit 2 entitlement service, paywall with StoreKit-supplied prices, restore and manage, expiry behavior, local `.storekit` tests.

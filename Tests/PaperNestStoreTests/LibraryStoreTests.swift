@@ -343,6 +343,135 @@ func samplePages(_ asset: AssetFileStore.StagedAsset, count: Int) -> [LibrarySto
     }
 }
 
+@Suite struct PageReplacementTests {
+    func imagePage(_ asset: AssetFileStore.StagedAsset, _ size: CGSize = CGSize(width: 500, height: 700)) -> LibraryStore.NewPage {
+        .init(sourceSize: size, content: .image(asset.id))
+    }
+
+    @Test func replacingKeepsThePageInPlaceAndCanBeReversed() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let old = try store.assets.store(Data("old scan".utf8), kind: .jpeg, originalFilename: nil)
+        let item = try await store.createItem(kind: .document, name: "Doc",
+                                              pages: [imagePage(old), imagePage(old), imagePage(old)], assets: [old])
+        let before = try await store.pages(of: item.id)
+        let target = before[1]
+        try await store.updateTransform(target.id, to: PageTransform(
+            crop: NormalizedRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5), rotation: .clockwise90, filter: .grayscale, brightness: 0.2))
+        let edited = try #require(try await store.page(target.id))
+
+        let new = try store.assets.store(Data("new scan".utf8), kind: .png, originalFilename: nil)
+        let snapshot = LibraryStore.PageContentSnapshot(sourceSize: CGSize(width: 600, height: 800), content: .image(new.id),
+                                                        transform: PageTransform(filter: .grayscale, brightness: 0.2))
+        let (previous, page) = try await store.replacePageContent(target.id, with: snapshot, assets: [new])
+
+        #expect(page.id == target.id && page.sortKey == target.sortKey)
+        #expect(page.content == .image(new.id) && page.sourceSize == CGSize(width: 600, height: 800))
+        #expect(page.transform == snapshot.transform)
+        #expect(page.revision == edited.revision + 1)
+        #expect(previous == LibraryStore.PageContentSnapshot(page: edited))
+        #expect(try await store.pages(of: item.id).map(\.id) == before.map(\.id))
+
+        // Reversing restores the previous content exactly.
+        let (_, restored) = try await store.replacePageContent(target.id, with: previous, assets: [])
+        #expect(LibraryStore.PageContentSnapshot(page: restored) == previous)
+        #expect(try await store.integrityCheck().isEmpty)
+    }
+
+    @Test func aReplacedOriginalSurvivesUntilTheNextLaunch() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let old = try store.assets.store(Data("only used by the replaced page".utf8), kind: .jpeg, originalFilename: nil)
+        let item = try await store.createItem(kind: .document, name: "Doc", pages: [imagePage(old)], assets: [old])
+        let other = try store.assets.store(Data("other".utf8), kind: .png, originalFilename: nil)
+        let otherItem = try await store.createItem(kind: .document, name: "Other", pages: [imagePage(other)], assets: [other])
+        let page = try await store.pages(of: item.id)[0]
+        let new = try store.assets.store(Data("new".utf8), kind: .png, originalFilename: nil)
+        let (previous, _) = try await store.replacePageContent(
+            page.id, with: .init(sourceSize: CGSize(width: 10, height: 10), content: .image(new.id), transform: .identity), assets: [new])
+
+        // Permanently deleting something else must not take the old scan
+        // that undo still needs.
+        try await store.moveToRecentlyDeleted([otherItem.id])
+        try await store.deletePermanently([otherItem.id])
+        #expect(FileManager.default.fileExists(atPath: store.assets.url(for: old.id, kind: .jpeg).path))
+        _ = try await store.replacePageContent(page.id, with: previous, assets: [])
+
+        // Next launch: the history goes, and the unused scan with it.
+        _ = try await store.replacePageContent(
+            page.id, with: .init(sourceSize: CGSize(width: 10, height: 10), content: .image(new.id), transform: .identity), assets: [])
+        #expect(try await store.purgeReplacedPageContent() >= 1)
+        try await store.sweepOrphanAssets(gracePeriod: -60)
+        #expect(!FileManager.default.fileExists(atPath: store.assets.url(for: old.id, kind: .jpeg).path))
+        #expect(FileManager.default.fileExists(atPath: store.assets.url(for: new.id, kind: .png).path))
+        #expect(try await store.integrityCheck().isEmpty)
+    }
+
+    @Test func replacingAMissingPageOrWithAMissingOriginalFails() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let asset = try store.assets.store(Data("x".utf8), kind: .jpeg, originalFilename: nil)
+        let item = try await store.createItem(kind: .document, name: "Doc", pages: [imagePage(asset)], assets: [asset])
+        let page = try await store.pages(of: item.id)[0]
+        let ghost = AssetID(sha256: String(repeating: "a", count: 64))
+        await #expect(throws: StoreError.assetMissing(ghost.sha256)) {
+            try await store.replacePageContent(page.id, with: .init(sourceSize: CGSize(width: 1, height: 1), content: .image(ghost), transform: .identity), assets: [])
+        }
+        await #expect(throws: StoreError.pageNotFound) {
+            try await store.replacePageContent(PageID.make(), with: .init(sourceSize: CGSize(width: 1, height: 1), content: .image(asset.id), transform: .identity), assets: [])
+        }
+        #expect(try await store.page(page.id)?.content == .image(asset.id))
+    }
+
+    @Test func aRescanWithExtraPagesIsOneChangeThatRevertsAndReappliesWhole() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let old = try store.assets.store(Data("old".utf8), kind: .jpeg, originalFilename: nil)
+        let item = try await store.createItem(kind: .document, name: "Doc", pages: [imagePage(old), imagePage(old)], assets: [old])
+        let before = try await store.pages(of: item.id)
+        let new = try store.assets.store(Data("new".utf8), kind: .png, originalFilename: nil)
+        let snapshot = LibraryStore.PageContentSnapshot(sourceSize: CGSize(width: 10, height: 10), content: .image(new.id), transform: .identity)
+
+        let change = try await store.replacePage(before[0].id, with: snapshot,
+                                                 inserting: [imagePage(new), imagePage(new)], assets: [new])
+        #expect(change.previous == LibraryStore.PageContentSnapshot(page: before[0]))
+        #expect(change.inserted.count == 2)
+        let after = try await store.pages(of: item.id).map(\.id)
+        #expect(after == [before[0].id] + change.inserted.map(\.id) + [before[1].id])
+
+        try await store.revertPageReplacement(change)
+        #expect(try await store.pages(of: item.id).map(\.id) == before.map(\.id))
+        #expect(try await store.page(before[0].id)?.content == .image(old.id))
+
+        try await store.reapplyPageReplacement(change)
+        #expect(try await store.pages(of: item.id).map(\.id) == after)
+        #expect(try await store.page(before[0].id)?.content == .image(new.id))
+        #expect(try await store.integrityCheck().isEmpty)
+    }
+
+    @Test func aRescanWhoseExtraPagesFailChangesNothing() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let old = try store.assets.store(Data("old".utf8), kind: .jpeg, originalFilename: nil)
+        let item = try await store.createItem(kind: .document, name: "Doc", pages: [imagePage(old)], assets: [old])
+        let page = try await store.pages(of: item.id)[0]
+        let new = try store.assets.store(Data("new".utf8), kind: .png, originalFilename: nil)
+        let ghost = AssetID(sha256: String(repeating: "b", count: 64))
+
+        // The replacement itself is valid; the extra page refers to an
+        // original that was never stored, so the insert fails.
+        await #expect(throws: StoreError.self) {
+            try await store.replacePage(page.id, with: .init(sourceSize: CGSize(width: 10, height: 10), content: .image(new.id), transform: .identity),
+                                        inserting: [.init(sourceSize: CGSize(width: 10, height: 10), content: .image(ghost))],
+                                        assets: [new])
+        }
+        #expect(try await store.page(page.id) == page)
+        #expect(try await store.pages(of: item.id).map(\.id) == [page.id])
+        #expect(try await store.purgeReplacedPageContent() == 0)
+        #expect(try await store.integrityCheck().isEmpty)
+    }
+}
+
 @Suite struct StorageUsageTests {
     @Test func countsLiveDocumentsAndPagesAndTheSpaceTheLibraryUses() async throws {
         let dir = TempDirectory()
@@ -411,5 +540,67 @@ func samplePages(_ asset: AssetFileStore.StagedAsset, count: Int) -> [LibrarySto
         #expect(favorites.map(\.id) == [item.id])
         #expect(favorites[0].pageCount == 2)
         #expect(favorites[0].coverPage?.content == .pdfPage(asset.id, index: 0))
+    }
+}
+
+@Suite struct FolderTests {
+    @Test func renamingAFolderKeepsNamesUniqueAmongSiblings() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        _ = try await store.createFolder(named: "Taxes")
+        let receipts = try await store.createFolder(named: "Receipts")
+        #expect(try await store.renameFolder(receipts.id, to: "taxes").name == "taxes 2")
+        #expect(try await store.renameFolder(receipts.id, to: "Receipts 2026").name == "Receipts 2026")
+        await #expect(throws: StoreError.folderNotFound) { try await store.renameFolder(FolderID.make(), to: "X") }
+    }
+
+    @Test func deletingAFolderKeepsEverythingInItAndMovesItUp() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let asset = try store.assets.store(Data("x".utf8), kind: .pdf, originalFilename: nil)
+        let folder = try await store.createFolder(named: "Taxes")
+        let nested = try await store.createFolder(named: "2026", parentID: folder.id)
+        _ = try await store.createFolder(named: "2026")
+        _ = try await store.createItem(kind: .document, name: "Invoice", pages: samplePages(asset, count: 1), assets: [asset])
+        let inside = try await store.createItem(kind: .document, name: "Invoice", folderID: folder.id, pages: samplePages(asset, count: 2), assets: [asset])
+        let trashed = try await store.createItem(kind: .document, name: "Old", folderID: folder.id, pages: samplePages(asset, count: 1), assets: [asset])
+        try await store.moveToRecentlyDeleted([trashed.id])
+
+        try await store.deleteFolder(folder.id)
+
+        let folders = try await store.folders()
+        #expect(!folders.contains { $0.id == folder.id })
+        let lifted = try #require(folders.first { $0.id == nested.id })
+        #expect(lifted.parentID == nil && lifted.name == "2026 2")
+        let moved = try #require(try await store.item(inside.id))
+        #expect(moved.folderID == nil && moved.name == "Invoice 2")
+        #expect(try await store.pages(of: inside.id).count == 2)
+        #expect(try await store.item(trashed.id)?.folderID == nil)
+        try await store.restore([trashed.id])
+        #expect(try await store.items(in: .folder(nil)).count == 3)
+        #expect(try await store.integrityCheck().isEmpty)
+    }
+
+    @Test func scopeCountsMatchWhatEachScopeLists() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let asset = try store.assets.store(Data("x".utf8), kind: .pdf, originalFilename: nil)
+        let folder = try await store.createFolder(named: "Receipts")
+        let empty = try await store.createFolder(named: "Empty")
+        let a = try await store.createItem(kind: .document, name: "A", pages: samplePages(asset, count: 1), assets: [asset])
+        let b = try await store.createItem(kind: .document, name: "B", folderID: folder.id, pages: samplePages(asset, count: 1), assets: [asset])
+        let c = try await store.createItem(kind: .document, name: "C", folderID: folder.id, pages: samplePages(asset, count: 1), assets: [asset])
+        try await store.setFavorite(a.id, true)
+        try await store.setFavorite(c.id, true)
+        try await store.moveToRecentlyDeleted([c.id])
+
+        let counts = try await store.scopeCounts()
+        #expect(counts.all == 2 && counts.favorites == 1 && counts.recentlyDeleted == 1)
+        #expect(counts.folders == [folder.id: 1])
+        #expect(counts.all == (try await store.items(in: .all)).count)
+        #expect(counts.favorites == (try await store.items(in: .favorites)).count)
+        #expect(counts.recentlyDeleted == (try await store.items(in: .recentlyDeleted)).count)
+        #expect(try await store.items(in: .folder(folder.id)).map(\.id) == [b.id])
+        #expect(counts.folders[empty.id, default: 0] == 0)
     }
 }

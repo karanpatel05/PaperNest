@@ -71,6 +71,10 @@
 "page.moveUp" = "Monter la page";
 "page.moveDown" = "Descendre la page";
 "page.addPages" = "Ajouter des pages…";
+"page.scanPages" = "Numériser des pages";
+"page.rescan" = "Renumériser la page";
+"page.replaceWithFile" = "Remplacer la page par un fichier…";
+"page.addOrReplace" = "Ajouter ou remplacer des pages";
 "page.label" = "Page %1$lld sur %2$lld";
 "page.unavailable" = "L’original de cette page n’est pas disponible sur cet appareil.";
 "page.loadFailed" = "Impossible d’afficher cette page.";
@@ -82,6 +86,7 @@
 "undo.filter" = "Changement de filtre";
 "undo.adjust" = "Réglage de la page";
 "undo.crop" = "Rognage de la page";
+"undo.replacePage" = "Remplacement de la page";
 "undo.deletePage" = "Suppression de la page";
 "undo.movePage" = "Déplacement de la page";
 
@@ -155,3 +160,31 @@
 "error.library.title" = "Bibliothèque indisponible";
 "error.library.newer" = "Cette bibliothèque a été créée par une version plus récente de %@. Mettez l’app à jour pour l’ouvrir.";
 "error.library.open" = "La bibliothèque n’a pas pu être ouverte.";
+
+// Clean & Native workspace
+"library.layout" = "Affichage de la bibliothèque";
+"library.layout.grid" = "Grille";
+"library.layout.list" = "Liste";
+"page.rotate" = "Rotation";
+"action.more" = "Plus";
+"page.selected" = "Sélectionnée";
+
+// Design pass 2: folders and sorting
+"sidebar.folders" = "Dossiers";
+"folder.new" = "Nouveau dossier";
+"folder.rename.title" = "Renommer le dossier";
+"folder.delete" = "Supprimer le dossier…";
+"folder.delete.title" = "Supprimer le dossier « %@ » ?";
+"folder.delete.message" = "Seul le dossier est supprimé. Les documents qu’il contient restent dans votre bibliothèque.";
+"folder.delete.confirm" = "Supprimer le dossier";
+"folder.moveTo" = "Déplacer vers un dossier";
+"folder.none" = "Aucun dossier";
+"library.empty.folder.title" = "Ce dossier est vide";
+"library.empty.folder.message" = "Importez des fichiers ici ou utilisez Déplacer vers un dossier sur un document.";
+"sort.title" = "Trier par";
+"sort.dateModified" = "Date de modification";
+"sort.dateAdded" = "Date d’ajout";
+"sort.name" = "Nom";
+"library.home.title" = "Documents";
+"library.home.recent" = "Récents";
+"library.home.seeAll" = "Tout afficher";

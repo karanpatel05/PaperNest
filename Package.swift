@@ -33,13 +33,6 @@ let package = Package(
             dependencies: ["PaperNestUI"],
             path: "Apps/Mac/Sources"
         ),
-        // iPhone/iPad entry point. The Xcode project builds it as the real
-        // app; scripts/build-ios-sim-app.sh wraps it for the Simulator.
-        .executableTarget(
-            name: "PaperNestPhone",
-            dependencies: ["PaperNestUI"],
-            path: "Apps/iOS/Sources"
-        ),
         // Dev tool: imports files into a library directory through the real
         // importer (used to seed Simulator and dev-app libraries).
         .executableTarget(
@@ -59,6 +52,6 @@ let package = Package(
         .testTarget(name: "PaperNestStoreTests", dependencies: ["PaperNestStore"]),
         .testTarget(name: "PaperNestImportTests", dependencies: ["PaperNestImport", "PaperNestRender", "PaperNestTestSupport"]),
         .testTarget(name: "PaperNestExportTests", dependencies: ["PaperNestExport", "PaperNestImport", "PaperNestTestSupport"]),
-        .testTarget(name: "PaperNestUITests", dependencies: ["PaperNestUI", "PaperNestTestSupport"]),
+        .testTarget(name: "PaperNestUITests", dependencies: ["PaperNestUI", "PaperNestImport", "PaperNestTestSupport"]),
     ]
 )

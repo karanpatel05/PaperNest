@@ -6,6 +6,7 @@ import SQLite3
 /// connection to one actor.
 final class SQLiteDatabase {
     private(set) var handle: OpaquePointer?
+    private var transactionDepth = 0
 
     enum OpenMode {
         case readWriteCreate
@@ -80,8 +81,28 @@ final class SQLiteDatabase {
 
     /// `BEGIN IMMEDIATE` takes the write lock up front so a transaction never
     /// fails halfway with SQLITE_BUSY. Anything thrown rolls everything back.
+    /// A transaction opened inside another becomes a savepoint, so store
+    /// operations compose into one atomic change: a nested failure rolls
+    /// back its own work and rethrows, and the outer transaction decides.
     func transaction<T>(_ body: () throws -> T) throws -> T {
+        if transactionDepth > 0 {
+            let savepoint = "nested\(transactionDepth)"
+            try execute("SAVEPOINT \(savepoint)")
+            transactionDepth += 1
+            defer { transactionDepth -= 1 }
+            do {
+                let result = try body()
+                try execute("RELEASE \(savepoint)")
+                return result
+            } catch {
+                try? execute("ROLLBACK TO \(savepoint)")
+                try? execute("RELEASE \(savepoint)")
+                throw error
+            }
+        }
         try execute("BEGIN IMMEDIATE")
+        transactionDepth = 1
+        defer { transactionDepth = 0 }
         do {
             let result = try body()
             try execute("COMMIT")

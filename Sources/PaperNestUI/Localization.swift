@@ -46,6 +46,9 @@ enum L10n {
     static var recentlyDeleted: String { tr("sidebar.recentlyDeleted") }
 
     // Library
+    static var libraryLayout: String { tr("library.layout") }
+    static var gridView: String { tr("library.layout.grid") }
+    static var listView: String { tr("library.layout.list") }
     static var emptyLibraryTitle: String { tr("library.empty.title") }
     static var emptyLibraryMessageMac: String { tr("library.empty.message.mac") }
     static var emptyLibraryMessageTouch: String { tr("library.empty.message.touch") }
@@ -88,6 +91,9 @@ enum L10n {
     static var scanFailed: String { tr("scan.failed", Brand.displayName) }
 
     // Document
+    static var rotate: String { tr("page.rotate") }
+    static var more: String { tr("action.more") }
+    static var selectedPage: String { tr("page.selected") }
     static var pages: String { tr("document.pages") }
     static var emptyDocumentTitle: String { tr("document.empty.title") }
     static var emptyDocumentMessage: String { tr("document.empty.message") }
@@ -112,6 +118,10 @@ enum L10n {
     static var movePageUp: String { tr("page.moveUp") }
     static var movePageDown: String { tr("page.moveDown") }
     static var addPages: String { tr("page.addPages") }
+    static var scanPages: String { tr("page.scanPages") }
+    static var rescanPage: String { tr("page.rescan") }
+    static var replacePageWithFile: String { tr("page.replaceWithFile") }
+    static var addOrReplacePages: String { tr("page.addOrReplace") }
     static func pageLabel(_ number: Int, of total: Int) -> String { tr("page.label", number, total) }
     static var pageUnavailable: String { tr("page.unavailable") }
     static var pageLoadFailed: String { tr("page.loadFailed") }
@@ -124,6 +134,7 @@ enum L10n {
     static var undoFilter: String { tr("undo.filter") }
     static var undoAdjust: String { tr("undo.adjust") }
     static var undoCrop: String { tr("undo.crop") }
+    static var undoReplacePage: String { tr("undo.replacePage") }
     static var undoDeletePage: String { tr("undo.deletePage") }
     static var undoMovePage: String { tr("undo.movePage") }
 
@@ -175,6 +186,27 @@ enum L10n {
     static var settingsAbout: String { tr("settings.about") }
     static var settingsVersion: String { tr("settings.version") }
     static var settingsPrivacy: String { tr("settings.privacy", Brand.displayName) }
+
+    // Design pass 2: folders and sorting
+    static var folders: String { tr("sidebar.folders") }
+    static var newFolder: String { tr("folder.new") }
+    static var renameFolderTitle: String { tr("folder.rename.title") }
+    static var deleteFolder: String { tr("folder.delete") }
+    static func deleteFolderTitle(_ name: String) -> String { tr("folder.delete.title", name) }
+    static var deleteFolderMessage: String { tr("folder.delete.message") }
+    static var deleteFolderConfirm: String { tr("folder.delete.confirm") }
+    static var moveToFolder: String { tr("folder.moveTo") }
+    static var noFolder: String { tr("folder.none") }
+    static var emptyFolderTitle: String { tr("library.empty.folder.title") }
+    static var emptyFolderMessage: String { tr("library.empty.folder.message") }
+    static var sortBy: String { tr("sort.title") }
+    static var sortDateModified: String { tr("sort.dateModified") }
+    static var sortDateAdded: String { tr("sort.dateAdded") }
+    static var sortName: String { tr("sort.name") }
+    static func itemCount(_ count: Int) -> String { plural("library.itemCount", count) }
+    static var homeTitle: String { tr("library.home.title") }
+    static var homeRecent: String { tr("library.home.recent") }
+    static var homeSeeAll: String { tr("library.home.seeAll") }
 
     // Errors
     static func importErrorTitle(_ file: String) -> String { tr("error.import.title", file) }

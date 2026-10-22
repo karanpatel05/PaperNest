@@ -71,6 +71,10 @@
 "page.moveUp" = "Subir página";
 "page.moveDown" = "Bajar página";
 "page.addPages" = "Añadir páginas…";
+"page.scanPages" = "Escanear páginas";
+"page.rescan" = "Volver a escanear la página";
+"page.replaceWithFile" = "Reemplazar la página con un archivo…";
+"page.addOrReplace" = "Añadir o reemplazar páginas";
 "page.label" = "Página %1$lld de %2$lld";
 "page.unavailable" = "El original de esta página no está disponible en este dispositivo.";
 "page.loadFailed" = "No se pudo mostrar esta página.";
@@ -82,6 +86,7 @@
 "undo.filter" = "Cambiar filtro";
 "undo.adjust" = "Ajustar página";
 "undo.crop" = "Recortar página";
+"undo.replacePage" = "Reemplazar página";
 "undo.deletePage" = "Eliminar página";
 "undo.movePage" = "Mover página";
 
@@ -155,3 +160,31 @@
 "error.library.title" = "Biblioteca no disponible";
 "error.library.newer" = "Esta biblioteca se creó con una versión más reciente de %@. Actualiza la app para abrirla.";
 "error.library.open" = "No se pudo abrir la biblioteca.";
+
+// Clean & Native workspace
+"library.layout" = "Vista de la biblioteca";
+"library.layout.grid" = "Cuadrícula";
+"library.layout.list" = "Lista";
+"page.rotate" = "Girar";
+"action.more" = "Más";
+"page.selected" = "Seleccionada";
+
+// Design pass 2: folders and sorting
+"sidebar.folders" = "Carpetas";
+"folder.new" = "Nueva carpeta";
+"folder.rename.title" = "Cambiar nombre de la carpeta";
+"folder.delete" = "Eliminar carpeta…";
+"folder.delete.title" = "¿Eliminar la carpeta “%@”?";
+"folder.delete.message" = "Solo se elimina la carpeta. Los documentos que contiene permanecen en tu biblioteca.";
+"folder.delete.confirm" = "Eliminar carpeta";
+"folder.moveTo" = "Mover a carpeta";
+"folder.none" = "Sin carpeta";
+"library.empty.folder.title" = "Esta carpeta está vacía";
+"library.empty.folder.message" = "Importa archivos aquí o usa Mover a carpeta en cualquier documento.";
+"sort.title" = "Ordenar por";
+"sort.dateModified" = "Fecha de modificación";
+"sort.dateAdded" = "Fecha de adición";
+"sort.name" = "Nombre";
+"library.home.title" = "Documentos";
+"library.home.recent" = "Recientes";
+"library.home.seeAll" = "Ver todo";

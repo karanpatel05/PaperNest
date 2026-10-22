@@ -69,6 +69,26 @@ public struct DocumentImporter: Sendable {
         }
     }
 
+    /// `prepare`, off the caller's thread: reading and validating a large
+    /// file must not block the UI.
+    public func prepareInBackground(_ source: Source, password: String? = nil) async throws -> Prepared {
+        try prepare(source, password: password)
+    }
+
+    /// Prepares several sources (e.g. one camera session) as one ordered
+    /// set of pages.
+    public func prepareAll(_ sources: [Source], password: String? = nil) async throws -> Prepared {
+        var pages: [LibraryStore.NewPage] = []
+        var assets: [AssetFileStore.StagedAsset] = []
+        for source in sources {
+            let prepared = try prepare(source, password: password)
+            pages += prepared.pages
+            assets += prepared.assets
+        }
+        guard let first = sources.first, !pages.isEmpty else { throw ImportError.empty(filename: "") }
+        return Prepared(suggestedName: first.suggestedItemName, pages: pages, assets: assets)
+    }
+
     /// Imports one file or data blob as a new document.
     public func importItem(_ source: Source, password: String? = nil, folderID: FolderID? = nil) async throws -> LibraryItem {
         let prepared = try prepare(source, password: password)
@@ -79,15 +99,9 @@ public struct DocumentImporter: Sendable {
     /// Combines several images (e.g. one camera scan session) into a single
     /// document, in the order given.
     public func importScan(images: [Data], name: String, folderID: FolderID? = nil) async throws -> LibraryItem {
-        var pages: [LibraryStore.NewPage] = []
-        var assets: [AssetFileStore.StagedAsset] = []
-        for (index, data) in images.enumerated() {
-            let prepared = try prepare(.data(data, name: "\(name) \(index + 1)"))
-            pages += prepared.pages
-            assets += prepared.assets
-        }
-        guard !pages.isEmpty else { throw ImportError.empty(filename: name) }
-        return try await store.createItem(kind: .document, name: name, folderID: folderID, pages: pages, assets: assets)
+        guard !images.isEmpty else { throw ImportError.empty(filename: name) }
+        let prepared = try await prepareAll(images.enumerated().map { .data($1, name: "\(name) \($0 + 1)") })
+        return try await store.createItem(kind: .document, name: name, folderID: folderID, pages: prepared.pages, assets: prepared.assets)
     }
 
     /// Adds the pages of `source` to an existing item after `pageID`
