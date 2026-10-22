@@ -147,7 +147,7 @@ Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 7 | Bulk share / export a selection as one ZIP | **Done** (2026-10-22). Size-reduction presets are row 35, not this | F1 follow-up |
 | 8 | Arbitrary file items (any type) with real size and previews | **Partial** (2026-10-22) — any type imports, shows its size/type symbol and opens in system Quick Look; generated grid/list thumbnails remain open | F2a |
 | 9 | File details / "Show Info" sheet | **Done** (2026-10-22) — kind, original name, size, dates, Share, Save a Copy | F2a |
-| 10 | Import from Photos | **Planned** | F2 |
+| 10 | Import from Photos | **Done** for images (2026-10-22); video needs a streaming transfer and is still open | F2c |
 | 11 | System Inbox folder | **Planned** | F2 |
 | 12 | Create ZIP from a selection | **Done** (2026-10-22) — documents as PDFs, files byte for byte, from the selection bar, the Tools screen and the Settings backup | F2b |
 | 13 | Extract ZIP | **Done** (2026-10-22) — traversal, symlink, encryption, expansion-ratio and total-size limits, each with an adversarial test | F2b |
@@ -169,7 +169,7 @@ Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 29 | Scanner with OCR, searchable PDF | **Partial** — camera wrapper and import exist; **OCR and searchable-PDF export both work** (2026-10-22); the real-camera test is still open | M4/F4 |
 | 30 | Text search across documents | **Done** for recognized text and titles (2026-10-22); typed notes follow with F3 | F4 |
 | 31 | Images ↔ PDF (JPEG, PNG) | **Done** | M1 |
-| 32 | HEIC and WEBP | **Planned** — verify codec support before claiming it | F4 |
+| 32 | HEIC and WEBP | **HEIC done** (2026-10-22), verified against ImageIO before being claimed. WEBP still unverified and unclaimed | F2c/F4 |
 | 33 | Office → PDF (DOCX, XLSX, PPTX), TXT → PDF | **Planned** | F4/F5 |
 | 34 | PDF → Word / Excel / PowerPoint / Text | **Planned** — retain-layout and editable-output are separate modes | F4/F5 |
 | 35 | Compression presets with before/after size | **Partial** — export quality levels exist; no explicit compressor | F2/F4 |

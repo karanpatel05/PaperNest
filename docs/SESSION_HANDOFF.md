@@ -37,7 +37,8 @@ file-preview work has a `FileKind.prepareTemporaryCopy` in it.
 
 ### Next for Claude, in order
 
-1. **F2c** — import from Photos, and a system Inbox folder.
+1. **A system Inbox folder.** Deliberately not built with Photos import: an Inbox with no inbound channel is just a folder with a special name. It needs
+   "Open in PaperNest" (document types and URL handling) first, which is F6 transfer work.
 2. **Rest of F4** — recognise text automatically after a scan, offer re-recognition after a rescan, a user
    language override, and pull text out of vector PDFs into the search index (today only recognised text is
    indexed, so a digital PDF is findable by title alone).
@@ -69,7 +70,7 @@ and photo tools, F9 VPN, and M5 subscriptions. The full list of what is needed i
 - **Verify before you change anything** (expected numbers as of the newest commit):
 
 ```bash
-./scripts/test.sh                                   # 209 tests, 0 failures, 0 warnings
+./scripts/test.sh                                   # 218 tests, 0 failures, 0 warnings
 ./scripts/build-mac-app.sh                          # 0 warnings
 xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build
 ./scripts/ui-test-ios.sh 63992C10-33B4-4CE3-91C3-EE23ECC595A5     # iPhone: 17 passed, Markup skipped
@@ -86,6 +87,9 @@ Library (import, folders, favourites, sort, rename, trash with 30-day purge, tit
 Evidence for every claim is in `docs/TEST_MATRIX.md`, newest rows first. Capability coverage against the owner's reference screenshots is `docs/REFERENCE_FEATURE_INVENTORY.md` (48 rows).
 
 ## Traps found the hard way — read before touching these
+
+- **The title menu's button is labelled `"<name>, Actions Menu"`.** Match it by label prefix with an existence check. An exact match on the name misses it, and the `staticTexts` fallback is not reliably present — a test written that way passes on luck.
+- **Restart the simulator before investigating a spread of unrelated UI failures.** One run showed three, including an app that would not launch at all; all passed after `simctl shutdown` and a clean boot.
 
 - **QuickLook supplies its own Done button only when it presents itself.** Inside a SwiftUI sheet or cover, SwiftUI owns the presentation, so install the dismissal yourself (`file-preview-done`).
 - **Temporary copies have an owner.** Await `FileKind.prepareTemporaryCopy`, retain its `PreparedFileCopy` for the entire preview/share/save lifetime, and let it clean up its own directory on release. Do not delete on `onDisappear`: child presentations can cover the parent. Info reuses the preview copy. Never give Quick Look the immutable asset path.

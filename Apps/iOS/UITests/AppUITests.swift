@@ -245,8 +245,12 @@ final class AppUITests: XCTestCase {
         original.tap()
         wait(for: [expectation(for: selected, evaluatedWith: original)], timeout: 5)
 
-        let titleButton = app.navigationBars.buttons["Crop target"]
-        let title = titleButton.exists ? titleButton : app.navigationBars.staticTexts["Crop target"]
+        // The title menu's button is labelled "<name>, Actions Menu", so an
+        // exact match misses it and the StaticText fallback is not always
+        // present. Matching by prefix is what actually holds.
+        let title = app.navigationBars.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Crop target")).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 5), "no title menu in the document toolbar")
         title.tap()
         app.buttons["Add to Favorites"].tap()
         title.tap()
