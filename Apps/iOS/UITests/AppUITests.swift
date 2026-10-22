@@ -569,7 +569,7 @@ final class AppUITests: XCTestCase {
                       "the document should be found by a word only its page carries")
     }
 
-    func testAFileItemShowsItsTypeAndSizeAndOffersACopy() throws {
+    func testAFileItemPreviewsAndShowsItsTypeSizeAndACopy() throws {
         continueAfterFailure = false
         let app = launch([], libraryPath: "/tmp/papernest-file-items-library")
         showAllDocuments(app)
@@ -577,10 +577,19 @@ final class AppUITests: XCTestCase {
         // tile shows its size where a document shows its page count.
         let cell = app.descendants(matching: .any)["Budget notes, 18 bytes"].firstMatch
         XCTAssertTrue(cell.waitForExistence(timeout: 15), "the file should be in the library")
-        cell.tap()
 
+        // Tapping opens the system preview, not a row of metadata.
+        cell.tap()
+        let previewDone = app.buttons["file-preview-done"]
+        XCTAssertTrue(previewDone.waitForExistence(timeout: 10), "tapping a file should preview it")
+        previewDone.tap()
+        XCTAssertTrue(cell.waitForExistence(timeout: 5))
+
+        // What it is, where it came from and how big: still a menu away.
+        app.buttons["item-more"].firstMatch.tap()
+        app.buttons["Show Info"].tap()
         let header = app.descendants(matching: .any)["file-details-header"].firstMatch
-        XCTAssertTrue(header.waitForExistence(timeout: 5), "tapping a file should show what it is")
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
         // A LabeledContent row is one element labelled "<label>, <value>".
         let originalName = app.staticTexts
             .matching(NSPredicate(format: "label CONTAINS %@", "Budget notes.txt")).firstMatch

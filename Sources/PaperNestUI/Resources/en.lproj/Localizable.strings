@@ -270,3 +270,6 @@
 "tools.splitName" = "%@ — Page %d";
 
 "tools.extractTitle" = "Extract";
+
+"file.preview.failed" = "Unable to Preview";
+"file.preview.failedDescription" = "The file could not be opened. Close the preview or open Show Info for file details.";

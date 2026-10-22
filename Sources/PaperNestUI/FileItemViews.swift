@@ -30,18 +30,44 @@ enum FileKind {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
-    /// Copies the stored bytes to a temporary file under the name the user
-    /// gave it, for sharing or saving. The library's own copy is untouched.
-    static func temporaryCopy(of payload: FilePayload, in store: LibraryStore) throws -> URL {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("PaperNestFile-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let destination = directory.appendingPathComponent(payload.originalFilename)
-        // Copied from the asset file rather than read into memory, so a large
-        // video costs no more than the copy itself.
-        try FileManager.default.copyItem(at: store.assets.url(for: payload.assetID, kind: .file), to: destination)
-        return destination
+    /// Prepare a copy off the UI actor without loading a large file into memory.
+    /// Retain the returned owner for as long as a preview, share or save uses it.
+    static func prepareTemporaryCopy(of payload: FilePayload, in store: LibraryStore) async throws -> PreparedFileCopy {
+        try Task.checkCancellation()
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("PaperNestFile-\(UUID().uuidString)", isDirectory: true)
+            let basename = (payload.originalFilename as NSString).lastPathComponent
+            let name = ["", ".", "..", "/"].contains(basename) ? "\(payload.assetID.sha256).bin" : basename
+            let copy = PreparedFileCopy(url: directory.appendingPathComponent(name), directory: directory)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: store.assets.url(for: payload.assetID, kind: .file), to: copy.url)
+            try Task.checkCancellation()
+            return copy
+        }
+        return try await withTaskCancellationHandler {
+            let copy = try await worker.value
+            try Task.checkCancellation()
+            return copy
+        } onCancel: {
+            worker.cancel()
+        }
     }
+}
+
+/// Owns only the directory this copy created. View disappearance is not a
+/// lifetime boundary: sharing or saving can temporarily cover the parent view.
+final class PreparedFileCopy: Sendable {
+    let url: URL
+    private let directory: URL
+
+    fileprivate init(url: URL, directory: URL) {
+        self.url = url
+        self.directory = directory
+    }
+
+    deinit { try? FileManager.default.removeItem(at: directory) }
 }
 
 struct FileDetailsRequest: Identifiable {
@@ -49,17 +75,17 @@ struct FileDetailsRequest: Identifiable {
     let summary: LibraryStore.ItemSummary
 }
 
-/// What a file is, where it came from and how big it is — the "Show Info" of
-/// the reference app, and the only way to open a file until QuickLook lands.
+/// What a file is, where it came from and how big it is, with share/save actions.
 struct FileDetailsSheet: View {
     let request: FileDetailsRequest
     @Environment(LibrarySession.self) private var session
     @Environment(\.dismiss) private var dismiss
-    @State private var shareURL: URL?
+    @State private var preparedCopy: PreparedFileCopy?
     @State private var isShowingSaver = false
     @State private var failed = false
 
     private var payload: FilePayload? { request.summary.file }
+    private var shareURL: URL? { preparedCopy?.url }
 
     var body: some View {
         NavigationStack {
@@ -127,7 +153,11 @@ struct FileDetailsSheet: View {
             }
             .task {
                 guard shareURL == nil, let payload, let store = session.environment?.store else { return }
-                do { shareURL = try FileKind.temporaryCopy(of: payload, in: store) } catch { failed = true }
+                do {
+                    preparedCopy = try await FileKind.prepareTemporaryCopy(of: payload, in: store)
+                } catch is CancellationError {
+                    // Dismissing the sheet is not a failed save.
+                } catch { failed = true }
             }
         }
         #if os(macOS)

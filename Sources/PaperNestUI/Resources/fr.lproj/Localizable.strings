@@ -270,3 +270,6 @@
 "tools.splitName" = "%@ — Page %d";
 
 "tools.extractTitle" = "Extraire";
+
+"file.preview.failed" = "Aperçu indisponible";
+"file.preview.failedDescription" = "Le fichier n’a pas pu être ouvert. Fermez l’aperçu ou affichez les informations du fichier.";

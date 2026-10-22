@@ -34,29 +34,29 @@ Files: create `Sources/PaperNestStore/LibraryComposition.swift`, `Tests/PaperNes
 
 Interfaces: `duplicateItems(_ ids: [ItemID]) throws -> [LibraryItem]`; `mergeItems(_ ids: [ItemID], named: String, folderID: FolderID?) throws -> LibraryItem`; `extractPages(_ pageIDs: [PageID], from: ItemID, named: String) throws -> LibraryItem`.
 
-- [ ] Add failing tests for order, new identities, editable objects, rollback, invalid/deleted sources and independent lifetime after deleting originals.
-- [ ] Implement using the actor's nested SQLite transaction and existing create/page/object APIs. Duplicate/extract retain color labels; merge starts unlabeled.
-- [ ] Run `./scripts/test.sh --filter DocumentCompositionTests`; require zero failures.
+- [x] Add failing tests for order, new identities, editable objects, rollback, invalid/deleted sources and independent lifetime after deleting originals.
+- [x] Implement using the actor's nested SQLite transaction and existing create/page/object APIs. Duplicate/extract retain color labels; merge starts unlabeled.
+- [x] Run `./scripts/test.sh --filter DocumentCompositionTests`; require zero failures.
 
 ### 2. Color labels (main)
 
-Files: `LibraryModels.swift`, new `LibraryColors.swift`, `Schema.swift`, `LibraryStore.swift`, new `ColorLabelTests.swift`.
+Files: `LibraryModels.swift`, `Schema.swift`, `LibraryStore.swift`, new `ColorLabelTests.swift`.
 
 Interface: optional `LibraryItem.colorLabel: ItemColor?`; `setColorLabel(_ color: ItemColor?, for ids: [ItemID]) throws`.
 
-- [ ] Test v3 migration, set/remove/relaunch and all-or-nothing batch edits with missing/deleted IDs.
-- [ ] Add v4 nullable constrained column and seven stable color values; update item decoding and batch write.
-- [ ] Run `./scripts/test.sh --filter ColorLabelTests`; require zero failures.
+- [x] Test v3 migration, set/remove/relaunch and all-or-nothing batch edits with missing/deleted IDs.
+- [x] Add v4 nullable constrained column and seven stable color values; update item decoding and batch write.
+- [x] Run `./scripts/test.sh --filter ColorLabelTests`; require zero failures.
 
 ### 3. Real library actions (main)
 
 Files: `LibraryView.swift`, `LibraryModel.swift`, new `DocumentToolsSheet.swift`, localization resources, `Apps/iOS/UITests/AppUITests.swift`.
 
-- [ ] Add selection mode and explicit selection indicators, clear/prune selection on scope/query changes.
-- [ ] Single-item menu: Duplicate, Extract Pages, Color Label. Bulk menu: Duplicate, Merge, Move, Color Label, Delete (soft delete).
-- [ ] Merge sheet snapshots selected items in visible order, permits reordering and naming, then creates/opens the merged document. Extraction sheet selects source pages and creates/opens a new document. Keep sources intact, disable submission during commit, retain errors in the presented sheet.
-- [ ] Add a real iOS workflow test using synthetic documents: duplicate, select/merge, then select/extract pages and verify resulting counts/content. Color state is exposed through accessibility text.
-- [ ] Run full unit tests, Mac/iOS builds and UI tests, inspect screenshots. Record exact outcomes and remaining work in TEST_MATRIX and SESSION_HANDOFF.
+- [x] Add selection mode and explicit selection indicators, clear/prune selection on scope/query changes.
+- [x] Single-item menu: Duplicate, Extract Pages, Color Label. Bulk menu: Duplicate, Merge, Move, Color Label, Delete (soft delete).
+- [x] Merge sheet snapshots selected items in visible order, permits reordering and naming, then creates/opens the merged document. Extraction sheet selects source pages and creates/opens a new document. Keep sources intact, disable submission during commit, retain errors in the presented sheet.
+- [x] Add a real iOS workflow test using synthetic documents: duplicate, select/merge, then select/extract pages and verify resulting counts/content. Color state is exposed through accessibility text.
+- [x] Run full unit tests, Mac/iOS builds and UI tests; record exact outcomes in TEST_MATRIX and SESSION_HANDOFF. Final screenshot/iPad checks are tracked in the latest handoff.
 
 Follow-up F1: ~~per-page splitting~~ and ~~bulk archive/share~~ — **both done 2026-10-22** (`LibraryStore.splitItem` + `DocumentSplitTests`; `BulkExportModel`/`BulkExportSheet` + `BulkExportTests`; one iPhone/iPad UI test each). **F1 is complete as scoped.** Later workstreams remain tracked in the expansion spec.
 
@@ -68,3 +68,8 @@ Tasks 1–3 are implemented in the working tree. The checkboxes above are left a
 - Task 3: `./scripts/build-mac-app.sh` and the `PaperNestUI` iOS Simulator build **passed with 0 warnings**; `scripts/ui-test-ios.sh 63992C10-…` on iPhone 17 Pro **succeeded, 11 tests** (Markup skipped as designed); the nine en/fr/es screenshots the localized test captures were exported and inspected (no truncation).
 - Both new UI tests failed on iPad at first (iPhone-only `page-thumbnail-1`; app-wide `staticTexts` matching the library grid behind a form sheet). **Fixed on the owner's instruction and re-verified: iPad `TEST SUCCEEDED`, both tests**, and everything above was re-run green afterwards. **Open question:** the grid's tile name texts should not have been matchable under `.accessibilityElement(children: .ignore)`, so selection mode still deserves a VoiceOver check.
 - **Review focus not covered:** a long document name in the merge and selection UI; a failed save keeping the sheet open (code-inspected only); the whole feature on the Mac.
+
+
+### Review follow-up
+
+The independent review identified stale reload publication, a missing Done button when a scope becomes empty, and selection hiding the VoiceOver color value. All were fixed. `LibraryReloadTests` uses a real blocked store actor (test-only gate) to exercise scope/search/cancellation changes across a suspended reload; all three cases failed before the fix and passed after it. The UI workflow asserts color while selecting and exits selection after deleting all visible items. Visual QA shortened sheet titles and moved selected-grid borders onto previews. Full output logs and final UI evidence are listed in TEST_MATRIX and SESSION_HANDOFF.

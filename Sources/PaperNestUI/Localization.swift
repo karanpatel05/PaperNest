@@ -313,6 +313,8 @@ extension L10n {
 
 // F2a: files kept as themselves.
 extension L10n {
+    static var filePreviewFailed: String { tr("file.preview.failed") }
+    static var filePreviewFailedDescription: String { tr("file.preview.failedDescription") }
     static var fileDetailsTitle: String { tr("file.details.title") }
     static var fileDetailsFooter: String { tr("file.details.footer") }
     static var fileShowDetails: String { tr("file.details.show") }

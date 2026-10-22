@@ -21,6 +21,7 @@ struct LibraryView: View {
     @State private var createdItemID: ItemID?
     @State private var bulkExport: BulkExportRequest?
     @State private var fileDetails: FileDetailsRequest?
+    @State private var filePreview: FilePreviewRequest?
 
     /// Anything can be kept: a type we cannot make pages from becomes a
     /// file item instead. Pages-only flows use `pageTypes`.
@@ -114,6 +115,7 @@ struct LibraryView: View {
             .sheet(item: $fileDetails) { request in
                 FileDetailsSheet(request: request)
             }
+            .modifier(FilePreviewPresentation(request: $filePreview))
     }
 
     @ViewBuilder
@@ -227,7 +229,7 @@ struct LibraryView: View {
             } else if model.scope == .recentlyDeleted {
                 ItemCell(summary: summary, showsDeletionDate: true, layout: layout)
             } else if summary.file != nil {
-                Button { fileDetails = FileDetailsRequest(summary: summary) } label: {
+                Button { filePreview = FilePreviewRequest(summary: summary) } label: {
                     ItemCell(summary: summary, showsDeletionDate: false, layout: layout)
                 }
                 .buttonStyle(.plain)

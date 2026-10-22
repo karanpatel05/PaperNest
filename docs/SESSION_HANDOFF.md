@@ -1,10 +1,20 @@
 # Session handoff
 
+## Current Codex continuation — file previews (2026-10-22)
+
+**Owner asked:** continue implementing features from the Markdown plans and keep handoff notes for Claude before the session limit. This continuation found newer commits in the shared checkout: `cb7a85c` (document tools/Tools/OCR), `2653994` (general files) and `f7e508d` (Claude handoff). Those changes supersede the earlier F1-only checkpoint. **Current branch:** `document-tools-ocr-and-file-items`. Do not commit without a new owner request.
+
+**Ownership now:** Codex is completing the existing uncommitted Quick Look work in `FilePreview.swift`, `FileItemViews.swift`, `LibraryView.swift`, plus Recent routing in `LibraryHome.swift`, localization, preview tests and docs. No other source files should be changed for this slice. Preserve the committed OCR/file/schema-v5 implementation and the earlier ink work.
+
+**Current task:** F2a step 3, already chosen by the owner in the design: native file previews, reachable from the library and Recent; dismissal even on failure; temporary copies cleaned safely without changing stored originals; Show Info/Share/Save still available. No ZIP/RAR work is part of this slice.
+
+**Verification in progress:** the preexisting preview implementation was unverified when resumed. A localized F1 rerun on the changed shared checkout failed while extraction showed an error; the prior F1 run had passed. Do not reuse the old 144-test count as evidence for today's tree (Claude's latest baseline below was 191). New final runs and outcomes will be recorded here and in TEST_MATRIX. Full historical F1 logs remain in TEST_MATRIX.
+
 **Read this page first, then `docs/IMPLEMENTATION_PLAN.md`. The product brief is `CLAUDE_CODE_PROMPT.md` and never changes.**
 
-## Start here — state on 2026-10-22, 15:20
+## Claude baseline — state on 2026-10-22, 15:20
 
-- **Who is editing what: nobody.** Claude has released every file. Codex last wrote at 06:01 and its F1 work is finished, verified and committed.
+- At this baseline Claude had released every file. Current ownership is in the Codex continuation above. F1 was verified and committed by Claude.
 - **The work is committed** on the branch **`document-tools-ocr-and-file-items`** (there is no remote): `cb7a85c` then `2653994`. The working tree is clean and sits on that branch. `main` still points at `bca0ba9`; move it with `git checkout main && git merge --ff-only document-tools-ocr-and-file-items`, or just keep working on the branch.
 - **Verify before you change anything** (expected numbers as of `2653994`):
 
@@ -21,21 +31,24 @@ xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' bui
 
 ## What works today
 
-Library (import, folders, favourites, sort, rename, trash with 30-day purge, title search, colour labels, multi-select) · document tools (duplicate, merge in an explicit order, extract pages, split into one document per page, export a selection as one ZIP) · a **Tools screen** listing only tools that work · page editing (rotate, reorder, delete, add, crop, filters, undo/redo, rescan with history) · Apple Pencil ink on iPad · **text recognition** (Vision, en/fr/es) with search over recognised text · **searchable PDF export** · **file items**: any file type kept as itself, with a type symbol, its size, a details sheet, Share and Save a Copy.
+Library (import, folders, favourites, sort, rename, trash with 30-day purge, title search, colour labels, multi-select) · document tools (duplicate, merge in an explicit order, extract pages, split into one document per page, export a selection as one ZIP) · a **Tools screen** listing only tools that work · page editing (rotate, reorder, delete, add, crop, filters, undo/redo, rescan with history) · Apple Pencil ink on iPad · **text recognition** (Vision, en/fr/es) with search over recognised text · **searchable PDF export** · **file items**: any file type kept as itself, with a type symbol, its size, a **QuickLook preview**, a details sheet, Share and Save a Copy.
 
 Evidence for every claim is in `docs/TEST_MATRIX.md`, newest rows first. Capability coverage against the owner's reference screenshots is `docs/REFERENCE_FEATURE_INVENTORY.md` (48 rows).
 
 ## Next, in order
 
-1. **F2a step 3 — QuickLook preview.** The owner chose it (decision 4 in `docs/F2_FILE_ITEMS_DESIGN.md`); the details sheet stands in until then. `QLPreviewController` on iOS; on the Mac decide between `QLPreviewPanel` and opening a temporary copy.
-2. **F2b — archives.** Create a ZIP from a selection (`Exporter` already writes valid ZIPs), then extract with traversal, symlink and expansion-size limits. RAR only once the owner settles licensing.
-3. **F2c** — Photos import, a system Inbox folder, Copy to.
-4. **Rest of F4** — a recognition status surface outside the menu, automatic recognition after a scan, re-recognition after a rescan, a user language override, and pulling text out of vector PDFs into the search index.
-5. **F3** — highlight/underline/strikethrough over recognised text, notes, stamps, shapes, visual fill & sign, app lock.
+1. **F2b — archives.** Create a ZIP from a selection (`Exporter` already writes valid ZIPs), then extract with traversal, symlink and expansion-size limits. RAR only once the owner settles licensing.
+2. **F2c** — Photos import, a system Inbox folder, Copy to.
+3. **Rest of F4** — a recognition status surface outside the menu, automatic recognition after a scan, re-recognition after a rescan, a user language override, and pulling text out of vector PDFs into the search index.
+4. **F3** — highlight/underline/strikethrough over recognised text, notes, stamps, shapes, visual fill & sign, app lock.
 
 F5–F9 (PDF text editing, cloud, media, browser, VPN) are blocked on owner decisions; see below.
 
 ## Traps found the hard way — read before touching these
+
+- **QuickLook supplies its own Done button only when it presents itself.** Inside a SwiftUI sheet or cover, SwiftUI owns the presentation, so install the dismissal yourself (`file-preview-done`).
+- **Temporary copies must be discarded.** `FileKind.temporaryCopy` makes a directory per copy for Share, Save a Copy and preview; call `FileKind.discardTemporaryCopy` on dismiss or they accumulate in the system temporary directory.
+- **A known Simulator flake:** *"test runner exited with code 0 before establishing connection"* fails a run before any test executes. Rerun once before investigating; it has never reproduced twice in a row here.
 
 - **Migrations that rebuild a table.** This store runs `PRAGMA foreign_keys = ON`, so `DROP TABLE items` performs an implicit delete that **cascades into `pages` and empties the library** (reproduced: *pages before 2 → after 0*). Mark such a migration `rebuildsTables`; the runner disables foreign keys around it and verifies `PRAGMA foreign_key_check` inside the transaction. Never hand-roll a rebuild.
 - **Recognised text is indexed only when `.completed` *and* `sourceRevision` matches the page.** Ordinary edits (rotate, crop, ink) keep the text findable; `replacePageContent` clears it, because a rescan puts different paper on the page. Do not widen this to every revision bump — an existing composition test depends on it.

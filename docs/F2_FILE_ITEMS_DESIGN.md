@@ -149,7 +149,7 @@ The alternative — storing the real extension in the path — was rejected: it 
 1. **F2a goes ahead as specified.** Files beside documents in one library, schema v5, the F1 verbs (rename, move, label, duplicate, delete, share) available on files, page-based operations rejecting them.
 2. **Any file type is accepted.** The bytes are stored content-addressed and never interpreted, so there is no new parsing risk; only previews differ by type.
 3. **No size ceiling was set.** Treat §9.2 (streaming import) as required rather than optional, since a large video is a realistic first import.
-4. **Tapping a file opens QuickLook** (`QLPreviewController` on iOS, `QLPreviewPanel` on Mac) for the types the system can show, with the details sheet behind an Info button.
+4. **Tapping a file opens QuickLook** — **done 2026-10-22**: `QLPreviewController` on iOS and `QLPreviewView` (QuickLookUI) on Mac, with the details sheet behind Show Info in the ⋯ menu. `QLPreviewPanel` was not needed.
 5. **F4 OCR comes first**, then F2a. OCR unlocks search, searchable PDF export and the text-based annotation tools that F3 needs.
 
 The original questions, for the record:

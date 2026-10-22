@@ -4,7 +4,7 @@ A native document scanner and notebook app for iPhone, iPad and Mac: scan paper 
 
 "PaperNest" is a placeholder working name, not a cleared trademark. Branding lives in `Sources/PaperNestCore/Brand.swift` and `Config/Base.xcconfig`.
 
-**Status:** milestone M0 is done and M1 is partly done. The shared code and tests pass on macOS, and the iPhone UI has been checked in the Simulator from screenshots. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for status and [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for evidence. This is not production-ready.
+**Status:** milestone M0 is done and M1 is partly done. The shared code and tests pass on macOS, and iPhone interactions are covered by Simulator UI tests. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for status and [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for evidence. This is not production-ready.
 
 ## Layout
 
@@ -18,7 +18,7 @@ A native document scanner and notebook app for iPhone, iPad and Mac: scan paper 
 | `Sources/PaperNestExport` | PDF, JPEG, PNG and ZIP export |
 | `Sources/PaperNestUI` | Shared SwiftUI views, view models, localization (en/fr/es) |
 | `Apps/Mac` | Native macOS app entry point, Info.plist, entitlements |
-| `Apps/iOS` | iPhone/iPad app entry point and Info.plist (not yet compiled) |
+| `Apps/iOS` | iPhone/iPad app entry point and Info.plist |
 | `project.yml` | XcodeGen spec for the iOS and macOS app targets |
 | `Tests/` | Swift Testing suites and synthetic fixtures (`Tests/Support`) |
 | `Samples/` | Synthetic sample documents (regenerate with `swift run papernest-samples Samples`) |

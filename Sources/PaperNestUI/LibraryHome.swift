@@ -7,8 +7,14 @@ import SwiftUI
 /// a row of the newest documents.
 struct LibraryHomeSections: View {
     @Bindable var model: LibraryModel
+    @State private var filePreview: FilePreviewRequest?
 
     var body: some View {
+        sections.modifier(FilePreviewPresentation(request: $filePreview))
+    }
+
+    @ViewBuilder
+    private var sections: some View {
         // In a header, not a row: buttons in a List row lose their styles
         // (Scan showed enabled without a camera) and can fire together.
         Section {
@@ -33,7 +39,13 @@ struct LibraryHomeSections: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(alignment: .top, spacing: 14) {
                             ForEach(model.recentItems) { summary in
-                                Button { model.open(summary.id) } label: {
+                                Button {
+                                    if summary.file != nil {
+                                        filePreview = FilePreviewRequest(summary: summary)
+                                    } else {
+                                        model.open(summary.id)
+                                    }
+                                } label: {
                                     ItemCell(summary: summary, showsDeletionDate: false, layout: .grid, reservesMenuSpace: false,
                                              tileBackground: Theme.surface)
                                         .frame(width: 128)
