@@ -110,11 +110,11 @@ A custom camera: Cancel, "Auto ▾", flash and `⋯` at the top; detected page c
 | Grid/list toggle | Done in pass 1 | |
 | "Sort by Date Added ▾" | **Build now**: Date Added, Date Modified, Name | Sort in `LibraryModel`; remember the choice in `@AppStorage` |
 | Tile with name, date and `⋯` (no white card) | **Build now** | |
-| Document title `▾` menu | **Build now**: Rename, Favorite, Export | |
+| Document title `▾` menu | **Built** (pass 4): Rename, Add/Remove Favorites, Export (`.toolbarTitleMenu`) | |
 | Pen, highlighter, eraser, text, selection, Pencil palette | Leave out | M3 |
 | OCR button, "Searchable text (OCR)" toggle | Leave out | M4 |
-| Thumbnail column with page numbers and `+` | **Build now** (Mac and iPad) | `+` = Add Pages… |
-| Labeled **Export** button | **Build now** | |
+| Thumbnail column with page numbers and `+` | **Built** (pass 4): `+` opens the add/replace menu | Selected page: system highlight, not yet the blue border |
+| Labeled **Export** button | **Built** (pass 4); labeled on the Mac, icon on iPad toolbars | |
 | Export: PDF / JPEG / PNG tiles | **Built** (pass 3) | |
 | Export: Word, Plain text tiles | Leave out | DOCX/TXT export (M4/M5, Pro) |
 | Export: All / Current / Custom range | **Built** (pass 3): tiles with a detail line (page count, "Page n of m", the range) | Contiguous range with From/To steppers; "2–5, 8" lists are a later enhancement |
@@ -127,7 +127,7 @@ A custom camera: Cancel, "Auto ▾", flash and `⋯` at the top; detected page c
 | iPhone tab bar (Library, Notes, Scan, Settings) | Not yet | A tab bar without Notes would be three tabs, one of them a button. Revisit with M3. Settings stays in the `⋯` menu |
 | Custom camera, modes, flash | Leave out | VisionKit's camera can't be restyled. A custom AVFoundation + Vision camera is a separate project that needs device testing |
 | Post-scan Edit screen | Later (after pass 4) | A flow change: review before saving |
-| Filter strip with live thumbnails | **Build now** in the document view (replaces the Filter menu on iPhone) | Original, Grayscale, B&W are real. "Auto", "Enhanced" and "High Contrast" may appear **only** as real presets with defined parameters, documented here before shipping |
+| Filter strip with live thumbnails | **Built** (pass 4) on iPhone: Filter toggles a strip of live previews + Adjustments + Revert | Original, Grayscale, B&W are real. "Auto", "Enhanced" and "High Contrast" may appear **only** as real presets with defined parameters, documented here before shipping |
 | Cleanup | Leave out | Not implemented |
 
 ## Work plan
@@ -137,7 +137,7 @@ A custom camera: Cancel, "Auto ▾", flash and `⋯` at the top; detected page c
 | 1 | Theme, Scan/Import buttons, grid/list, labeled phone tools | Codex | Done 17:42. Verified on the combined tree: 115 unit tests and 4 UI tests pass |
 | 2 | **Library + sidebar + iPhone home:** counts; Folders (create, rename, delete, Move to Folder, import into the shown folder); title + "N items"; sort menu; tiles with `⋯`; iPhone home (Scan/Import, Recent + See All, library, folders) | Claude | **Done 20:30** (see TEST_MATRIX.md). Follow-ups: home search field, `⋯` on Recent cards, drag to folders, folder colors, Mac/iPad visual check |
 | 3 | **Export sheet** redesign, all platforms | Claude | **Done 21:00**: document row, Format and Pages tiles, Export To tiles, one Export button (iOS: pinned full-width; Mac: Cancel/Export at the bottom right). Verified on iPhone (UI tests, en/fr/es, dark, largest text). **Mac sheet not viewed** |
-| 4 | **Document view:** Mac/iPad thumbnail column with `+`, title `▾` menu, labeled Export, `⋯` menu; iPhone filter strip | open | Open |
+| 4 | **Document view:** title `▾` menu, editing tools in the middle, Export + `⋯`, page column `+`; iPhone filter strip | Claude | **Done 21:30.** Verified on iPhone (UI test, screenshots) and, for the first time, on an **iPad** simulator (iPad Air 13-inch M4, iOS 26.5): library and document layouts match the mockups' structure. **Follow-ups:** the page column's selected page uses the system gray highlight, not the mockup's blue border (needs replacing the `List` selection while keeping drag-to-reorder and keyboard navigation); the Export toolbar button shows its label on the Mac only (iPad toolbars show icons); **Mac not viewed** |
 | 5 | Continuity Camera "Scan from iPhone" on Mac | open | Needs hardware to verify |
 | 6 | Post-scan review (Edit) screen on iPhone | open | After pass 4 |
 

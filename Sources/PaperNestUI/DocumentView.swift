@@ -27,6 +27,10 @@ struct DocumentView: View {
     @State private var isShowingAdjustments = false
     @State private var isShowingPageOrganizer = false
     @State private var isShowingCrop = false
+    /// iPhone: the strip of filter previews above the tools.
+    @State private var isShowingFilterStrip = false
+    @State private var isRenaming = false
+    @State private var renameText = ""
     @State private var zoom: CGFloat = 1
 
     init(itemID: ItemID, session: LibrarySession) {
@@ -62,6 +66,19 @@ struct DocumentView: View {
             } else {
                 HStack(spacing: 0) {
                     PageStrip(model: model, undoManager: undoManager)
+                        .safeAreaInset(edge: .bottom, spacing: 0) {
+                            addPagesMenu {
+                                Image(systemName: "plus")
+                                    .font(.body.weight(.semibold))
+                                    .frame(maxWidth: .infinity, minHeight: 32)
+                            }
+                            .menuIndicator(.hidden)
+                            .buttonStyle(.bordered)
+                            .padding(10)
+                            .background(Theme.surface)
+                            .accessibilityLabel(L10n.addOrReplacePages)
+                            .accessibilityIdentifier("strip-add-pages")
+                        }
                         .frame(width: 168)
                     Divider()
                     PageViewer(model: model, zoom: $zoom, showsZoomButtons: true)
@@ -69,13 +86,30 @@ struct DocumentView: View {
             }
         }
         .navigationTitle(model.item?.name ?? "")
+        // The title's ▾ menu, as in the mockups.
+        .toolbarTitleMenu { titleMenu }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        // iPad: title at the leading edge, editing tools in the middle.
+        .toolbarRole(isCompact ? .automatic : .editor)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if isCompact, !model.pages.isEmpty { compactTools }
+            if isCompact, !model.pages.isEmpty {
+                VStack(spacing: 0) {
+                    if isShowingFilterStrip { filterStrip }
+                    compactTools
+                }
+            }
         }
         #endif
         .toolbar { toolbar }
+        .alert(L10n.renameTitle, isPresented: $isRenaming) {
+            TextField(L10n.renamePlaceholder, text: $renameText)
+            Button(L10n.cancel, role: .cancel) {}
+            Button(L10n.ok) {
+                let name = renameText
+                Task { await model.rename(to: name) }
+            }
+        }
         .task(id: model.session.changeToken) { await model.load() }
         #if DEBUG
         // Dev/screenshot hooks: `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`.
@@ -172,11 +206,61 @@ struct DocumentView: View {
                 exportButton
             }
         } else {
-            ToolbarItemGroup(placement: .primaryAction) { allActions }
+            ToolbarItemGroup(placement: .secondaryAction) { editingTools }
+            ToolbarItemGroup(placement: .primaryAction) { trailingActions }
         }
         #else
-        ToolbarItemGroup(placement: .primaryAction) { allActions }
+        ToolbarItemGroup(placement: .principal) { editingTools }
+        ToolbarItemGroup(placement: .primaryAction) { trailingActions }
         #endif
+    }
+
+    @ViewBuilder
+    private var titleMenu: some View {
+        Button {
+            renameText = model.item?.name ?? ""
+            isRenaming = true
+        } label: {
+            Label(L10n.rename, systemImage: "pencil")
+        }
+        Button {
+            Task { await model.setFavorite(!(model.item?.isFavorite ?? false)) }
+        } label: {
+            if model.item?.isFavorite == true {
+                Label(L10n.removeFavorite, systemImage: "star.slash")
+            } else {
+                Label(L10n.addFavorite, systemImage: "star")
+            }
+        }
+        Button {
+            isShowingExport = true
+        } label: {
+            Label(L10n.export, systemImage: "square.and.arrow.up")
+        }
+        .disabled(model.pages.isEmpty)
+    }
+
+    /// The page-editing tools (the mockups' tool group): rotate, crop, filter.
+    @ViewBuilder
+    private var editingTools: some View {
+        rotateMenu
+        cropButton
+        filterMenu
+    }
+
+    /// A labeled Export button, then everything else in ⋯.
+    @ViewBuilder
+    private var trailingActions: some View {
+        exportButton
+            .labelStyle(.titleAndIcon)
+        Menu {
+            addPagesItems
+            Divider()
+            deleteButton
+        } label: {
+            Label(L10n.more, systemImage: "ellipsis.circle")
+        }
+        .accessibilityIdentifier("editor-more")
     }
 
     private var pageNavigation: some View {
@@ -211,7 +295,15 @@ struct DocumentView: View {
     private var compactToolButtons: some View {
         rotateMenu
         cropButton
-        filterMenu
+        Button {
+            withAnimation(.snappy) { isShowingFilterStrip.toggle() }
+        } label: {
+            Label(L10n.filter, systemImage: "camera.filters")
+        }
+        .disabled(model.selectedPage == nil)
+        .accessibilityValue(isShowingFilterStrip ? L10n.selectedPage : "")
+        .accessibilityAddTraits(isShowingFilterStrip ? .isSelected : [])
+        .accessibilityIdentifier("editor-filter")
         Button { isShowingPageOrganizer = true } label: {
             Label(L10n.pages, systemImage: "square.grid.2x2")
         }
@@ -221,17 +313,68 @@ struct DocumentView: View {
             Label(L10n.more, systemImage: "ellipsis.circle")
         }
     }
-    #endif
 
-    @ViewBuilder
-    private var allActions: some View {
-        rotateMenu
-        cropButton
-        filterMenu
-        addPagesButton
-        exportButton
-        Menu { deleteButton } label: { Label(L10n.more, systemImage: "ellipsis.circle") }
+    /// Live previews of the selected page in each filter, then Adjustments
+    /// and Revert. Only real filters appear (no invented presets).
+    private var filterStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 12) {
+                if let page = model.selectedPage {
+                    ForEach([PageFilter.original, .grayscale, .blackAndWhite], id: \.self) { filter in
+                        filterPreview(page, filter)
+                    }
+                }
+                Divider().frame(height: 72)
+                VStack(spacing: 8) {
+                    Button(L10n.adjustments) { isShowingAdjustments = true }
+                        .popover(isPresented: $isShowingAdjustments) {
+                            AdjustmentsPanel(model: model, undoManager: undoManager)
+                                .presentationCompactAdaptation(.sheet)
+                        }
+                    Button(L10n.revertToOriginal) {
+                        Task { await model.revertToOriginal(undoManager: undoManager) }
+                    }
+                    .disabled(model.selectedPage?.transform == .identity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .font(.caption.weight(.medium))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .background(Theme.surface)
+        .overlay(alignment: .top) { Divider() }
+        .accessibilityIdentifier("filter-strip")
     }
+
+    private func filterPreview(_ page: Page, _ filter: PageFilter) -> some View {
+        let isSelected = page.transform.filter == filter
+        var preview = page
+        preview.transform.filter = filter
+        return Button {
+            Task { await model.setFilter(filter, undoManager: undoManager) }
+        } label: {
+            VStack(spacing: 5) {
+                PageImageView(page: preview, pixelSize: 180)
+                    .frame(width: 56, height: 72)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 3)
+                            .strokeBorder(isSelected ? Theme.accent : .clear, lineWidth: 2)
+                    }
+                Text(filter.title)
+                    .font(.caption2.weight(isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Theme.accent : .primary)
+                    .fixedSize()
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(filter.title)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier("filter-\(filter)")
+    }
+    #endif
 
     private var rotateMenu: some View {
         Menu {
@@ -307,38 +450,45 @@ struct DocumentView: View {
     /// Add pages (camera on iPhone/iPad, files everywhere) or replace the
     /// selected page with a new capture.
     private var addPagesButton: some View {
-        Menu {
-            #if os(iOS)
-            Button {
-                cameraPurpose = .add
-            } label: {
-                Label(L10n.scanPages, systemImage: "doc.viewfinder")
-            }
-            .disabled(!DocumentCameraView.isSupported)
-            #endif
-            Button {
-                openFilePicker(.add)
-            } label: {
-                Label(L10n.addPages, systemImage: "doc.badge.plus")
-            }
-            Divider()
-            #if os(iOS)
-            Button {
-                cameraPurpose = .replace
-            } label: {
-                Label(L10n.rescanPage, systemImage: "arrow.triangle.2.circlepath.camera")
-            }
-            .disabled(!DocumentCameraView.isSupported || model.selectedPage == nil)
-            #endif
-            Button {
-                openFilePicker(.replace)
-            } label: {
-                Label(L10n.replacePageWithFile, systemImage: "arrow.triangle.2.circlepath.doc.on.clipboard")
-            }
-            .disabled(model.selectedPage == nil)
-        } label: {
+        addPagesMenu {
             Label(L10n.addOrReplacePages, systemImage: "doc.badge.plus")
         }
+    }
+
+    private func addPagesMenu(@ViewBuilder label: () -> some View) -> some View {
+        Menu { addPagesItems } label: { label() }
+    }
+
+    @ViewBuilder
+    private var addPagesItems: some View {
+        #if os(iOS)
+        Button {
+            cameraPurpose = .add
+        } label: {
+            Label(L10n.scanPages, systemImage: "doc.viewfinder")
+        }
+        .disabled(!DocumentCameraView.isSupported)
+        #endif
+        Button {
+            openFilePicker(.add)
+        } label: {
+            Label(L10n.addPages, systemImage: "doc.badge.plus")
+        }
+        Divider()
+        #if os(iOS)
+        Button {
+            cameraPurpose = .replace
+        } label: {
+            Label(L10n.rescanPage, systemImage: "arrow.triangle.2.circlepath.camera")
+        }
+        .disabled(!DocumentCameraView.isSupported || model.selectedPage == nil)
+        #endif
+        Button {
+            openFilePicker(.replace)
+        } label: {
+            Label(L10n.replacePageWithFile, systemImage: "arrow.triangle.2.circlepath.doc.on.clipboard")
+        }
+        .disabled(model.selectedPage == nil)
     }
 
     private func openFilePicker(_ purpose: PageSourcePurpose) {
@@ -602,5 +752,15 @@ private struct AdjustmentsPanel: View {
 
     private func commit() {
         Task { await model.setAdjustments(brightness: brightness, contrast: contrast, undoManager: undoManager) }
+    }
+}
+
+extension PageFilter {
+    var title: String {
+        switch self {
+        case .original: L10n.filterOriginal
+        case .grayscale: L10n.filterGrayscale
+        case .blackAndWhite: L10n.filterBlackAndWhite
+        }
     }
 }

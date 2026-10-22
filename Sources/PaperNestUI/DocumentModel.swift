@@ -41,6 +41,29 @@ final class DocumentModel {
         }
     }
 
+    // MARK: - The document itself (title menu)
+
+    func rename(to name: String) async {
+        guard let store else { return }
+        do {
+            item = try await store.rename(itemID, to: name)
+            session.didChange()
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
+    func setFavorite(_ isFavorite: Bool) async {
+        guard let store else { return }
+        do {
+            try await store.setFavorite(itemID, isFavorite)
+            item = try await store.item(itemID)
+            session.didChange()
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
     // MARK: - Transform edits
 
     func rotate(clockwise: Bool, undoManager: UndoManager?) async {

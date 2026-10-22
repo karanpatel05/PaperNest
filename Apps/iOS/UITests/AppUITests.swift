@@ -224,4 +224,36 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Save…"].waitForExistence(timeout: 10), "no fallback after closing the save dialog")
         XCTAssertTrue(app.descendants(matching: .any)["export-share"].exists)
     }
+
+    /// Design pass 4 (iPhone): the filter strip applies a filter, and the
+    /// title's menu adds and removes the document from Favorites. Leaves
+    /// the page and the favorite as they were for the other tests.
+    func testFilterStripAndTitleMenu() throws {
+        continueAfterFailure = false
+        let app = launch(["-PaperNestDebugOpenItem", "Crop target"])
+        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("compact-width behaviour") }
+        let filterButton = app.buttons["editor-filter"]
+        XCTAssertTrue(filterButton.waitForExistence(timeout: 15), "document did not open")
+        filterButton.tap()
+        let original = app.buttons["filter-original"], gray = app.buttons["filter-grayscale"]
+        XCTAssertTrue(gray.waitForExistence(timeout: 5), "no filter strip")
+        XCTAssertTrue(original.isSelected)
+        gray.tap()
+        let selected = NSPredicate(format: "isSelected == true")
+        wait(for: [expectation(for: selected, evaluatedWith: gray)], timeout: 5)
+        XCTAssertFalse(original.isSelected)
+        original.tap()
+        wait(for: [expectation(for: selected, evaluatedWith: original)], timeout: 5)
+
+        let titleButton = app.navigationBars.buttons["Crop target"]
+        let title = titleButton.exists ? titleButton : app.navigationBars.staticTexts["Crop target"]
+        title.tap()
+        app.buttons["Add to Favorites"].tap()
+        title.tap()
+        XCTAssertTrue(app.buttons["Remove from Favorites"].waitForExistence(timeout: 5), "favorite not saved")
+        app.buttons["Remove from Favorites"].tap()
+        title.tap()
+        XCTAssertTrue(app.buttons["Add to Favorites"].waitForExistence(timeout: 5))
+        app.buttons["Add to Favorites"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: 0, dy: 400)).tap()
+    }
 }
