@@ -7,14 +7,9 @@ import SwiftUI
 /// a row of the newest documents.
 struct LibraryHomeSections: View {
     @Bindable var model: LibraryModel
-    @State private var filePreview: FilePreviewRequest?
+    var openFile: (LibraryStore.ItemSummary) -> Void
 
     var body: some View {
-        sections.modifier(FilePreviewPresentation(request: $filePreview))
-    }
-
-    @ViewBuilder
-    private var sections: some View {
         // In a header, not a row: buttons in a List row lose their styles
         // (Scan showed enabled without a camera) and can fire together.
         Section {
@@ -41,7 +36,7 @@ struct LibraryHomeSections: View {
                             ForEach(model.recentItems) { summary in
                                 Button {
                                     if summary.file != nil {
-                                        filePreview = FilePreviewRequest(summary: summary)
+                                        openFile(summary)
                                     } else {
                                         model.open(summary.id)
                                     }

@@ -26,6 +26,12 @@ enum FileKind {
         UTType(uti)?.localizedDescription ?? L10n.fileKindUnknown
     }
 
+    /// Only offer to unpack things we can actually read.
+    static func isArchive(_ uti: String) -> Bool {
+        guard let type = UTType(uti) else { return false }
+        return type.conforms(to: .zip)
+    }
+
     static func size(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
@@ -78,6 +84,7 @@ struct FileDetailsRequest: Identifiable {
 /// What a file is, where it came from and how big it is, with share/save actions.
 struct FileDetailsSheet: View {
     let request: FileDetailsRequest
+    var existingCopy: PreparedFileCopy? = nil
     @Environment(LibrarySession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @State private var preparedCopy: PreparedFileCopy?
@@ -85,7 +92,7 @@ struct FileDetailsSheet: View {
     @State private var failed = false
 
     private var payload: FilePayload? { request.summary.file }
-    private var shareURL: URL? { preparedCopy?.url }
+    private var shareURL: URL? { preparedCopy?.url ?? existingCopy?.url }
 
     var body: some View {
         NavigationStack {

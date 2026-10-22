@@ -569,9 +569,39 @@ final class AppUITests: XCTestCase {
                       "the document should be found by a word only its page carries")
     }
 
+    func testMissingFilePreviewCanBeClosedInEveryLanguage() throws {
+        continueAfterFailure = false
+        for language in ["en", "fr", "es"] {
+            let app = launch([], libraryPath: "/tmp/papernest-missing-file-preview-library", language: language)
+            let cell = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Budget notes")).firstMatch
+            XCTAssertTrue(cell.waitForExistence(timeout: 15))
+            cell.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["file-preview-error"].firstMatch.waitForExistence(timeout: 10))
+            let done = app.buttons["file-preview-done"]
+            XCTAssertTrue(done.isHittable)
+            XCTAssertTrue(app.buttons["file-preview-info"].isHittable)
+            let attachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = "file-preview-error-\(language)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            done.tap()
+            XCTAssertTrue(cell.waitForExistence(timeout: 10), "a failed preview must be dismissible")
+            app.terminate()
+        }
+    }
+
     func testAFileItemPreviewsAndShowsItsTypeSizeAndACopy() throws {
         continueAfterFailure = false
         let app = launch([], libraryPath: "/tmp/papernest-file-items-library")
+        // Recent must route files to the same viewer as the full library.
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            let recent = app.descendants(matching: .any)["Budget notes, 18 bytes"].firstMatch
+            XCTAssertTrue(recent.waitForExistence(timeout: 15))
+            recent.tap()
+            XCTAssertTrue(app.buttons["file-preview-done"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.descendants(matching: .any)["file-preview"].firstMatch.waitForExistence(timeout: 10))
+            app.buttons["file-preview-done"].tap()
+        }
         showAllDocuments(app)
         // A text file cannot become pages, so it is kept as a file and the
         // tile shows its size where a document shows its page count.
@@ -582,6 +612,21 @@ final class AppUITests: XCTestCase {
         cell.tap()
         let previewDone = app.buttons["file-preview-done"]
         XCTAssertTrue(previewDone.waitForExistence(timeout: 10), "tapping a file should preview it")
+        let preview = app.descendants(matching: .any)["file-preview"].firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 10), "the file copy should load")
+        let text = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS %@ OR value CONTAINS %@", "quarterly figures", "quarterly figures")).firstMatch
+        XCTAssertTrue(text.waitForExistence(timeout: 15), "Quick Look should show the actual text file")
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "file-preview-text"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        // Info is a child sheet: dismissing it returns to the working preview.
+        app.buttons["file-preview-info"].tap()
+        XCTAssertTrue(app.buttons["file-share"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["file-save-copy"].isEnabled)
+        app.buttons["file-details-done"].tap()
+        XCTAssertTrue(text.waitForExistence(timeout: 10), "the preview copy should survive Info dismissal")
         previewDone.tap()
         XCTAssertTrue(cell.waitForExistence(timeout: 5))
 

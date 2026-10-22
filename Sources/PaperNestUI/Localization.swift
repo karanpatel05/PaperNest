@@ -325,4 +325,6 @@ extension L10n {
     static var fileAdded: String { tr("file.added") }
     static var fileModified: String { tr("file.modified") }
     static var fileSaveCopy: String { tr("file.saveCopy") }
+    static var fileExtract: String { tr("file.extract") }
+    static var extractArchiveFailed: String { tr("file.extract.failed") }
 }

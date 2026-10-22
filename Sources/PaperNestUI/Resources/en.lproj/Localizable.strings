@@ -233,6 +233,8 @@
 "tools.moveDown" = "Move %@ down";
 "tools.mergeTitle" = "Merge";
 /* File items */
+"file.extract" = "Extract";
+"file.extract.failed" = "This archive couldn’t be opened safely, so nothing was added.";
 "file.details.title" = "File Details";
 "file.details.footer" = "Your copy in PaperNest stays where it is.";
 "file.details.show" = "Show Info";

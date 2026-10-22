@@ -1,6 +1,6 @@
 # F2 design: general file items
 
-**Status: proposal. Nothing here is built.** Written by Claude, 2026-10-22, before any F2 code, because this is the first change that alters what a *library item* is. It needs the owner's decisions (§11) before implementation starts.
+**Status: F2a implemented in stages, 2026-10-22.** The owner’s decisions are recorded in §11. Schema v5, streaming imports of any file type, library operations and details/share/save are committed. Native Quick Look previews are being verified on the current shared tree (see TEST_MATRIX and SESSION_HANDOFF). Grid/list tiles still use type symbols: Quick Look thumbnail generation remains open. F2b–F2d are not complete. The design rationale below describes the pre-F2 baseline where stated.
 
 Context: [FEATURE_EXPANSION.md](FEATURE_EXPANSION.md) (F2), [REFERENCE_FEATURE_INVENTORY.md](REFERENCE_FEATURE_INVENTORY.md) (rows 8–14, 35, 41), [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -8,7 +8,7 @@ Context: [FEATURE_EXPANSION.md](FEATURE_EXPANSION.md) (F2), [REFERENCE_FEATURE_I
 
 `docs/design/reference/09-manage-files.png` shows a library holding things PaperNest cannot hold: a `.txt` of 2 KB, PDFs of 4 MB and 24 MB, a 350 MB video with a duration badge, audio tracks, a Photos-backed folder and a system Inbox — each with its real size and a type-appropriate preview. `04-work-with-files-actions.png` adds per-file actions: Show Info, Copy to, Compress, Convert to MP3, Transcribe.
 
-PaperNest's library today holds **only page-based items** (`document`, `notebook`). An import is turned into pages; anything that is not a PDF, JPEG or PNG is rejected. Every row in `items` is assumed to have pages: `ItemSummary` carries `pageCount` and a `coverPage`, the grid cell renders that cover, export renders pages, and composition (merge/extract/split) copies pages.
+Before F2, PaperNest's library held **only page-based items** (`document`, `notebook`). An import is turned into pages; anything that is not a PDF, JPEG or PNG is rejected. Every row in `items` is assumed to have pages: `ItemSummary` carries `pageCount` and a `coverPage`, the grid cell renders that cover, export renders pages, and composition (merge/extract/split) copies pages.
 
 So F2 is not "import more types". It is: **a library item that is a file, not a sequence of pages**, living beside the page-based ones in the same library, folders, trash, labels and search.
 
@@ -118,13 +118,15 @@ The alternative — storing the real extension in the path — was rejected: it 
 
 **UI**
 - `ItemCell` renders a file's thumbnail, falling back to a UTI-based SF Symbol, and shows the size instead of the page count.
-- Opening a file item shows the details sheet (and, later, a viewer) rather than `DocumentView`.
+- Opening a file item shows a native Quick Look preview, with Show Info/Share/Save available from its Info button; page-based items keep `DocumentView`. Recent uses the same viewer.
 - The Tools screen's document pickers filter file items out; the ZIP export accepts them.
 - Page-only menu entries (Export as PDF, Extract, Split, Crop) are absent for files.
 
 ## 7. Previews
 
-`QLThumbnailGenerator` (iOS 13+/macOS 10.15+, no third-party) covers images, PDFs, video, audio artwork, text and Office files. Cache by `assetID + pixel size`, reusing `ThumbnailCache`'s shape. A failed or unsupported preview falls back to a symbol chosen from the UTI — never a blank tile, never a wrong-looking "document" page.
+The full viewer uses `QLPreviewController` on iOS and an embedded `QLPreviewView` on macOS. Mac previews close the native view on dismantle. Loading and copy errors retain Done and Info. A cancellable background copy restores the original extension; a retained `PreparedFileCopy` owns cleanup and is shared with Info. The library asset is never passed to Quick Look. System-supported formats can be viewed; importing a format does not guarantee the OS has a previewer.
+
+**Thumbnail generation is still planned:** `QLThumbnailGenerator` (iOS 13+/macOS 10.15+, no third-party) covers images, PDFs, video, audio artwork, text and Office files. Cache by `assetID + pixel size`, reusing `ThumbnailCache`'s shape. A failed or unsupported preview falls back to a symbol chosen from the UTI — never a blank tile, never a wrong-looking "document" page.
 
 ## 8. What does not change
 
@@ -149,7 +151,7 @@ The alternative — storing the real extension in the path — was rejected: it 
 1. **F2a goes ahead as specified.** Files beside documents in one library, schema v5, the F1 verbs (rename, move, label, duplicate, delete, share) available on files, page-based operations rejecting them.
 2. **Any file type is accepted.** The bytes are stored content-addressed and never interpreted, so there is no new parsing risk; only previews differ by type.
 3. **No size ceiling was set.** Treat §9.2 (streaming import) as required rather than optional, since a large video is a realistic first import.
-4. **Tapping a file opens QuickLook** — **done 2026-10-22**: `QLPreviewController` on iOS and `QLPreviewView` (QuickLookUI) on Mac, with the details sheet behind Show Info in the ⋯ menu. `QLPreviewPanel` was not needed.
+4. **Tapping a file opens QuickLook** — **done 2026-10-22**: `QLPreviewController` on iOS and `QLPreviewView` (QuickLookUI) on Mac, with the details sheet behind the preview’s Info button or the library’s ⋯ menu. `QLPreviewPanel` was not needed. Verification evidence is in TEST_MATRIX; Mac interaction remains unverified.
 5. **F4 OCR comes first**, then F2a. OCR unlocks search, searchable PDF export and the text-based annotation tools that F3 needs.
 
 The original questions, for the record:

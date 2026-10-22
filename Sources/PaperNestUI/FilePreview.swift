@@ -55,8 +55,8 @@ private struct QuickLookPreview: UIViewControllerRepresentable {
             self.title = title
         }
 
-        var previewItemURL: URL? { copy.url }
-        var previewItemTitle: String? { title }
+        nonisolated var previewItemURL: URL? { copy.url }
+        nonisolated var previewItemTitle: String? { title }
         func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
         func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> any QLPreviewItem { self }
     }
@@ -136,7 +136,7 @@ struct FilePreviewSheet: View {
                 }
             }
             .sheet(isPresented: $showingDetails) {
-                FileDetailsSheet(request: FileDetailsRequest(summary: request.summary))
+                FileDetailsSheet(request: FileDetailsRequest(summary: request.summary), existingCopy: preparedCopy)
             }
             .task {
                 guard preparedCopy == nil else { return }

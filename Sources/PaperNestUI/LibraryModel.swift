@@ -371,6 +371,39 @@ public final class LibraryModel {
         }
     }
 
+    /// Unpacks an archive file item into a folder of its own. The archive
+    /// is untrusted: anything that escapes the destination, is a symbolic
+    /// link, is encrypted or expands past the limits is refused outright,
+    /// and nothing is added to the library in that case.
+    func extractArchive(_ summary: LibraryStore.ItemSummary) async -> Bool {
+        guard let env = environment, let payload = summary.file else { return false }
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PaperNestExtract-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        do {
+            let data = try await env.store.assetData(payload.assetID).0
+            let reader = try ZipReader(data: data)
+            let files = try reader.extract(to: scratch)
+            guard !files.isEmpty else { throw ZipReader.ArchiveError.notAnArchive }
+            let folder = try await env.store.createFolder(named: summary.item.name)
+            for url in files.sorted(by: { $0.path < $1.path }) {
+                do {
+                    _ = try await env.importer.importItem(.file(url), folderID: folder.id)
+                } catch {
+                    // Anything we cannot make pages from is still kept.
+                    _ = try? await FileItemImporter(store: env.store).importFile(at: url, into: folder.id)
+                }
+            }
+            session.didChange()
+            await reload()
+            sidebarSelection = .folder(folder.id)
+            return true
+        } catch {
+            presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.extractArchiveFailed)
+            return false
+        }
+    }
+
     func setColorLabel(_ color: ItemColor?, for ids: [ItemID]) async {
         await mutate { try await $0.store.setColorLabel(color, for: ids) }
     }

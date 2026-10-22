@@ -13,6 +13,7 @@ public struct RootView: View {
     @State private var folderPrompt: FolderPrompt?
     @State private var folderName = ""
     @State private var deletingFolder: Folder?
+    @State private var homeFilePreview: FilePreviewRequest?
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
@@ -61,6 +62,7 @@ public struct RootView: View {
                 splitView
             }
         }
+        .modifier(FilePreviewPresentation(request: $homeFilePreview))
         .environment(model.session)
         .tint(Theme.accent)
         .task { await model.session.bootstrap() }
@@ -70,7 +72,9 @@ public struct RootView: View {
         NavigationSplitView {
             List(selection: $model.sidebarSelection) {
                 if showsHome {
-                    LibraryHomeSections(model: model)
+                    LibraryHomeSections(model: model) { summary in
+                        homeFilePreview = FilePreviewRequest(summary: summary)
+                    }
                 }
                 Section(L10n.sidebarLibrary) {
                     Label(L10n.allDocuments, systemImage: "doc.on.doc").badge(model.counts.all).tag(LibraryStore.Scope.all)

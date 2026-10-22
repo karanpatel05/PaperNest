@@ -41,6 +41,17 @@ FILES_LIBRARY=/tmp/papernest-file-items-library
 rm -rf "$FILES_LIBRARY"
 swift run --scratch-path "$SCRATCH" papernest-seed "$FILES_LIBRARY" "$FIXTURES/Budget notes.txt"
 
+# A missing synthetic original exercises the preview error and its dismissal.
+MISSING_FILE_LIBRARY=/tmp/papernest-missing-file-preview-library
+rm -rf "$MISSING_FILE_LIBRARY"
+cp -R "$FILES_LIBRARY" "$MISSING_FILE_LIBRARY"
+python3 - "$MISSING_FILE_LIBRARY/Assets" <<'PY'
+from pathlib import Path
+import sys
+for asset in Path(sys.argv[1]).rglob('*.bin'):
+    asset.unlink()
+PY
+
 # The text-recognition test reads words printed on a real sample page.
 cp Samples/multilingual-letter.pdf "$FIXTURES/OCR target.pdf"
 OCR_LIBRARY=/tmp/papernest-ocr-library

@@ -145,12 +145,12 @@ Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 5 | Extract pages into a new editable document | **Done** | F1 |
 | 6 | Split a document into one file per page | **Done** (2026-10-22) | F1 follow-up |
 | 7 | Bulk share / export a selection as one ZIP | **Done** (2026-10-22). Size-reduction presets are row 35, not this | F1 follow-up |
-| 8 | Arbitrary file items (any type) with real size and previews | **Done** (2026-10-22) — any type imports, shows its size and a type symbol, and opens in QuickLook | F2a |
+| 8 | Arbitrary file items (any type) with real size and previews | **Partial** (2026-10-22) — any type imports, shows its size/type symbol and opens in system Quick Look; generated grid/list thumbnails remain open | F2a |
 | 9 | File details / "Show Info" sheet | **Done** (2026-10-22) — kind, original name, size, dates, Share, Save a Copy | F2a |
 | 10 | Import from Photos | **Planned** | F2 |
 | 11 | System Inbox folder | **Planned** | F2 |
 | 12 | Create ZIP from a selection | **Partial** — the backup writer produces a valid ZIP; no user-facing compression | F2 |
-| 13 | Extract ZIP | **Planned** — needs traversal, symlink and expansion-bomb limits | F2 |
+| 13 | Extract ZIP | **Done** (2026-10-22) — traversal, symlink, encryption, expansion-ratio and total-size limits, each with an adversarial test | F2b |
 | 14 | Extract RAR | **Planned** — licensing question first; creation is *not* requested | F2 |
 | 15 | PDF/page viewer | **Done** | M1 |
 | 16 | Rotate, reorder, delete, add pages | **Done** | M1 |
@@ -201,7 +201,7 @@ The delivery order in FEATURE_EXPANSION.md still stands. Concretely, the next sl
 
 1. ~~**Finish F1**~~ — **done 2026-10-22**: `LibraryStore.splitItem` and selection-wide ZIP export (`BulkExportModel`). F1 is complete as scoped.
 2. ~~**Tools screen**~~ — **done 2026-10-22** (`ToolsSheet.swift`): Create (Scan, Import) and Documents (Merge, Extract, Split, Export as ZIP), each with a picker that enforces its own selection rule. Only working tools are listed. Page tools (crop, rotate, filters) stay in the document, where they have a page to act on.
-3. **F2 general files** — the schema design is written: **[F2_FILE_ITEMS_DESIGN.md](F2_FILE_ITEMS_DESIGN.md)** (proposal, awaiting the owner's answers in its §11). It covers schema v5, the two CHECK-constraint table rebuilds, asset sweeping across both item kinds, streaming import for large files, QuickLook thumbnails, and the F2a–F2d slices.
+3. **F2 general files** — the schema design is written: **[F2_FILE_ITEMS_DESIGN.md](F2_FILE_ITEMS_DESIGN.md)** (owner decisions recorded in §11; F2a implemented in stages). It covers schema v5, the two CHECK-constraint table rebuilds, asset sweeping across both item kinds, streaming import for large files, QuickLook thumbnails, and the F2a–F2d slices.
 4. **F4 OCR** — first slice **done 2026-10-22**: `TextRecognizer`, source-space boxes, FTS over recognised text, and a Recognize Text action. Searchable-PDF export landed the same day. Still open: a status surface outside the menu, automatic recognition after a scan, re-recognition after a rescan, and a user language override.
 5. **F3 annotations and app lock** — highlight/underline/strikethrough over recognised runs, notes, stamps, shapes, visual fill & sign, device authentication.
 

@@ -37,7 +37,9 @@ No third-party dependencies. Everything uses Apple frameworks and the system SQL
 
 In **All Documents** or a folder, use **Select** to choose several documents, then **More** for merge, duplicate, color label, move or delete. Merge opens a sheet where you name the new document and arrange the source documents. A document’s **⋯** menu also offers **Duplicate**, **Extract Pages**, and **Color Label**. Extraction copies the pages you select in their original order. The source documents remain unchanged and the new documents remain editable.
 
-The broader feature request from the nine reference photos is tracked in [the expansion roadmap](docs/FEATURE_EXPANSION.md). General file storage, archives, richer PDF editing, OCR/conversions, cloud providers, media, browser and VPN are future workstreams.
+PaperNest also keeps general files with their original bytes and filename. Tap a file in the library or Recent to open the system Quick Look viewer; use Info for file details, Share and Save a Copy. Previews use disposable copies, and supported formats depend on the operating system. Page-based documents keep the editable document view.
+
+Real text recognition (English, French and Spanish), recognized-text search and searchable PDF export are implemented. The broader feature request is tracked in [the expansion roadmap](docs/FEATURE_EXPANSION.md): archive extraction, richer PDF editing, additional conversions, cloud providers, media, browser and VPN remain future workstreams.
 
 ## Build and test
 

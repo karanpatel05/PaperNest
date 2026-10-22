@@ -297,8 +297,12 @@ struct LibraryView: View {
             Button(L10n.splitPages) { split(summary) }
                 .disabled(summary.pageCount < 2 || isComposing)
             ColorLabelMenu { color in Task { await model.setColorLabel(color, for: [summary.id]) } }
-            if summary.file != nil {
+            if let file = summary.file {
                 Button(L10n.fileShowDetails) { fileDetails = FileDetailsRequest(summary: summary) }
+                if FileKind.isArchive(file.uti) {
+                    Button(L10n.fileExtract) { extractArchive(summary) }
+                        .disabled(isComposing)
+                }
             }
             Divider()
             Button(L10n.delete, role: .destructive) { Task { await model.moveToRecentlyDeleted([summary.id]) } }
@@ -467,6 +471,15 @@ struct LibraryView: View {
         isComposing = true
         Task {
             if await model.duplicate(ids) { endSelection() }
+            isComposing = false
+        }
+    }
+
+    private func extractArchive(_ summary: LibraryStore.ItemSummary) {
+        guard !isComposing else { return }
+        isComposing = true
+        Task {
+            _ = await model.extractArchive(summary)
             isComposing = false
         }
     }

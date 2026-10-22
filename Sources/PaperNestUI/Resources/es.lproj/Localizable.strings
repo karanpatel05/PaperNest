@@ -233,6 +233,8 @@
 "tools.moveDown" = "Bajar %@";
 "tools.mergeTitle" = "Combinar";
 /* File items */
+"file.extract" = "Extraer";
+"file.extract.failed" = "Este archivo comprimido no se pudo abrir de forma segura; no se añadió nada.";
 "file.details.title" = "Detalles del archivo";
 "file.details.footer" = "Tu copia en PaperNest se queda donde está.";
 "file.details.show" = "Mostrar información";

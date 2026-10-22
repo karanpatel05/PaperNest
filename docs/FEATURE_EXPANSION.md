@@ -8,8 +8,8 @@ This is a multi-release expansion. The table is a coverage ledger, not a stateme
 
 | Area / reference | Required capability | Current baseline / workstream |
 |---|---|---|
-| Files (1, 3, 8, 9) | Browse local files and folders, grid/list, rename, sort, search, favorites, recent files, trash | Existing for PaperNest documents; arbitrary file types planned in F2 |
-| Files (1, 3) | Color labels, select multiple, copy/duplicate, move, file details, share/email | Existing single-document move/share; F1 adds selection, duplicate and color; general file details F2 |
+| Files (1, 3, 8, 9) | Browse local files and folders, grid/list, rename, sort, search, favorites, recent files, trash | Existing for PaperNest documents and general file items (F2a) |
+| Files (1, 3) | Color labels, select multiple, copy/duplicate, move, file details, share/email | F1 selection/duplicate/color/batch actions done; F2a general file details/share/save implemented |
 | Files (8) | Import from Photos, Files, camera, computer/cable; create folders, PDF notes and text files | Files/camera/folders exist; Photos/text/notebooks F2/F3; computer transfer F6 |
 | PDF (1, 5, 7) | Read PDFs, scanned documents and books, navigate/search/bookmark | Page viewer exists; text search/bookmarks/reading mode F3/F4; supported book formats must be explicit |
 | PDF (1, 5) | Merge documents, split/extract pages, rotate/reorder/delete | Rotate/reorder/delete/add exist; merge/extract F1; per-page split F1 follow-up |
@@ -39,10 +39,10 @@ This is a multi-release expansion. The table is a coverage ledger, not a stateme
 
 ## Delivery sequence
 
-- **F1 — Document tools (in progress):** select documents, duplicate, merge with explicit order/name, extract selected pages as a new editable document, color labels. Keep sources. Follow up with one-document-per-page splitting and bulk share/compress.
-- **F2 — General file library and archives:** keep non-document assets as first-class file items, metadata/previews/Photos import, copy/move/details, ZIP creation/extraction and RAR extraction. Existing page-based documents remain editable. Secure bounded extraction with traversal/symlink/expansion-size checks; cancellation leaves no partial library entries.
+- **F1 — Document tools (implemented and verified):** selection, duplicate, explicit-order merge, extraction, color labels, per-page splitting and selection-wide ZIP export. Original documents and editable objects are preserved.
+- **F2 — General file library and archives (partly implemented):** F2a now stores any file type, streams large imports, supports library operations/details/share/save, and opens system Quick Look previews. Grid/list thumbnails still use type symbols. Remaining: thumbnail generation, Photos import, Copy to, Inbox, ZIP extraction and archive compression presets; RAR needs a licensing decision. Existing page-based documents remain editable. Secure bounded extraction with traversal/symlink/expansion-size checks; cancellation leaves no partial library entries.
 - **F3 — Notes, annotations and access:** finish notebook creation/templates, text/images/shapes, richer ink, signatures and visual form filling, device authentication/app lock. Preserve existing ink work. Verify edit/reopen/export on each platform.
-- **F4 — OCR and first conversion set:** en/fr/es printed-text recognition, correction UI, text search, searchable PDF, TXT and basic DOCX. Add HEIC/WEBP only where codecs are verified; expose explicit compression presets/results. PDFs with selectable text use their text where possible.
+- **F4 — OCR and first conversion set (partly implemented):** en/fr/es Vision recognition, recognized-text search and searchable PDF are implemented. Remaining: correction/status UI, automatic scan/rescan recognition, language override, TXT and basic DOCX. Add HEIC/WEBP only where codecs are verified; expose explicit compression presets/results. PDFs with selectable text use their text where possible.
 - **F5 — Advanced PDF and Office engine:** real PDF text/image editing, interactive forms, permanent redaction, password export, Office-to-PDF and PDF-to-Office reconstruction. Evaluate a vetted local engine/SDK against synthetic fixtures before committing to paid dependencies or cloud processing.
 - **F6 — Cloud and transfer:** iCloud sync first, then direct Dropbox/Google Drive adapters and local computer transfer. Provider sign-in is for that provider; no new PaperNest username/password service. Stable IDs, conflicts, offline edits, revocation and interrupted transfers need real integration tests.
 - **F7 — Media and transcription:** audio/video/audiobooks, background playback and resume, codecs/export, editable transcripts. Long-running operations must support cancel/relaunch without corrupting originals.
@@ -53,7 +53,7 @@ These workstreams extend M1/M3/M4 and preserve M2 sync, M5 subscriptions and M6 
 
 ## Architecture and quality gates
 
-- SQLite LibraryStore remains the single metadata authority; assets remain immutable/content-addressed. General file entries need a versioned schema design, not dummy PDF pages. Use the next free migration number; color labels use v4, so planned sync moves to v5 or later.
+- SQLite LibraryStore remains the single metadata authority; assets remain immutable/content-addressed. General files use schema v5 with `file_items`, never dummy PDF pages. Color labels use v4; planned sync must use v6 or the next unused migration.
 - Document composition copies current transforms and editable objects with fresh IDs while sharing immutable originals; no rasterization or file reimport just to merge. History/undo stacks are not copied. Validate all sources and commit a batch atomically.
 - A Tools screen should list only working tools. Add categories as implementations land. Do not create dozens of disabled marketing tiles.
 - Keep Clean & Native UI, iPhone/iPad/native Mac, en/fr/es, keyboard access and VoiceOver. Reference competitor screenshots are feature references, not assets for the shipped app.

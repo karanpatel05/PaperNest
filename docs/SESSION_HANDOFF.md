@@ -1,28 +1,79 @@
 # Session handoff
 
-## Current Codex continuation — file previews (2026-10-22)
+## Work division — read this before you touch anything
 
-**Owner asked:** continue implementing features from the Markdown plans and keep handoff notes for Claude before the session limit. This continuation found newer commits in the shared checkout: `cb7a85c` (document tools/Tools/OCR), `2653994` (general files) and `f7e508d` (Claude handoff). Those changes supersede the earlier F1-only checkpoint. **Current branch:** `document-tools-ocr-and-file-items`. Do not commit without a new owner request.
+Two agents share this one working tree. On 2026-10-22 both were editing it at the same time and a `git add -A`
+swept Codex's in-flight work into commit `5abebea` under a Claude message. Codex recorded the same event from its
+side. The commit is kept as it is; these rules exist so it does not happen again.
 
-**Ownership now:** Codex is completing the existing uncommitted Quick Look work in `FilePreview.swift`, `FileItemViews.swift`, `LibraryView.swift`, plus Recent routing in `LibraryHome.swift`, localization, preview tests and docs. No other source files should be changed for this slice. Preserve the committed OCR/file/schema-v5 implementation and the earlier ink work.
+### Rules for both of you
 
-**Current task:** F2a step 3, already chosen by the owner in the design: native file previews, reachable from the library and Recent; dismissal even on failure; temporary copies cleaned safely without changing stored originals; Show Info/Share/Save still available. No ZIP/RAR work is part of this slice.
+1. **Claim your files in "Current claims" below before you edit them.** First run `ls -lT` on them. If anything
+   changed in the last few minutes, stop and re-read this page: the other session may still be running.
+2. **Never `git add -A`.** Stage by explicit path, and only paths you wrote.
+3. **Commit only when the owner asks.** They asked on 2026-10-22; the current branch is
+   `document-tools-ocr-and-file-items` and there is no remote.
+4. **Verify before you claim anything works**, and record the real outcome in `docs/TEST_MATRIX.md`. Never mark an
+   unrun check as passed.
+5. **Shared files** — `Localization.swift`, the three `Localizable.strings`, `Apps/iOS/UITests/AppUITests.swift`,
+   `scripts/ui-test-ios.sh` — are touched by nearly every slice. Add keys in the same change as the code that uses
+   them, in a block commented with your slice name, and append UI tests at the end of the file without reordering
+   the existing ones.
 
-**Verification in progress:** the preexisting preview implementation was unverified when resumed. A localized F1 rerun on the changed shared checkout failed while extraction showed an error; the prior F1 run had passed. Do not reuse the old 144-test count as evidence for today's tree (Claude's latest baseline below was 191). New final runs and outcomes will be recorded here and in TEST_MATRIX. Full historical F1 logs remain in TEST_MATRIX.
+### Who takes what
+
+| | Area | Targets |
+|---|---|---|
+| **Claude** | Engine and data: schema and migrations, store APIs, composition, import/export, rendering, OCR, and anything security-sensitive (archives, encryption, redaction) | `PaperNestCore`, `PaperNestStore`, `PaperNestImport`, `PaperNestExport`, `PaperNestRender`, their test targets |
+| **Codex** | Interface: views, navigation, the Clean & Native design passes against the owner's mockups, XCUITest flows, screenshots and layout checks in en/fr/es | `PaperNestUI`, `Apps/iOS/UITests`, `docs/CLEAN_NATIVE_DESIGN.md` |
+
+Most slices span both. The agent who owns the **workstream** writes the thin layer it needs on the other side and
+says so in Current claims — that is how the ZIP work below has a `LibraryModel.extractArchive` in it, and how the
+file-preview work has a `FileKind.prepareTemporaryCopy` in it.
+
+### Current claims
+
+**None. Nobody is editing. The tree is clean as of the commit named in "Start here".**
+
+### Next for Claude, in order
+
+1. **Finish F2b — create a ZIP from a selection** ("Compress" in the reference app). `ZipWriter` already writes
+   valid archives and `Exporter.exportLibrary` already packs documents; what is missing is packing a selection of
+   **file items** as their own bytes, plus the selection-bar and Tools entries.
+2. **F2c** — import from Photos, and a system Inbox folder.
+3. **Rest of F4** — recognise text automatically after a scan, offer re-recognition after a rescan, a user
+   language override, and pull text out of vector PDFs into the search index (today only recognised text is
+   indexed, so a digital PDF is findable by title alone).
+4. **F2d** — compression presets with real before-and-after sizes.
+
+### Next for Codex, in order
+
+1. **Look at the Mac app.** Nobody ever has. Library window, document window, Tools, the export sheet, file
+   preview and details, Settings. It builds warning-free and its logic is tested, but every screen is unverified;
+   the checklist is at the end of `docs/TEST_MATRIX.md`.
+2. **F3 annotations** — highlight, underline and strikethrough over *recognised* text (F4a already stores line
+   boxes in source space), then notes, stamps and shapes.
+3. **Notebook creation and templates** — the models and template rendering exist; the editor does not.
+4. **Visual fill & sign**, then app lock (device authentication).
+
+### Blocked on the owner — neither of you start these
+
+F5 PDF text/image editing engine (build or license), F6 cloud and transfer, F7 media and transcription, F8 browser
+and photo tools, F9 VPN, and M5 subscriptions. The full list of what is needed is under "Waiting on the owner".
 
 **Read this page first, then `docs/IMPLEMENTATION_PLAN.md`. The product brief is `CLAUDE_CODE_PROMPT.md` and never changes.**
 
-## Claude baseline — state on 2026-10-22, 15:20
+## Start here — state on 2026-10-22, 16:40
 
-- At this baseline Claude had released every file. Current ownership is in the Codex continuation above. F1 was verified and committed by Claude.
-- **The work is committed** on the branch **`document-tools-ocr-and-file-items`** (there is no remote): `cb7a85c` then `2653994`. The working tree is clean and sits on that branch. `main` still points at `bca0ba9`; move it with `git checkout main && git merge --ff-only document-tools-ocr-and-file-items`, or just keep working on the branch.
-- **Verify before you change anything** (expected numbers as of `2653994`):
+- **Who is editing what: nobody.** Codex reached its session limit; its file-preview slice is finished and verified. Check "Current claims" above before you start.
+- **The work is committed** on the branch **`document-tools-ocr-and-file-items`** (there is no remote). The working tree is clean and sits on that branch. `main` still points at `bca0ba9`; move it with `git checkout main && git merge --ff-only document-tools-ocr-and-file-items`, or just keep working on the branch.
+- **Verify before you change anything** (expected numbers as of the newest commit):
 
 ```bash
-./scripts/test.sh                                   # 191 tests, 0 failures, 0 warnings
+./scripts/test.sh                                   # 206 tests, 0 failures, 0 warnings
 ./scripts/build-mac-app.sh                          # 0 warnings
 xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build
-./scripts/ui-test-ios.sh 63992C10-33B4-4CE3-91C3-EE23ECC595A5     # iPhone: 16 passed, Markup skipped
+./scripts/ui-test-ios.sh 63992C10-33B4-4CE3-91C3-EE23ECC595A5     # iPhone: 17 passed, Markup skipped
 ./scripts/ui-test-ios.sh 62328381-19FB-400A-A8FC-4F4AD13EB5C4 -only-testing:PaperNest-iOSUITests/AppUITests/<name>
 ```
 
@@ -31,23 +82,15 @@ xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' bui
 
 ## What works today
 
-Library (import, folders, favourites, sort, rename, trash with 30-day purge, title search, colour labels, multi-select) · document tools (duplicate, merge in an explicit order, extract pages, split into one document per page, export a selection as one ZIP) · a **Tools screen** listing only tools that work · page editing (rotate, reorder, delete, add, crop, filters, undo/redo, rescan with history) · Apple Pencil ink on iPad · **text recognition** (Vision, en/fr/es) with search over recognised text · **searchable PDF export** · **file items**: any file type kept as itself, with a type symbol, its size, a **QuickLook preview**, a details sheet, Share and Save a Copy.
+Library (import, folders, favourites, sort, rename, trash with 30-day purge, title search, colour labels, multi-select) · document tools (duplicate, merge in an explicit order, extract pages, split into one document per page, export a selection as one ZIP) · a **Tools screen** listing only tools that work · page editing (rotate, reorder, delete, add, crop, filters, undo/redo, rescan with history) · Apple Pencil ink on iPad · **text recognition** (Vision, en/fr/es) with search over recognised text · **searchable PDF export** · **file items**: any file type kept as itself, with a type symbol, its size, a **QuickLook preview** from the library and from Recent, a details sheet, Share and Save a Copy · **ZIP extraction** that refuses anything unsafe.
 
 Evidence for every claim is in `docs/TEST_MATRIX.md`, newest rows first. Capability coverage against the owner's reference screenshots is `docs/REFERENCE_FEATURE_INVENTORY.md` (48 rows).
-
-## Next, in order
-
-1. **F2b — archives.** Create a ZIP from a selection (`Exporter` already writes valid ZIPs), then extract with traversal, symlink and expansion-size limits. RAR only once the owner settles licensing.
-2. **F2c** — Photos import, a system Inbox folder, Copy to.
-3. **Rest of F4** — a recognition status surface outside the menu, automatic recognition after a scan, re-recognition after a rescan, a user language override, and pulling text out of vector PDFs into the search index.
-4. **F3** — highlight/underline/strikethrough over recognised text, notes, stamps, shapes, visual fill & sign, app lock.
-
-F5–F9 (PDF text editing, cloud, media, browser, VPN) are blocked on owner decisions; see below.
 
 ## Traps found the hard way — read before touching these
 
 - **QuickLook supplies its own Done button only when it presents itself.** Inside a SwiftUI sheet or cover, SwiftUI owns the presentation, so install the dismissal yourself (`file-preview-done`).
-- **Temporary copies must be discarded.** `FileKind.temporaryCopy` makes a directory per copy for Share, Save a Copy and preview; call `FileKind.discardTemporaryCopy` on dismiss or they accumulate in the system temporary directory.
+- **Temporary copies have an owner.** Await `FileKind.prepareTemporaryCopy`, retain its `PreparedFileCopy` for the entire preview/share/save lifetime, and let it clean up its own directory on release. Do not delete on `onDisappear`: child presentations can cover the parent. Info reuses the preview copy. Never give Quick Look the immutable asset path.
+- **Recent previews belong to RootView.** A presentation modifier on the empty List sections in `LibraryHomeSections` did not present. The home callback now sets `RootView.homeFilePreview`.
 - **A known Simulator flake:** *"test runner exited with code 0 before establishing connection"* fails a run before any test executes. Rerun once before investigating; it has never reproduced twice in a row here.
 
 - **Migrations that rebuild a table.** This store runs `PRAGMA foreign_keys = ON`, so `DROP TABLE items` performs an implicit delete that **cascades into `pages` and empties the library** (reproduced: *pages before 2 → after 0*). Mark such a migration `rebuildsTables`; the runner disables foreign keys around it and verifies `PRAGMA foreign_key_check` inside the transaction. Never hand-roll a rebuild.
