@@ -15,12 +15,15 @@ final class ThumbnailCache {
         let revision: Int
         let transform: PageTransform
         let pixelSize: Int
+        /// The ink editor shows the page without its ink.
+        let includesInk: Bool
 
-        init(_ page: Page, pixelSize: CGFloat) {
+        init(_ page: Page, pixelSize: CGFloat, includesInk: Bool = true) {
             self.page = page.id
             revision = page.revision
             transform = page.transform
             self.pixelSize = ThumbnailCache.bucket(pixelSize)
+            self.includesInk = includesInk
         }
     }
 
@@ -35,15 +38,15 @@ final class ThumbnailCache {
         return steps.first { CGFloat($0) >= pixels } ?? 4096
     }
 
-    func cached(_ page: Page, pixelSize: CGFloat) -> CGImage? {
-        let key = Key(page, pixelSize: pixelSize)
+    func cached(_ page: Page, pixelSize: CGFloat, includesInk: Bool = true) -> CGImage? {
+        let key = Key(page, pixelSize: pixelSize, includesInk: includesInk)
         guard let image = images[key] else { return nil }
         touch(key)
         return image
     }
 
-    func image(for page: Page, pixelSize: CGFloat, renderer: PageRenderer) async throws -> CGImage {
-        let key = Key(page, pixelSize: pixelSize)
+    func image(for page: Page, pixelSize: CGFloat, includesInk: Bool = true, renderer: PageRenderer) async throws -> CGImage {
+        let key = Key(page, pixelSize: pixelSize, includesInk: includesInk)
         if let hit = images[key] {
             touch(key)
             return hit
@@ -52,7 +55,7 @@ final class ThumbnailCache {
         let image: CGImage
         do {
             try Task.checkCancellation()
-            image = try await renderer.renderThumbnail(page, maxPixelSize: CGFloat(key.pixelSize))
+            image = try await renderer.renderThumbnail(page, maxPixelSize: CGFloat(key.pixelSize), includingInk: includesInk)
             await gate.leave()
         } catch {
             await gate.leave()

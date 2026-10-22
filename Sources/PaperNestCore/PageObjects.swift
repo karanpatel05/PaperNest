@@ -64,10 +64,22 @@ public struct InkStroke: Hashable, Codable, Sendable {
     }
 
     public var tool: Tool
+    /// The color the user picked, at full strength. The highlighter's
+    /// translucency is added when drawing (`highlighterOpacity`), never
+    /// stored, so it can't be applied twice.
     public var color: RGBAColor
-    /// Nominal width in points at pressure 1.
+    /// Nominal width in source points; each point scales it.
     public var width: Double
     public var points: [InkPoint]
+
+    /// How opaque highlighter ink is drawn over the page.
+    public static let highlighterOpacity = 0.35
+
+    /// Drawn width at a point, in source points. The renderer and the
+    /// PencilKit conversion both use this, so exports match the editor.
+    public func width(at point: InkPoint) -> Double {
+        width * min(max(point.widthScale, 0.05), 4)
+    }
 
     public init(tool: Tool, color: RGBAColor, width: Double, points: [InkPoint]) {
         self.tool = tool
@@ -80,15 +92,17 @@ public struct InkStroke: Hashable, Codable, Sendable {
 public struct InkPoint: Hashable, Codable, Sendable {
     public var x: Double
     public var y: Double
-    /// 0...1; 1 when the input device reports no pressure.
-    public var pressure: Double
+    /// Width here relative to the stroke's `width` (1 = nominal). From
+    /// PencilKit this is the point's size, which already reflects pressure
+    /// and tilt; input without pressure uses 1.
+    public var widthScale: Double
     /// Seconds since the first point of the stroke.
     public var time: Double
 
-    public init(x: Double, y: Double, pressure: Double = 1, time: Double = 0) {
+    public init(x: Double, y: Double, widthScale: Double = 1, time: Double = 0) {
         self.x = x
         self.y = y
-        self.pressure = pressure
+        self.widthScale = widthScale
         self.time = time
     }
 }

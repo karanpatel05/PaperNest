@@ -51,7 +51,7 @@ Remaining (in order):
 ## Later milestones (summary)
 
 - **M2:** CKSyncEngine adapter, v4 migration (`sync_state`, `outbox`, `tombstones`), asset upload/download with `remoteOnly` availability, conflict copies, account-change flow, sync status UI driven by real state. Two-device test plan in TEST_MATRIX.md.
-- **M3:** notebook creation, templates (rendering exists), PencilKit adapter on iPad, mouse/trackpad ink on Mac, text boxes, image objects, the 3-notebook free limit hook.
+- **M3:** notebook creation, templates (rendering exists), PencilKit adapter on iPad, mouse/trackpad ink on Mac, text boxes, image objects, the 3-notebook free limit hook. **First slice, owner request (2026-10-21): Apple Pencil on iPad** (ink rendering + export on all platforms, then the iPad PencilKit canvas). Spec: `CLEAN_NATIVE_DESIGN.md` → "Apple Pencil on iPad".
 - **M4:** Vision OCR (`VNRecognizeTextRequest`, automatic language detection plus user override), recognition status UI, search over OCR text and typed notes, searchable PDF (invisible text layer aligned through `PageGeometry`), TXT with page separators and empty-content warnings, a DOCX writer (both variants) validated by `unzip`/XML checks and opening in an external editor.
 - **M5:** StoreKit 2 entitlement service, paywall with StoreKit-supplied prices, restore and manage, expiry behavior, local `.storekit` tests.
 - **M6:** accessibility audit (VoiceOver, Dynamic Type, keyboard focus), 1/20/100-page performance runs with recorded numbers, storage-full handling, release docs.

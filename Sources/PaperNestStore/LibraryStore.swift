@@ -672,6 +672,25 @@ public actor LibraryStore {
         }
     }
 
+    /// One edit of a page's objects (strokes drawn, erased or moved by one
+    /// gesture): saves and deletes in a single transaction with a single
+    /// revision bump, and returns the updated page. Objects must belong to
+    /// `pageID`; nothing changes if any don't.
+    @discardableResult
+    public func applyObjectChanges(on pageID: PageID, saving: [PageObject], deleting: [PageObjectID]) throws -> Page {
+        try db.transaction {
+            guard let page = try page(pageID) else { throw StoreError.pageNotFound }
+            guard saving.allSatisfy({ $0.pageID == pageID }) else { throw StoreError.pageNotFound }
+            for object in saving { try upsertObjectRow(object) }
+            for id in deleting {
+                try db.run("DELETE FROM page_objects WHERE id = ? AND page_id = ?", [.text(id.rawValue), .text(pageID.rawValue)])
+            }
+            if !saving.isEmpty || !deleting.isEmpty { try bumpRevision(page) }
+            guard let updated = try self.page(pageID) else { throw StoreError.pageNotFound }
+            return updated
+        }
+    }
+
     public func deleteObject(_ id: PageObjectID) throws {
         try db.transaction {
             guard let pageIDString = try db.query("SELECT page_id FROM page_objects WHERE id = ?", [.text(id.rawValue)], map: { $0.text(0) }).first,

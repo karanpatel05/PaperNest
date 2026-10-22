@@ -270,3 +270,73 @@ final class TestLibrary: @unchecked Sendable {
         await #expect(throws: RenderError.sourceUnavailable) { try await lib.renderer.renderThumbnail(page, maxPixelSize: 100) }
     }
 }
+
+/// Pass 7, step 1: ink drawn by the renderer that every display and export
+/// path uses.
+@Suite struct InkRenderTests {
+    func stroke(_ tool: InkStroke.Tool = .pen, color: RGBAColor = .black, width: Double, _ points: [(Double, Double)]) -> InkStroke {
+        InkStroke(tool: tool, color: color, width: width, points: points.map { InkPoint(x: $0.0, y: $0.1) })
+    }
+
+    func add(_ stroke: InkStroke, to page: Page, _ lib: TestLibrary) async throws -> Page {
+        try await lib.store.saveObject(PageObject(pageID: page.id, zKey: "m", payload: .ink(stroke), modifiedAt: Date()))
+        return try #require(try await lib.store.page(page.id))
+    }
+
+    func squarePage(_ lib: TestLibrary) async throws -> Page {
+        let item = try await lib.importer.importItem(.data(SyntheticDocuments.image(width: 500, height: 500, type: .png), name: "Square"))
+        return try #require(try await lib.store.pages(of: item.id).first)
+    }
+
+    @Test func penInkFollowsRotationAndCropAndRefreshesTheRevision() async throws {
+        let lib = try TestLibrary()
+        let page = try await squarePage(lib)
+        // Near the source's top-right corner; the red marker is top-left.
+        // Coordinates are fractions of the page: image point size follows DPI.
+        let side = page.sourceSize.width
+        let inked = try await add(stroke(width: 0.06 * side, [(0.76 * side, 0.12 * side), (0.92 * side, 0.12 * side)]), to: page, lib)
+        #expect(inked.revision == page.revision + 1, "thumbnails are keyed by revision")
+
+        let plain = try await lib.renderer.renderThumbnail(inked, maxPixelSize: 200)
+        #expect(PixelProbe.pixel(plain, x: 0.84, y: 0.12).isDark)
+        // The ink editor asks for the page without its ink.
+        let contentOnly = try await lib.renderer.renderThumbnail(inked, maxPixelSize: 200, includingInk: false)
+        #expect(PixelProbe.pixel(contentOnly, x: 0.84, y: 0.12).isWhite)
+
+        // Clockwise: the source's top-right lands at the page's bottom-right.
+        let turned = try await lib.store.updateTransform(page.id, to: PageTransform(rotation: .clockwise90))
+        let rotated = try await lib.renderer.renderThumbnail(turned, maxPixelSize: 200)
+        #expect(PixelProbe.pixel(rotated, x: 0.88, y: 0.84).isDark)
+        #expect(PixelProbe.pixel(rotated, x: 0.6, y: 0.84).isWhite)
+
+        // A crop that leaves the stroke out hides it.
+        let cropped = try await lib.store.updateTransform(page.id, to: PageTransform(crop: NormalizedRect(x: 0, y: 0, width: 0.6, height: 0.5)))
+        let croppedImage = try await lib.renderer.renderThumbnail(cropped, maxPixelSize: 200)
+        #expect(PixelProbe.pixel(croppedImage, x: 0.95, y: 0.24).isWhite)
+        #expect(PixelProbe.pixel(croppedImage, x: 0.1, y: 0.1).isRed)
+    }
+
+    @Test func highlighterLetsThePageShowThrough() async throws {
+        let lib = try TestLibrary()
+        let page = try await squarePage(lib)
+        let yellow = RGBAColor(red: 1, green: 1, blue: 0)
+        let side = page.sourceSize.width
+        let inked = try await add(stroke(.highlighter, color: yellow, width: 0.08 * side, [(0.04 * side, 0.1 * side), (0.6 * side, 0.1 * side)]),
+                                  to: page, lib)
+        let image = try await lib.renderer.renderThumbnail(inked, maxPixelSize: 250)
+        // Multiplied over the red marker it stays red; painted normally the
+        // green channel would rise to about 90.
+        #expect(PixelProbe.pixel(image, x: 0.1, y: 0.1).isRed)
+        // Over white paper: a light yellow tint, not opaque yellow.
+        let tint = PixelProbe.pixel(image, x: 0.4, y: 0.1)
+        #expect(!tint.isWhite && tint.r > 230 && tint.g > 230 && tint.b > 120 && tint.b < 200, "\(tint)")
+    }
+
+    @Test func penWidthFollowsEachPointWithinLimits() {
+        let pen = InkStroke(tool: .pen, color: .black, width: 4, points: [])
+        #expect(pen.width(at: InkPoint(x: 0, y: 0)) == 4)
+        #expect(pen.width(at: InkPoint(x: 0, y: 0, widthScale: 0.5)) == 2)
+        #expect(pen.width(at: InkPoint(x: 0, y: 0, widthScale: 0)) == 0.2)
+        #expect(pen.width(at: InkPoint(x: 0, y: 0, widthScale: 10)) == 16)
+    }
+}

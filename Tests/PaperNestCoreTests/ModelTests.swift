@@ -27,7 +27,7 @@ import Testing
         let objects = [
             PageObject(pageID: page, zKey: "V", payload: .ink(InkStroke(
                 tool: .pen, color: RGBAColor(red: 0.1, green: 0.2, blue: 0.3), width: 2.5,
-                points: [InkPoint(x: 1, y: 2, pressure: 0.5, time: 0), InkPoint(x: 3, y: 4, pressure: 0.7, time: 0.016)]
+                points: [InkPoint(x: 1, y: 2, widthScale: 0.5, time: 0), InkPoint(x: 3, y: 4, widthScale: 0.7, time: 0.016)]
             )), modifiedAt: Date(timeIntervalSince1970: 1000)),
             PageObject(pageID: page, zKey: "k", payload: .text(TextBox(
                 frame: CGRect(x: 10, y: 10, width: 200, height: 40), text: "Façade — ¿Qué tal? 1 234,56 €"

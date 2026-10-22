@@ -30,6 +30,9 @@ struct DocumentView: View {
     /// iPhone: the strip of filter previews above the tools.
     @State private var isShowingFilterStrip = false
     @State private var isRenaming = false
+    /// iPad: the PencilKit ink layer is over the page (pass 7).
+    @State private var isMarkingUp = false
+    @State private var isFingerDrawing = false
     @State private var renameText = ""
     @State private var zoom: CGFloat = 1
 
@@ -81,7 +84,8 @@ struct DocumentView: View {
                         }
                         .frame(width: 168)
                     Divider()
-                    PageViewer(model: model, zoom: $zoom, showsZoomButtons: true)
+                    PageViewer(model: model, zoom: $zoom, showsZoomButtons: true, isMarkingUp: isMarkingUp,
+                               fingerDrawing: isFingerDrawing)
                 }
             }
         }
@@ -111,11 +115,14 @@ struct DocumentView: View {
             }
         }
         .task(id: model.session.changeToken) { await model.load() }
+        .task(id: model.selectedPageID) { await model.loadSelectedPageObjects() }
         #if DEBUG
-        // Dev/screenshot hooks: `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`.
+        // Dev/screenshot hooks: `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`,
+        // `-PaperNestDebugShowMarkup YES` (iPad).
         .task {
             isShowingExport = UserDefaults.standard.bool(forKey: "PaperNestDebugShowExport")
             isShowingCrop = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCrop")
+            isMarkingUp = UserDefaults.standard.bool(forKey: "PaperNestDebugShowMarkup")
         }
         #endif
         .alert(model.presentedError?.title ?? "", isPresented: errorBinding, presenting: model.presentedError) { _ in
@@ -240,9 +247,26 @@ struct DocumentView: View {
         .disabled(model.pages.isEmpty)
     }
 
-    /// The page-editing tools (the mockups' tool group): rotate, crop, filter.
+    /// The page-editing tools (the mockups' tool group): Markup (iPad), then
+    /// rotate, crop, filter.
     @ViewBuilder
     private var editingTools: some View {
+        #if os(iOS)
+        Toggle(isOn: $isMarkingUp) {
+            Label(L10n.markup, systemImage: "pencil.tip.crop.circle")
+        }
+        .toggleStyle(.button)
+        .disabled(model.selectedPage == nil)
+        .accessibilityIdentifier("editor-markup")
+        if isMarkingUp {
+            // The touch alternative to Apple Pencil (and how the Simulator draws).
+            Toggle(isOn: $isFingerDrawing) {
+                Label(L10n.drawWithFinger, systemImage: "hand.draw")
+            }
+            .toggleStyle(.button)
+            .accessibilityIdentifier("editor-finger-drawing")
+        }
+        #endif
         rotateMenu
         cropButton
         filterMenu
@@ -652,6 +676,8 @@ private struct PageViewer: View {
     @Bindable var model: DocumentModel
     @Binding var zoom: CGFloat
     let showsZoomButtons: Bool
+    var isMarkingUp = false
+    var fingerDrawing = false
     @Environment(\.displayScale) private var displayScale
     @State private var pinchBase: CGFloat?
 
@@ -664,8 +690,24 @@ private struct PageViewer: View {
                 let size = CGSize(width: fitted.width * zoom, height: fitted.height * zoom)
                 ScrollView([.horizontal, .vertical]) {
                     PageImageView(page: page, pixelSize: max(size.width, size.height) * displayScale,
-                                  accessibilityLabel: L10n.pageLabel(index + 1, of: model.pages.count))
+                                  accessibilityLabel: L10n.pageLabel(index + 1, of: model.pages.count),
+                                  includesInk: !isMarkingUp)
                         .frame(width: size.width, height: size.height)
+                        #if os(iOS)
+                        .overlay {
+                            if isMarkingUp {
+                                let pageSize = page.geometry.pageSize
+                                // Only this page's objects: right after a page switch the
+                                // previous page's are still loaded.
+                                InkCanvas(pageID: page.id, objects: model.selectedPageObjects.filter { $0.pageID == page.id },
+                                          sourceToView: page.geometry.sourceToPage.concatenating(
+                                              CGAffineTransform(scaleX: size.width / pageSize.width, y: size.height / pageSize.height)),
+                                          fingerDrawing: fingerDrawing) { saving, deleting in
+                                    Task { await model.changeInk(on: page.id, saving: saving, deleting: deleting, undoManager: nil) }
+                                }
+                            }
+                        }
+                        #endif
                         .frame(minWidth: proxy.size.width, minHeight: proxy.size.height)
                 }
                 .background(Theme.canvas)

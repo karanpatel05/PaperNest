@@ -10,6 +10,8 @@ struct PageImageView: View {
     /// Target size of the longer edge, in pixels.
     let pixelSize: CGFloat
     var accessibilityLabel: String?
+    /// False under the ink canvas, which draws the ink itself.
+    var includesInk = true
 
     @Environment(LibrarySession.self) private var session
     @State private var image: CGImage?
@@ -18,7 +20,7 @@ struct PageImageView: View {
     private var pageSize: CGSize { page.geometry.pageSize }
 
     private var loadKey: ThumbnailCache.Key {
-        ThumbnailCache.Key(page, pixelSize: pixelSize)
+        ThumbnailCache.Key(page, pixelSize: pixelSize, includesInk: includesInk)
     }
 
     var body: some View {
@@ -52,14 +54,14 @@ struct PageImageView: View {
     }
 
     private func load() async {
-        if let cached = session.thumbnails.cached(page, pixelSize: pixelSize) {
+        if let cached = session.thumbnails.cached(page, pixelSize: pixelSize, includesInk: includesInk) {
             image = cached
             failure = nil
             return
         }
         guard let renderer = session.environment?.renderer else { return }
         do {
-            let rendered = try await session.thumbnails.image(for: page, pixelSize: pixelSize, renderer: renderer)
+            let rendered = try await session.thumbnails.image(for: page, pixelSize: pixelSize, includesInk: includesInk, renderer: renderer)
             image = rendered
             failure = nil
         } catch is CancellationError {

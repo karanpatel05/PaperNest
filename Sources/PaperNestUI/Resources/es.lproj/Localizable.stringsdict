@@ -38,5 +38,23 @@
 			<string>%lld elementos</string>
 		</dict>
 	</dict>
+	<key>ink.strokeCount</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@strokes@</string>
+		<key>strokes</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld trazo</string>
+			<key>many</key>
+			<string>%lld trazos</string>
+			<key>other</key>
+			<string>%lld trazos</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

@@ -111,7 +111,7 @@ A custom camera: Cancel, "Auto ▾", flash and `⋯` at the top; detected page c
 | "Sort by Date Added ▾" | **Build now**: Date Added, Date Modified, Name | Sort in `LibraryModel`; remember the choice in `@AppStorage` |
 | Tile with name, date and `⋯` (no white card) | **Build now** | |
 | Document title `▾` menu | **Built** (pass 4): Rename, Add/Remove Favorites, Export (`.toolbarTitleMenu`) | |
-| Pen, highlighter, eraser, text, selection, Pencil palette | Leave out | M3 |
+| Pen, highlighter, eraser, lasso, Pencil palette | **Built on iPad (pass 7)** with the system `PKToolPicker`. The mockup's custom palette is not built: offer it once the owner has tried the system one | Text boxes and other note tools stay M3 |
 | OCR button, "Searchable text (OCR)" toggle | Leave out | M4 |
 | Thumbnail column with page numbers and `+` | **Built** (pass 4): `+` opens the add/replace menu | Selected page: system highlight, not yet the blue border |
 | Labeled **Export** button | **Built** (pass 4); labeled on the Mac, icon on iPad toolbars | |
@@ -140,8 +140,47 @@ A custom camera: Cancel, "Auto ▾", flash and `⋯` at the top; detected page c
 | 4 | **Document view:** title `▾` menu, editing tools in the middle, Export + `⋯`, page column `+`; iPhone filter strip | Claude | **Done 21:30.** Verified on iPhone (UI test, screenshots) and, for the first time, on an **iPad** simulator (iPad Air 13-inch M4, iOS 26.5): library and document layouts match the mockups' structure. **Follow-ups:** the page column's selected page uses the system gray highlight, not the mockup's blue border (needs replacing the `List` selection while keeping drag-to-reorder and keyboard navigation); the Export toolbar button shows its label on the Mac only (iPad toolbars show icons); **Mac not viewed** |
 | 5 | Continuity Camera "Scan from iPhone" on Mac | open | Needs hardware to verify |
 | 6 | Post-scan review (Edit) screen on iPhone | open | After pass 4 |
+| 7 | **Apple Pencil on iPad** (owner request) | Claude | **First slice done (22:50).** (1) Ink renders everywhere: `PageRenderer` (pen with per-point width; highlighter multiplied), thumbnails, PDF export (vector) and image export. (2) `LibraryStore.applyObjectChanges` (one transaction) and `DocumentModel.changeInk` with an exact undo inverse (`InkChange`). (3) iPad: a **Markup** toggle (`editor-markup`) lays `InkCanvas` (a `PKCanvasView` with the system `PKToolPicker`) over a content-only page; Apple Pencil only by default, **Draw with Finger** toggle (`editor-finger-drawing`); `InkConversion` maps PencilKit ↔ stored ink through `PageGeometry`; strokes are tracked by `randomSeed`. **Limitations (documented):** canvas undo lives in its own undo manager and ends whenever the canvas reloads (page switch, zoom, rotation, an outside change) or Markup ends; ink drawn with PencilKit's pencil/crayon/watercolor textures is stored and exported as a solid pen line; iPhone and Mac show ink but can't draw yet; zooming during Markup reloads the canvas. **Needs a real iPad + Apple Pencil** for feel (latency, palm rejection, pressure, hover). |
 
 When you finish a pass, update this table and the "Who is editing what" line in `SESSION_HANDOFF.md`, and record results in `TEST_MATRIX.md`.
+
+## Apple Pencil on iPad (pass 7, owner request 2026-10-21)
+
+**Goal.** On iPad, write and highlight with Apple Pencil on any page: scans, imported PDF pages and, later, blank note pages. Ink stays editable vector data (never flattened into the scan), every stroke and erase is undoable, it survives quit and relaunch, and it looks the same in thumbnails, on the Mac and in exports. This is the first slice of M3 (brief §7: "Apple Pencil drawing on compatible iPads; appropriate touch alternatives").
+
+**Already in place (don't rebuild):**
+- `InkStroke` / `InkPoint` in `PageObjects.swift`: tool (pen or highlighter), sRGB color, width, and points with pressure and time, in **source space** (upright, uncropped, top-left origin). That keeps ink attached to the content through crop and rotation.
+- The `page_objects` table and `LibraryStore.objects(on:)`, `saveObject`, `deleteObject`, with tests.
+- `PageGeometry`, the only mapping between source space and the displayed page. Never hand-write flips or rotations.
+- The mockup palette in `ipad-notebook-export.png`: a floating bar with undo/redo, pens, eraser, lasso and color dots.
+
+**Build, in this order:**
+1. **Render ink everywhere (all platforms, testable without a Pencil).**
+   - Draw a page's ink objects in `PageRenderer`, after the page content and filter, through `PageGeometry`.
+   - **Pen:** an opaque path whose width varies with pressure. **Highlighter:** translucent, multiply-blended, so the scan shows through.
+   - The same code feeds `PageImageView`, thumbnails and export. PDF export writes vector paths, and JPEG export flattens onto white without losing black ink.
+   - The thumbnail cache key must change when a page's ink changes.
+   - **Tests:** a stroke lands in the right place after rotation and crop; the PDF contains vector paths, not an image; a JPEG keeps the ink.
+2. **Store and undo.**
+   - Save or delete a set of strokes in **one transaction** (`db.transaction` nests as savepoints).
+   - Each stroke added, erased or moved is one undo step, registered synchronously before the async write, like the other edits in `DocumentModel`.
+   - Ink doesn't change the page's original. Saving or deleting ink bumps the page revision (existing store behavior), which refreshes thumbnails; it also marks OCR stale, which is acceptable now and can be refined in M4.
+3. **iPad canvas (`#if os(iOS)`).**
+   - A **Markup** toggle in the document toolbar (`pencil.tip.crop.circle`, identifier `editor-markup`) lays a `PKCanvasView` over the page, inside the page viewer's scroll content and sized to the page. The canvas never scrolls or zooms itself; the page viewer does that.
+   - **Gestures:** `drawingPolicy = .pencilOnly` by default, so fingers keep scrolling and zooming. A **Draw with Finger** switch in the palette is the touch alternative (also how the Simulator and UI tests can draw).
+   - **Conversion:** `PKStroke` ↔ `InkStroke` goes from view space to source space through the inverse of `PageGeometry`. Point location, force → pressure, and `timeOffset` → time. `PKInkingTool` `.pen` / `.marker` map to pen / highlighter. Detect added and removed strokes by diffing the drawing on `canvasViewDrawingDidChange`, and write only the changes.
+   - **Eraser:** the stroke eraser (whole strokes) → `deleteObject`. **Lasso move** → save the moved points.
+   - **Palette:** start with the system `PKToolPicker`. It's native, accessible, has undo/redo, and supports Pencil hover and squeeze. Show the custom mockup bar only if the owner wants that look after trying it. Record that as a decision then.
+4. **iPhone and Mac: view the ink** (step 1 covers this). Drawing on iPhone and mouse or trackpad annotation on the Mac are later M3 slices. The brief says not to promise an identical Pencil experience on the Mac.
+
+**Not in this slice:** handwriting recognition (the brief defers it), blank/lined/grid note pages and notebook creation (a separate M3 slice; template rendering exists), text boxes, shape recognition, and sync of ink (it follows M2 sync, one record per stroke).
+
+**Free and Pro.** Basic pen, highlighter and eraser stay free. The brief puts "additional annotation tools" in Pro; decide that boundary in M5, not now.
+
+**Verification.**
+- Unit tests: conversion round trips (including rotated and cropped pages), store batch writes and undo, rendering and export.
+- An iPad Simulator UI test with Draw with Finger: drag to draw → a stroke is saved → it's still there after relaunch → it appears in an exported PDF. Undo removes it.
+- **A real iPad with an Apple Pencil is needed** for latency, palm rejection, pressure and hover. That's the "Apple Pencil feel" row in TEST_MATRIX. Simulator results don't count for it.
 
 ## Risks to handle
 

@@ -216,6 +216,12 @@ enum L10n {
     static var homeRecent: String { tr("library.home.recent") }
     static var homeSeeAll: String { tr("library.home.seeAll") }
 
+    // Pass 7: Apple Pencil
+    static var undoInk: String { tr("undo.ink") }
+    static var markup: String { tr("page.markup") }
+    static var drawWithFinger: String { tr("page.drawWithFinger") }
+    static func strokeCount(_ count: Int) -> String { plural("ink.strokeCount", count) }
+
     // Errors
     static func importErrorTitle(_ file: String) -> String { tr("error.import.title", file) }
     static var importErrorsTitle: String { tr("error.import.multiple.title") }

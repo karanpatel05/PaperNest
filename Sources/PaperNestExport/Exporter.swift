@@ -58,6 +58,7 @@ public struct Exporter: Sendable {
             let pageSize = page.geometry.pageSize
             let layout = PaperLayout(pageSize: pageSize, paper: options.paperSize)
             let source = try await pdfSource(for: page, layout: layout, quality: options.pdfImageQuality)
+            let ink = try await renderer.inkStrokes(for: page)
 
             var box = CGRect(origin: .zero, size: layout.paperSize)
             let boxData = Data(bytes: &box, count: MemoryLayout<CGRect>.size)
@@ -65,7 +66,7 @@ public struct Exporter: Sendable {
             // Paper space is y-down in our model; PDF user space is y-up.
             let pageToContext = layout.pageToPaper(pageSize: pageSize)
                 .concatenating(CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: layout.paperSize.height))
-            PageRenderer.draw(page, source: source, in: ctx, pageToContext: pageToContext)
+            PageRenderer.draw(page, source: source, ink: ink, in: ctx, pageToContext: pageToContext)
             ctx.endPDFPage()
             progress(ExportProgress(completedPages: index + 1, totalPages: pages.count))
         }

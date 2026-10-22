@@ -339,6 +339,56 @@ import PaperNestTestSupport
         #expect(library.items.count == 3)
     }
 
+    /// Pass 7: an ink gesture is one undoable change; erasing and moving
+    /// undo exactly; ink survives a relaunch.
+    @Test func inkChangesUndoRedoAndSurviveRelaunch() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let letter = try writeSample(SyntheticDocuments.textPDF(pages: ["Ink page"]), "Ink.pdf")
+        var session: LibrarySession? = try await readySession()
+        let library = LibraryModel(session: session!)
+        await library.importFiles([letter])
+        await library.reload()
+        let itemID = try #require(library.items.first?.id)
+        let undo = UndoManager()
+        let document = DocumentModel(itemID: itemID, session: session!)
+        await document.load()
+        let page = try #require(document.selectedPage)
+        func stroke(_ x: Double) -> PageObject {
+            PageObject(pageID: page.id, zKey: "m\(Int(x))", payload: .ink(InkStroke(tool: .pen, color: .black, width: 3,
+                       points: [InkPoint(x: x, y: 100), InkPoint(x: x + 50, y: 120)])), modifiedAt: Date())
+        }
+        let a = stroke(100), b = stroke(300)
+
+        await document.changeInk(on: page.id, saving: [a, b], deleting: [], undoManager: undo)
+        #expect(document.selectedPageObjects.map(\.id) == [a.id, b.id])
+        #expect(try #require(document.selectedPage).revision == page.revision + 1)
+
+        // Erase a and move b in one gesture, then undo it.
+        var moved = b
+        moved.payload = .ink(InkStroke(tool: .pen, color: .black, width: 3, points: [InkPoint(x: 400, y: 400)]))
+        await document.changeInk(on: page.id, saving: [moved], deleting: [a], undoManager: undo)
+        #expect(document.selectedPageObjects == [moved])
+        undo.undo()
+        try await eventually { document.selectedPageObjects.map(\.id) == [a.id, b.id] }
+        #expect(document.selectedPageObjects.last == b, "the moved stroke went back to its old points")
+        undo.redo()
+        try await eventually { document.selectedPageObjects == [moved] }
+        undo.undo()
+        try await eventually { document.selectedPageObjects.count == 2 }
+        undo.undo()
+        try await eventually { document.selectedPageObjects.isEmpty }
+        undo.redo()
+        try await eventually { document.selectedPageObjects.count == 2 }
+
+        // Quit and relaunch: the ink is still there.
+        session = nil
+        let relaunched = try await readySession()
+        let reopened = DocumentModel(itemID: itemID, session: relaunched)
+        await reopened.load()
+        await reopened.loadSelectedPageObjects()
+        #expect(reopened.selectedPageObjects.map(\.id) == [a.id, b.id])
+    }
+
     @Test func recentlyDeletedRecoverAndPermanentDelete() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let session = try await readySession()

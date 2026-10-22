@@ -256,4 +256,63 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Add to Favorites"].waitForExistence(timeout: 5))
         app.buttons["Add to Favorites"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: 0, dy: 400)).tap()
     }
+
+    /// Pass 7 (iPad): Markup lays the ink canvas over the page. Fingers
+    /// don't draw until Draw with Finger is on (Apple Pencil only by
+    /// default); a drawn stroke is saved and is still there after leaving
+    /// Markup and after a relaunch. The Pencil itself needs a real device.
+    func testMarkupWithFingerDrawingSavesAStroke() throws {
+        continueAfterFailure = false
+        var app = launch(["-PaperNestDebugOpenItem", "Crop target"])
+        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad: Apple Pencil markup") }
+        let markup = app.descendants(matching: .any)["editor-markup"]
+        XCTAssertTrue(markup.waitForExistence(timeout: 15), "no Markup button")
+        markup.tap()
+        let canvas = app.descendants(matching: .any)["ink-canvas"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 5), "no ink canvas")
+        let strokes = { canvas.value as? String }
+        XCTAssertEqual(strokes(), "0 strokes")
+
+        func drag(_ from: CGFloat, _ to: CGFloat) {
+            canvas.coordinate(withNormalizedOffset: CGVector(dx: from, dy: 0.5))
+                .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: to, dy: 0.55)))
+        }
+        drag(0.3, 0.6)
+        sleep(1)
+        XCTAssertEqual(strokes(), "0 strokes", "a finger drew while Apple Pencil only")
+
+        app.descendants(matching: .any)["editor-finger-drawing"].tap()
+        drag(0.3, 0.7)
+        let one = NSPredicate(format: "value == %@", "1 stroke")
+        let none = NSPredicate(format: "value == %@", "0 strokes")
+        wait(for: [expectation(for: one, evaluatedWith: canvas)], timeout: 10)
+
+        // Undo and redo while marking up (the canvas's own history), saved each time.
+        app.typeKey("z", modifierFlags: .command)
+        wait(for: [expectation(for: none, evaluatedWith: canvas)], timeout: 10)
+        app.typeKey("z", modifierFlags: [.command, .shift])
+        wait(for: [expectation(for: one, evaluatedWith: canvas)], timeout: 10)
+
+        // Zooming reloads the canvas and ends that history, so an undo can't
+        // bring back strokes drawn at the old scale.
+        app.buttons["Zoom In"].tap()
+        sleep(1)
+        app.typeKey("z", modifierFlags: .command)
+        sleep(1)
+        XCTAssertEqual(strokes(), "1 stroke", "undo after a zoom changed the ink")
+
+        markup.tap()   // off
+        markup.tap()   // on again: reloaded from the library
+        XCTAssertTrue(canvas.waitForExistence(timeout: 5))
+        XCTAssertEqual(strokes(), "1 stroke")
+
+        app.terminate()
+        app = launch(["-PaperNestDebugOpenItem", "Crop target"])
+        let markupAgain = app.descendants(matching: .any)["editor-markup"]
+        XCTAssertTrue(markupAgain.waitForExistence(timeout: 15))
+        markupAgain.tap()
+        let canvasAgain = app.descendants(matching: .any)["ink-canvas"]
+        XCTAssertTrue(canvasAgain.waitForExistence(timeout: 5))
+        XCTAssertEqual(canvasAgain.value as? String, "1 stroke", "the stroke did not survive a relaunch")
+    }
 }

@@ -30,23 +30,33 @@ public struct PageRenderer: Sendable {
     // MARK: - Bitmaps
 
     /// Renders `page` with `pixelsPerPoint` resolution onto white.
-    public func renderImage(_ page: Page, pixelsPerPoint: CGFloat) async throws -> CGImage {
+    /// `includingInk: false` is for the ink editor, which draws the strokes
+    /// it is editing over the page itself.
+    public func renderImage(_ page: Page, pixelsPerPoint: CGFloat, includingInk: Bool = true) async throws -> CGImage {
         let size = page.geometry.pageSize
         let width = max(1, Int((size.width * pixelsPerPoint).rounded()))
         let height = max(1, Int((size.height * pixelsPerPoint).rounded()))
         guard width * height <= Self.maxPixelCount else { throw RenderError.outputTooLarge }
         let source = try await prepareSource(for: page, pixelsPerPoint: pixelsPerPoint)
+        let ink = includingInk ? try await inkStrokes(for: page) : []
         return try Self.bitmap(width: width, height: height) { ctx in
             let pageToContext = CGAffineTransform(a: CGFloat(width) / size.width, b: 0, c: 0, d: -CGFloat(height) / size.height,
                                                   tx: 0, ty: CGFloat(height))
-            Self.draw(page, source: source, in: ctx, pageToContext: pageToContext)
+            Self.draw(page, source: source, ink: ink, in: ctx, pageToContext: pageToContext)
         }
     }
 
     /// Renders with the longer page edge at `maxPixelSize` pixels.
-    public func renderThumbnail(_ page: Page, maxPixelSize: CGFloat) async throws -> CGImage {
+    public func renderThumbnail(_ page: Page, maxPixelSize: CGFloat, includingInk: Bool = true) async throws -> CGImage {
         let size = page.geometry.pageSize
-        return try await renderImage(page, pixelsPerPoint: maxPixelSize / max(size.width, size.height))
+        return try await renderImage(page, pixelsPerPoint: maxPixelSize / max(size.width, size.height), includingInk: includingInk)
+    }
+
+    /// The page's ink, in paint order.
+    public func inkStrokes(for page: Page) async throws -> [InkStroke] {
+        try await store.objects(on: page.id).compactMap { object in
+            if case .ink(let stroke) = object.payload { stroke } else { nil }
+        }
     }
 
     static func bitmap(width: Int, height: Int, draw: (CGContext) -> Void) throws -> CGImage {
@@ -117,10 +127,12 @@ public struct PageRenderer: Sendable {
 
     // MARK: - Drawing
 
-    /// Draws a page. `pageToContext` maps page space (points, y-down) into
-    /// the context's user space; the page is clipped to its bounds and
-    /// painted on white so transparent originals never lose dark content.
-    public static func draw(_ page: Page, source: PreparedSource, in ctx: CGContext, pageToContext: CGAffineTransform) {
+    /// Draws a page and its ink. `pageToContext` maps page space (points,
+    /// y-down) into the context's user space; the page is clipped to its
+    /// bounds and painted on white so transparent originals never lose dark
+    /// content. Ink is in source space, so it follows crop and rotation.
+    /// `ink` has no default: every caller decides, so none drops it silently.
+    public static func draw(_ page: Page, source: PreparedSource, ink: [InkStroke], in ctx: CGContext, pageToContext: CGAffineTransform) {
         let geometry = page.geometry
         ctx.saveGState()
         defer { ctx.restoreGState() }
@@ -143,6 +155,59 @@ public struct PageRenderer: Sendable {
         case .template(let template):
             drawTemplate(template, size: page.sourceSize, in: ctx)
         }
+        for stroke in ink { drawInk(stroke, in: ctx) }
+    }
+
+    /// Draws one stroke in source space. Pen ink is opaque, its width
+    /// following each point (consecutive segments of the same width share
+    /// one path, keeping PDFs small). Highlighter ink is one translucent
+    /// path, multiplied so the page shows through.
+    static func drawInk(_ stroke: InkStroke, in ctx: CGContext) {
+        guard let first = stroke.points.first else { return }
+        let c = stroke.color
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
+        let point = { (p: InkPoint) in CGPoint(x: p.x, y: p.y) }
+
+        if stroke.tool == .highlighter || c.alpha < 0.999 {
+            let opacity = stroke.tool == .highlighter ? InkStroke.highlighterOpacity : 1
+            if stroke.tool == .highlighter { ctx.setBlendMode(.multiply) }
+            ctx.setStrokeColor(CGColor(srgbRed: c.red, green: c.green, blue: c.blue, alpha: c.alpha * opacity))
+            ctx.setLineWidth(stroke.width)
+            ctx.move(to: point(first))
+            // A tap leaves a dot: a zero-length segment with round caps.
+            for p in stroke.points.dropFirst() { ctx.addLine(to: point(p)) }
+            if stroke.points.count == 1 { ctx.addLine(to: point(first)) }
+            ctx.strokePath()
+            return
+        }
+
+        ctx.setStrokeColor(CGColor(srgbRed: c.red, green: c.green, blue: c.blue, alpha: c.alpha))
+        guard stroke.points.count > 1 else {
+            ctx.setLineWidth(stroke.width(at: first))
+            ctx.move(to: point(first))
+            ctx.addLine(to: point(first))
+            ctx.strokePath()
+            return
+        }
+        func rounded(_ w: Double) -> Double { (w * 4).rounded() / 4 }
+        var runWidth = rounded((stroke.width(at: stroke.points[0]) + stroke.width(at: stroke.points[1])) / 2)
+        ctx.move(to: point(first))
+        for i in 1..<stroke.points.count {
+            let a = stroke.points[i - 1], b = stroke.points[i]
+            let w = rounded((stroke.width(at: a) + stroke.width(at: b)) / 2)
+            if w != runWidth {
+                ctx.setLineWidth(runWidth)
+                ctx.strokePath()
+                ctx.move(to: point(a))
+                runWidth = w
+            }
+            ctx.addLine(to: point(b))
+        }
+        ctx.setLineWidth(runWidth)
+        ctx.strokePath()
     }
 
     /// Draws a PDF page as vectors into a context currently in source space.

@@ -604,3 +604,42 @@ func samplePages(_ asset: AssetFileStore.StagedAsset, count: Int) -> [LibrarySto
         #expect(counts.folders[empty.id, default: 0] == 0)
     }
 }
+
+@Suite struct ObjectChangeTests {
+    func ink(_ page: Page, _ z: String) -> PageObject {
+        PageObject(pageID: page.id, zKey: z, payload: .ink(InkStroke(tool: .pen, color: .black, width: 2,
+                                                                     points: [InkPoint(x: 1, y: 1), InkPoint(x: 5, y: 5)])),
+                   modifiedAt: Date(timeIntervalSince1970: 1_700_000_000))
+    }
+
+    @Test func oneGestureIsOneTransactionWithOneRevisionBump() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let asset = try store.assets.store(Data("x".utf8), kind: .pdf, originalFilename: nil)
+        let item = try await store.createItem(kind: .document, name: "Doc", pages: samplePages(asset, count: 2), assets: [asset])
+        let pages = try await store.pages(of: item.id)
+        let a = ink(pages[0], "a"), b = ink(pages[0], "b")
+
+        let afterAdd = try await store.applyObjectChanges(on: pages[0].id, saving: [a, b], deleting: [])
+        #expect(afterAdd.revision == pages[0].revision + 1)
+        #expect(try await store.objects(on: pages[0].id).map(\.id) == [a.id, b.id])
+
+        // Erase one and move the other in one change.
+        var moved = b
+        moved.payload = .ink(InkStroke(tool: .pen, color: .black, width: 2, points: [InkPoint(x: 9, y: 9)]))
+        let afterEdit = try await store.applyObjectChanges(on: pages[0].id, saving: [moved], deleting: [a.id])
+        #expect(afterEdit.revision == afterAdd.revision + 1)
+        #expect(try await store.objects(on: pages[0].id) == [moved])
+
+        // An object for another page aborts the whole change.
+        await #expect(throws: StoreError.pageNotFound) {
+            try await store.applyObjectChanges(on: pages[0].id, saving: [ink(pages[1], "c")], deleting: [moved.id])
+        }
+        #expect(try await store.objects(on: pages[0].id) == [moved])
+        #expect(try await store.page(pages[0].id)?.revision == afterEdit.revision)
+
+        // Nothing to do: no revision bump (thumbnails stay cached).
+        #expect(try await store.applyObjectChanges(on: pages[0].id, saving: [], deleting: []).revision == afterEdit.revision)
+        #expect(try await store.integrityCheck().isEmpty)
+    }
+}

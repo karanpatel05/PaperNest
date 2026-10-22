@@ -197,3 +197,8 @@
 "export.destination.share" = "Partager";
 "export.copy.unavailable" = "Une archive ZIP ne peut pas être copiée. Enregistrez-la ou partagez-la.";
 "export.copied" = "Copié dans le presse-papiers.";
+
+// Pass 7: Apple Pencil
+"undo.ink" = "Encre";
+"page.markup" = "Annoter";
+"page.drawWithFinger" = "Dessiner avec le doigt";

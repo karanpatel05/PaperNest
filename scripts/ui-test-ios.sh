@@ -3,14 +3,16 @@
 # the library the tests open, regenerates the Xcode project, then runs
 # `xcodebuild test`. Nothing is shown on screen.
 #
-# Usage: scripts/ui-test-ios.sh [simulator-udid]
+# Usage: scripts/ui-test-ios.sh [simulator-udid] [extra xcodebuild args…]
 #   Defaults to the "PaperNest iPhone Duo" simulator, else the first
-#   available iPhone.
+#   available iPhone. Extra args go to xcodebuild, e.g. on an iPad:
+#   scripts/ui-test-ios.sh <ipad-udid> -only-testing:PaperNest-iOSUITests/AppUITests/testMarkupWithFingerDrawingSavesAStroke
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/env.sh
 
 DEVICE="${1:-}"
+shift || true
 if [[ -z "$DEVICE" ]]; then
     DEVICE="$(xcrun simctl list devices available -j | python3 -c '
 import json, sys
@@ -32,4 +34,4 @@ rm -rf "$FIXTURES"
 xcodegen generate --quiet
 xcodebuild test -project PaperNest.xcodeproj -scheme PaperNest-iOS \
     -destination "platform=iOS Simulator,id=$DEVICE" \
-    -derivedDataPath "$SCRATCH/xcodeproj"
+    -derivedDataPath "$SCRATCH/xcodeproj" ${1+"$@"}

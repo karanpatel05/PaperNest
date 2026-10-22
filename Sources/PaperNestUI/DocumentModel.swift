@@ -136,6 +136,83 @@ final class DocumentModel {
         }
     }
 
+    // MARK: - Ink (pass 7: Apple Pencil on iPad)
+
+    /// Objects on the selected page, for the ink canvas. Refreshed after
+    /// every committed ink change, undo and redo included, so the canvas
+    /// can follow along.
+    private(set) var selectedPageObjects: [PageObject] = []
+
+    func loadSelectedPageObjects() async {
+        guard let store, let pageID = selectedPageID else {
+            selectedPageObjects = []
+            return
+        }
+        do {
+            let objects = try await store.objects(on: pageID)
+            if selectedPageID == pageID { selectedPageObjects = objects }
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
+    /// What one ink gesture changed on a page, with what it needs to be
+    /// reversed exactly (erased strokes come back, moved strokes go back).
+    struct InkChange {
+        let pageID: PageID
+        /// New or moved objects, as saved.
+        let saved: [PageObject]
+        /// The moved objects as they were before.
+        let replaced: [PageObject]
+        let deleted: [PageObject]
+
+        var inverse: InkChange {
+            let replacedIDs = Set(replaced.map(\.id))
+            return InkChange(pageID: pageID, saved: replaced + deleted,
+                             replaced: saved.filter { replacedIDs.contains($0.id) },
+                             deleted: saved.filter { !replacedIDs.contains($0.id) })
+        }
+    }
+
+    /// Commits one ink gesture as one undo step: `saving` holds new or
+    /// moved objects, `deleting` the erased ones.
+    func changeInk(on pageID: PageID, saving: [PageObject], deleting: [PageObject], undoManager: UndoManager?) async {
+        guard let store, !saving.isEmpty || !deleting.isEmpty else { return }
+        do {
+            let current = Dictionary(uniqueKeysWithValues: try await store.objects(on: pageID).map { ($0.id, $0) })
+            let change = InkChange(pageID: pageID, saved: saving, replaced: saving.compactMap { current[$0.id] }, deleted: deleting)
+            guard await commitInk(change) else { return }
+            registerInkUndo(change.inverse, undoManager: undoManager)
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
+    private func registerInkUndo(_ change: InkChange, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                model.registerInkUndo(change.inverse, undoManager: undoManager)
+                model.selectedPageID = change.pageID
+                _ = Task { await model.commitInk(change) }
+            }
+        }
+        undoManager?.setActionName(L10n.undoInk)
+    }
+
+    @discardableResult
+    private func commitInk(_ change: InkChange) async -> Bool {
+        guard let store else { return false }
+        do {
+            replace(try await store.applyObjectChanges(on: change.pageID, saving: change.saved, deleting: change.deleted.map(\.id)))
+            if selectedPageID == change.pageID { selectedPageObjects = try await store.objects(on: change.pageID) }
+            session.didChange()
+            return true
+        } catch {
+            presentedError = .saveFailed()
+            return false
+        }
+    }
+
     // MARK: - Page order
 
     func movePages(from offsets: IndexSet, to destination: Int, undoManager: UndoManager?) async {

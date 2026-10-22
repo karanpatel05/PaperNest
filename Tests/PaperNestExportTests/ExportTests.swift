@@ -317,3 +317,43 @@ func unzip(_ arguments: [String]) throws -> (status: Int32, output: String) {
         }
     }
 }
+
+/// Pass 7, step 1: exports carry ink exactly as the renderer draws it.
+@Suite struct InkExportTests {
+    func addInk(_ stroke: InkStroke, to page: Page, _ store: LibraryStore) async throws {
+        try await store.saveObject(PageObject(pageID: page.id, zKey: "m", payload: .ink(stroke), modifiedAt: Date()))
+    }
+
+    @Test func pdfExportKeepsTheTextVectorAndDrawsTheInk() async throws {
+        let f = try ExportFixture()
+        let (item, pages) = try await f.importPDF(["Ink over text"])
+        try await addInk(InkStroke(tool: .pen, color: .black, width: 20, points: [InkPoint(x: 300, y: 600), InkPoint(x: 500, y: 600)]),
+                         to: pages[0], f.store)
+        let output = try await f.exporter.export(itemName: item.name, pages: try await f.store.pages(of: item.id),
+                                                 options: ExportOptions(format: .pdf))
+        defer { output.removeTemporaryFiles() }
+        let data = try Data(contentsOf: output.files[0])
+        // Text still selectable: the page was not turned into a picture.
+        #expect(PDFDocument(data: data)?.page(at: 0)?.string?.contains("Ink over text") == true)
+        let image = try #require(PixelProbe.renderPDFPage(data, index: 0, scale: 0.5))
+        #expect(PixelProbe.pixel(image, x: 400.0 / 612, y: 600.0 / 792).isDark)
+        #expect(PixelProbe.pixel(image, x: 400.0 / 612, y: 700.0 / 792).isWhite)
+    }
+
+    @Test func jpegExportOfATransparentPageKeepsBlackInk() async throws {
+        let f = try ExportFixture()
+        let png = SyntheticDocuments.image(width: 400, height: 300, type: .png, transparentBackground: true)
+        let item = try await f.importer.importItem(.data(png, name: "Clear"))
+        let page = try #require(try await f.store.pages(of: item.id).first)
+        let size = page.sourceSize
+        try await addInk(InkStroke(tool: .pen, color: .black, width: size.height * 0.06,
+                                   points: [InkPoint(x: size.width * 0.75, y: size.height * 0.8),
+                                            InkPoint(x: size.width * 0.95, y: size.height * 0.8)]), to: page, f.store)
+        let output = try await f.exporter.export(itemName: item.name, pages: try await f.store.pages(of: item.id),
+                                                 options: ExportOptions(format: .jpeg))
+        defer { output.removeTemporaryFiles() }
+        let image = try #require(PixelProbe.decode(try Data(contentsOf: output.files[0])))
+        #expect(PixelProbe.pixel(image, x: 0.85, y: 0.8).isDark)
+        #expect(PixelProbe.pixel(image, x: 0.85, y: 0.3).isWhite)
+    }
+}
