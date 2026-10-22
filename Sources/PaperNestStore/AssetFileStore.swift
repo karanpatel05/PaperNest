@@ -70,6 +70,66 @@ public struct AssetFileStore: Sendable {
         return staged
     }
 
+    /// Writes the file at `source` durably without ever holding it whole in
+    /// memory: the bytes are hashed as they are copied, so a large video costs
+    /// one buffer rather than its own size. Identical bytes already present
+    /// are reused, as with `store(_:kind:originalFilename:)`.
+    public func store(contentsOf source: URL, kind: AssetKind, originalFilename: String?) throws -> StagedAsset {
+        let fm = FileManager.default
+        let temp = stagingURL.appendingPathComponent(UUID().uuidString)
+        guard fm.createFile(atPath: temp.path, contents: nil) else {
+            throw StoreError.io("Could not create a staging file")
+        }
+
+        var digest = SHA256()
+        var byteCount: Int64 = 0
+        do {
+            let reader = try FileHandle(forReadingFrom: source)
+            defer { try? reader.close() }
+            let writer = try FileHandle(forWritingTo: temp)
+            defer { try? writer.close() }
+            while let chunk = try reader.read(upToCount: Self.copyBufferSize), !chunk.isEmpty {
+                digest.update(data: chunk)
+                try writer.write(contentsOf: chunk)
+                byteCount += Int64(chunk.count)
+            }
+            try writer.synchronize()
+        } catch {
+            try? fm.removeItem(at: temp)
+            throw StoreError.io("Could not read \(source.lastPathComponent): \(error.localizedDescription)")
+        }
+
+        let id = AssetID(sha256: digest.finalize().map { String(format: "%02x", $0) }.joined())
+        let staged = StagedAsset(id: id, kind: kind, byteCount: byteCount, originalFilename: originalFilename)
+        let finalURL = url(for: id, kind: kind)
+
+        if fm.fileExists(atPath: finalURL.path) {
+            // Same name means the same bytes unless the file was damaged.
+            // Checking the size first avoids rehashing a large healthy file
+            // only to confirm what it already told us.
+            let existingSize = (try? finalURL.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init)
+            if existingSize == byteCount, (try? verify(id, kind: kind)) != nil {
+                try? fm.removeItem(at: temp)
+                return staged
+            }
+            try fm.removeItem(at: finalURL)
+        }
+
+        let dir = finalURL.deletingLastPathComponent()
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        do {
+            try fm.moveItem(at: temp, to: finalURL)
+            try Self.fsyncDirectory(dir)
+        } catch {
+            try? fm.removeItem(at: temp)
+            if fm.fileExists(atPath: finalURL.path) { return staged }
+            throw StoreError.io("Could not store asset: \(error.localizedDescription)")
+        }
+        return staged
+    }
+
+    static let copyBufferSize = 1 << 20
+
     public func read(_ id: AssetID, kind: AssetKind) throws -> Data {
         let fileURL = url(for: id, kind: kind)
         guard FileManager.default.fileExists(atPath: fileURL.path) else {

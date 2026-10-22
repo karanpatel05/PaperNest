@@ -45,7 +45,16 @@ var failures = 0
 for path in args.dropFirst() {
     let url = URL(fileURLWithPath: path)
     do {
-        let item = try await importer.importItem(.file(url), password: password, folderID: folderID)
+        let item: LibraryItem
+        do {
+            item = try await importer.importItem(.file(url), password: password, folderID: folderID)
+        } catch ImportError.unsupportedType {
+            // Same fallback as the app: anything that cannot become pages is
+            // kept as the file it is.
+            let file = try await FileItemImporter(store: store).importFile(at: url, into: folderID)
+            print("imported \(url.lastPathComponent) as the file \"\(file.name)\"")
+            continue
+        }
         if let crop {
             for page in try await store.pages(of: item.id) {
                 try await store.updateTransform(page.id, to: PageTransform(crop: crop, rotation: page.transform.rotation))

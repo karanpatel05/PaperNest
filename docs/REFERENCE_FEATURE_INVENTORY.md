@@ -145,8 +145,8 @@ Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 5 | Extract pages into a new editable document | **Done** | F1 |
 | 6 | Split a document into one file per page | **Done** (2026-10-22) | F1 follow-up |
 | 7 | Bulk share / export a selection as one ZIP | **Done** (2026-10-22). Size-reduction presets are row 35, not this | F1 follow-up |
-| 8 | Arbitrary file items (any type) with real size and previews | **In progress** — schema v5 and the store layer landed 2026-10-22; no UI yet | F2a |
-| 9 | File details / "Show Info" sheet | **Planned** | F2 |
+| 8 | Arbitrary file items (any type) with real size and previews | **Done** (2026-10-22) — any type imports, shows its size and a type symbol; QuickLook preview still to come | F2a |
+| 9 | File details / "Show Info" sheet | **Done** (2026-10-22) — kind, original name, size, dates, Share, Save a Copy | F2a |
 | 10 | Import from Photos | **Planned** | F2 |
 | 11 | System Inbox folder | **Planned** | F2 |
 | 12 | Create ZIP from a selection | **Partial** — the backup writer produces a valid ZIP; no user-facing compression | F2 |

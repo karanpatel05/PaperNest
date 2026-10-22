@@ -232,6 +232,18 @@
 "tools.moveUp" = "Move %@ up";
 "tools.moveDown" = "Move %@ down";
 "tools.mergeTitle" = "Merge";
+/* File items */
+"file.details.title" = "File Details";
+"file.details.footer" = "Your copy in PaperNest stays where it is.";
+"file.details.show" = "Show Info";
+"file.kind" = "Kind";
+"file.kind.unknown" = "Unknown";
+"file.originalName" = "Original Name";
+"file.size" = "Size";
+"file.added" = "Added";
+"file.modified" = "Modified";
+"file.saveCopy" = "Save a Copy…";
+
 /* Text recognition */
 "document.recognizeText" = "Recognize Text";
 "document.recognizeProgress" = "Reading page %1$lld of %2$lld…";

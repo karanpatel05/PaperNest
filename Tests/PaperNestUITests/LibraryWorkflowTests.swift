@@ -86,7 +86,9 @@ import PaperNestTestSupport
         var session: LibrarySession? = try await readySession()
         let library = LibraryModel(session: session!)
         await library.importFiles([letter, receipt, locked, notes])
-        #expect(library.presentedError?.title == L10n.importErrorTitle("notes.txt"))
+        // A text file cannot become pages, so it is kept as a file item
+        // rather than refused (F2a; see docs/F2_FILE_ITEMS_DESIGN.md).
+        #expect(library.presentedError == nil)
         #expect(library.passwordQueue.map(\.filename) == ["Locked.pdf"])
 
         await library.submitPassword("wrong", for: library.passwordQueue[0])
@@ -95,7 +97,11 @@ import PaperNestTestSupport
         #expect(library.passwordQueue.isEmpty)
 
         await library.reload()
-        #expect(Set(library.items.map(\.item.name)) == ["Letter", "Receipt", "Locked"])
+        #expect(Set(library.items.map(\.item.name)) == ["Letter", "Receipt", "Locked", "notes"])
+        let kept = try #require(library.items.first { $0.item.name == "notes" })
+        #expect(kept.item.kind == .file)
+        #expect(kept.pageCount == 0)
+        #expect(kept.file?.originalFilename == "notes.txt")
         let letterID = try #require(library.items.first { $0.item.name == "Letter" }?.id)
 
         // --- Edit: rotate page 2, move page 3 to the front, delete + undo ---
@@ -140,7 +146,8 @@ import PaperNestTestSupport
         let relaunched = try await readySession()
         let reopenedLibrary = LibraryModel(session: relaunched)
         await reopenedLibrary.reload()
-        #expect(reopenedLibrary.items.count == 3)
+        #expect(reopenedLibrary.items.count == 4)
+        #expect(reopenedLibrary.items.contains { $0.item.kind == .file })
         let reopened = DocumentModel(itemID: letterID, session: relaunched)
         await reopened.load()
         #expect(reopened.pages.map(\.id) == [original[2].id, original[0].id, original[1].id])

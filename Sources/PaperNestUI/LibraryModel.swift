@@ -143,7 +143,13 @@ public final class LibraryModel {
                     let added = try await env.importer.insertPages(from: .file(url), into: target, after: insertAfter)
                     insertAfter = added.last?.id ?? insertAfter
                 } else {
-                    _ = try await env.importer.importItem(.file(url), folderID: currentFolderID)
+                    do {
+                        _ = try await env.importer.importItem(.file(url), folderID: currentFolderID)
+                    } catch ImportError.unsupportedType {
+                        // Not something we can make pages from, so keep it as
+                        // the file it is rather than refusing it.
+                        _ = try await FileItemImporter(store: env.store).importFile(at: url, into: currentFolderID)
+                    }
                 }
             } catch ImportError.passwordRequired(let filename) {
                 if let data = try? env.importer.loadData(.file(url)) {

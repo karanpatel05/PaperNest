@@ -232,6 +232,18 @@
 "tools.moveUp" = "Subir %@";
 "tools.moveDown" = "Bajar %@";
 "tools.mergeTitle" = "Combinar";
+/* File items */
+"file.details.title" = "Detalles del archivo";
+"file.details.footer" = "Tu copia en PaperNest se queda donde está.";
+"file.details.show" = "Mostrar información";
+"file.kind" = "Tipo";
+"file.kind.unknown" = "Desconocido";
+"file.originalName" = "Nombre original";
+"file.size" = "Tamaño";
+"file.added" = "Añadido";
+"file.modified" = "Modificado";
+"file.saveCopy" = "Guardar una copia…";
+
 /* Text recognition */
 "document.recognizeText" = "Reconocer texto";
 "document.recognizeProgress" = "Leyendo la página %1$lld de %2$lld…";

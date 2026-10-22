@@ -35,6 +35,12 @@ for TOOLS_LIBRARY in /tmp/papernest-file-tools-uitest-library /tmp/papernest-fil
     rm -rf "$TOOLS_LIBRARY"
     swift run --scratch-path "$SCRATCH" papernest-seed "$TOOLS_LIBRARY" "$FIXTURES/Crop target.png"
 done
+# The file-item test needs something that cannot become pages.
+printf 'quarterly figures\n' > "$FIXTURES/Budget notes.txt"
+FILES_LIBRARY=/tmp/papernest-file-items-library
+rm -rf "$FILES_LIBRARY"
+swift run --scratch-path "$SCRATCH" papernest-seed "$FILES_LIBRARY" "$FIXTURES/Budget notes.txt"
+
 # The text-recognition test reads words printed on a real sample page.
 cp Samples/multilingual-letter.pdf "$FIXTURES/OCR target.pdf"
 OCR_LIBRARY=/tmp/papernest-ocr-library

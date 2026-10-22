@@ -310,3 +310,17 @@ extension L10n {
     static var recognizeText: String { tr("document.recognizeText") }
     static func recognizeProgress(_ page: Int, _ total: Int) -> String { tr("document.recognizeProgress", page, total) }
 }
+
+// F2a: files kept as themselves.
+extension L10n {
+    static var fileDetailsTitle: String { tr("file.details.title") }
+    static var fileDetailsFooter: String { tr("file.details.footer") }
+    static var fileShowDetails: String { tr("file.details.show") }
+    static var fileKind: String { tr("file.kind") }
+    static var fileKindUnknown: String { tr("file.kind.unknown") }
+    static var fileOriginalName: String { tr("file.originalName") }
+    static var fileSize: String { tr("file.size") }
+    static var fileAdded: String { tr("file.added") }
+    static var fileModified: String { tr("file.modified") }
+    static var fileSaveCopy: String { tr("file.saveCopy") }
+}

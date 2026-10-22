@@ -145,7 +145,8 @@ struct DocumentView: View {
             PageOrganizer(model: model, undoManager: undoManager)
         }
         #endif
-        .fileImporter(isPresented: $isShowingFilePicker, allowedContentTypes: LibraryView.importableTypes,
+        // Adding or replacing a page needs something we can make pages from.
+        .fileImporter(isPresented: $isShowingFilePicker, allowedContentTypes: LibraryView.pageTypes,
                       allowsMultipleSelection: filePurpose != .replace) { result in
             let purpose = filePurpose
             guard case .success(let urls) = result else {

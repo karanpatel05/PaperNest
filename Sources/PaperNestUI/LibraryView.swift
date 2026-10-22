@@ -20,8 +20,12 @@ struct LibraryView: View {
     @State private var toolsRequest: DocumentToolsRequest?
     @State private var createdItemID: ItemID?
     @State private var bulkExport: BulkExportRequest?
+    @State private var fileDetails: FileDetailsRequest?
 
-    static let importableTypes: [UTType] = [.pdf, .jpeg, .png]
+    /// Anything can be kept: a type we cannot make pages from becomes a
+    /// file item instead. Pages-only flows use `pageTypes`.
+    static let importableTypes: [UTType] = [.item]
+    static let pageTypes: [UTType] = [.pdf, .jpeg, .png]
 
     private var reloadKey: String {
         "\(model.scope)|\(model.searchText)|\(model.session.changeToken)"
@@ -106,6 +110,9 @@ struct LibraryView: View {
             }
             .sheet(item: $bulkExport) { request in
                 BulkExportSheet(request: request)
+            }
+            .sheet(item: $fileDetails) { request in
+                FileDetailsSheet(request: request)
             }
     }
 
@@ -219,6 +226,11 @@ struct LibraryView: View {
                 .accessibilityAddTraits(selection.contains(summary.id) ? [.isSelected] : [])
             } else if model.scope == .recentlyDeleted {
                 ItemCell(summary: summary, showsDeletionDate: true, layout: layout)
+            } else if summary.file != nil {
+                Button { fileDetails = FileDetailsRequest(summary: summary) } label: {
+                    ItemCell(summary: summary, showsDeletionDate: false, layout: layout)
+                }
+                .buttonStyle(.plain)
             } else {
                 NavigationLink(value: summary.id) {
                     ItemCell(summary: summary, showsDeletionDate: false, layout: layout)
@@ -283,6 +295,9 @@ struct LibraryView: View {
             Button(L10n.splitPages) { split(summary) }
                 .disabled(summary.pageCount < 2 || isComposing)
             ColorLabelMenu { color in Task { await model.setColorLabel(color, for: [summary.id]) } }
+            if summary.file != nil {
+                Button(L10n.fileShowDetails) { fileDetails = FileDetailsRequest(summary: summary) }
+            }
             Divider()
             Button(L10n.delete, role: .destructive) { Task { await model.moveToRecentlyDeleted([summary.id]) } }
         }
@@ -521,7 +536,9 @@ struct ItemCell: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(L10n.itemAccessibilityLabel(name: summary.item.name, pages: L10n.pageCount(summary.pageCount)))
+        .accessibilityLabel(L10n.itemAccessibilityLabel(
+            name: summary.item.name,
+            pages: summary.file.map { FileKind.size($0.byteCount) } ?? L10n.pageCount(summary.pageCount)))
         .accessibilityValue(summary.item.colorLabel?.title ?? "")
         .accessibilityAddTraits(showsDeletionDate ? [] : .isButton)
     }
@@ -532,6 +549,10 @@ struct ItemCell: View {
             if let cover = summary.coverPage {
                 PageImageView(page: cover, pixelSize: 560)
                     .padding(layout == .grid ? 16 : 6)
+            } else if let file = summary.file {
+                Image(systemName: FileKind.symbol(for: file.uti))
+                    .font(.system(size: layout == .grid ? 44 : 28))
+                    .foregroundStyle(Theme.accent)
             } else {
                 Image(systemName: "doc.text").font(.largeTitle).foregroundStyle(.secondary)
             }
@@ -553,7 +574,7 @@ struct ItemCell: View {
                         .accessibilityLabel(color.title)
                 }
             }
-            Text(verbatim: "\(secondaryText) · \(L10n.pageCount(summary.pageCount))")
+            Text(verbatim: "\(secondaryText) · \(summary.file.map { FileKind.size($0.byteCount) } ?? L10n.pageCount(summary.pageCount))")
                 .font(.caption).foregroundStyle(.secondary).lineLimit(2)
         }
     }

@@ -568,4 +568,26 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(document.waitForExistence(timeout: 30),
                       "the document should be found by a word only its page carries")
     }
+
+    func testAFileItemShowsItsTypeAndSizeAndOffersACopy() throws {
+        continueAfterFailure = false
+        let app = launch([], libraryPath: "/tmp/papernest-file-items-library")
+        showAllDocuments(app)
+        // A text file cannot become pages, so it is kept as a file and the
+        // tile shows its size where a document shows its page count.
+        let cell = app.descendants(matching: .any)["Budget notes, 18 bytes"].firstMatch
+        XCTAssertTrue(cell.waitForExistence(timeout: 15), "the file should be in the library")
+        cell.tap()
+
+        let header = app.descendants(matching: .any)["file-details-header"].firstMatch
+        XCTAssertTrue(header.waitForExistence(timeout: 5), "tapping a file should show what it is")
+        // A LabeledContent row is one element labelled "<label>, <value>".
+        let originalName = app.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS %@", "Budget notes.txt")).firstMatch
+        XCTAssertTrue(originalName.waitForExistence(timeout: 5), "the details should name the original file")
+        XCTAssertTrue(app.buttons["file-save-copy"].waitForExistence(timeout: 10),
+                      "a copy of the file should be offered")
+        app.buttons["file-details-done"].tap()
+        XCTAssertTrue(cell.waitForExistence(timeout: 5))
+    }
 }
