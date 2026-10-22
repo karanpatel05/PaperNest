@@ -39,11 +39,19 @@ final class SettingsModel {
         backup = .exporting(ExportProgress(completedPages: 0, totalPages: usage?.pages ?? 0))
         backupTask = Task {
             do {
-                var items: [LibraryExportItem] = []
+                var entries: [LibraryExportEntry] = []
                 for summary in try await env.store.items(in: .all) {
-                    items.append(LibraryExportItem(name: summary.item.name, pages: try await env.store.pages(of: summary.id)))
+                    if let payload = summary.file {
+                        // A backup that quietly dropped the user's files
+                        // would not be a backup.
+                        entries.append(.file(name: summary.item.name, originalFilename: payload.originalFilename,
+                                             url: env.store.assets.url(for: payload.assetID, kind: .file)))
+                    } else {
+                        entries.append(.document(LibraryExportItem(name: summary.item.name,
+                                                                   pages: try await env.store.pages(of: summary.id))))
+                    }
                 }
-                let output = try await env.exporter.exportLibrary(items, archiveName: archiveName) { progress in
+                let output = try await env.exporter.exportArchive(entries, archiveName: archiveName) { progress in
                     Task { @MainActor in
                         if case .exporting = self.backup { self.backup = .exporting(progress) }
                     }

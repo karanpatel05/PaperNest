@@ -37,14 +37,13 @@ file-preview work has a `FileKind.prepareTemporaryCopy` in it.
 
 ### Next for Claude, in order
 
-1. **Finish F2b — create a ZIP from a selection** ("Compress" in the reference app). `ZipWriter` already writes
-   valid archives and `Exporter.exportLibrary` already packs documents; what is missing is packing a selection of
-   **file items** as their own bytes, plus the selection-bar and Tools entries.
-2. **F2c** — import from Photos, and a system Inbox folder.
-3. **Rest of F4** — recognise text automatically after a scan, offer re-recognition after a rescan, a user
+1. **F2c** — import from Photos, and a system Inbox folder.
+2. **Rest of F4** — recognise text automatically after a scan, offer re-recognition after a rescan, a user
    language override, and pull text out of vector PDFs into the search index (today only recognised text is
    indexed, so a digital PDF is findable by title alone).
-4. **F2d** — compression presets with real before-and-after sizes.
+3. **F2d** — compression presets with real before-and-after sizes. Note this is *size reduction*, which F2b did
+   not do: F2b packs, it does not compress.
+4. **RAR extraction**, once the owner settles the licensing question.
 
 ### Next for Codex, in order
 
@@ -70,7 +69,7 @@ and photo tools, F9 VPN, and M5 subscriptions. The full list of what is needed i
 - **Verify before you change anything** (expected numbers as of the newest commit):
 
 ```bash
-./scripts/test.sh                                   # 206 tests, 0 failures, 0 warnings
+./scripts/test.sh                                   # 209 tests, 0 failures, 0 warnings
 ./scripts/build-mac-app.sh                          # 0 warnings
 xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build
 ./scripts/ui-test-ios.sh 63992C10-33B4-4CE3-91C3-EE23ECC595A5     # iPhone: 17 passed, Markup skipped
@@ -82,7 +81,7 @@ xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' bui
 
 ## What works today
 
-Library (import, folders, favourites, sort, rename, trash with 30-day purge, title search, colour labels, multi-select) · document tools (duplicate, merge in an explicit order, extract pages, split into one document per page, export a selection as one ZIP) · a **Tools screen** listing only tools that work · page editing (rotate, reorder, delete, add, crop, filters, undo/redo, rescan with history) · Apple Pencil ink on iPad · **text recognition** (Vision, en/fr/es) with search over recognised text · **searchable PDF export** · **file items**: any file type kept as itself, with a type symbol, its size, a **QuickLook preview** from the library and from Recent, a details sheet, Share and Save a Copy · **ZIP extraction** that refuses anything unsafe.
+Library (import, folders, favourites, sort, rename, trash with 30-day purge, title search, colour labels, multi-select) · document tools (duplicate, merge in an explicit order, extract pages, split into one document per page, export a selection as one ZIP) · a **Tools screen** listing only tools that work · page editing (rotate, reorder, delete, add, crop, filters, undo/redo, rescan with history) · Apple Pencil ink on iPad · **text recognition** (Vision, en/fr/es) with search over recognised text · **searchable PDF export** · **file items**: any file type kept as itself, with a type symbol, its size, a **QuickLook preview** from the library and from Recent, a details sheet, Share and Save a Copy · **ZIP extraction** that refuses anything unsafe, and **archiving a selection** (documents as PDFs, files byte for byte).
 
 Evidence for every claim is in `docs/TEST_MATRIX.md`, newest rows first. Capability coverage against the owner's reference screenshots is `docs/REFERENCE_FEATURE_INVENTORY.md` (48 rows).
 

@@ -51,9 +51,14 @@ struct ToolsSheet: View {
         var allowsMany: Bool { self == .merge || self == .archive }
         var minimum: Int { self == .merge ? 2 : 1 }
 
-        /// Splitting one page would just copy the document.
+        /// Splitting one page would just copy the document. Only the
+        /// archive takes file items: the rest are page operations.
         func accepts(_ summary: LibraryStore.ItemSummary) -> Bool {
-            self == .split ? summary.pageCount > 1 : summary.pageCount > 0
+            switch self {
+            case .split: summary.pageCount > 1
+            case .archive: summary.pageCount > 0 || summary.file != nil
+            default: summary.pageCount > 0
+            }
         }
     }
 

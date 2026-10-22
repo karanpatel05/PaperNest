@@ -450,7 +450,7 @@ struct LibraryView: View {
             // Page-less documents are skipped by the archive writer, so the
             // action is offered as long as one selected document has pages.
             Button(L10n.exportAsZip) { bulkExport = BulkExportRequest(ids: selectedItems.map(\.id)) }
-                .disabled(!selectedItems.contains { $0.pageCount > 0 })
+                .disabled(!selectedItems.contains { $0.pageCount > 0 || $0.file != nil })
             ColorLabelMenu { color in
                 let ids = selectedItems.map(\.id)
                 Task { await model.setColorLabel(color, for: ids) }

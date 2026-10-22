@@ -130,7 +130,7 @@
 "settings.spaceUsed" = "Space Used";
 "settings.storage.footer" = "Your library is stored on this device. Deleted documents stay in Recently Deleted for %d days.";
 "settings.exportAll" = "Export All Documents…";
-"settings.exportAll.footer" = "Creates a ZIP file with every document as a PDF, including your edits. Keep a copy somewhere safe as a backup.";
+"settings.exportAll.footer" = "Creates a ZIP file with every document as a PDF, including your edits, and every other file exactly as you added it. Keep a copy somewhere safe as a backup.";
 "settings.backup.archiveName" = "%1$@ Backup %2$@";
 "settings.language" = "Language";
 "settings.language.change" = "Change Language…";

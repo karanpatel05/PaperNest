@@ -149,7 +149,7 @@ Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 9 | File details / "Show Info" sheet | **Done** (2026-10-22) — kind, original name, size, dates, Share, Save a Copy | F2a |
 | 10 | Import from Photos | **Planned** | F2 |
 | 11 | System Inbox folder | **Planned** | F2 |
-| 12 | Create ZIP from a selection | **Partial** — the backup writer produces a valid ZIP; no user-facing compression | F2 |
+| 12 | Create ZIP from a selection | **Done** (2026-10-22) — documents as PDFs, files byte for byte, from the selection bar, the Tools screen and the Settings backup | F2b |
 | 13 | Extract ZIP | **Done** (2026-10-22) — traversal, symlink, encryption, expansion-ratio and total-size limits, each with an adversarial test | F2b |
 | 14 | Extract RAR | **Planned** — licensing question first; creation is *not* requested | F2 |
 | 15 | PDF/page viewer | **Done** | M1 |

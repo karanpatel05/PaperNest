@@ -43,12 +43,18 @@ final class BulkExportModel {
         phase = .exporting(ExportProgress(completedPages: 0, totalPages: 0))
         task = Task {
             do {
-                var items: [LibraryExportItem] = []
+                var entries: [LibraryExportEntry] = []
                 for id in ids {
                     guard let item = try await env.store.item(id), !item.isDeleted else { continue }
-                    items.append(LibraryExportItem(name: item.name, pages: try await env.store.pages(of: id)))
+                    if let payload = try await env.store.filePayload(id) {
+                        // A file goes in as itself, not re-rendered as a PDF.
+                        entries.append(.file(name: item.name, originalFilename: payload.originalFilename,
+                                             url: env.store.assets.url(for: payload.assetID, kind: .file)))
+                    } else {
+                        entries.append(.document(LibraryExportItem(name: item.name, pages: try await env.store.pages(of: id))))
+                    }
                 }
-                let output = try await env.exporter.exportLibrary(items, archiveName: archiveName) { progress in
+                let output = try await env.exporter.exportArchive(entries, archiveName: archiveName) { progress in
                     Task { @MainActor in
                         if case .exporting = self.phase { self.phase = .exporting(progress) }
                     }
