@@ -316,3 +316,17 @@
 "notebook.undo" = "Annuler l’action";
 "notebook.redo" = "Rétablir";
 "notebook.pageTitle" = "Nouvelle page";
+
+/* Page comments */
+"comments.title" = "Commentaires";
+"comments.add" = "Ajouter un commentaire";
+"comments.body" = "Commentaire";
+"comments.empty" = "Aucun commentaire sur cette page.";
+"comments.privacy" = "Les commentaires restent dans PaperNest et ne sont pas inclus dans les exports PDF ou image.";
+"comments.save" = "Enregistrer";
+"comments.changed" = "Votre brouillon est inchangé. Enregistrez-le comme nouveau commentaire pour conserver les deux versions.";
+"comments.limit" = "Saisissez de 1 à 10 000 caractères.";
+"comments.action" = "Modifier le commentaire";
+"comments.saveAsNew" = "Enregistrer comme nouveau commentaire";
+"comments.historyChanged" = "Le commentaire a changé. Les derniers commentaires sont conservés ; l’action précédente ne peut plus être annulée ou rétablie.";
+"comments.pageUnavailable" = "Cette page n’est plus disponible. Tout brouillon ouvert est conservé pour vous permettre de copier son texte.";

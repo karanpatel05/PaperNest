@@ -770,6 +770,15 @@ public actor LibraryStore {
         }
     }
 
+    /// Private comments do not change rendered page content or OCR. Keep the
+    /// page row stable so an undone comment does not invalidate page history.
+    /// Caller owns the transaction and has checked the exact object snapshot.
+    func persistCommentChange(on page: Page, saving: PageObject?, deleting id: PageObjectID) throws {
+        if let saving { try upsertObjectRow(saving) }
+        else { try db.run("DELETE FROM page_objects WHERE id = ? AND page_id = ?", [.text(id.rawValue), .text(page.id.rawValue)]) }
+        try touchItem(page.itemID, at: now())
+    }
+
     public func deleteObject(_ id: PageObjectID) throws {
         try db.transaction {
             guard let pageIDString = try db.query("SELECT page_id FROM page_objects WHERE id = ?", [.text(id.rawValue)], map: { $0.text(0) }).first,

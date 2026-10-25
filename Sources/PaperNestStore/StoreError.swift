@@ -10,6 +10,7 @@ public enum StoreError: Error, Equatable, Sendable {
     case pageNotFound
     case assetMissing(String)
     case assetChecksumMismatch(String)
+    case invalidComment
     case invalidOrder
     case notebookPageChanged
     /// Recognition or the page changed while a text-markup picker was open.

@@ -316,3 +316,17 @@
 "notebook.undo" = "Undo";
 "notebook.redo" = "Redo";
 "notebook.pageTitle" = "New Page";
+
+/* Page comments */
+"comments.title" = "Comments";
+"comments.add" = "Add Comment";
+"comments.body" = "Comment";
+"comments.empty" = "No comments on this page.";
+"comments.privacy" = "Comments stay in PaperNest and are not included in PDF or image exports.";
+"comments.save" = "Save";
+"comments.changed" = "Your draft is unchanged. Save it as a new comment to keep both versions.";
+"comments.limit" = "Enter 1–10,000 characters.";
+"comments.action" = "Change Comment";
+"comments.saveAsNew" = "Save as New Comment";
+"comments.historyChanged" = "The comment changed. The latest comments were kept; the previous action can no longer be undone or redone.";
+"comments.pageUnavailable" = "This page is no longer available. Any open draft is kept so you can copy its text.";

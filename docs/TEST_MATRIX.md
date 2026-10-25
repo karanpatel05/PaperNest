@@ -1,5 +1,16 @@
 # Test matrix
 
+## Page comments — Codex, 2026-10-25
+
+- New private page comments use schema v7 (widens page_objects kind constraint). Add/edit/delete, exact-object guarded undo/redo, duplicate/reopen persistence; explicitly excluded from PDF/image exports. Existing ink/text/image rows preserved.
+- Test-first logs: `/private/tmp/papernest-comments-store-red.log`, `-model-red.log` (missing APIs). Focused green: `-focused.log` (5 store + 2 model tests), covering valid/corrupt migration, text limits, deleted parent/page, stale edit/undo and restored-ID collision, duplication/reopen and PDF export privacy.
+- Final full suite: **254 tests passed** (57 UI + 85 Store + 47 Import + 26 Export + 39 Core), no warning/error matches: `/private/tmp/papernest-comments-unit-final.log`. Final Mac build passed: `-mac-final.log`.
+- Independent review found mixed comment/page undo invalidation and draft loss in the conflict recovery instructions. Mixed history reproduced red (`-mixed-red.log`); fixed private comment persistence to preserve the rendered page row while touching item modification time. Draft model regression first failed on missing API (`-draft-red.log`); explicit Save as New Comment now preserves both versions. Both regressions green (`-review-green.log`), then full suite passed. No second reviewer pass claimed.
+- Initial iPhone UI test reached relaunch but failed a cursor-position assumption: text was inserted at the caret instead of appended. Corrected test captures the actual edited text and asserts exact persistence.
+- Final iPhone localized flow passed in en/fr/es: `/private/tmp/papernest-comments-phone-final.log`, xcresult `Test-PaperNest-iOS-2026.10.25_12-41-50--0500.xcresult`. Exercises blank-save disabled, create, edit cancellation, saved edit, deletion, undo/redo and relaunch persistence. All three editor screenshots inspected; title/actions and export notice fit above keyboard (`docs/screenshots/page-comment-editor-*-iphone.png`).
+- iPad Air 13-inch (M4) localized flow passed in en/fr/es: `/private/tmp/papernest-comments-ipad.log`, xcresult `Test-PaperNest-iOS-2026.10.25_17-42-16--0500.xcresult`. Same create/edit/cancel/delete/history/relaunch coverage; three editor screenshots inspected (`docs/screenshots/page-comment-editor-*-ipad.png`), labels/controls and wrapped export notice fit above keyboard.
+- Native Mac interaction, real-device checks, large Dynamic Type/VoiceOver, and injected I/O failure UI not run. Stale-draft conflict and Save as New are model-tested; no native multiwindow conflict UI pass claimed. Focused UI flows only; complete existing UI suite not rerun. Xcode OS-build parsing diagnostics appeared but both final UI runs report TEST SUCCEEDED.
+
 ## Additional notebook pages — Codex, 2026-10-25
 
 Notebooks now offer Add Notebook Page in the existing add-pages menu. Blank/lined/grid A4 paper defaults to the selected template; insert after selection or append without one. Selection changes after the store commit. Cancel writes nothing; save failures keep the form open. Undo/redo validates the page row, objects, OCR and surrounding order atomically, preserves newer edits, and clears obsolete history on conflicts. No migration or dependency changes.

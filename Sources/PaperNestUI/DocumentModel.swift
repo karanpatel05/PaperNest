@@ -428,6 +428,48 @@ final class DocumentModel {
         }
     }
 
+    // MARK: - Page comments
+
+    func comments(on pageID: PageID) async throws -> [PageObject] {
+        guard let store, let page = try await store.page(pageID), page.itemID == itemID,
+              let parent = try await store.item(itemID), !parent.isDeleted else { throw StoreError.pageNotFound }
+        return try await store.objects(on: pageID).filter { $0.commentText != nil }
+    }
+
+    func setComment(on pageID: PageID, replacing expected: PageObject?, text: String?, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, let page = try await store.page(pageID), page.itemID == itemID else { throw StoreError.pageNotFound }
+        let change = try await store.setPageComment(on: pageID, replacing: expected, text: text)
+        registerCommentUndo(change.inverse, undoManager: undoManager)
+        await load()
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    private func registerCommentUndo(_ change: LibraryStore.PageCommentChange, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                model.registerCommentUndo(change.inverse, undoManager: undoManager)
+                model.enqueueHistory(undoManager: undoManager) {
+                    do {
+                        guard let store = model.store else { throw StoreError.pageNotFound }
+                        _ = try await store.applyPageCommentChange(change)
+                        await model.load()
+                        await model.loadSelectedPageObjects()
+                        model.session.didChange()
+                        return true
+                    } catch {
+                        await model.load()
+                        await model.loadSelectedPageObjects()
+                        model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.commentHistoryChanged)
+                        return false
+                    }
+                }
+            }
+        }
+        undoManager?.setActionName(L10n.commentAction)
+    }
+
     // MARK: - Notebook template pages
 
     func addNotebookPage(_ template: PageTemplate, after anchor: PageID?, undoManager: UndoManager?) async throws {

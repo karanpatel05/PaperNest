@@ -878,4 +878,81 @@ final class AppUITests: XCTestCase {
             app.terminate()
         }
     }
+    func testPageCommentsEditCancelDeleteUndoAndReopenInAllLanguages() throws {
+        continueAfterFailure = false
+        for language in ["en", "fr", "es"] {
+            let library = "/tmp/papernest-comments-ui-\(UUID().uuidString)"
+            let title = "Comments \(language)"
+            var app = launch([], libraryPath: library, language: language)
+            XCTAssertTrue(app.buttons["library-tools"].waitForExistence(timeout: 15))
+            app.buttons["library-tools"].tap()
+            app.buttons["tool-notebook"].tap()
+            let name = app.textFields["notebook-name"]
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            name.tap()
+            name.typeText(title)
+            app.buttons["notebook-create"].tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
+            func openComments(_ app: XCUIApplication) {
+                app.buttons["editor-more"].tap()
+                app.buttons["editor-comments"].tap()
+                XCTAssertTrue(app.buttons["comment-add"].waitForExistence(timeout: 5))
+            }
+            func row(_ app: XCUIApplication) -> XCUIElement {
+                app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "comment-row-")).firstMatch
+            }
+            openComments(app)
+            app.buttons["comment-add"].tap()
+            let text = app.textViews["comment-text"]
+            XCTAssertTrue(text.waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["comment-save"].isEnabled)
+            text.tap()
+            text.typeText("Review this page")
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "page-comment-editor-\(language)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.buttons["comment-save"].tap()
+            XCTAssertTrue(row(app).waitForExistence(timeout: 5))
+            row(app).tap()
+            XCTAssertTrue(text.waitForExistence(timeout: 5))
+            XCTAssertEqual(text.value as? String, "Review this page")
+            text.tap()
+            text.typeText(" cancelled")
+            app.buttons["comment-cancel"].tap()
+            row(app).tap()
+            XCTAssertTrue(text.waitForExistence(timeout: 5))
+            XCTAssertEqual(text.value as? String, "Review this page")
+            text.tap()
+            text.typeText(" updated")
+            let savedText = try XCTUnwrap(text.value as? String).trimmingCharacters(in: .whitespacesAndNewlines)
+            XCTAssertTrue(savedText.contains("Review this page"))
+            XCTAssertTrue(savedText.contains("updated"))
+            app.buttons["comment-save"].tap()
+            XCTAssertTrue(row(app).waitForExistence(timeout: 5))
+            row(app).tap()
+            XCTAssertTrue(text.waitForExistence(timeout: 5))
+            app.buttons["comment-delete"].tap()
+            XCTAssertTrue(app.staticTexts["comments-empty"].waitForExistence(timeout: 5))
+            app.buttons["comments-history"].tap()
+            app.buttons["notebook-undo"].tap()
+            XCTAssertTrue(row(app).waitForExistence(timeout: 5))
+            app.buttons["comments-history"].tap()
+            app.buttons["notebook-redo"].tap()
+            XCTAssertTrue(app.staticTexts["comments-empty"].waitForExistence(timeout: 5))
+            app.buttons["comments-history"].tap()
+            app.buttons["notebook-undo"].tap()
+            XCTAssertTrue(row(app).waitForExistence(timeout: 5))
+            app.terminate()
+            app = launch(["-PaperNestDebugOpenItem", title], libraryPath: library, language: language)
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 15))
+            openComments(app)
+            XCTAssertTrue(row(app).waitForExistence(timeout: 5))
+            row(app).tap()
+            XCTAssertTrue(app.textViews["comment-text"].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.textViews["comment-text"].value as? String, savedText)
+            app.terminate()
+        }
+    }
+
 }

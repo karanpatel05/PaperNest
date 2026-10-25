@@ -316,3 +316,17 @@
 "notebook.undo" = "Deshacer";
 "notebook.redo" = "Rehacer";
 "notebook.pageTitle" = "Nueva página";
+
+/* Page comments */
+"comments.title" = "Comentarios";
+"comments.add" = "Añadir comentario";
+"comments.body" = "Comentario";
+"comments.empty" = "No hay comentarios en esta página.";
+"comments.privacy" = "Los comentarios se guardan en PaperNest y no se incluyen en las exportaciones PDF o de imagen.";
+"comments.save" = "Guardar";
+"comments.changed" = "Tu borrador no ha cambiado. Guárdalo como un comentario nuevo para conservar ambas versiones.";
+"comments.limit" = "Introduce entre 1 y 10 000 caracteres.";
+"comments.action" = "Cambiar comentario";
+"comments.saveAsNew" = "Guardar como comentario nuevo";
+"comments.historyChanged" = "El comentario ha cambiado. Se conservaron los últimos comentarios; la acción anterior ya no se puede deshacer ni rehacer.";
+"comments.pageUnavailable" = "Esta página ya no está disponible. Se conserva cualquier borrador abierto para que puedas copiar su texto.";

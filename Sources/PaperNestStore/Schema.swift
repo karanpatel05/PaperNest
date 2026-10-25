@@ -214,5 +214,20 @@ enum Schema {
         DROP TABLE assets;
         ALTER TABLE assets_v6 RENAME TO assets;
         """, rebuildsTables: true),
+        // Page-level comments share page object lifetime and composition.
+        Migration(version: 7, sql: """
+        CREATE TABLE page_objects_v7 (
+            id TEXT PRIMARY KEY NOT NULL,
+            page_id TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+            z_key TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('ink', 'text', 'image', 'comment')),
+            payload_json TEXT NOT NULL,
+            modified_at REAL NOT NULL
+        );
+        INSERT INTO page_objects_v7 SELECT id, page_id, z_key, kind, payload_json, modified_at FROM page_objects;
+        DROP TABLE page_objects;
+        ALTER TABLE page_objects_v7 RENAME TO page_objects;
+        CREATE INDEX page_objects_by_page ON page_objects(page_id, z_key, id);
+        """, rebuildsTables: true),
     ]
 }

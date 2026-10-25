@@ -14,6 +14,7 @@ struct DocumentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
     @State private var isShowingExport = false
+    @State private var commentsPage: Page?
     /// Why the file picker was opened. Kept apart from the presented flag:
     /// SwiftUI clears the flag when the picker closes, before calling the
     /// completion, so a purpose stored in the flag would already be gone
@@ -145,6 +146,9 @@ struct DocumentView: View {
         }
         .sheet(item: $notebookPageRequest) { request in
             NotebookPageSheet(model: model, request: request, undoManager: undoManager)
+        }
+        .sheet(item: $commentsPage) { page in
+            PageCommentsSheet(model: model, pageID: page.id, undoManager: undoManager)
         }
         .sheet(item: $annotationPage) { page in
             TextAnnotationSheet(model: model, pageID: page.id, undoManager: undoManager)
@@ -300,6 +304,7 @@ struct DocumentView: View {
             recognizeTextButton
             annotateTextButton
             manageMarkupButton
+            commentsButton
             Divider()
             deleteButton
         } label: {
@@ -329,6 +334,14 @@ struct DocumentView: View {
         }
         .disabled(model.selectedPage == nil || model.isRecognizing)
         .accessibilityIdentifier("editor-annotate")
+    }
+
+    private var commentsButton: some View {
+        Button { commentsPage = model.selectedPage } label: {
+            Label(L10n.comments, systemImage: "text.bubble")
+        }
+        .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
+        .accessibilityIdentifier("editor-comments")
     }
 
     private var manageMarkupButton: some View {
@@ -391,6 +404,7 @@ struct DocumentView: View {
             recognizeTextButton
             annotateTextButton
             manageMarkupButton
+            commentsButton
             Divider()
             deleteButton
         } label: {

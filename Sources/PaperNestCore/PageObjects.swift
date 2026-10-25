@@ -27,12 +27,15 @@ public struct PageObject: Identifiable, Hashable, Codable, Sendable {
         case ink(InkStroke)
         case text(TextBox)
         case image(PlacedImage)
+        /// Page-level private comment; not painted or included in image/PDF exports.
+        case comment(String)
 
         public var kind: String {
             switch self {
             case .ink: "ink"
             case .text: "text"
             case .image: "image"
+            case .comment: "comment"
             }
         }
     }
@@ -177,5 +180,12 @@ public struct RecognizedLine: Hashable, Codable, Sendable {
         self.text = text
         self.box = box
         self.confidence = confidence
+    }
+}
+
+extension PageObject {
+    public var commentText: String? {
+        if case .comment(let text) = payload { return text }
+        return nil
     }
 }

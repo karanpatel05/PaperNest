@@ -377,3 +377,22 @@ extension L10n {
     static var notebookUndo: String { tr("notebook.undo") }
     static var notebookRedo: String { tr("notebook.redo") }
 }
+
+// Page comments
+extension L10n {
+    static var comments: String { tr("comments.title") }
+    static var commentAdd: String { tr("comments.add") }
+    static var commentBody: String { tr("comments.body") }
+    static var commentEmpty: String { tr("comments.empty") }
+    static var commentPrivacy: String { tr("comments.privacy") }
+    static var commentSave: String { tr("comments.save") }
+    static var commentChanged: String { tr("comments.changed") }
+    static var commentLimit: String { tr("comments.limit") }
+    static var commentAction: String { tr("comments.action") }
+}
+
+extension L10n {
+    static var commentSaveAsNew: String { tr("comments.saveAsNew") }
+    static var commentHistoryChanged: String { tr("comments.historyChanged") }
+    static var commentPageUnavailable: String { tr("comments.pageUnavailable") }
+}
