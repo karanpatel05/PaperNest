@@ -818,4 +818,64 @@ final class AppUITests: XCTestCase {
         showAllDocuments(app)
         XCTAssertTrue(app.descendants(matching: .any)["Study notebook, 1 page"].firstMatch.waitForExistence(timeout: 10))
     }
+    func testNotebookPagesAddCancelUndoRedoAndReopenInAllLanguages() throws {
+        continueAfterFailure = false
+        for (language, selected, one, two) in [
+            ("en", "Selected", "Page 1 of 1", "Page 2 of 2"),
+            ("fr", "Sélectionné", "Page 1 sur 1", "Page 2 sur 2"),
+            ("es", "Seleccionado", "Página 1 de 1", "Página 2 de 2")
+        ] {
+            let library = "/tmp/papernest-pages-ui-\(UUID().uuidString)"
+            let title = "Notebook \(language)"
+            var app = launch([], libraryPath: library, language: language)
+            XCTAssertTrue(app.buttons["library-tools"].waitForExistence(timeout: 15))
+            app.buttons["library-tools"].tap()
+            XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 5))
+            app.buttons["tool-notebook"].tap()
+            let name = app.textFields["notebook-name"]
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            name.tap()
+            name.typeText(title)
+            app.buttons["notebook-paper-lined"].tap()
+            app.buttons["notebook-create"].tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
+
+            func openAdd() {
+                if app.buttons["editor-add-pages"].exists {
+                    app.buttons["editor-add-pages"].tap()
+                } else {
+                    app.buttons["editor-more"].tap()
+                }
+                app.buttons["editor-add-notebook-page"].tap()
+                XCTAssertTrue(app.buttons["add-page-create"].waitForExistence(timeout: 5))
+            }
+            openAdd()
+            XCTAssertEqual(app.buttons["add-page-paper-lined"].value as? String, selected)
+            app.buttons["add-page-cancel"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)[one].firstMatch.waitForExistence(timeout: 5))
+            openAdd()
+            app.buttons["add-page-paper-grid"].tap()
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "notebook-add-page-\(language)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.buttons["add-page-create"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)[two].firstMatch.waitForExistence(timeout: 10))
+            app.buttons["editor-more"].tap()
+            let undo = app.buttons["notebook-undo"]
+            XCTAssertTrue(undo.isEnabled)
+            undo.tap()
+            XCTAssertTrue(app.descendants(matching: .any)[one].firstMatch.waitForExistence(timeout: 10))
+            app.buttons["editor-more"].tap()
+            let redo = app.buttons["notebook-redo"]
+            XCTAssertTrue(redo.isEnabled)
+            redo.tap()
+            XCTAssertTrue(app.descendants(matching: .any)[two].firstMatch.waitForExistence(timeout: 10))
+            app.terminate()
+            app = launch(["-PaperNestDebugOpenItem", title], libraryPath: library, language: language)
+            // Reopening selects the first page; the second page still exists in the strip.
+            XCTAssertTrue(app.descendants(matching: .any)[two].firstMatch.waitForExistence(timeout: 15))
+            app.terminate()
+        }
+    }
 }

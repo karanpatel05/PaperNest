@@ -367,3 +367,13 @@ extension L10n {
     static var notebookGrid: String { tr("notebook.grid") }
     static var notebookFooter: String { tr("notebook.footer") }
 }
+
+// Additional notebook pages
+extension L10n {
+    static var addNotebookPage: String { tr("notebook.addPage") }
+    static var notebookPageTitle: String { tr("notebook.pageTitle") }
+    static var notebookPageFooter: String { tr("notebook.addPage.footer") }
+    static var notebookPageChanged: String { tr("notebook.pageChanged") }
+    static var notebookUndo: String { tr("notebook.undo") }
+    static var notebookRedo: String { tr("notebook.redo") }
+}

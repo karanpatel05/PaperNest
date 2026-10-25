@@ -308,3 +308,11 @@
 "notebook.lined" = "Lined";
 "notebook.grid" = "Grid";
 "notebook.footer" = "Creates one A4 page. Write or draw using the document’s markup tools.";
+
+/* Additional notebook pages */
+"notebook.addPage" = "Add Notebook Page…";
+"notebook.addPage.footer" = "Adds one A4 page after the selected page.";
+"notebook.pageChanged" = "The notebook changed. Your latest pages were kept. The previous action can no longer be undone or redone.";
+"notebook.undo" = "Undo";
+"notebook.redo" = "Redo";
+"notebook.pageTitle" = "New Page";

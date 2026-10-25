@@ -308,3 +308,11 @@
 "notebook.lined" = "Ligné";
 "notebook.grid" = "Quadrillé";
 "notebook.footer" = "Crée une page A4. Écrivez ou dessinez avec les outils d’annotation du document.";
+
+/* Additional notebook pages */
+"notebook.addPage" = "Ajouter une page au carnet…";
+"notebook.addPage.footer" = "Ajoute une page A4 après la page sélectionnée.";
+"notebook.pageChanged" = "Le carnet a changé. Vos dernières pages sont conservées. L’action précédente ne peut plus être annulée ni rétablie.";
+"notebook.undo" = "Annuler l’action";
+"notebook.redo" = "Rétablir";
+"notebook.pageTitle" = "Nouvelle page";

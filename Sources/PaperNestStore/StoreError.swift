@@ -11,6 +11,7 @@ public enum StoreError: Error, Equatable, Sendable {
     case assetMissing(String)
     case assetChecksumMismatch(String)
     case invalidOrder
+    case notebookPageChanged
     /// Recognition or the page changed while a text-markup picker was open.
     case recognitionChanged
     /// Saved marks or page geometry changed while the markup manager was open.

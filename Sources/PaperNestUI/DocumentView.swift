@@ -29,6 +29,7 @@ struct DocumentView: View {
     @State private var isShowingCrop = false
     @State private var annotationPage: Page?
     @State private var managedMarkupPage: Page?
+    @State private var notebookPageRequest: NotebookPageRequest?
     /// iPhone: the strip of filter previews above the tools.
     @State private var isShowingFilterStrip = false
     @State private var isRenaming = false
@@ -141,6 +142,9 @@ struct DocumentView: View {
                     Task { await model.setCrop(crop, undoManager: undoManager) }
                 }
             }
+        }
+        .sheet(item: $notebookPageRequest) { request in
+            NotebookPageSheet(model: model, request: request, undoManager: undoManager)
         }
         .sheet(item: $annotationPage) { page in
             TextAnnotationSheet(model: model, pageID: page.id, undoManager: undoManager)
@@ -287,6 +291,10 @@ struct DocumentView: View {
         exportButton
             .labelStyle(.titleAndIcon)
         Menu {
+            if model.item?.kind == .notebook {
+                NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
+                Divider()
+            }
             addPagesItems
             Divider()
             recognizeTextButton
@@ -376,6 +384,10 @@ struct DocumentView: View {
             Label(L10n.pages, systemImage: "square.grid.2x2")
         }
         Menu {
+            if model.item?.kind == .notebook {
+                NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
+                Divider()
+            }
             recognizeTextButton
             annotateTextButton
             manageMarkupButton
@@ -530,10 +542,23 @@ struct DocumentView: View {
 
     private func addPagesMenu(@ViewBuilder label: () -> some View) -> some View {
         Menu { addPagesItems } label: { label() }
+            .accessibilityIdentifier("editor-add-pages")
     }
 
     @ViewBuilder
     private var addPagesItems: some View {
+        if model.item?.kind == .notebook {
+            Button {
+                let template: PageTemplate
+                if case .template(let paper) = model.selectedPage?.content { template = paper }
+                else { template = .blank }
+                notebookPageRequest = NotebookPageRequest(after: model.selectedPageID, template: template)
+            } label: {
+                Label(L10n.addNotebookPage, systemImage: "doc.badge.plus")
+            }
+            .accessibilityIdentifier("editor-add-notebook-page")
+            .disabled(model.isChangingNotebookPage)
+        }
         #if os(iOS)
         Button {
             cameraPurpose = .add

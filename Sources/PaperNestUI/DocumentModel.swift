@@ -17,6 +17,10 @@ final class DocumentModel {
     private(set) var hasLoaded = false
     var selectedPageID: PageID?
     var presentedError: PresentedError?
+    private(set) var isChangingNotebookPage = false
+    private var historyTask: Task<Void, Never>?
+    private var pendingHistory = 0
+    private var historyGeneration = 0
     /// Pages finished, pages in total, while text recognition runs.
     private(set) var recognitionProgress: (done: Int, total: Int)?
 
@@ -34,6 +38,7 @@ final class DocumentModel {
     /// is useful before the last page is done, and a failure on one page does
     /// not discard the others.
     func recognizeText(on pageID: PageID? = nil) async {
+        await finishPendingHistory()
         guard let store, let renderer = session.environment?.renderer, recognitionProgress == nil else { return }
         let recognizer = TextRecognizer()
         let languages = TextRecognizer.supportedLanguages(from: TextRecognizer.preferredLanguages)
@@ -101,6 +106,7 @@ final class DocumentModel {
     // MARK: - Transform edits
 
     func rotate(clockwise: Bool, undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard let page = selectedPage else { return }
         var t = page.transform
         t.rotation = clockwise ? t.rotation.rotatedClockwise() : t.rotation.rotatedCounterclockwise()
@@ -108,6 +114,7 @@ final class DocumentModel {
     }
 
     func setFilter(_ filter: PageFilter, undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard let page = selectedPage, page.transform.filter != filter else { return }
         var t = page.transform
         t.filter = filter
@@ -115,6 +122,7 @@ final class DocumentModel {
     }
 
     func setAdjustments(brightness: Double, contrast: Double, undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard let page = selectedPage else { return }
         var t = page.transform
         t = PageTransform(crop: t.crop, rotation: t.rotation, filter: t.filter, brightness: brightness, contrast: contrast)
@@ -124,6 +132,7 @@ final class DocumentModel {
     /// Applies a crop drawn in the crop editor. A crop that only differs by
     /// rounding from the current one is not recorded as an edit.
     func setCrop(_ crop: NormalizedRect, undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard let page = selectedPage, !page.transform.crop.isApproximately(crop) else { return }
         var t = page.transform
         t.crop = crop.isApproximately(.full) ? .full : crop
@@ -131,6 +140,7 @@ final class DocumentModel {
     }
 
     func revertToOriginal(undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard let page = selectedPage else { return }
         await apply(.identity, to: page.id, actionName: L10n.revertToOriginal, undoManager: undoManager)
     }
@@ -145,13 +155,43 @@ final class DocumentModel {
     // while the undo manager is undoing (or redoing), so the inverse lands
     // on the correct stack; only then does it start the async store write.
 
+    /// A fresh edit must not write into an intermediate undo/redo state.
+    /// Recheck after each suspension because native shortcuts may enqueue more.
+    private func finishPendingHistory() async {
+        while let pending = historyTask { await pending.value }
+    }
+
+    /// All callbacks sharing the document's UndoManager must commit in request
+    /// order, including mixed page creation/deletion/ink/transform history.
+    private func enqueueHistory(undoManager: UndoManager?, operation: @escaping @MainActor () async -> Bool) {
+        isChangingNotebookPage = true
+        pendingHistory += 1
+        let previous = historyTask
+        let generation = historyGeneration
+        historyTask = Task { @MainActor in
+            await previous?.value
+            defer {
+                pendingHistory -= 1
+                isChangingNotebookPage = pendingHistory > 0
+                if pendingHistory == 0 { historyTask = nil }
+            }
+            guard generation == historyGeneration else { return }
+            if !(await operation()) {
+                historyGeneration += 1
+                undoManager?.removeAllActions(withTarget: self)
+            }
+        }
+    }
+
     private func registerTransformUndo(restoring old: PageTransform, redoing new: PageTransform, pageID: PageID,
                                        actionName: String, undoManager: UndoManager?) {
         undoManager?.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated {
                 model.registerTransformUndo(restoring: new, redoing: old, pageID: pageID, actionName: actionName, undoManager: undoManager)
-                model.selectedPageID = pageID
-                _ = Task { await model.commitTransform(old, to: pageID) }
+                model.enqueueHistory(undoManager: undoManager) {
+                    model.selectedPageID = pageID
+                    return await model.commitTransform(old, to: pageID)
+                }
             }
         }
         undoManager?.setActionName(actionName)
@@ -211,6 +251,7 @@ final class DocumentModel {
     /// Commits one ink gesture as one undo step: `saving` holds new or
     /// moved objects, `deleting` the erased ones.
     func changeInk(on pageID: PageID, saving: [PageObject], deleting: [PageObject], undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard let store, !saving.isEmpty || !deleting.isEmpty else { return }
         do {
             let current = Dictionary(uniqueKeysWithValues: try await store.objects(on: pageID).map { ($0.id, $0) })
@@ -224,6 +265,7 @@ final class DocumentModel {
 
     func addTextMarkup(_ snapshot: PageRecognition, lineIndices: Set<Int>, style: TextMarkupStyle, color: RGBAColor? = nil,
                        undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
         guard let store else { throw StoreError.pageNotFound }
         let result = try await store.addTextMarkup(snapshot, lineIndices: lineIndices, style: style, color: color)
         replace(result.page)
@@ -234,6 +276,7 @@ final class DocumentModel {
     }
 
     func editInk(on page: Page, objects: [PageObject], edit: InkEdit, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
         guard let store else { throw StoreError.pageNotFound }
         let result = try await store.editInk(on: page.id, expectedRevision: page.revision, objects: objects, edit: edit)
         replace(result.page)
@@ -251,13 +294,9 @@ final class DocumentModel {
         undoManager?.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated {
                 model.registerInkUndo(change.inverse, undoManager: undoManager, actionName: actionName)
-                model.selectedPageID = change.pageID
-                _ = Task {
-                    if !(await model.commitInk(change)) {
-                        // The inverse was registered synchronously for UndoManager.
-                        // If the write failed, neither direction is safe to replay.
-                        undoManager?.removeAllActions(withTarget: model)
-                    }
+                model.enqueueHistory(undoManager: undoManager) {
+                    model.selectedPageID = change.pageID
+                    return await model.commitInk(change)
                 }
             }
         }
@@ -287,6 +326,7 @@ final class DocumentModel {
     // MARK: - Page order
 
     func movePages(from offsets: IndexSet, to destination: Int, undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard offsets.count == 1, let from = offsets.first else { return }
         // List's destination counts the moved row; convert to a final index.
         let target = destination > from ? destination - 1 : destination
@@ -294,6 +334,7 @@ final class DocumentModel {
     }
 
     func moveSelected(by delta: Int, undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard let index = selectedIndex else { return }
         await movePage(at: index, to: index + delta, undoManager: undoManager)
     }
@@ -307,7 +348,7 @@ final class DocumentModel {
         undoManager?.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated {
                 model.registerMoveUndo(from: target, to: from, undoManager: undoManager)
-                _ = Task { await model.commitMove(at: from, to: target) }
+                model.enqueueHistory(undoManager: undoManager) { await model.commitMove(at: from, to: target) }
             }
         }
         undoManager?.setActionName(L10n.undoMovePage)
@@ -330,6 +371,7 @@ final class DocumentModel {
     // MARK: - Deletion
 
     func deleteSelectedPage(undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard let page = selectedPage, let deleted = await commitDelete([page.id]) else { return }
         registerDeleteUndo(deleted, undoManager: undoManager)
     }
@@ -338,7 +380,7 @@ final class DocumentModel {
         undoManager?.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated {
                 model.registerRestoreUndo(deleted, undoManager: undoManager)
-                _ = Task { await model.commitRestore(deleted) }
+                model.enqueueHistory(undoManager: undoManager) { await model.commitRestore(deleted) }
             }
         }
         undoManager?.setActionName(L10n.undoDeletePage)
@@ -348,7 +390,7 @@ final class DocumentModel {
         undoManager?.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated {
                 model.registerDeleteUndo(deleted, undoManager: undoManager)
-                _ = Task { await model.commitDelete(deleted.map(\.page.id)) }
+                model.enqueueHistory(undoManager: undoManager) { await model.commitDelete(deleted.map(\.page.id)) != nil }
             }
         }
         undoManager?.setActionName(L10n.undoDeletePage)
@@ -372,22 +414,76 @@ final class DocumentModel {
         }
     }
 
-    private func commitRestore(_ deleted: [LibraryStore.DeletedPage]) async {
-        guard let store else { return }
+    private func commitRestore(_ deleted: [LibraryStore.DeletedPage]) async -> Bool {
+        guard let store else { return false }
         do {
             try await store.restorePages(deleted)
             pages = try await store.pages(of: itemID)
             selectedPageID = deleted.first?.page.id
             session.didChange()
+            return true
         } catch {
             presentedError = .saveFailed()
+            return false
         }
+    }
+
+    // MARK: - Notebook template pages
+
+    func addNotebookPage(_ template: PageTemplate, after anchor: PageID?, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard !isChangingNotebookPage, let store else { throw StoreError.pageNotFound }
+        isChangingNotebookPage = true
+        defer { isChangingNotebookPage = pendingHistory > 0 }
+        let change = try await store.addNotebookPage(template, to: itemID, after: anchor)
+        registerNotebookPageUndo(NotebookUndoStep(change), undoManager: undoManager)
+        selectedPageID = change.page.id
+        await load()
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    @MainActor private final class NotebookUndoStep {
+        var change: LibraryStore.NotebookPageChange?
+        init(_ change: LibraryStore.NotebookPageChange? = nil) { self.change = change }
+    }
+
+    private func registerNotebookPageUndo(_ step: NotebookUndoStep, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                // UndoManager routes registration to redo only within this
+                // synchronous callback. Native keyboard/menu requests may consume
+                // this slot immediately; serialize their mutations until its token
+                // is armed by the preceding durable transition.
+                let inverse = NotebookUndoStep()
+                model.registerNotebookPageUndo(inverse, undoManager: undoManager)
+                model.enqueueHistory(undoManager: undoManager) {
+                    do {
+                        guard let store = model.store, let change = step.change else { throw StoreError.pageNotFound }
+                        let result = try await store.toggleNotebookPage(change)
+                        inverse.change = result
+                        if !result.isDeleted { model.selectedPageID = result.page.id }
+                        await model.load()
+                        await model.loadSelectedPageObjects()
+                        model.session.didChange()
+                        return true
+                    } catch {
+                        await model.load()
+                        await model.loadSelectedPageObjects()
+                        model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.notebookPageChanged)
+                        return false
+                    }
+                }
+            }
+        }
+        undoManager?.setActionName(L10n.addNotebookPage)
     }
 
     // MARK: - Adding and replacing pages (scan, rescan)
 
     /// Adds validated pages after the selected page and selects the first.
     func insertPages(_ prepared: DocumentImporter.Prepared) async {
+        await finishPendingHistory()
         guard let store else { return }
         do {
             let inserted = try await store.insertPages(prepared.pages, into: itemID, after: selectedPageID, assets: prepared.assets)
@@ -404,6 +500,7 @@ final class DocumentModel {
     /// chosen look (filter, brightness, contrast) carries over; crop and
     /// rotation described the old capture, so they reset.
     func replaceSelectedPage(with prepared: DocumentImporter.Prepared, undoManager: UndoManager?) async {
+        await finishPendingHistory()
         guard let store, let page = selectedPage, let first = prepared.pages.first else { return }
         let look = page.transform
         let replacement = LibraryStore.PageContentSnapshot(
@@ -425,7 +522,7 @@ final class DocumentModel {
         undoManager?.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated {
                 model.registerReplacementRedo(change, undoManager: undoManager)
-                _ = Task { await model.commitReplacement(change, undoing: true) }
+                model.enqueueHistory(undoManager: undoManager) { await model.commitReplacement(change, undoing: true) }
             }
         }
         undoManager?.setActionName(L10n.undoReplacePage)
@@ -435,14 +532,14 @@ final class DocumentModel {
         undoManager?.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated {
                 model.registerReplacementUndo(change, undoManager: undoManager)
-                _ = Task { await model.commitReplacement(change, undoing: false) }
+                model.enqueueHistory(undoManager: undoManager) { await model.commitReplacement(change, undoing: false) }
             }
         }
         undoManager?.setActionName(L10n.undoReplacePage)
     }
 
-    private func commitReplacement(_ change: LibraryStore.PageReplacement, undoing: Bool) async {
-        guard let store else { return }
+    private func commitReplacement(_ change: LibraryStore.PageReplacement, undoing: Bool) async -> Bool {
+        guard let store else { return false }
         do {
             if undoing {
                 try await store.revertPageReplacement(change)
@@ -452,8 +549,10 @@ final class DocumentModel {
             pages = try await store.pages(of: itemID)
             selectedPageID = change.pageID
             session.didChange()
+            return true
         } catch {
             presentedError = .saveFailed()
+            return false
         }
     }
 

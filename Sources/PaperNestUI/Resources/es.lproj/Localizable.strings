@@ -308,3 +308,11 @@
 "notebook.lined" = "Rayado";
 "notebook.grid" = "Cuadriculado";
 "notebook.footer" = "Crea una página A4. Escribe o dibuja con las herramientas de anotación del documento.";
+
+/* Additional notebook pages */
+"notebook.addPage" = "Añadir página al cuaderno…";
+"notebook.addPage.footer" = "Añade una página A4 después de la página seleccionada.";
+"notebook.pageChanged" = "El cuaderno ha cambiado. Se conservaron tus últimas páginas. La acción anterior ya no se puede deshacer ni rehacer.";
+"notebook.undo" = "Deshacer";
+"notebook.redo" = "Rehacer";
+"notebook.pageTitle" = "Nueva página";

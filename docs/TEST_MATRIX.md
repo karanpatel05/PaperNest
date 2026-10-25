@@ -1,5 +1,24 @@
 # Test matrix
 
+## Additional notebook pages — Codex, 2026-10-25
+
+Notebooks now offer Add Notebook Page in the existing add-pages menu. Blank/lined/grid A4 paper defaults to the selected template; insert after selection or append without one. Selection changes after the store commit. Cancel writes nothing; save failures keep the form open. Undo/redo validates the page row, objects, OCR and surrounding order atomically, preserves newer edits, and clears obsolete history on conflicts. No migration or dependency changes.
+
+- Checkpoint `7444b4d` saved all preceding work after **236 passing tests** (`/private/tmp/papernest-checkpoint-tests.log`).
+- Test-first store/model failures: `/private/tmp/papernest-pages-red.log`, `-model-red.log`; focused green: `-store-green.log`, `-model-green.log`.
+- Fresh reviewer found rapid native Undo→Redo discarded an unarmed inverse. Reproduced four failed assertions in `/private/tmp/papernest-pages-history-red.log`; fixed by serializing native requests and invalidating queued requests on conflict. Focused green: `-history-green.log`. Regression tests cover immediate undo/redo/undo and conflict with a queued redo.
+- Review follow-up reproduced mixed delete/notebook history ending with two pages rather than one (`/private/tmp/papernest-pages-mixed-red.log`). All document history callbacks now share the serial queue; mixed regression passed (`-mixed-green.log`).
+- Fresh page edits now await pending history; new-edit race reproduced and fixed (`/private/tmp/papernest-pages-new-edit-red.log`, `-new-edit-green.log`).
+- Final independent review: no remaining actionable data-loss or regression issues found; reviewer did not edit files or run tests.
+- Final full unit suite: **245 passed** (53 UI + 80 Store + 47 Import + 26 Export + 39 Core), no compiler warning/error matches. `/private/tmp/papernest-pages-unit-final.log`. Covers all paper templates; empty/middle/end insertion; invalid notebook/anchor; deleted/purged/conflicting states; undo/redo; reopening; two-page PDF export; localization parity.
+- Final Mac build passed: `/private/tmp/papernest-pages-mac-final.log`. Native Mac sheet and keyboard interaction remain unrun.
+- First iPhone UI attempt failed because the test targeted More rather than the compact editor’s separate Add Pages menu. Investigation also found compact history controls missing; added them. Corrected iPhone run passed the add/cancel/default-paper/undo/redo/relaunch flow in en/fr/es (`/private/tmp/papernest-pages-phone.log`). Screenshots `docs/screenshots/notebook-add-page-*-iphone.png` inspected: titles, controls and wrapped Spanish footer fit.
+- Initial iPad Air 13-inch (M4) flow passed in en/fr/es: `/private/tmp/papernest-pages-ipad.log`, xcresult `Test-PaperNest-iOS-2026.10.25_06-18-45--0500.xcresult`. All three new-sheet screenshots inspected; labels/controls/footer fit (`docs/screenshots/notebook-add-page-*-ipad.png`).
+- iPhone rerun after native rapid undo/redo fix passed in en/fr/es: `/private/tmp/papernest-pages-phone-final.log`, xcresult `Test-PaperNest-iOS-2026.10.25_06-21-26--0500.xcresult`. This run preceded the later shared-history queue and fresh-edit wait.
+- iPad shared-history regression passed **2/2**: existing PencilKit drawing/undo/redo/reopen (41.720 s) plus notebook flow in en/fr/es; `/private/tmp/papernest-pages-ipad-final.log`, xcresult `Test-PaperNest-iOS-2026.10.25_06-24-11--0500.xcresult`. This build includes shared history serialization and precedes fresh-edit waiting.
+- Final-source iPhone 17 Pro check passed in en/fr/es (130.101 s, zero failures): `/private/tmp/papernest-pages-phone-verified.log`, xcresult `Test-PaperNest-iOS-2026.10.25_06-27-55--0500.xcresult`. Includes all review fixes and fresh-edit waiting. Xcode emitted OS-build parsing diagnostics; tests succeeded.
+- Not claimed: full existing UI suite, real-device Pencil/camera, VoiceOver, large Dynamic Type, native Mac interaction, or injected storage-failure UI. Store/model failures are covered; save-error form retention is implemented.
+
 ## Notebook creation — Codex, 2026-10-24
 
 Implemented Tools → New Notebook: enter a name, choose blank/lined/grid paper, and create one A4 template page. The item is stored as a notebook in the current folder (root from home), created atomically through the existing store API, and opened after dismissing the creation sheet. Empty names disable Create; double submission/dismissal during save is disabled; errors leave the form open. No schema changes or new dependencies. Existing editor/ink/render/export paths are reused.

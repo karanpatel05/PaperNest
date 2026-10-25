@@ -41,6 +41,8 @@ PaperNest also keeps general files with their original bytes and filename. Tap a
 
 Open a document’s **More → Annotate Text** to highlight, underline or strike through whole recognized lines on the current page. If necessary, use **Recognize Text** in the sheet first. Select a style and one or more lines, then **Apply**. Marks are editable ink, support document undo/redo, and survive reopening and export. Choose a preset or custom color before applying. Use **More → Manage Markup** to select saved highlights or drawn strokes, apply a new color or remove them. Each action supports document undo/redo. Whole-line selection is supported; word-level selection remains planned.
 
+Create a notebook from **Tools → New Notebook** with blank, lined or grid A4 paper. In the editor, use **Add or Replace Pages → Add Notebook Page…** (or the wider layout’s **More** menu) to insert a page after the selected page. Choose its paper, then Create. Notebook **More → Undo/Redo** supports reversing page insertion; reopening and PDF export preserve the added pages.
+
 Real text recognition (English, French and Spanish), recognized-text search and searchable PDF export are implemented. The broader feature request is tracked in [the expansion roadmap](docs/FEATURE_EXPANSION.md): ZIP extraction/creation and Photos/HEIC import are also implemented; richer PDF editing, additional conversions, cloud providers, media, browser and VPN remain future workstreams.
 
 ## Build and test
