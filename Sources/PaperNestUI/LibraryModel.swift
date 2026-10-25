@@ -307,6 +307,18 @@ public final class LibraryModel {
         }
     }
 
+    /// Creates the notebook and its first A4 page together before publishing.
+    func createNotebook(named name: String, template: PageTemplate) async throws -> ItemID {
+        guard let env = environment else { throw CocoaError(.fileReadUnknown) }
+        let item = try await env.store.createItem(kind: .notebook, name: name,
+            folderID: currentFolderID,
+            pages: [.init(sourceSize: CGSize(width: 595.28, height: 841.89), content: .template(template))],
+            assets: [])
+        session.didChange()
+        await reload()
+        return item.id
+    }
+
     // MARK: - Folders
 
     /// New documents go into the folder being shown; from the iPhone home

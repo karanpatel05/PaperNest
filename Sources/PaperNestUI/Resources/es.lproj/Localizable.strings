@@ -276,3 +276,35 @@
 
 "file.preview.failed" = "Vista previa no disponible";
 "file.preview.failedDescription" = "No se pudo abrir el archivo. Cierra la vista previa o consulta la información del archivo.";
+
+/* F3a: recognized-line annotations */
+"annotation.title" = "Anotar texto";
+"annotation.style" = "Estilo";
+"annotation.highlight" = "Resaltar";
+"annotation.underline" = "Subrayar";
+"annotation.strikethrough" = "Tachar";
+"annotation.lines" = "Líneas reconocidas";
+"annotation.noText" = "No hay texto reconocido actualizado. Reconoce esta página para elegir sus líneas.";
+"annotation.help" = "Selecciona líneas reconocidas completas. Los trazos siguen siendo editables; elige un color predefinido o personalizado.";
+"annotation.apply" = "Aplicar";
+"annotation.changed" = "Esta página o su texto reconocido ha cambiado. Revisa las líneas actualizadas y selecciónalas de nuevo.";
+
+/* F3b: colors and managing saved ink. */
+"markup.manage" = "Gestionar anotaciones";
+"markup.color" = "Color";
+"markup.customColor" = "Color personalizado";
+"markup.saved" = "Trazos guardados";
+"markup.empty" = "No hay trazos en esta página.";
+"markup.help" = "Selecciona resaltados o trazos para cambiar su color o eliminarlos. Cada acción se puede deshacer en el documento.";
+"markup.recolor" = "Aplicar color";
+"markup.remove" = "Eliminar selección";
+"markup.changed" = "Esta página o sus trazos han cambiado. Revisa la página actualizada y vuelve a seleccionar los trazos.";
+"markup.mark" = "Trazo %d";
+
+/* Notebook creation */
+"notebook.new" = "Nuevo cuaderno";
+"notebook.paper" = "Papel";
+"notebook.blank" = "En blanco";
+"notebook.lined" = "Rayado";
+"notebook.grid" = "Cuadriculado";
+"notebook.footer" = "Crea una página A4. Escribe o dibuja con las herramientas de anotación del documento.";

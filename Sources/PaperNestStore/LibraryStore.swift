@@ -947,6 +947,13 @@ public actor LibraryStore {
     private func bumpRevision(_ page: Page) throws {
         let timestamp = now()
         try db.run("UPDATE pages SET revision = revision + 1, modified_at = ? WHERE id = ?", [.date(timestamp), .text(page.id.rawValue)])
+        // Object edits don't change the underlying paper. Preserve only a
+        // current completed result; never make already-stale OCR current.
+        if var recognition = try recognition(for: page.id), recognition.status == .completed,
+           recognition.sourceRevision == page.revision {
+            recognition.sourceRevision += 1
+            try upsertRecognitionRow(recognition)
+        }
         try touchItem(page.itemID, at: timestamp)
     }
 

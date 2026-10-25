@@ -58,6 +58,19 @@ OCR_LIBRARY=/tmp/papernest-ocr-library
 rm -rf "$OCR_LIBRARY"
 swift run --scratch-path "$SCRATCH" papernest-seed "$OCR_LIBRARY" "$FIXTURES/OCR target.pdf"
 
+# Text markup has its own real OCR source, independent of the search test.
+cp Samples/multilingual-letter.pdf "$FIXTURES/Markup target.pdf"
+MARKUP_LIBRARY=/tmp/papernest-text-markup-library
+rm -rf "$MARKUP_LIBRARY"
+swift run --scratch-path "$SCRATCH" papernest-seed "$MARKUP_LIBRARY" "$FIXTURES/Markup target.pdf"
+
+# Saved-mark controls have an independent library per locale.
+for MARKUP_LOCALE in en fr es; do
+    CONTROLS_LIBRARY="/tmp/papernest-markup-controls-$MARKUP_LOCALE"
+    rm -rf "$CONTROLS_LIBRARY"
+    cp -R "$MARKUP_LIBRARY" "$CONTROLS_LIBRARY"
+done
+
 # The Tools screen test merges two documents of its own.
 cp Samples/whiteboard-300dpi.png "$FIXTURES/Tools A.png"
 cp Samples/whiteboard-300dpi.png "$FIXTURES/Tools B.png"

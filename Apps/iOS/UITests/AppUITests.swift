@@ -652,4 +652,170 @@ final class AppUITests: XCTestCase {
         app.buttons["file-details-done"].tap()
         XCTAssertTrue(cell.waitForExistence(timeout: 5))
     }
+
+    func testRecognizedLinesCanBeMarkedAndKeptAfterRelaunch() throws {
+        continueAfterFailure = false
+        let library = "/tmp/papernest-text-markup-library"
+        for (index, entry) in [("en", "Annotate Text", "highlight"), ("fr", "Annoter le texte", "underline"),
+                               ("es", "Anotar texto", "strikethrough")].enumerated() {
+            let (language, title, style) = entry
+            var app = launch(["-PaperNestDebugOpenItem", "Markup target"], libraryPath: library, language: language)
+            let page = app.descendants(matching: .any)["document-page-image"].firstMatch
+            XCTAssertTrue(page.waitForExistence(timeout: 15))
+            func openAnnotations(_ app: XCUIApplication) {
+                let more = UIDevice.current.userInterfaceIdiom == .phone
+                    ? app.buttons.matching(identifier: "editor-more").firstMatch : app.buttons["editor-more"]
+                // Compact layout's overflow has a localized label; identify
+                // its shared action entry through the supplied identifier.
+                more.tap()
+                app.buttons[title].tap()
+            }
+            openAnnotations(app)
+            let apply = app.buttons["annotation-apply"]
+            XCTAssertTrue(apply.waitForExistence(timeout: 5))
+            XCTAssertFalse(apply.isEnabled)
+            let recognize = app.buttons["annotation-recognize"]
+            if recognize.waitForExistence(timeout: 2) { recognize.tap() }
+            let line = app.buttons["annotation-line-0"]
+            XCTAssertTrue(line.waitForExistence(timeout: 30), "real OCR should provide a line")
+            app.buttons["annotation-style-" + style].tap()
+            line.tap()
+            XCTAssertTrue(apply.isEnabled)
+            let choice = XCTAttachment(screenshot: app.screenshot())
+            choice.name = "text-markup-picker-" + language
+            choice.lifetime = .keepAlways
+            add(choice)
+            apply.tap()
+            XCTAssertTrue(apply.waitForNonExistence(timeout: 10))
+            let expected = String(index + 1)
+            let count = NSPredicate(format: "value BEGINSWITH %@", expected)
+            expectation(for: count, evaluatedWith: page)
+            waitForExpectations(timeout: 10)
+            let saved = XCTAttachment(screenshot: app.screenshot())
+            saved.name = "text-markup-saved-" + language
+            saved.lifetime = .keepAlways
+            add(saved)
+            // Cancellation never adds a mark.
+            openAnnotations(app)
+            XCTAssertTrue(app.buttons["annotation-line-0"].waitForExistence(timeout: 10))
+            app.buttons["annotation-line-0"].tap()
+            app.buttons["annotation-cancel"].tap()
+            expectation(for: count, evaluatedWith: page)
+            waitForExpectations(timeout: 5)
+            app.terminate()
+            app = launch(["-PaperNestDebugOpenItem", "Markup target"], libraryPath: library, language: language)
+            let reopened = app.descendants(matching: .any)["document-page-image"].firstMatch
+            XCTAssertTrue(reopened.waitForExistence(timeout: 15))
+            expectation(for: count, evaluatedWith: reopened)
+            waitForExpectations(timeout: 10)
+            app.terminate()
+        }
+    }
+
+    func testSavedMarkupSupportsColorsSelectionRemovalAndRelaunch() throws {
+        continueAfterFailure = false
+        for (language, annotate, manage) in [("en", "Annotate Text", "Manage Markup"),
+                                             ("fr", "Annoter le texte", "Gérer les annotations"),
+                                             ("es", "Anotar texto", "Gestionar anotaciones")] {
+            let library = "/tmp/papernest-markup-controls-\(language)"
+            var app = launch(["-PaperNestDebugOpenItem", "Markup target"], libraryPath: library, language: language)
+            func open(_ title: String) {
+                XCTAssertTrue(app.buttons["editor-more"].waitForExistence(timeout: 15))
+                app.buttons["editor-more"].tap()
+                app.buttons[title].tap()
+            }
+            func reveal(_ element: XCUIElement) {
+                for _ in 0..<6 where !element.isHittable { app.swipeUp() }
+                XCTAssertTrue(element.isHittable)
+            }
+            func rows() -> XCUIElementQuery {
+                app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "markup-row-"))
+            }
+            func expectColor(_ element: XCUIElement, _ hex: String) {
+                expectation(for: NSPredicate(format: "value CONTAINS %@", hex), evaluatedWith: element)
+                waitForExpectations(timeout: 10)
+            }
+            open(annotate)
+            let green = app.buttons["markup-color-green"]
+            XCTAssertTrue(green.waitForExistence(timeout: 10))
+            reveal(green); green.tap()
+            let recognize = app.buttons["annotation-recognize"]
+            reveal(recognize); recognize.tap()
+            let first = app.buttons["annotation-line-0"]
+            XCTAssertTrue(first.waitForExistence(timeout: 30))
+            reveal(first); first.tap()
+            let second = app.buttons["annotation-line-1"]
+            reveal(second); second.tap()
+            app.buttons["annotation-apply"].tap()
+            XCTAssertTrue(app.buttons["annotation-apply"].waitForNonExistence(timeout: 10))
+            open(manage)
+            XCTAssertTrue(rows().firstMatch.waitForExistence(timeout: 10))
+            XCTAssertEqual(rows().count, 2)
+            expectColor(rows().element(boundBy: 0), "#00A640")
+            rows().element(boundBy: 0).tap()
+            let attachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = "markup-manager-" + language
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            // Selecting and closing does not write.
+            app.buttons["markup-done"].tap()
+            open(manage)
+            XCTAssertTrue(rows().firstMatch.waitForExistence(timeout: 10))
+            XCTAssertEqual(rows().count, 2)
+            expectColor(rows().element(boundBy: 0), "#00A640")
+            rows().element(boundBy: 0).tap()
+            let blue = app.buttons["markup-color-blue"]
+            reveal(blue); blue.tap()
+            let recolor = app.buttons["markup-recolor"]
+            reveal(recolor); recolor.tap()
+            expectColor(rows().element(boundBy: 0), "#1A59CC")
+            expectColor(rows().element(boundBy: 1), "#00A640")
+            app.buttons["markup-done"].tap()
+            app.terminate()
+            app = launch(["-PaperNestDebugOpenItem", "Markup target"], libraryPath: library, language: language)
+            open(manage)
+            XCTAssertTrue(rows().firstMatch.waitForExistence(timeout: 10))
+            expectColor(rows().element(boundBy: 0), "#1A59CC")
+            rows().element(boundBy: 0).tap()
+            let remove = app.buttons["markup-remove"]
+            reveal(remove); remove.tap()
+            expectation(for: NSPredicate(format: "count == 1"), evaluatedWith: rows())
+            waitForExpectations(timeout: 10)
+            expectColor(rows().firstMatch, "#00A640")
+            reveal(rows().firstMatch); rows().firstMatch.tap()
+            reveal(remove); remove.tap()
+            XCTAssertTrue(app.staticTexts["markup-empty"].waitForExistence(timeout: 10))
+            app.buttons["markup-done"].tap()
+            app.terminate()
+            app = launch(["-PaperNestDebugOpenItem", "Markup target"], libraryPath: library, language: language)
+            open(manage)
+            XCTAssertTrue(app.staticTexts["markup-empty"].waitForExistence(timeout: 10))
+            app.terminate()
+        }
+    }
+
+    func testNotebookCreationOpensAndSurvivesRelaunch() throws {
+        continueAfterFailure = false
+        let library = "/tmp/papernest-notebook-ui-\(UUID().uuidString)"
+        var app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        XCTAssertTrue(app.buttons["library-tools"].waitForExistence(timeout: 15))
+        app.buttons["library-tools"].tap()
+        XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 5))
+        app.buttons["tool-notebook"].tap()
+        let create = app.buttons["notebook-create"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        XCTAssertFalse(create.isEnabled)
+        let name = app.textFields["notebook-name"]
+        name.tap()
+        name.typeText("Study notebook")
+        app.buttons["notebook-paper-grid"].tap()
+        XCTAssertTrue(create.isEnabled)
+        create.tap()
+        XCTAssertTrue(app.navigationBars["Study notebook"].waitForExistence(timeout: 10))
+        app.terminate()
+        app = launch([], libraryPath: library)
+        showAllDocuments(app)
+        XCTAssertTrue(app.descendants(matching: .any)["Study notebook, 1 page"].firstMatch.waitForExistence(timeout: 10))
+    }
 }

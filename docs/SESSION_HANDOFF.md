@@ -33,7 +33,17 @@ file-preview work has a `FileKind.prepareTemporaryCopy` in it.
 
 ### Current claims
 
-**None. Nobody is editing. The tree is clean as of the commit named in "Start here".**
+**Codex finished and released notebook-creation files — 2026-10-24:** Tools → New Notebook creates a named, one-page A4 notebook with blank/lined/grid paper in the current folder, then opens the existing editor. 236 unit tests, Mac build, iPhone creation/relaunch + Tools merge, and iPad creation/relaunch passed. No compiler warnings in unit/Mac runs. New NotebookCreationSheet.swift and NotebookCreationTests.swift; updates to LibraryModel, ToolsSheet, localization and appended AppUITests. Qwen reservations untouched. No commit/push. Further template pages/planners and native Mac/localized visual checks remain. See TEST_MATRIX for logs and limits. No commands or edits remain active for this slice.
+
+**Qwen queue prepared; Codex released its files — 2026-10-24:** the owner asked for work sized to a Qwen 9B model. Start at `QWEN.md` and `docs/QWEN_HANDOFF.md`; progress is `docs/qwen/PROGRESS.md`. Q1 = saved-mark Select All/Deselect All; Q2 = recognized-line Select All/Deselect All. This reserves `MarkupManagerSheet.swift` then `TextAnnotationSheet.swift`, with appended XCUITests and separate synthetic fixture copies. **Reservation only: Qwen is not running and has not claimed or implemented either task.** Other workers should avoid starting these two tasks unless the owner reassigns them. Qwen must claim the current card's files when it actually starts. Higher-risk engine work stays with Claude/Codex. The interrupted next-feature turn made no app changes. This preparation changed documentation/startup pointers only; no model install, launch, server change, commit, push or new app-test claim. Local Ollama listed `qwen3.5:4b`, not 9B; do not silently substitute model identities.
+
+**Codex finished and released all files — 2026-10-24, F3b:** preset/custom annotation colors and selection/recolor/removal of saved ink are implemented. New `InkEdit.swift`, `InkEditStore.swift`, `MarkupColorPicker.swift` and `MarkupManagerSheet.swift`; updates to text markup/store APIs, `DocumentModel.swift`, `DocumentView.swift`, `TextAnnotationSheet.swift`, localized strings, tests, UI seed script and docs. Existing uncommitted work is retained; no commit or GitHub push made. Plan: `docs/superpowers/plans/2026-10-24-markup-controls.md`. Final **235 unit tests**, Mac build, iPhone manager flow and iPad manager + PencilKit flows pass; en/fr/es manager screenshots inspected on both devices. Two review findings (stale undo/redo and manager refresh) are fixed, with conflict regressions. Independent follow-up was unavailable due to the reviewer's usage limit; no final independent sign-off claimed. Native Mac manager/custom-picker and native two-window interaction remain unrun. No Codex edit or test command is running; the next agent may take these files.
+
+**Pipeline follow-up — 2026-10-23:** the owner said **“All features to pipeline including media”** after reviewing the latest converter/media picture. Updated only FEATURE_EXPANSION, REFERENCE_FEATURE_INVENTORY, IMPLEMENTATION_PLAN and this handoff for that request; all four files are released. All identified features are confirmed in scope, including F7a local audio/video/audiobook playback, F7b library/playlists/background/resume, F7c MP3/audio extraction and F7d editable transcription/export. These media features remain planned. This request did not start implementation or change the current delivery order. Preserve the earlier uncommitted application work below.
+
+**Codex finished and released all files — 2026-10-23, 20:36 CDT:** checkout is now **`/Users/karanpatel/Desktop/PaperNest`** (formerly `DOCS PRO`). Audit fixes are uncommitted in `ExportSheet.swift`, `FileItemViews.swift`, `LibraryView.swift`, `ToolsSheet.swift`, and `FilePreviewTests.swift`. Native Mac: Export freeze fixed; text-file Save a Copy extension fixed; Tools Continue fixed and page extraction completed; preview/Info/dismissal and Settings viewed. 219 unit tests and full iPhone suite passed (17 passed, 1 iPad-only skip). Focused tests after the last two Mac fixes passed (3/3); see TEST_MATRIX for exact scope.
+
+**F3a implemented and verified:** recognized-line highlight/underline/strikethrough as ordinary editable ink. Changed `DocumentModel.swift`, `DocumentView.swift`, new `TextAnnotationSheet.swift`, `Localization.swift` plus en/fr/es strings, new Core `TextMarkup.swift`, Store `TextMarkupStore.swift`/`StoreError.swift` and the ink-only `bumpRevision` path in `LibraryStore.swift`, new related tests, and an appended XCUITest plus its seed library. Reuses rendering/export/ink undo; no schema change. Review follow-up also changed `PageRenderer.swift` and new `TextMarkupRenderTests.swift`: preserve exact constant-width marks so small underlines remain visible and contained. Notes, shapes and word-level selection remain later slices; F3b adds custom colors and saved-mark controls below. No commit request was received in this continuation; all changes remain uncommitted. This F3a entry is historical; consult the current F3b claim before editing.
 
 ### Next for Claude, in order
 
@@ -48,41 +58,60 @@ file-preview work has a `FileKind.prepareTemporaryCopy` in it.
 
 ### Next for Codex, in order
 
-1. **Look at the Mac app.** Nobody ever has. Library window, document window, Tools, the export sheet, file
-   preview and details, Settings. It builds warning-free and its logic is tested, but every screen is unverified;
-   the checklist is at the end of `docs/TEST_MATRIX.md`.
-2. **F3 annotations** — highlight, underline and strikethrough over *recognised* text (F4a already stores line
-   boxes in source space), then notes, stamps and shapes.
-3. **Notebook creation and templates** — the models and template rendering exist; the editor does not.
+1. **Finish the remaining Mac audit checks**, including the new annotation sheet, localized fr/es layouts, backup, import/paste, crop/reorder/keyboard and sandboxed save. Representative native Mac library/document/export, Tools extraction, file preview/details/save and Settings checks have now passed; no longer claim the entire Mac app was never viewed.
+2. **Continue F3** — word-level selection, notes/comments, stamps and shapes. Whole-line marks, preset/custom colors and saved-ink selection/recolor/removal are implemented. Preserve the store snapshot guards and existing PencilKit ink workflow. See the current verification section for exact run scope.
+3. **Notebook creation and templates** — the models and template rendering exist; creation/editor flows remain.
 4. **Visual fill & sign**, then app lock (device authentication).
 
-### Blocked on the owner — neither of you start these
+### Planned expansion and remaining dependencies
 
-F5 PDF text/image editing engine (build or license), F6 cloud and transfer, F7 media and transcription, F8 browser
-and photo tools, F9 VPN, and M5 subscriptions. The full list of what is needed is under "Waiting on the owner".
+All identified F5–F9 features and M5 subscriptions are in the confirmed pipeline. Resolve dependencies for each implementation slice: F5 editing/conversion engine and licensing, F6 provider credentials/provisioning, F7c codec/encoder licensing, F7d transcription processing choice, F8 object-removal engine, F9 VPN provider/entitlements and M5 pricing/product setup. The details are under "Waiting on the owner".
+
+**F7a/F7b local media playback and library controls are not blocked by the transcription or MP3 decisions.** They remain planned in the existing sequence, with platform/format verification required. Browser/download work likewise has no blanket dependency on the object-removal engine. Scope confirmation does not authorize service purchases, private-document uploads, deployment or publishing; existing constraints still apply.
 
 **Read this page first, then `docs/IMPLEMENTATION_PLAN.md`. The product brief is `CLAUDE_CODE_PROMPT.md` and never changes.**
 
-## Start here — state on 2026-10-22, 16:40
+## Start here — state on 2026-10-24
 
-- **Who is editing what: nobody.** Codex reached its session limit; its file-preview slice is finished and verified. Check "Current claims" above before you start.
-- **The work is committed** on the branch **`document-tools-ocr-and-file-items`** (there is no remote). The working tree is clean and sits on that branch. `main` still points at `bca0ba9`; move it with `git checkout main && git merge --ff-only document-tools-ocr-and-file-items`, or just keep working on the branch.
-- **Verify before you change anything** (expected numbers as of the newest commit):
+- **Working directory:** `/Users/karanpatel/Desktop/PaperNest`. `Desktop/DOCS PRO` no longer exists. Pass the new workdir explicitly if the chat still points at the old path. Build cache is now `~/Library/Caches/PaperNest/build-17de0868e51d`.
+- **Branch:** `document-tools-ocr-and-file-items`, HEAD `3d25653`, no remote. The audit, F3a and F3b changes are **uncommitted**. Do not reset them or stage everything indiscriminately. No commit request was received in this continuation.
+- **Current schema:** v6 (HEIC assets); general file items use v5. Future sync must use v7 or the next unused migration. F3a/F3b add no migration.
+- **Current verification:** 235 unit tests and final Mac build pass. The F3b manager workflow passes in en/fr/es on iPhone and iPad after review fixes, and iPad PencilKit drawing/undo/redo/reopen passes. The earlier iPhone annotation regression also passed. Screenshots were inspected on both devices. Independent review found two multiwindow issues; both are fixed with regression coverage for conflicting undo/redo. Independent follow-up hit a usage limit, so no second reviewer sign-off is claimed. Exact logs and remaining checks are in TEST_MATRIX.
 
 ```bash
-./scripts/test.sh                                   # 218 tests, 0 failures, 0 warnings
-./scripts/build-mac-app.sh                          # 0 warnings
-xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build
-./scripts/ui-test-ios.sh 63992C10-33B4-4CE3-91C3-EE23ECC595A5     # iPhone: 17 passed, Markup skipped
-./scripts/ui-test-ios.sh 62328381-19FB-400A-A8FC-4F4AD13EB5C4 -only-testing:PaperNest-iOSUITests/AppUITests/<name>
+./scripts/test.sh
+./scripts/build-mac-app.sh
+./scripts/ui-test-ios.sh 63992C10-33B4-4CE3-91C3-EE23ECC595A5
+./scripts/ui-test-ios.sh 62328381-19FB-400A-A8FC-4F4AD13EB5C4 -only-testing:PaperNest-iOSUITests/AppUITests/testRecognizedLinesCanBeMarkedAndKeptAfterRelaunch
 ```
+
+Do not run two UI seed scripts at once: they reset shared disposable libraries in `/tmp`.
 
 - Simulators in use: iPhone 17 Pro `63992C10-33B4-4CE3-91C3-EE23ECC595A5`, iPad Air 13-inch (M4) `62328381-19FB-400A-A8FC-4F4AD13EB5C4`.
 - Screenshot hooks: `-PaperNestDebugOpenItem <name>`, `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`, `-PaperNestDebugShowMarkup YES` (iPad), `-PaperNestDebugShowTools YES`. The last one is new and is **not** yet listed in CLAUDE.md, which is the owner's file.
 
+## F3b implementation details for the next agent
+
+- **Entry points:** document More → Annotate Text now includes five presets and a native custom color picker. More → Manage Markup lists saved ink with stroke swatches, selection state and a page preview outlining selected marks. Select one or more, then Apply Color or Remove Selected. Actions persist immediately; Done only closes. Opening/selecting/closing alone does not write.
+- **Storage:** `InkEdit.swift`, optional color in `TextMarkupStyle`/`addTextMarkup`, and `InkEditStore.swift`. `editInk` atomically validates live parent, exact page revision and selected snapshots before recoloring/removing. IDs/z-order/geometry, unrelated objects, current OCR and originals are preserved. Legacy freehand/annotation strokes work without a migration.
+- **Undo safety:** `applyInkChanges` checks expected replaced/deleted objects and globally absent IDs before inverse writes. Unrelated mark edits may coexist. Conflicting undo/redo does not overwrite another window: refresh, show the localized changed-page message, and clear this document model's undo actions because the pre-registered inverse is no longer safe. Red/green workflow regression covers recolor undo, removal redo and restoring a reused ID; store coverage checks atomic mixed rejection and foreign-page ID collisions.
+- **Live manager:** observes `session.changeToken`; refreshes rows/preview and clears stale selections after another window changes the page. Request IDs and cancellation checks prevent an older load from overwriting a newer snapshot. A change elsewhere in the library preserves the selection when this page is unchanged.
+- **Coverage/limits:** real persistence, undo/redo, relaunch and exported blue-pixel tests. Preset controls are exercised by XCUITest in en/fr/es. Custom color components/storage are unit-tested, but manual interaction with the system custom picker and native Mac manager remain unrun. Multiwindow snapshot conflicts are model-tested; a native two-window UI pass remains open. No word-level/semantic annotation labels are inferred from old ink.
+- Plan: `docs/superpowers/plans/2026-10-24-markup-controls.md`. Evidence and actual run status: TEST_MATRIX. No commit or push was made.
+
+## F3a implementation details for the next agent
+
+- `TextMarkupStyle.stroke(for:in:)`: full normalized OCR line → source-point vector stroke; yellow highlighter or blue pen. Rounded caps fit within the original box, including narrow boxes. `PageRenderer.drawInk` now bypasses freehand width quantization for constant-width pens: a 0.1-point mark remains visible, and a 1.2-point mark no longer expands to 1.25. A four-case rendered-pixel regression was run red/green. No new object kind or schema.
+- `LibraryStore.addTextMarkup`: validates completed OCR, exact saved snapshot, page revision, live parent, line indices and bounds inside one transaction; saves fresh IDs in reading order above current z-order. A changed/rescanned page cannot receive an old selection.
+- Object edits now carry forward **only current completed OCR** in `bumpRevision`. This preserves searchable text through annotations and ink undo/redo. **Transform/reorder code still invalidates OCR for rendering through its separate revision path** (existing behavior), although the search index remains. Do not claim this patch fixed every OCR revision issue. Follow-up: carry recognition through source-preserving transforms with explicit regression tests; the old composition stale-result fixture currently uses rotation to make OCR stale.
+- `TextAnnotationSheet` is available from each layout’s More menu. It recognizes only the target page if needed, selects whole lines, handles stale-data retry, guards repeated Apply and dismisses only after commit. Marks can be edited with existing iPad ink tools; word-level selection remains follow-up work; F3b now supplies custom colors and dedicated saved-mark controls on all layouts.
+- `DocumentModel.addTextMarkup` registers the existing ink inverse under a localized annotation action name. Store/model tests verify undo/redo and reopen; exported PDF pixel geometry and searchable text are checked. UI accessibility reports stroke count on the document image.
+- **Potential engine follow-up, code-inspected only:** Settings and bulk archive code still resolve general file assets with `kind: .file`. Preview now resolves the actual asset record. A file item referencing a shared PDF asset may therefore preview correctly yet fail archive/backup. Add a regression before changing those engine paths.
+- Plan/checklist: `docs/superpowers/plans/2026-10-23-text-markup.md`. Screenshots: `docs/screenshots/text-markup-*-iphone.png` and `text-markup-*-ipad.png`. See TEST_MATRIX for limitations and review status.
+
 ## What works today
 
-Library (import, folders, favourites, sort, rename, trash with 30-day purge, title search, colour labels, multi-select) · document tools (duplicate, merge in an explicit order, extract pages, split into one document per page, export a selection as one ZIP) · a **Tools screen** listing only tools that work · page editing (rotate, reorder, delete, add, crop, filters, undo/redo, rescan with history) · Apple Pencil ink on iPad · **text recognition** (Vision, en/fr/es) with search over recognised text · **searchable PDF export** · **file items**: any file type kept as itself, with a type symbol, its size, a **QuickLook preview** from the library and from Recent, a details sheet, Share and Save a Copy · **ZIP extraction** that refuses anything unsafe, and **archiving a selection** (documents as PDFs, files byte for byte).
+Library (import, folders, favourites, sort, rename, trash with 30-day purge, title search, colour labels, multi-select) · document tools (duplicate, merge in an explicit order, extract pages, split into one document per page, export a selection as one ZIP) · a **Tools screen** listing only tools that work · page editing (rotate, reorder, delete, add, crop, filters, undo/redo, rescan with history) · Apple Pencil ink on iPad · **whole recognized-line highlight/underline/strikethrough** with preset/custom colors, saved-ink selection/recolor/removal and undo · **text recognition** (Vision, en/fr/es) with search over recognised text · **searchable PDF export** · **file items**: any file type kept as itself, with a type symbol, its size, a **QuickLook preview** from the library and from Recent, a details sheet, Share and Save a Copy · **ZIP extraction** that refuses anything unsafe, and **archiving a selection** (documents as PDFs, files byte for byte).
 
 Evidence for every claim is in `docs/TEST_MATRIX.md`, newest rows first. Capability coverage against the owner's reference screenshots is `docs/REFERENCE_FEATURE_INVENTORY.md` (48 rows).
 
@@ -287,3 +316,12 @@ xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' bui
 - PDFKit `dataRepresentation()` of an unlocked encrypted PDF stays encrypted. The importer copies the pages into a new document instead (see `PDFInspector`).
 - ImageIO happily decodes truncated JPEG/PNG files, which is why the importer checks their structure itself.
 - Under Xcode 27, `swift test` runs each test target in its own process and code-signs the bundles.
+
+## Tools screen continuation verification — 2026-10-24
+
+The resumed chat referenced the old DOCS PRO checkout and unfinished Tools toolbar verification. The current checkout is Desktop/PaperNest; the existing 2026-10-23 Tools fixes were preserved. No application source changes were needed in this continuation.
+
+- Full `./scripts/test.sh`: 235 tests passed (47 + 76 + 47 + 26 + 39); no compiler warning/error matches in the log. Log: `/private/tmp/papernest-tools-resume-tests.log`.
+- iPhone 17 Pro: `testToolsScreenPicksTwoDocumentsAndMergesThem` and `testAFolderMadeInTheSidebarHoldsAMovedDocument` both passed, 0 failures; `TEST SUCCEEDED`. Log: `/private/tmp/papernest-tools-resume-ui.log`. Result: cache `build-17de0868e51d/xcodeproj/Logs/Test/Test-PaperNest-iOS-2026.10.24_13-10-01--0500.xcresult`.
+- This run covers Tools merge and the folder regression on iPhone. It does not newly verify iPad, Mac UI, all Tools actions, or real camera access. Xcode emitted operating-system-build parsing diagnostics after the successful tests.
+- Existing work and Qwen reservations remain intact. No commit or push. No test process remains active from this continuation.

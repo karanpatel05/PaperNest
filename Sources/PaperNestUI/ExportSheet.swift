@@ -196,6 +196,15 @@ struct ExportSheet: View {
     /// Tiles side by side, or stacked when their labels don't fit (long
     /// French and Spanish labels on a phone).
     private func tileRow(@ViewBuilder _ tiles: () -> some View) -> some View {
+        #if os(macOS)
+        // ViewThatFits inside a grouped Mac Form enters an AttributeGraph
+        // preference cycle when this sheet opens. The desktop sheet has
+        // room for one stable row; labels can still wrap within each tile.
+        HStack(spacing: 10) { tiles() }
+            .fixedSize(horizontal: false, vertical: true)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8))
+        #else
         ViewThatFits(in: .horizontal) {
             // Tiles in a row share the tallest one's height.
             HStack(spacing: 10) { tiles() }
@@ -206,6 +215,7 @@ struct ExportSheet: View {
         // Inset from the row's edges: rows clip to large rounded corners,
         // which would cut into the tiles' borders.
         .listRowInsets(EdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8))
+        #endif
     }
 
     @ViewBuilder
@@ -547,7 +557,10 @@ struct SaveExportedFiles: ViewModifier {
 /// Hands an already-written temporary file to the system save UI.
 struct ExportedFile: FileDocument {
     static let readableContentTypes: [UTType] = []
-    static let writableContentTypes: [UTType] = [.pdf, .jpeg, .png, .zip]
+    // This wrapper copies existing bytes; it never converts formats. Every
+    // caller supplies the actual type. Advertising a limited format list makes
+    // the Mac save panel silently select PDF for an arbitrary file (e.g. TXT).
+    static let writableContentTypes: [UTType] = [.data]
     let url: URL
 
     init(url: URL) {

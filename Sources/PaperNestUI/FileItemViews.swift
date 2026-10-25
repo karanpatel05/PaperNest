@@ -40,6 +40,10 @@ enum FileKind {
     /// Retain the returned owner for as long as a preview, share or save uses it.
     static func prepareTemporaryCopy(of payload: FilePayload, in store: LibraryStore) async throws -> PreparedFileCopy {
         try Task.checkCancellation()
+        guard let record = try await store.assetRecord(payload.assetID), record.availability == .local else {
+            throw StoreError.assetMissing(payload.assetID.sha256)
+        }
+        let source = store.assets.url(for: payload.assetID, kind: record.kind)
         let worker = Task.detached(priority: .userInitiated) {
             try Task.checkCancellation()
             let directory = FileManager.default.temporaryDirectory
@@ -48,7 +52,7 @@ enum FileKind {
             let name = ["", ".", "..", "/"].contains(basename) ? "\(payload.assetID.sha256).bin" : basename
             let copy = PreparedFileCopy(url: directory.appendingPathComponent(name), directory: directory)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try FileManager.default.copyItem(at: store.assets.url(for: payload.assetID, kind: .file), to: copy.url)
+            try FileManager.default.copyItem(at: source, to: copy.url)
             try Task.checkCancellation()
             return copy
         }

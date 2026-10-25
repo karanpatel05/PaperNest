@@ -215,10 +215,14 @@ public struct PageRenderer: Sendable {
         }
 
         ctx.setStrokeColor(CGColor(srgbRed: c.red, green: c.green, blue: c.blue, alpha: c.alpha))
-        guard stroke.points.count > 1 else {
+        // Generated text marks (and other constant-width pens) must retain
+        // their exact width. Freehand run quantization below can otherwise
+        // erase a thin line or expand its caps beyond the source bounds.
+        if stroke.points.allSatisfy({ stroke.width(at: $0) == stroke.width(at: first) }) {
             ctx.setLineWidth(stroke.width(at: first))
             ctx.move(to: point(first))
-            ctx.addLine(to: point(first))
+            for p in stroke.points.dropFirst() { ctx.addLine(to: point(p)) }
+            if stroke.points.count == 1 { ctx.addLine(to: point(first)) }
             ctx.strokePath()
             return
         }

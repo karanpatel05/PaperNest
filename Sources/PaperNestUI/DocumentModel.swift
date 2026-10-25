@@ -33,11 +33,11 @@ final class DocumentModel {
     /// a scan findable. Each page is saved as it finishes, so a long document
     /// is useful before the last page is done, and a failure on one page does
     /// not discard the others.
-    func recognizeText() async {
+    func recognizeText(on pageID: PageID? = nil) async {
         guard let store, let renderer = session.environment?.renderer, recognitionProgress == nil else { return }
         let recognizer = TextRecognizer()
         let languages = TextRecognizer.supportedLanguages(from: TextRecognizer.preferredLanguages)
-        let pages = self.pages
+        let pages = self.pages.filter { pageID == nil || $0.id == pageID }
         recognitionProgress = (0, pages.count)
         defer { recognitionProgress = nil }
         for (index, page) in pages.enumerated() {
@@ -222,25 +222,62 @@ final class DocumentModel {
         }
     }
 
-    private func registerInkUndo(_ change: InkChange, undoManager: UndoManager?) {
+    func addTextMarkup(_ snapshot: PageRecognition, lineIndices: Set<Int>, style: TextMarkupStyle, color: RGBAColor? = nil,
+                       undoManager: UndoManager?) async throws {
+        guard let store else { throw StoreError.pageNotFound }
+        let result = try await store.addTextMarkup(snapshot, lineIndices: lineIndices, style: style, color: color)
+        replace(result.page)
+        let change = InkChange(pageID: result.page.id, saved: result.objects, replaced: [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.annotateText)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    func editInk(on page: Page, objects: [PageObject], edit: InkEdit, undoManager: UndoManager?) async throws {
+        guard let store else { throw StoreError.pageNotFound }
+        let result = try await store.editInk(on: page.id, expectedRevision: page.revision, objects: objects, edit: edit)
+        replace(result.page)
+        let removing: Bool
+        if case .remove = edit { removing = true } else { removing = false }
+        let change = InkChange(pageID: page.id, saved: result.saved,
+                               replaced: removing ? [] : result.previous, deleted: removing ? result.previous : [])
+        registerInkUndo(change.inverse, undoManager: undoManager,
+                        actionName: removing ? L10n.markupRemove : L10n.markupRecolor)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    private func registerInkUndo(_ change: InkChange, undoManager: UndoManager?, actionName: String = L10n.undoInk) {
         undoManager?.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated {
-                model.registerInkUndo(change.inverse, undoManager: undoManager)
+                model.registerInkUndo(change.inverse, undoManager: undoManager, actionName: actionName)
                 model.selectedPageID = change.pageID
-                _ = Task { await model.commitInk(change) }
+                _ = Task {
+                    if !(await model.commitInk(change)) {
+                        // The inverse was registered synchronously for UndoManager.
+                        // If the write failed, neither direction is safe to replay.
+                        undoManager?.removeAllActions(withTarget: model)
+                    }
+                }
             }
         }
-        undoManager?.setActionName(L10n.undoInk)
+        undoManager?.setActionName(actionName)
     }
 
     @discardableResult
     private func commitInk(_ change: InkChange) async -> Bool {
         guard let store else { return false }
         do {
-            replace(try await store.applyObjectChanges(on: change.pageID, saving: change.saved, deleting: change.deleted.map(\.id)))
+            replace(try await store.applyInkChanges(on: change.pageID, saving: change.saved,
+                                                  replacing: change.replaced, deleting: change.deleted))
             if selectedPageID == change.pageID { selectedPageObjects = try await store.objects(on: change.pageID) }
             session.didChange()
             return true
+        } catch StoreError.pageObjectsChanged {
+            await load()
+            await loadSelectedPageObjects()
+            presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.markupChanged)
+            return false
         } catch {
             presentedError = .saveFailed()
             return false

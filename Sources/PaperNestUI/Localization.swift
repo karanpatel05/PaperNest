@@ -312,6 +312,34 @@ extension L10n {
     static func recognizeProgress(_ page: Int, _ total: Int) -> String { tr("document.recognizeProgress", page, total) }
 }
 
+// F3a: marking recognized lines with editable ink.
+extension L10n {
+    static var annotateText: String { tr("annotation.title") }
+    static var annotationStyle: String { tr("annotation.style") }
+    static var annotationHighlight: String { tr("annotation.highlight") }
+    static var annotationUnderline: String { tr("annotation.underline") }
+    static var annotationStrikethrough: String { tr("annotation.strikethrough") }
+    static var annotationLines: String { tr("annotation.lines") }
+    static var annotationNoText: String { tr("annotation.noText") }
+    static var annotationHelp: String { tr("annotation.help") }
+    static var annotationApply: String { tr("annotation.apply") }
+    static var annotationChanged: String { tr("annotation.changed") }
+}
+
+// F3b: colors and managing saved ink.
+extension L10n {
+    static var manageMarkup: String { tr("markup.manage") }
+    static var markupColor: String { tr("markup.color") }
+    static var markupCustomColor: String { tr("markup.customColor") }
+    static var markupSaved: String { tr("markup.saved") }
+    static var markupEmpty: String { tr("markup.empty") }
+    static var markupHelp: String { tr("markup.help") }
+    static var markupRecolor: String { tr("markup.recolor") }
+    static var markupRemove: String { tr("markup.remove") }
+    static var markupChanged: String { tr("markup.changed") }
+    static func markupMark(_ number: Int) -> String { tr("markup.mark", number) }
+}
+
 // F2a: files kept as themselves.
 extension L10n {
     static var filePreviewFailed: String { tr("file.preview.failed") }
@@ -328,4 +356,14 @@ extension L10n {
     static var fileSaveCopy: String { tr("file.saveCopy") }
     static var fileExtract: String { tr("file.extract") }
     static var extractArchiveFailed: String { tr("file.extract.failed") }
+}
+
+// Notebook creation
+extension L10n {
+    static var newNotebook: String { tr("notebook.new") }
+    static var notebookPaper: String { tr("notebook.paper") }
+    static var notebookBlank: String { tr("notebook.blank") }
+    static var notebookLined: String { tr("notebook.lined") }
+    static var notebookGrid: String { tr("notebook.grid") }
+    static var notebookFooter: String { tr("notebook.footer") }
 }

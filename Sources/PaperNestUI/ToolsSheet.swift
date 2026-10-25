@@ -11,6 +11,7 @@ import SwiftUI
 struct ToolsSheet: View {
     @Bindable var model: LibraryModel
     @Environment(\.dismiss) private var dismiss
+    @State private var creatingNotebook = false
     @State private var picking: ToolPick?
     @State private var composing: DocumentToolsRequest?
     @State private var archiving: BulkExportRequest?
@@ -94,12 +95,26 @@ struct ToolsSheet: View {
             .navigationTitle(L10n.toolsTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.done) { dismiss() }.accessibilityIdentifier("tools-done")
                 }
             }
+            #else
+            // A Mac sheet retains its root confirmation toolbar while pushing
+            // a destination. Keep each screen's action in its own content so
+            // the picker can replace Done with Continue.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button(L10n.done) { dismiss() }
+                        .accessibilityIdentifier("tools-done")
+                        .keyboardShortcut(.defaultAction)
+                }
+                .padding()
+                .background(.bar)
+            }
+            #endif
             .onChange(of: photoSelection) { _, picked in
                 guard !picked.isEmpty else { return }
                 photoSelection = []
@@ -115,6 +130,9 @@ struct ToolsSheet: View {
         }
         .sheet(item: $composing, onDismiss: openCreatedItem) { request in
             DocumentToolsSheet(request: request) { createdItemID = $0 }
+        }
+        .sheet(isPresented: $creatingNotebook, onDismiss: openCreatedItem) {
+            NotebookCreationSheet(model: model) { createdItemID = $0 }
         }
         .sheet(item: $archiving) { request in
             BulkExportSheet(request: request)
@@ -137,6 +155,10 @@ struct ToolsSheet: View {
                                 isSelected: false, identifier: "tool-import") {
             dismiss()
             model.isShowingFileImporter = true
+        })
+        tiles.append(ChoiceTile(title: L10n.newNotebook, systemImage: "book.closed", iconColor: Theme.accent,
+                                isSelected: false, identifier: "tool-notebook") {
+            creatingNotebook = true
         })
         return tiles
     }
@@ -231,18 +253,31 @@ private struct DocumentPicker: View {
         .navigationTitle(tool.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button(L10n.toolsContinue) { chosen(items.filter { selection.contains($0.id) }.sorted(by: pickOrder)) }
-                    .accessibilityIdentifier("pick-continue")
-                    .disabled(selection.count < tool.minimum)
+                continueButton
             }
         }
+        #else
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack {
+                Spacer()
+                continueButton.keyboardShortcut(.defaultAction)
+            }
+            .padding()
+            .background(.bar)
+        }
+        #endif
         .task {
             defer { isLoading = false }
             items = (try? await session.environment?.store.items(in: .all)) ?? []
         }
+    }
+
+    private var continueButton: some View {
+        Button(L10n.toolsContinue) { chosen(items.filter { selection.contains($0.id) }.sorted(by: pickOrder)) }
+            .accessibilityIdentifier("pick-continue")
+            .disabled(selection.count < tool.minimum)
     }
 
     private func toggle(_ summary: LibraryStore.ItemSummary) {

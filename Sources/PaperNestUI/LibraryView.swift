@@ -175,6 +175,7 @@ struct LibraryView: View {
                     .accessibilityLabel(L10n.listView)
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .frame(width: 96)
             .accessibilityIdentifier("library-layout")
         }

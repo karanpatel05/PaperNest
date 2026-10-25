@@ -276,3 +276,35 @@
 
 "file.preview.failed" = "Aperçu indisponible";
 "file.preview.failedDescription" = "Le fichier n’a pas pu être ouvert. Fermez l’aperçu ou affichez les informations du fichier.";
+
+/* F3a: recognized-line annotations */
+"annotation.title" = "Annoter le texte";
+"annotation.style" = "Style";
+"annotation.highlight" = "Surligner";
+"annotation.underline" = "Souligner";
+"annotation.strikethrough" = "Barrer";
+"annotation.lines" = "Lignes reconnues";
+"annotation.noText" = "Aucun texte reconnu à jour. Reconnaissez cette page pour choisir ses lignes.";
+"annotation.help" = "Sélectionnez des lignes reconnues entières. Les tracés restent modifiables ; choisissez une couleur prédéfinie ou personnalisée.";
+"annotation.apply" = "Appliquer";
+"annotation.changed" = "Cette page ou son texte reconnu a changé. Vérifiez les lignes actualisées et sélectionnez-les à nouveau.";
+
+/* F3b: colors and managing saved ink. */
+"markup.manage" = "Gérer les annotations";
+"markup.color" = "Couleur";
+"markup.customColor" = "Couleur personnalisée";
+"markup.saved" = "Tracés enregistrés";
+"markup.empty" = "Aucun tracé sur cette page.";
+"markup.help" = "Sélectionnez des surlignages ou des tracés pour changer leur couleur ou les supprimer. Chaque action peut être annulée dans le document.";
+"markup.recolor" = "Appliquer la couleur";
+"markup.remove" = "Supprimer la sélection";
+"markup.changed" = "Cette page ou ses tracés ont changé. Vérifiez la page mise à jour et sélectionnez à nouveau les tracés.";
+"markup.mark" = "Tracé %d";
+
+/* Notebook creation */
+"notebook.new" = "Nouveau carnet";
+"notebook.paper" = "Papier";
+"notebook.blank" = "Vierge";
+"notebook.lined" = "Ligné";
+"notebook.grid" = "Quadrillé";
+"notebook.footer" = "Crée une page A4. Écrivez ou dessinez avec les outils d’annotation du document.";

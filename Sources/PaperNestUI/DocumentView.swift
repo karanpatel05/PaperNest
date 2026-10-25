@@ -27,6 +27,8 @@ struct DocumentView: View {
     @State private var isShowingAdjustments = false
     @State private var isShowingPageOrganizer = false
     @State private var isShowingCrop = false
+    @State private var annotationPage: Page?
+    @State private var managedMarkupPage: Page?
     /// iPhone: the strip of filter previews above the tools.
     @State private var isShowingFilterStrip = false
     @State private var isRenaming = false
@@ -139,6 +141,12 @@ struct DocumentView: View {
                     Task { await model.setCrop(crop, undoManager: undoManager) }
                 }
             }
+        }
+        .sheet(item: $annotationPage) { page in
+            TextAnnotationSheet(model: model, pageID: page.id, undoManager: undoManager)
+        }
+        .sheet(item: $managedMarkupPage) { page in
+            MarkupManagerSheet(model: model, pageID: page.id, undoManager: undoManager)
         }
         #if os(iOS)
         .sheet(isPresented: $isShowingPageOrganizer) {
@@ -282,6 +290,8 @@ struct DocumentView: View {
             addPagesItems
             Divider()
             recognizeTextButton
+            annotateTextButton
+            manageMarkupButton
             Divider()
             deleteButton
         } label: {
@@ -303,6 +313,22 @@ struct DocumentView: View {
             .disabled(model.pages.isEmpty)
             .accessibilityIdentifier("editor-recognize")
         }
+    }
+
+    private var annotateTextButton: some View {
+        Button { annotationPage = model.selectedPage } label: {
+            Label(L10n.annotateText, systemImage: "highlighter")
+        }
+        .disabled(model.selectedPage == nil || model.isRecognizing)
+        .accessibilityIdentifier("editor-annotate")
+    }
+
+    private var manageMarkupButton: some View {
+        Button { managedMarkupPage = model.selectedPage } label: {
+            Label(L10n.manageMarkup, systemImage: "pencil.and.outline")
+        }
+        .disabled(model.selectedPage == nil)
+        .accessibilityIdentifier("editor-manage-markup")
     }
 
     private var pageNavigation: some View {
@@ -351,11 +377,14 @@ struct DocumentView: View {
         }
         Menu {
             recognizeTextButton
+            annotateTextButton
+            manageMarkupButton
             Divider()
             deleteButton
         } label: {
             Label(L10n.more, systemImage: "ellipsis.circle")
         }
+        .accessibilityIdentifier("editor-more")
     }
 
     /// Live previews of the selected page in each filter, then Adjustments
@@ -713,6 +742,12 @@ private struct PageViewer: View {
                     PageImageView(page: page, pixelSize: max(size.width, size.height) * displayScale,
                                   accessibilityLabel: L10n.pageLabel(index + 1, of: model.pages.count),
                                   includesInk: !isMarkingUp)
+                        .accessibilityIdentifier("document-page-image")
+                        .accessibilityValue(L10n.strokeCount(model.selectedPageObjects.filter {
+                            guard $0.pageID == page.id else { return false }
+                            if case .ink = $0.payload { return true }
+                            return false
+                        }.count))
                         .frame(width: size.width, height: size.height)
                         #if os(iOS)
                         .overlay {

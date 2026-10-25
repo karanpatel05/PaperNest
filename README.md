@@ -39,7 +39,9 @@ In **All Documents** or a folder, use **Select** to choose several documents, th
 
 PaperNest also keeps general files with their original bytes and filename. Tap a file in the library or Recent to open the system Quick Look viewer; use Info for file details, Share and Save a Copy. Previews use disposable copies, and supported formats depend on the operating system. Page-based documents keep the editable document view.
 
-Real text recognition (English, French and Spanish), recognized-text search and searchable PDF export are implemented. The broader feature request is tracked in [the expansion roadmap](docs/FEATURE_EXPANSION.md): archive extraction, richer PDF editing, additional conversions, cloud providers, media, browser and VPN remain future workstreams.
+Open a document’s **More → Annotate Text** to highlight, underline or strike through whole recognized lines on the current page. If necessary, use **Recognize Text** in the sheet first. Select a style and one or more lines, then **Apply**. Marks are editable ink, support document undo/redo, and survive reopening and export. Choose a preset or custom color before applying. Use **More → Manage Markup** to select saved highlights or drawn strokes, apply a new color or remove them. Each action supports document undo/redo. Whole-line selection is supported; word-level selection remains planned.
+
+Real text recognition (English, French and Spanish), recognized-text search and searchable PDF export are implemented. The broader feature request is tracked in [the expansion roadmap](docs/FEATURE_EXPANSION.md): ZIP extraction/creation and Photos/HEIC import are also implemented; richer PDF editing, additional conversions, cloud providers, media, browser and VPN remain future workstreams.
 
 ## Build and test
 

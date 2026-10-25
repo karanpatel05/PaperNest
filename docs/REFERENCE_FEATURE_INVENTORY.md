@@ -4,6 +4,8 @@
 
 This file is the capability record behind [FEATURE_EXPANSION.md](FEATURE_EXPANSION.md), which keeps the delivery order (F1–F9). Nothing here changes `CLAUDE_CODE_PROMPT.md`, which stays as written.
 
+**Scope confirmed again on 2026-10-23:** after reviewing the Convert Files / Enjoy Media picture and its feature-by-feature status, the owner said **“All features to pipeline including media.”** Every identified feature in this inventory remains in scope. Media rows 42–44 are explicit deliverables; see the F7a–F7d breakdown in FEATURE_EXPANSION. This confirmation does not mark planned tools as built.
+
 ## How to use this file
 
 - It is a **capability reference, not a design reference.** PaperNest keeps its own Clean & Native look ([CLEAN_NATIVE_DESIGN.md](CLEAN_NATIVE_DESIGN.md)) and the owner's mockups in `docs/design/mockups/`.
@@ -134,7 +136,7 @@ Reference flow, for **M5** when it is built:
 
 ## 3. Capability checklist
 
-Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. **Partial** = only the stated subset. **Planned** = not implemented.
+Status as of 2026-10-24. **Done** = implemented *and* recorded in TEST_MATRIX. **Partial** = only the stated subset. **Planned** = not implemented.
 
 | # | Capability | Status in PaperNest | Workstream |
 |---|---|---|---|
@@ -157,9 +159,9 @@ Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 17 | Crop | **Done** | M1 |
 | 18 | Rescan / replace a page | **Done** (file path; camera path needs a device) | M1 |
 | 19 | Freehand ink, Apple Pencil on iPad | **Done, first slice** (`InkCanvas`, undo, export) — **preserve this** | M3/F3 |
-| 20 | Highlight / underline / strike through text | **Planned** | F3 |
+| 20 | Highlight / underline / strike through text | **Partial** (2026-10-24) — whole recognized lines, editable ink, undo/reopen/export covered by unit tests; iPhone/iPad Simulator workflows pass in en/fr/es. Native Mac annotation interaction remains unrun. F3b preset/custom colors and saved-ink selection/recolor/removal are implemented; iPhone/iPad preset-manager workflows pass in en/fr/es. System custom-picker interaction remains unrun. Word-level selection, moving/resizing marks outside PencilKit and semantic annotation objects remain planned. | F3 |
 | 21 | Notes/comments, stickers, shapes, inserted text and images | **Planned** (models for text/image objects exist) | F3 |
-| 22 | Notebook creation, templates, planners | **Partial** — models and template rendering exist, no editor | F3 |
+| 22 | Notebook creation, templates, planners | **Partial** — Tools creates a one-page blank/lined/grid A4 notebook and opens the existing editor; planners and adding template pages remain | F3 |
 | 23 | Visual fill & sign, saved signatures, initials, checkmarks | **Planned** | F3 |
 | 24 | Interactive PDF form fields preserved | **Planned** | F5 |
 | 25 | Edit existing text and images inside a PDF | **Planned** — needs an engine decision | F5 |
@@ -169,7 +171,7 @@ Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 29 | Scanner with OCR, searchable PDF | **Partial** — camera wrapper and import exist; **OCR and searchable-PDF export both work** (2026-10-22); the real-camera test is still open | M4/F4 |
 | 30 | Text search across documents | **Done** for recognized text and titles (2026-10-22); typed notes follow with F3 | F4 |
 | 31 | Images ↔ PDF (JPEG, PNG) | **Done** | M1 |
-| 32 | HEIC and WEBP | **HEIC done** (2026-10-22), verified against ImageIO before being claimed. WEBP still unverified and unclaimed | F2c/F4 |
+| 32 | HEIC and WEBP | **Partial** — HEIC import and conversion to PDF implemented (2026-10-22), verified against ImageIO. HEIC export and WEBP conversion remain planned | F2c/F4 |
 | 33 | Office → PDF (DOCX, XLSX, PPTX), TXT → PDF | **Planned** | F4/F5 |
 | 34 | PDF → Word / Excel / PowerPoint / Text | **Planned** — retain-layout and editable-output are separate modes | F4/F5 |
 | 35 | Compression presets with before/after size | **Partial** — export quality levels exist; no explicit compressor | F2/F4 |
@@ -179,9 +181,9 @@ Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 39 | Remote files without downloading first (cached / remote-only / downloading / offline states) | **Planned** | F6 |
 | 40 | Wi-Fi transfer to a Mac or PC; cable/Files access | **Partial** — native share exists | F6 |
 | 41 | Nearby / Email / cloud-upload share destinations | **Partial** — native share sheet only | F2/F6 |
-| 42 | Audio and video playback, audiobooks, playlists, speed, background, resume | **Planned** | F7 |
-| 43 | Convert media to MP3 / extract audio | **Planned** — codec and licensing review first | F7 |
-| 44 | Audio/video → editable transcript with timestamps and export | **Planned** — disclose on-device vs network per engine | F7 |
+| 42 | Audio and video playback, audiobooks, playlists, speed, background, resume | **Planned; explicitly confirmed 2026-10-23** — includes seek, metadata/artwork, previous/next, shuffle/repeat, system controls and supported picture-in-picture | F7a/F7b |
+| 43 | Convert media to MP3 / extract audio | **Planned; explicitly confirmed 2026-10-23** — codec and licensing review first; progress, cancellation and real output verification | F7c |
+| 44 | Audio/video → editable transcript with timestamps and export | **Planned; explicitly confirmed 2026-10-23** — disclose on-device vs network per engine; persist transcript edits | F7d |
 | 45 | Smart Eraser / object removal in photos | **Planned** — preview, undo, original preserved | F8 |
 | 46 | Built-in browser, downloads, save web content | **Planned** | F8 |
 | 47 | VPN with real connection state and server choice | **Planned** — ship only with a working provider | F9 |
@@ -189,11 +191,12 @@ Status as of 2026-10-22. **Done** = implemented *and* recorded in TEST_MATRIX. *
 
 ---
 
-## 4. Where PaperNest stands today (2026-10-22)
+## 4. Where PaperNest stands today (2026-10-24)
 
-- M0 foundation and the M1 Mac/iPhone path are built; see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
-- **F1 first slice is implemented and verified**: selection, duplicate, merge, extract, colour labels. 144 unit tests, 11 iPhone UI tests, the two document-tools tests on iPad, 0-warning Mac and iOS builds, en/fr/es screenshots inspected on both devices. Evidence: the "F1 document tools" row in [TEST_MATRIX.md](TEST_MATRIX.md).
-- Nothing is committed beyond `bca0ba9`; the working tree holds the F1 slice. **Commit only when the owner asks.**
+- F1 document tools are implemented. General file items, previews/details, Photos/HEIC import, ZIP creation/extraction, OCR/search/searchable PDFs and the first text-annotation slice are also implemented; remaining work is described by the individual rows above.
+- Latest implementation verification: 235 unit tests and a Mac build passed; F3a annotation workflows passed on iPhone/iPad in en/fr/es and F3b manager/color controls passed on both devices, with the iPad drawing regression also passing. Real camera/Pencil and remaining native Mac checks are still open. Exact evidence and run scope are in [TEST_MATRIX.md](TEST_MATRIX.md).
+- F5–F9, including dedicated media playback/conversion/transcription, remain planned. The 2026-10-23 pipeline confirmation did not implement media or other future tools.
+- Current branch/commit and uncommitted work are recorded in [SESSION_HANDOFF.md](SESSION_HANDOFF.md). **Commit only when the owner asks.**
 
 ## 5. Suggested order for Codex
 
@@ -203,7 +206,8 @@ The delivery order in FEATURE_EXPANSION.md still stands. Concretely, the next sl
 2. ~~**Tools screen**~~ — **done 2026-10-22** (`ToolsSheet.swift`): Create (Scan, Import) and Documents (Merge, Extract, Split, Export as ZIP), each with a picker that enforces its own selection rule. Only working tools are listed. Page tools (crop, rotate, filters) stay in the document, where they have a page to act on.
 3. **F2 general files** — the schema design is written: **[F2_FILE_ITEMS_DESIGN.md](F2_FILE_ITEMS_DESIGN.md)** (owner decisions recorded in §11; F2a implemented in stages). It covers schema v5, the two CHECK-constraint table rebuilds, asset sweeping across both item kinds, streaming import for large files, QuickLook thumbnails, and the F2a–F2d slices.
 4. **F4 OCR** — first slice **done 2026-10-22**: `TextRecognizer`, source-space boxes, FTS over recognised text, and a Recognize Text action. Searchable-PDF export landed the same day. Still open: a status surface outside the menu, automatic recognition after a scan, re-recognition after a rescan, and a user language override.
-5. **F3 annotations and app lock** — highlight/underline/strikethrough over recognised runs, notes, stamps, shapes, visual fill & sign, device authentication.
+5. **F3 annotations and app lock** — whole-line highlights/underlines/strikethroughs are implemented; colors and saved-ink selection/recolor/removal are implemented with unit and iPhone/iPad preset-workflow coverage. Word selection, notes, stamps, shapes, visual fill & sign and device authentication remain.
+6. **F5–F9 expansion, including media** — retain all confirmed features in the pipeline. F7a local playback → F7b library/continuity → F7c MP3/audio extraction → F7d editable transcription. Keep engine/provider decisions attached to the capability that needs them; a transcription decision does not block local playback. See FEATURE_EXPANSION for the complete sequence and dependencies.
 
 Each slice: meaningful store tests, persistence and relaunch, rollback on failure, real iOS interaction tests, Mac and iOS compiles, layout checks in en/fr/es on iPhone and iPad, and an honest TEST_MATRIX row.
 

@@ -276,3 +276,35 @@
 
 "file.preview.failed" = "Unable to Preview";
 "file.preview.failedDescription" = "The file could not be opened. Close the preview or open Show Info for file details.";
+
+/* F3a: recognized-line annotations */
+"annotation.title" = "Annotate Text";
+"annotation.style" = "Style";
+"annotation.highlight" = "Highlight";
+"annotation.underline" = "Underline";
+"annotation.strikethrough" = "Strikethrough";
+"annotation.lines" = "Recognized Lines";
+"annotation.noText" = "No current recognized text. Recognize this page to choose its lines.";
+"annotation.help" = "Select whole recognized lines. Marks remain editable ink; choose a preset or custom color.";
+"annotation.apply" = "Apply";
+"annotation.changed" = "This page or its recognized text changed. Review the refreshed lines and select them again.";
+
+/* F3b: colors and managing saved ink. */
+"markup.manage" = "Manage Markup";
+"markup.color" = "Color";
+"markup.customColor" = "Custom Color";
+"markup.saved" = "Saved Marks";
+"markup.empty" = "No marks on this page.";
+"markup.help" = "Select highlights or drawn strokes to change their color or remove them. Each action can be undone in the document.";
+"markup.recolor" = "Apply Color";
+"markup.remove" = "Remove Selected";
+"markup.changed" = "This page or its marks changed. Review the updated page and select the marks again.";
+"markup.mark" = "Mark %d";
+
+/* Notebook creation */
+"notebook.new" = "New Notebook";
+"notebook.paper" = "Paper";
+"notebook.blank" = "Blank";
+"notebook.lined" = "Lined";
+"notebook.grid" = "Grid";
+"notebook.footer" = "Creates one A4 page. Write or draw using the document’s markup tools.";
