@@ -7,6 +7,10 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     /// Plain text, from what the pages really carry. `ExportOptions`' paper,
     /// resolution and quality do not apply to it.
     case txt
+    /// A Word file holding the same text as `.txt`, one paragraph per line.
+    /// The words, not the layout: `ExportOptions`' paper, resolution and
+    /// quality do not apply to it either.
+    case docx
 
     public var fileExtension: String {
         switch self {
@@ -14,6 +18,7 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
         case .jpeg: "jpg"
         case .png: "png"
         case .txt: "txt"
+        case .docx: "docx"
         }
     }
 }

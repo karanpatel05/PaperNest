@@ -52,6 +52,7 @@ public struct Exporter: Sendable {
                                            options: options, rasterQuality: rasterQuality, progress: progress)]
             case .jpeg, .png: try await writeImages(pages, base: base, in: directory, options: options, progress: progress)
             case .txt: [try await writeText(pages, to: directory.appendingPathComponent("\(base).txt"), progress: progress)]
+            case .docx: [try await writeDocx(pages, to: directory.appendingPathComponent("\(base).docx"), progress: progress)]
             }
             return ExportOutput(directory: directory, files: files)
         } catch {
