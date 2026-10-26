@@ -47,9 +47,12 @@ final class BulkExportModel {
                 for id in ids {
                     guard let item = try await env.store.item(id), !item.isDeleted else { continue }
                     if let payload = try await env.store.filePayload(id) {
-                        // A file goes in as itself, not re-rendered as a PDF.
+                        // A file goes in as itself, not re-rendered as a PDF,
+                        // and its original is resolved through the record's
+                        // own kind: an assumed kind names a file that was
+                        // never written and costs the whole archive.
                         entries.append(.file(name: item.name, originalFilename: payload.originalFilename,
-                                             url: env.store.assets.url(for: payload.assetID, kind: .file)))
+                                             url: try await env.store.originalURL(for: payload.assetID)))
                     } else {
                         entries.append(.document(LibraryExportItem(name: item.name, pages: try await env.store.pages(of: id))))
                     }

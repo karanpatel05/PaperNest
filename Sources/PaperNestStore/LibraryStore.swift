@@ -840,6 +840,19 @@ public actor LibraryStore {
         }.first
     }
 
+    /// The file that holds an original, named by the kind its record actually
+    /// carries.
+    ///
+    /// Originals are shared by hash, and the `assets` insert keeps the kind of
+    /// whichever import arrived first, so a file item can point at bytes that
+    /// were stored as a document's PDF. Never assume a kind here: that names a
+    /// file which was never written, and a caller that packs originals into an
+    /// archive loses the whole archive, not just that entry.
+    public func originalURL(for assetID: AssetID) throws -> URL {
+        guard let record = try assetRecord(assetID) else { throw StoreError.assetMissing(assetID.sha256) }
+        return assets.url(for: assetID, kind: record.kind)
+    }
+
     /// Reads an original's bytes, refusing ones that are not on this device.
     public func assetData(_ id: AssetID) throws -> (Data, AssetKind) {
         guard let record = try assetRecord(id) else { throw StoreError.assetMissing(id.sha256) }

@@ -43,9 +43,12 @@ final class SettingsModel {
                 for summary in try await env.store.items(in: .all) {
                     if let payload = summary.file {
                         // A backup that quietly dropped the user's files
-                        // would not be a backup.
+                        // would not be a backup. The original is resolved
+                        // through the record's own kind, because an assumed
+                        // kind names a file that was never written and fails
+                        // the entire backup over one shared original.
                         entries.append(.file(name: summary.item.name, originalFilename: payload.originalFilename,
-                                             url: env.store.assets.url(for: payload.assetID, kind: .file)))
+                                             url: try await env.store.originalURL(for: payload.assetID)))
                     } else {
                         entries.append(.document(LibraryExportItem(name: summary.item.name,
                                                                    pages: try await env.store.pages(of: summary.id))))
