@@ -62,9 +62,15 @@ Library/
 
 Tests cover each step: `DurabilityTests`, `LibraryStoreTests`, `DeletionTests`.
 
-### Schema (v4)
+### Schema (v7)
 
-`folders`, `items`, `tags`/`item_tags`, `assets` (keyed by SHA-256, with `availability` local or remoteOnly), `pages`, `page_transform_history`, `page_objects` (ink/text/image JSON payloads), `page_recognition` (OCR, stale when `source_revision` is older than the page's revision), and `search_index` (FTS5, `unicode61 remove_diacritics 2`, derived and rebuildable). v2 adds `pages.deleted_at` (soft delete until next launch). v3 adds `page_content_history`: a rescanned page's previous content, whose original stays referenced (so it can't be swept) until the next launch. v4 adds nullable `items.color_label` with seven stable color values. See `Sources/PaperNestStore/Schema.swift`. Migrations are ordered and each runs in its own transaction with its `user_version` bump.
+`folders`, `items`, `tags`/`item_tags`, `assets` (keyed by SHA-256, with `availability` local or remoteOnly), `pages`, `page_transform_history`, `page_objects` (ink/text/image/comment JSON payloads), `page_recognition` (OCR, stale when `source_revision` is older than the page's revision), `file_items` (one row per general file: its bytes and what they are), and `search_index` (FTS5, `unicode61 remove_diacritics 2`, derived and rebuildable, holding `title`, `ocr`, `text` and `pdfText` rows).
+
+Migrations, in order: **v2** adds `pages.deleted_at` (soft delete until next launch). **v3** adds `page_content_history`: a rescanned page's previous content, whose original stays referenced (so it can't be swept) until the next launch. **v4** adds nullable `items.color_label` with seven stable color values. **v5** takes general file items, widening `items.kind` and `assets.kind` to accept `file` and adding `file_items`. **v6** widens `assets.kind` to accept `heic`. **v7** widens `page_objects.kind` to accept `comment`.
+
+SQLite cannot alter a CHECK constraint, so v5, v6 and v7 rebuild their tables. Those migrations run with foreign keys disabled and are checked with `PRAGMA foreign_key_check` before they commit, which is SQLite's documented procedure: with foreign keys enforced, `DROP TABLE items` performs an implicit delete that **cascades into `pages`** and empties the library. Each migration runs in its own transaction with its `user_version` bump, so an interrupted one leaves the previous, consistent version in place.
+
+**The next migration must be v8**, which planned sync takes. Shape annotations and embedded PDF text needed none: shapes save as ordinary ink, and `search_index` is derived, rebuildable and has an unconstrained `field`. See `Sources/PaperNestStore/Schema.swift`.
 
 ### Ordering
 

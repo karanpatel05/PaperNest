@@ -136,7 +136,7 @@ Reference flow, for **M5** when it is built:
 
 ## 3. Capability checklist
 
-Status as of 2026-10-24. **Done** = implemented *and* recorded in TEST_MATRIX. **Partial** = only the stated subset. **Planned** = not implemented.
+Status as of 2026-10-24, except where a row carries a later date of its own. **Done** = implemented *and* recorded in TEST_MATRIX. **Partial** = only the stated subset. **Planned** = not implemented.
 
 | # | Capability | Status in PaperNest | Workstream |
 |---|---|---|---|
@@ -160,8 +160,8 @@ Status as of 2026-10-24. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 18 | Rescan / replace a page | **Done** (file path; camera path needs a device) | M1 |
 | 19 | Freehand ink, Apple Pencil on iPad | **Done, first slice** (`InkCanvas`, undo, export) — **preserve this** | M3/F3 |
 | 20 | Highlight / underline / strike through text | **Partial** (2026-10-24) — whole recognized lines, editable ink, undo/reopen/export covered by unit tests; iPhone/iPad Simulator workflows pass in en/fr/es. Native Mac annotation interaction remains unrun. F3b preset/custom colors and saved-ink selection/recolor/removal are implemented; iPhone/iPad preset-manager workflows pass in en/fr/es. System custom-picker interaction remains unrun. Word-level selection, moving/resizing marks outside PencilKit and semantic annotation objects remain planned. | F3 |
-| 21 | Notes/comments, stickers, shapes, inserted text and images | **Planned** (models for text/image objects exist) | F3 |
-| 22 | Notebook creation, templates, planners | **Partial** — Tools creates a one-page blank/lined/grid A4 notebook and opens the existing editor; planners and adding template pages remain | F3 |
+| 21 | Notes/comments, stickers, shapes, inserted text and images | **Partial** (2026-10-25) — private per-page comments (add/edit/delete, guarded undo/redo, kept out of PDF/image exports, schema v7) and outlined rectangles/ellipses/lines/arrows saved as editable ink with preview placement, colour and width. Stickers/stamps, text boxes and placed images remain planned; models for text/image objects exist. Post-save shape resize handles and exported positioned PDF comment annotations are separate work | F3 |
+| 22 | Notebook creation, templates, planners | **Partial** (2026-10-25) — Tools creates a one-page blank/lined/grid A4 notebook and opens the existing editor, and further blank/lined/grid A4 pages can be inserted after the selected page with guarded undo/redo. Planners and notebook-specific navigation remain | F3 |
 | 23 | Visual fill & sign, saved signatures, initials, checkmarks | **Planned** | F3 |
 | 24 | Interactive PDF form fields preserved | **Planned** | F5 |
 | 25 | Edit existing text and images inside a PDF | **Planned** — needs an engine decision | F5 |
