@@ -955,4 +955,110 @@ final class AppUITests: XCTestCase {
         }
     }
 
+    func testShapesPlaceCancelUndoRedoAndReopenInAllLanguages() throws {
+        continueAfterFailure = false
+        for (language, selected) in [("en", "Selected"), ("fr", "Sélectionné"), ("es", "Seleccionado")] {
+            let library = "/tmp/papernest-shapes-ui-\(UUID().uuidString)"
+            let title = "Shapes \(language)"
+            var app = launch([], libraryPath: library, language: language)
+            XCTAssertTrue(app.buttons["library-tools"].waitForExistence(timeout: 15))
+            app.buttons["library-tools"].tap()
+            app.buttons["tool-notebook"].tap()
+            let name = app.textFields["notebook-name"]
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            name.tap()
+            name.typeText(title)
+            app.buttons["notebook-create"].tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
+            func openShapes() {
+                app.buttons["editor-more"].tap()
+                app.buttons["editor-shapes"].tap()
+                XCTAssertTrue(app.buttons["shape-save"].waitForExistence(timeout: 5))
+            }
+            func checkMarkup(empty: Bool) {
+                app.buttons["editor-more"].tap()
+                app.buttons["editor-manage-markup"].tap()
+                if empty {
+                    XCTAssertTrue(app.staticTexts["markup-empty"].waitForExistence(timeout: 5))
+                } else {
+                    let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "markup-row-"))
+                    XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
+                    XCTAssertEqual(rows.count, 1)
+                }
+                app.buttons["markup-done"].tap()
+                XCTAssertTrue(app.buttons["markup-done"].waitForNonExistence(timeout: 5))
+            }
+            openShapes()
+            app.buttons["shape-cancel"].tap()
+            checkMarkup(empty: true)
+            openShapes()
+            for shape in ["ellipse", "line", "rectangle", "arrow"] {
+                app.buttons["shape-kind-\(shape)"].tap()
+                XCTAssertEqual(app.buttons["shape-kind-\(shape)"].value as? String, selected)
+            }
+            let preview = app.descendants(matching: .any)["shape-preview"].firstMatch
+            XCTAssertTrue(preview.waitForExistence(timeout: 5))
+            let previousPosition = preview.value as? String
+            preview.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.7))
+                .press(forDuration: 0.1, thenDragTo: preview.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.3)))
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            XCTAssertNotEqual(preview.value as? String, previousPosition, "Dragging must place the shape instead of scrolling the form")
+            shot.name = "shape-placement-\(language)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            let red = app.buttons["markup-color-red"]
+            // Use the form margin next to the preview, inside the centered iPad
+            // sheet as well as the phone sheet. Preview drags place the shape.
+            let scrollStart = app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: preview.frame.maxX + 8, dy: preview.frame.midY))
+            let scrollEnd = scrollStart.withOffset(CGVector(dx: 0, dy: -220))
+            for _ in 0..<5 where !red.isHittable {
+                scrollStart.press(forDuration: 0.1, thenDragTo: scrollEnd)
+            }
+            XCTAssertTrue(red.isHittable)
+            red.tap()
+            XCTAssertEqual(red.value as? String, selected)
+            app.buttons["shape-save"].tap()
+            XCTAssertTrue(app.buttons["shape-save"].waitForNonExistence(timeout: 10))
+            checkMarkup(empty: false)
+            app.buttons["editor-more"].tap()
+            app.buttons["notebook-undo"].tap()
+            checkMarkup(empty: true)
+            app.buttons["editor-more"].tap()
+            app.buttons["notebook-redo"].tap()
+            checkMarkup(empty: false)
+            app.terminate()
+            app = launch(["-PaperNestDebugOpenItem", title], libraryPath: library, language: language)
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 15))
+            checkMarkup(empty: false)
+            app.terminate()
+        }
+    }
+
+    func testShapeUndoOnImportedDocument() throws {
+        continueAfterFailure = false
+        let app = launch(["-PaperNestDebugOpenItem", "Markup target"], libraryPath: "/tmp/papernest-text-markup-library")
+        XCTAssertTrue(app.navigationBars["Markup target"].waitForExistence(timeout: 15))
+        app.buttons["editor-more"].tap()
+        app.buttons["editor-shapes"].tap()
+        XCTAssertTrue(app.buttons["shape-save"].waitForExistence(timeout: 5))
+        app.buttons["shape-save"].tap()
+        XCTAssertTrue(app.buttons["shape-save"].waitForNonExistence(timeout: 10))
+        app.buttons["editor-more"].tap()
+        let undo = app.buttons["notebook-undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "Imported documents need accessible shape history too")
+        XCTAssertTrue(undo.isEnabled)
+        undo.tap()
+        app.buttons["editor-more"].tap()
+        app.buttons["editor-manage-markup"].tap()
+        XCTAssertTrue(app.staticTexts["markup-empty"].waitForExistence(timeout: 5))
+        app.buttons["markup-done"].tap()
+        app.buttons["editor-more"].tap()
+        app.buttons["notebook-redo"].tap()
+        app.buttons["editor-more"].tap()
+        app.buttons["editor-manage-markup"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "markup-row-")).firstMatch.waitForExistence(timeout: 5))
+        app.terminate()
+    }
+
 }

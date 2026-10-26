@@ -43,6 +43,8 @@ Open a document’s **More → Annotate Text** to highlight, underline or strike
 
 Create a notebook from **Tools → New Notebook** with blank, lined or grid A4 paper. In the editor, use **Add or Replace Pages → Add Notebook Page…** (or the wider layout’s **More** menu) to insert a page after the selected page. Choose its paper, then Create. Notebook **More → Undo/Redo** supports reversing page insertion; reopening and PDF export preserve the added pages.
 
+Use **More → Shape** to add an outlined rectangle, ellipse, line or arrow. Drag on the preview or expand Position to place it, then choose its color and line width. Shapes save as ink, appear in PDF/image exports, and support Undo/Redo. Use Manage Markup to recolor or remove saved shapes; dedicated shape resize handles are not included.
+
 Use **More → Comments** to add private comments to the current page. Tap a comment to edit or delete it; the sheet’s More menu offers Undo and Redo. Comments survive reopening and document duplication. They stay in PaperNest and are not included in PDF or image exports.
 
 Real text recognition (English, French and Spanish), recognized-text search and searchable PDF export are implemented. The broader feature request is tracked in [the expansion roadmap](docs/FEATURE_EXPANSION.md): ZIP extraction/creation and Photos/HEIC import are also implemented; richer PDF editing, additional conversions, cloud providers, media, browser and VPN remain future workstreams.

@@ -263,6 +263,18 @@ final class DocumentModel {
         }
     }
 
+    func addShape(to page: Page, kind: ShapeAnnotation, start: CGPoint, end: CGPoint,
+                  color: RGBAColor, width: Double, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        let result = try await store.addShape(to: page, kind: kind, start: start, end: end, color: color, width: width)
+        replace(result.page)
+        let change = InkChange(pageID: page.id, saved: result.objects, replaced: [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.shapeTitle)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
     func addTextMarkup(_ snapshot: PageRecognition, lineIndices: Set<Int>, style: TextMarkupStyle, color: RGBAColor? = nil,
                        undoManager: UndoManager?) async throws {
         await finishPendingHistory()

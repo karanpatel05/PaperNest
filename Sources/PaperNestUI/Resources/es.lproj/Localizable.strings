@@ -330,3 +330,27 @@
 "comments.saveAsNew" = "Guardar como comentario nuevo";
 "comments.historyChanged" = "El comentario ha cambiado. Se conservaron los últimos comentarios; la acción anterior ya no se puede deshacer ni rehacer.";
 "comments.pageUnavailable" = "Esta página ya no está disponible. Se conserva cualquier borrador abierto para que puedas copiar su texto.";
+
+// Shape annotations
+"shape.title" = "Forma";
+"shape.add" = "Añadir";
+"shape.rectangle" = "Rectángulo";
+"shape.ellipse" = "Elipse";
+"shape.line" = "Línea";
+"shape.arrow" = "Flecha";
+"shape.position" = "Posición";
+"shape.startX" = "Inicio: horizontal";
+"shape.startY" = "Inicio: vertical";
+"shape.endX" = "Fin: horizontal";
+"shape.endY" = "Fin: vertical";
+"shape.width" = "Grosor del trazo";
+"shape.thin" = "Fino";
+"shape.medium" = "Medio";
+"shape.thick" = "Grueso";
+"shape.style" = "Estilo";
+"shape.preview" = "Vista previa de la forma";
+"shape.drag" = "Arrastra sobre la página para colocar la forma o usa los controles de posición.";
+"shape.invalid" = "Amplía la forma para añadirla.";
+"shape.help" = "Las formas se guardan como tinta y se incluyen en las exportaciones. Usa Gestionar anotaciones para cambiar su color o eliminarlas.";
+"shape.saveFailed" = "No se pudo guardar la forma. Si la página cambió, cierra esta ventana e inténtalo de nuevo.";
+"shape.coordinates" = "Inicio: %d%%, %d%%. Fin: %d%%, %d%%.";

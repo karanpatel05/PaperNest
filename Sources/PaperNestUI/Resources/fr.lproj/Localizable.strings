@@ -330,3 +330,27 @@
 "comments.saveAsNew" = "Enregistrer comme nouveau commentaire";
 "comments.historyChanged" = "Le commentaire a changé. Les derniers commentaires sont conservés ; l’action précédente ne peut plus être annulée ou rétablie.";
 "comments.pageUnavailable" = "Cette page n’est plus disponible. Tout brouillon ouvert est conservé pour vous permettre de copier son texte.";
+
+// Shape annotations
+"shape.title" = "Forme";
+"shape.add" = "Ajouter";
+"shape.rectangle" = "Rectangle";
+"shape.ellipse" = "Ellipse";
+"shape.line" = "Ligne";
+"shape.arrow" = "Flèche";
+"shape.position" = "Position";
+"shape.startX" = "Début : horizontal";
+"shape.startY" = "Début : vertical";
+"shape.endX" = "Fin : horizontal";
+"shape.endY" = "Fin : vertical";
+"shape.width" = "Épaisseur du trait";
+"shape.thin" = "Fin";
+"shape.medium" = "Moyen";
+"shape.thick" = "Épais";
+"shape.style" = "Style";
+"shape.preview" = "Aperçu de la forme";
+"shape.drag" = "Faites glisser sur la page pour placer la forme, ou utilisez les réglages de position.";
+"shape.invalid" = "Agrandissez la forme pour l’ajouter.";
+"shape.help" = "Les formes sont enregistrées comme encre et incluses dans les exports. Utilisez Gérer les annotations pour les recolorer ou les supprimer.";
+"shape.saveFailed" = "Impossible d’enregistrer cette forme. Si la page a changé, fermez cette fenêtre et réessayez.";
+"shape.coordinates" = "Début : %d%%, %d%%. Fin : %d%%, %d%%.";

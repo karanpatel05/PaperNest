@@ -24,13 +24,17 @@ extension LibraryStore {
         }
     }
 
-    /// Toggles only the exact state that produced the token. A failure changes
+    /// Toggles only the same content state that produced the token. A failure changes
     /// nothing, including when another window edited, moved or deleted a page.
     public func toggleNotebookPage(_ expected: NotebookPageChange) throws -> NotebookPageChange {
         try db.transaction {
             try requireActiveNotebook(expected.page.itemID)
             let current = try notebookPageChange(expected.page, deleted: expected.isDeleted)
-            guard current.row == expected.row, current.objects == expected.objects,
+            // Fully undone ink restores content but advances cache revisions/timestamps.
+            // Keep every semantic field (including deletion identity), objects and OCR guarded.
+            let semanticColumns = Array(0..<10) + [11, 13]
+            guard semanticColumns.allSatisfy({ current.row[$0] == expected.row[$0] }),
+                  current.objects == expected.objects,
                   current.recognition == expected.recognition,
                   current.surroundingOrder == expected.surroundingOrder else {
                 throw StoreError.notebookPageChanged

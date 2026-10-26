@@ -330,3 +330,27 @@
 "comments.saveAsNew" = "Save as New Comment";
 "comments.historyChanged" = "The comment changed. The latest comments were kept; the previous action can no longer be undone or redone.";
 "comments.pageUnavailable" = "This page is no longer available. Any open draft is kept so you can copy its text.";
+
+// Shape annotations
+"shape.title" = "Shape";
+"shape.add" = "Add";
+"shape.rectangle" = "Rectangle";
+"shape.ellipse" = "Ellipse";
+"shape.line" = "Line";
+"shape.arrow" = "Arrow";
+"shape.position" = "Position";
+"shape.startX" = "Start: horizontal";
+"shape.startY" = "Start: vertical";
+"shape.endX" = "End: horizontal";
+"shape.endY" = "End: vertical";
+"shape.width" = "Line width";
+"shape.thin" = "Thin";
+"shape.medium" = "Medium";
+"shape.thick" = "Thick";
+"shape.style" = "Style";
+"shape.preview" = "Shape preview";
+"shape.drag" = "Drag on the page to place your shape, or use the position controls.";
+"shape.invalid" = "Make the shape larger to add it.";
+"shape.help" = "Shapes are saved as ink and included in exports. Use Manage Markup to recolor or remove them.";
+"shape.saveFailed" = "Couldn’t save this shape. If the page changed, close this sheet and try again.";
+"shape.coordinates" = "Start: %d%%, %d%%. End: %d%%, %d%%.";

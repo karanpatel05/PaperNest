@@ -14,6 +14,7 @@ struct DocumentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
     @State private var isShowingExport = false
+    @State private var shapePage: Page?
     @State private var commentsPage: Page?
     /// Why the file picker was opened. Kept apart from the presented flag:
     /// SwiftUI clears the flag when the picker closes, before calling the
@@ -146,6 +147,9 @@ struct DocumentView: View {
         }
         .sheet(item: $notebookPageRequest) { request in
             NotebookPageSheet(model: model, request: request, undoManager: undoManager)
+        }
+        .sheet(item: $shapePage) { page in
+            ShapeAnnotationSheet(model: model, page: page, undoManager: undoManager)
         }
         .sheet(item: $commentsPage) { page in
             PageCommentsSheet(model: model, pageID: page.id, undoManager: undoManager)
@@ -295,15 +299,14 @@ struct DocumentView: View {
         exportButton
             .labelStyle(.titleAndIcon)
         Menu {
-            if model.item?.kind == .notebook {
-                NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
-                Divider()
-            }
+            NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
+            Divider()
             addPagesItems
             Divider()
             recognizeTextButton
             annotateTextButton
             manageMarkupButton
+            shapeButton
             commentsButton
             Divider()
             deleteButton
@@ -334,6 +337,14 @@ struct DocumentView: View {
         }
         .disabled(model.selectedPage == nil || model.isRecognizing)
         .accessibilityIdentifier("editor-annotate")
+    }
+
+    private var shapeButton: some View {
+        Button { shapePage = model.selectedPage } label: {
+            Label(L10n.shapeTitle, systemImage: "square.on.circle")
+        }
+        .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
+        .accessibilityIdentifier("editor-shapes")
     }
 
     private var commentsButton: some View {
@@ -397,13 +408,12 @@ struct DocumentView: View {
             Label(L10n.pages, systemImage: "square.grid.2x2")
         }
         Menu {
-            if model.item?.kind == .notebook {
-                NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
-                Divider()
-            }
+            NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
+            Divider()
             recognizeTextButton
             annotateTextButton
             manageMarkupButton
+            shapeButton
             commentsButton
             Divider()
             deleteButton

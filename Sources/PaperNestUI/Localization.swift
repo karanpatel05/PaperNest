@@ -39,6 +39,30 @@ enum L10n {
         String.localizedStringWithFormat(ResourceBundle.ui.localizedString(forKey: key, value: nil, table: nil), count)
     }
 
+    static func shapeCoordinates(_ x1: Int, _ y1: Int, _ x2: Int, _ y2: Int) -> String { tr("shape.coordinates", x1, y1, x2, y2) }
+    static var shapeTitle: String { tr("shape.title") }
+
+    static var shapeAdd: String { tr("shape.add") }
+    static var shapeRectangle: String { tr("shape.rectangle") }
+    static var shapeEllipse: String { tr("shape.ellipse") }
+    static var shapeLine: String { tr("shape.line") }
+    static var shapeArrow: String { tr("shape.arrow") }
+    static var shapePosition: String { tr("shape.position") }
+    static var shapeStartX: String { tr("shape.startX") }
+    static var shapeStartY: String { tr("shape.startY") }
+    static var shapeEndX: String { tr("shape.endX") }
+    static var shapeEndY: String { tr("shape.endY") }
+    static var shapeWidth: String { tr("shape.width") }
+    static var shapeThin: String { tr("shape.thin") }
+    static var shapeMedium: String { tr("shape.medium") }
+    static var shapeThick: String { tr("shape.thick") }
+    static var shapeStyle: String { tr("shape.style") }
+    static var shapePreview: String { tr("shape.preview") }
+    static var shapeDrag: String { tr("shape.drag") }
+    static var shapeInvalid: String { tr("shape.invalid") }
+    static var shapeHelp: String { tr("shape.help") }
+    static var shapeSaveFailed: String { tr("shape.saveFailed") }
+
     // Sidebar
     static var sidebarLibrary: String { tr("sidebar.library") }
     static var allDocuments: String { tr("sidebar.allDocuments") }
