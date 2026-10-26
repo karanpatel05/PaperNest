@@ -1061,4 +1061,93 @@ final class AppUITests: XCTestCase {
         app.terminate()
     }
 
+    func testSymbolStampsPlaceCancelUndoRedoAndReopenInAllLanguages() throws {
+        continueAfterFailure = false
+        for (language, selected) in [("en", "Selected"), ("fr", "Sélectionné"), ("es", "Seleccionado")] {
+            let library = "/tmp/papernest-stamps-ui-\(UUID().uuidString)"
+            let title = "Stamps \(language)"
+            var app = launch([], libraryPath: library, language: language)
+            XCTAssertTrue(app.buttons["library-tools"].waitForExistence(timeout: 15))
+            app.buttons["library-tools"].tap()
+            app.buttons["tool-notebook"].tap()
+            let name = app.textFields["notebook-name"]
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            name.tap()
+            name.typeText(title)
+            app.buttons["notebook-create"].tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
+            func openStamps() {
+                app.buttons["editor-more"].tap()
+                app.buttons["editor-stamps"].tap()
+                XCTAssertTrue(app.buttons["stamp-save"].waitForExistence(timeout: 5))
+            }
+            func checkMarkup(empty: Bool) {
+                app.buttons["editor-more"].tap()
+                app.buttons["editor-manage-markup"].tap()
+                if empty {
+                    XCTAssertTrue(app.staticTexts["markup-empty"].waitForExistence(timeout: 5))
+                } else {
+                    let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "markup-row-"))
+                    XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
+                    XCTAssertEqual(rows.count, 1)
+                }
+                app.buttons["markup-done"].tap()
+                XCTAssertTrue(app.buttons["markup-done"].waitForNonExistence(timeout: 5))
+            }
+            // The shared sheet must still open ordinary shapes in shape mode.
+            app.buttons["editor-more"].tap()
+            app.buttons["editor-shapes"].tap()
+            XCTAssertTrue(app.buttons["shape-kind-rectangle"].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.buttons["shape-kind-rectangle"].value as? String, selected)
+            XCTAssertFalse(app.buttons["stamp-kind-checkmark"].exists)
+            app.buttons["shape-cancel"].tap()
+            openStamps()
+            XCTAssertEqual(app.buttons["stamp-kind-checkmark"].value as? String, selected)
+            app.buttons["stamp-cancel"].tap()
+            checkMarkup(empty: true)
+            openStamps()
+            for shape in ["checkmark", "cross", "star"] {
+                app.buttons["stamp-kind-\(shape)"].tap()
+                XCTAssertEqual(app.buttons["stamp-kind-\(shape)"].value as? String, selected)
+            }
+            let preview = app.descendants(matching: .any)["stamp-preview"].firstMatch
+            XCTAssertTrue(preview.waitForExistence(timeout: 5))
+            let previousPosition = preview.value as? String
+            preview.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.7))
+                .press(forDuration: 0.1, thenDragTo: preview.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.3)))
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            XCTAssertNotEqual(preview.value as? String, previousPosition, "Dragging must place the shape instead of scrolling the form")
+            shot.name = "stamp-placement-\(language)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            let red = app.buttons["markup-color-red"]
+            // Use the form margin next to the preview, inside the centered iPad
+            // sheet as well as the phone sheet. Preview drags place the shape.
+            let scrollStart = app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: preview.frame.maxX + 8, dy: preview.frame.midY))
+            let scrollEnd = scrollStart.withOffset(CGVector(dx: 0, dy: -220))
+            for _ in 0..<5 where !red.isHittable {
+                scrollStart.press(forDuration: 0.1, thenDragTo: scrollEnd)
+            }
+            XCTAssertTrue(red.isHittable)
+            red.tap()
+            XCTAssertEqual(red.value as? String, selected)
+            app.buttons["stamp-save"].tap()
+            XCTAssertTrue(app.buttons["stamp-save"].waitForNonExistence(timeout: 10))
+            checkMarkup(empty: false)
+            app.buttons["editor-more"].tap()
+            app.buttons["notebook-undo"].tap()
+            checkMarkup(empty: true)
+            app.buttons["editor-more"].tap()
+            app.buttons["notebook-redo"].tap()
+            checkMarkup(empty: false)
+            app.terminate()
+            app = launch(["-PaperNestDebugOpenItem", title], libraryPath: library, language: language)
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 15))
+            checkMarkup(empty: false)
+            app.terminate()
+        }
+    }
+
+
 }

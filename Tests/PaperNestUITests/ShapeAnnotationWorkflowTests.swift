@@ -6,7 +6,7 @@ import PaperNestCore
 @testable import PaperNestUI
 
 @MainActor @Suite(.serialized) struct ShapeAnnotationWorkflowTests {
-    @Test func shapePersistsRendersExportsAndUndoesWithPageCreation() async throws {
+    @Test(arguments: [ShapeAnnotation.rectangle, .checkmark, .cross, .star]) func shapePersistsRendersExportsAndUndoesWithPageCreation(_ kind: ShapeAnnotation) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let session = LibrarySession(libraryURL: root)
@@ -22,7 +22,7 @@ import PaperNestCore
         undo.endUndoGrouping()
         let page = try #require(model.selectedPage)
         undo.beginUndoGrouping()
-        try await model.addShape(to: page, kind: .rectangle, start: .init(x: 0.25, y: 0.25), end: .init(x: 0.75, y: 0.75), color: .black, width: 4, undoManager: undo)
+        try await model.addShape(to: page, kind: kind, start: .init(x: 0.25, y: 0.25), end: .init(x: 0.75, y: 0.75), color: .black, width: 4, undoManager: undo)
         undo.endUndoGrouping()
         #expect(try await env.store.objects(on: page.id).count == 1)
         let reopened = DocumentModel(itemID: id, session: session)
@@ -51,7 +51,7 @@ import PaperNestCore
         #expect(try await env.store.objects(on: page.id).count == 1)
     }
 
-    @Test(arguments: [ShapeAnnotation.rectangle, .arrow])
+    @Test(arguments: [ShapeAnnotation.rectangle, .arrow, .checkmark, .cross, .star])
     func shapeCornersSurvivePencilKit(_ kind: ShapeAnnotation) throws {
         let geometry = PageGeometry(sourceSize: CGSize(width: 600, height: 800), rotation: .clockwise90)
         let original = try kind.stroke(from: .init(x: 0.2, y: 0.2), to: .init(x: 0.8, y: 0.8),

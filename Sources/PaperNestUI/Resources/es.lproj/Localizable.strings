@@ -354,3 +354,14 @@
 "shape.help" = "Las formas se guardan como tinta y se incluyen en las exportaciones. Usa Gestionar anotaciones para cambiar su color o eliminarlas.";
 "shape.saveFailed" = "No se pudo guardar la forma. Si la página cambió, cierra esta ventana e inténtalo de nuevo.";
 "shape.coordinates" = "Inicio: %d%%, %d%%. Fin: %d%%, %d%%.";
+
+// Symbol stamps
+"stamp.title" = "Sello";
+"stamp.checkmark" = "Marca de verificación";
+"stamp.cross" = "Cruz";
+"stamp.star" = "Estrella";
+"stamp.preview" = "Vista previa del sello";
+"stamp.drag" = "Arrastra sobre la página para colocar el sello o usa los controles de posición.";
+"stamp.invalid" = "Amplía el sello para añadirlo.";
+"stamp.help" = "Los sellos de símbolos se guardan como tinta y se incluyen en las exportaciones. Usa Gestionar anotaciones para cambiar su color o eliminarlos.";
+"stamp.saveFailed" = "No se pudo guardar el sello. Si la página cambió, cierra esta ventana e inténtalo de nuevo.";

@@ -270,7 +270,7 @@ final class DocumentModel {
         let result = try await store.addShape(to: page, kind: kind, start: start, end: end, color: color, width: width)
         replace(result.page)
         let change = InkChange(pageID: page.id, saved: result.objects, replaced: [], deleted: [])
-        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.shapeTitle)
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: kind.isStamp ? L10n.stampTitle : L10n.shapeTitle)
         await loadSelectedPageObjects()
         session.didChange()
     }

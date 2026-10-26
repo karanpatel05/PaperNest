@@ -63,6 +63,17 @@ enum L10n {
     static var shapeHelp: String { tr("shape.help") }
     static var shapeSaveFailed: String { tr("shape.saveFailed") }
 
+    // Symbol stamps
+    static var stampTitle: String { tr("stamp.title") }
+    static var stampCheckmark: String { tr("stamp.checkmark") }
+    static var stampCross: String { tr("stamp.cross") }
+    static var stampStar: String { tr("stamp.star") }
+    static var stampPreview: String { tr("stamp.preview") }
+    static var stampDrag: String { tr("stamp.drag") }
+    static var stampInvalid: String { tr("stamp.invalid") }
+    static var stampHelp: String { tr("stamp.help") }
+    static var stampSaveFailed: String { tr("stamp.saveFailed") }
+
     // Sidebar
     static var sidebarLibrary: String { tr("sidebar.library") }
     static var allDocuments: String { tr("sidebar.allDocuments") }

@@ -26,6 +26,25 @@ import Testing
         }
     }
 
+    @Test func stampPresetsAreDistinctAndKeepTheirCorners() throws {
+        #expect(ShapeAnnotation.stamps == [.checkmark, .cross, .star])
+        #expect(ShapeAnnotation.shapes == [.rectangle, .ellipse, .line, .arrow])
+        let geometry = PageGeometry(sourceSize: CGSize(width: 600, height: 800))
+        for kind in ShapeAnnotation.stamps {
+            let ink = try kind.stroke(from: .init(x: 0.2, y: 0.2), to: .init(x: 0.8, y: 0.8), geometry: geometry, color: .black, width: 4)
+            #expect(ink.points.count >= 9)
+            #expect(ink.points[0] == ink.points[1] && ink.points[1] == ink.points[2])
+            #expect(throws: ShapeAnnotationError.self) {
+                try kind.stroke(from: .init(x: 0.5, y: 0.2), to: .init(x: 0.5, y: 0.8), geometry: geometry, color: .black, width: 4)
+            }
+        }
+        let check = try ShapeAnnotation.checkmark.stroke(from: .zero, to: .init(x: 1, y: 1), geometry: geometry, color: .black, width: 4)
+        #expect(check.points[3].y > check.points[0].y)
+        #expect(check.points.last!.y < check.points[3].y)
+        let star = try ShapeAnnotation.star.stroke(from: .zero, to: .init(x: 1, y: 1), geometry: geometry, color: .black, width: 4)
+        #expect(star.points.first == star.points.last)
+    }
+
     @Test func invalidOrDegenerateGeometryIsRejected() {
         let g = PageGeometry(sourceSize: CGSize(width: 600, height: 800))
         for end in [CGPoint.zero, CGPoint(x: .nan, y: 0.5), CGPoint(x: 2, y: 0.5)] {

@@ -6,7 +6,11 @@ public enum ShapeAnnotationError: Error, Equatable, Sendable { case invalidGeome
 /// Outlined shapes saved as ordinary editable ink. Input endpoints are
 /// normalized to the displayed (cropped/rotated) page, not the source image.
 public enum ShapeAnnotation: String, CaseIterable, Sendable {
-    case rectangle, ellipse, line, arrow
+    case rectangle, ellipse, line, arrow, checkmark, cross, star
+
+    public static let shapes: [Self] = [.rectangle, .ellipse, .line, .arrow]
+    public static let stamps: [Self] = [.checkmark, .cross, .star]
+    public var isStamp: Bool { Self.stamps.contains(self) }
 
     public func stroke(from start: CGPoint, to end: CGPoint, geometry: PageGeometry,
                        color: RGBAColor, width: Double) throws -> InkStroke {
@@ -34,6 +38,24 @@ public enum ShapeAnnotation: String, CaseIterable, Sendable {
             points = [a, b,
                       bounded(CGPoint(x: b.x - ux * head - uy * head / 2, y: b.y - uy * head + ux * head / 2)), b,
                       bounded(CGPoint(x: b.x - ux * head + uy * head / 2, y: b.y - uy * head - ux * head / 2))]
+        case .checkmark, .cross, .star:
+            guard rect.width >= width * 2, rect.height >= width * 2 else { throw ShapeAnnotationError.invalidGeometry }
+            func at(_ x: Double, _ y: Double) -> CGPoint {
+                CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height)
+            }
+            switch self {
+            case .checkmark:
+                points = [at(0, 0.5), at(0.35, 1), at(1, 0)]
+            case .cross:
+                points = [at(0, 0), at(1, 1), at(0.5, 0.5), at(1, 0), at(0, 1)]
+            default:
+                points = (0..<10).map { index in
+                    let angle = Double(index) * .pi / 5 - .pi / 2
+                    let radius = index.isMultiple(of: 2) ? 0.5 : 0.2
+                    return at(0.5 + cos(angle) * radius, 0.5 + sin(angle) * radius)
+                }
+                points.append(points[0])
+            }
         case .rectangle, .ellipse:
             guard rect.width >= width * 2, rect.height >= width * 2 else { throw ShapeAnnotationError.invalidGeometry }
             if self == .rectangle {
@@ -50,7 +72,7 @@ public enum ShapeAnnotation: String, CaseIterable, Sendable {
         // PencilKit treats stored points as cubic B-spline control points.
         // Repeated vertices preserve sharp corners and arrowhead reversals;
         // the ordinary ink renderer sees the same polyline with zero-length joins.
-        if self == .rectangle || self == .arrow {
+        if self == .rectangle || self == .arrow || isStamp {
             points = points.flatMap { [$0, $0, $0] }
         }
         return InkStroke(tool: .pen, color: color, width: width, points: points.map {

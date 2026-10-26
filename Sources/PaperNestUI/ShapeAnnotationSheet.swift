@@ -5,6 +5,7 @@ struct ShapeAnnotationSheet: View {
     let model: DocumentModel
     let page: Page
     let undoManager: UndoManager?
+    let stampsOnly: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var kind = ShapeAnnotation.rectangle
     @State private var start = CGPoint(x: 0.25, y: 0.25)
@@ -14,6 +15,20 @@ struct ShapeAnnotationSheet: View {
     @State private var saving = false
     @State private var failed = false
 
+    init(model: DocumentModel, page: Page, undoManager: UndoManager?, stampsOnly: Bool = false) {
+        self.model = model
+        self.page = page
+        self.undoManager = undoManager
+        self.stampsOnly = stampsOnly
+        _kind = State(initialValue: stampsOnly ? .checkmark : .rectangle)
+        if stampsOnly {
+            _start = State(initialValue: CGPoint(x: 0.35, y: 0.35))
+            _end = State(initialValue: CGPoint(x: 0.65, y: 0.65))
+        }
+    }
+
+    private var prefix: String { stampsOnly ? "stamp" : "shape" }
+
     private var stroke: InkStroke? {
         try? kind.stroke(from: start, to: end, geometry: page.geometry, color: color, width: width)
     }
@@ -22,7 +37,7 @@ struct ShapeAnnotationSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    ForEach(ShapeAnnotation.allCases, id: \.self) { shape in
+                    ForEach(stampsOnly ? ShapeAnnotation.stamps : ShapeAnnotation.shapes, id: \.self) { shape in
                         Button { kind = shape } label: {
                             HStack {
                                 Label(shape.title, systemImage: shape.symbol)
@@ -31,7 +46,7 @@ struct ShapeAnnotationSheet: View {
                             }.contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier("shape-kind-\(shape.rawValue)")
+                        .accessibilityIdentifier("\(prefix)-kind-\(shape.rawValue)")
                         .accessibilityValue(kind == shape ? L10n.selectionOn : L10n.selectionOff)
                     }
                 }
@@ -43,7 +58,7 @@ struct ShapeAnnotationSheet: View {
                         positionSlider(L10n.shapeEndX, value: $end.x, id: "end-x")
                         positionSlider(L10n.shapeEndY, value: $end.y, id: "end-y")
                     }
-                } footer: { Text(stroke == nil ? L10n.shapeInvalid : L10n.shapeDrag) }
+                } footer: { Text(stroke == nil ? (stampsOnly ? L10n.stampInvalid : L10n.shapeInvalid) : (stampsOnly ? L10n.stampDrag : L10n.shapeDrag)) }
                 Section {
                     Picker(L10n.shapeWidth, selection: $width) {
                         Text(L10n.shapeThin).tag(1.0)
@@ -52,29 +67,29 @@ struct ShapeAnnotationSheet: View {
                     }.pickerStyle(.segmented)
                     MarkupColorPicker(color: $color)
                 } header: { Text(L10n.shapeStyle) }
-                  footer: { Text(L10n.shapeHelp) }
+                  footer: { Text(stampsOnly ? L10n.stampHelp : L10n.shapeHelp) }
             }
             .formStyle(.grouped)
             .disabled(saving)
-            .navigationTitle(L10n.shapeTitle)
+            .navigationTitle(stampsOnly ? L10n.stampTitle : L10n.shapeTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.cancel) { dismiss() }.disabled(saving)
-                        .accessibilityIdentifier("shape-cancel")
+                        .accessibilityIdentifier("\(prefix)-cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.shapeAdd) { Task { await save() } }
                         .disabled(saving || stroke == nil || model.isChangingNotebookPage)
-                        .accessibilityIdentifier("shape-save")
+                        .accessibilityIdentifier("\(prefix)-save")
                 }
             }
             .interactiveDismissDisabled(saving)
             .alert(L10n.genericErrorTitle, isPresented: $failed) {
                 Button(L10n.ok) {}
-            } message: { Text(L10n.shapeSaveFailed) }
+            } message: { Text(stampsOnly ? L10n.stampSaveFailed : L10n.shapeSaveFailed) }
         }
         #if os(macOS)
         .frame(minWidth: 500, minHeight: 650)
@@ -119,9 +134,9 @@ struct ShapeAnnotationSheet: View {
                 end = normalized(value.location)
             })
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(L10n.shapePreview)
+            .accessibilityLabel(stampsOnly ? L10n.stampPreview : L10n.shapePreview)
             .accessibilityValue(L10n.shapeCoordinates(Int(start.x * 100), Int(start.y * 100), Int(end.x * 100), Int(end.y * 100)))
-            .accessibilityIdentifier("shape-preview")
+            .accessibilityIdentifier("\(prefix)-preview")
         }
     }
 
@@ -143,6 +158,9 @@ private extension ShapeAnnotation {
         case .ellipse: L10n.shapeEllipse
         case .line: L10n.shapeLine
         case .arrow: L10n.shapeArrow
+        case .checkmark: L10n.stampCheckmark
+        case .cross: L10n.stampCross
+        case .star: L10n.stampStar
         }
     }
     var symbol: String {
@@ -151,6 +169,9 @@ private extension ShapeAnnotation {
         case .ellipse: "oval"
         case .line: "line.diagonal"
         case .arrow: "arrow.up.right"
+        case .checkmark: "checkmark"
+        case .cross: "xmark"
+        case .star: "star"
         }
     }
 }

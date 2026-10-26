@@ -354,3 +354,14 @@
 "shape.help" = "Shapes are saved as ink and included in exports. Use Manage Markup to recolor or remove them.";
 "shape.saveFailed" = "Couldn’t save this shape. If the page changed, close this sheet and try again.";
 "shape.coordinates" = "Start: %d%%, %d%%. End: %d%%, %d%%.";
+
+// Symbol stamps
+"stamp.title" = "Stamp";
+"stamp.checkmark" = "Checkmark";
+"stamp.cross" = "Cross";
+"stamp.star" = "Star";
+"stamp.preview" = "Stamp preview";
+"stamp.drag" = "Drag on the page to place your stamp, or use the position controls.";
+"stamp.invalid" = "Make the stamp larger to add it.";
+"stamp.help" = "Symbol stamps are saved as ink and included in exports. Use Manage Markup to recolor or remove them.";
+"stamp.saveFailed" = "Couldn’t save this stamp. If the page changed, close this sheet and try again.";

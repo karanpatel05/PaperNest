@@ -354,3 +354,14 @@
 "shape.help" = "Les formes sont enregistrées comme encre et incluses dans les exports. Utilisez Gérer les annotations pour les recolorer ou les supprimer.";
 "shape.saveFailed" = "Impossible d’enregistrer cette forme. Si la page a changé, fermez cette fenêtre et réessayez.";
 "shape.coordinates" = "Début : %d%%, %d%%. Fin : %d%%, %d%%.";
+
+// Symbol stamps
+"stamp.title" = "Tampon";
+"stamp.checkmark" = "Coche";
+"stamp.cross" = "Croix";
+"stamp.star" = "Étoile";
+"stamp.preview" = "Aperçu du tampon";
+"stamp.drag" = "Faites glisser sur la page pour placer le tampon, ou utilisez les réglages de position.";
+"stamp.invalid" = "Agrandissez le tampon pour l’ajouter.";
+"stamp.help" = "Les tampons symboles sont enregistrés comme encre et inclus dans les exports. Utilisez Gérer les annotations pour les recolorer ou les supprimer.";
+"stamp.saveFailed" = "Impossible d’enregistrer ce tampon. Si la page a changé, fermez cette fenêtre et réessayez.";

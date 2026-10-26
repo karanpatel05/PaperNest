@@ -14,6 +14,7 @@ struct DocumentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
     @State private var isShowingExport = false
+    @State private var stampPage: Page?
     @State private var shapePage: Page?
     @State private var commentsPage: Page?
     /// Why the file picker was opened. Kept apart from the presented flag:
@@ -147,6 +148,9 @@ struct DocumentView: View {
         }
         .sheet(item: $notebookPageRequest) { request in
             NotebookPageSheet(model: model, request: request, undoManager: undoManager)
+        }
+        .sheet(item: $stampPage) { page in
+            ShapeAnnotationSheet(model: model, page: page, undoManager: undoManager, stampsOnly: true)
         }
         .sheet(item: $shapePage) { page in
             ShapeAnnotationSheet(model: model, page: page, undoManager: undoManager)
@@ -307,6 +311,7 @@ struct DocumentView: View {
             annotateTextButton
             manageMarkupButton
             shapeButton
+            stampButton
             commentsButton
             Divider()
             deleteButton
@@ -337,6 +342,14 @@ struct DocumentView: View {
         }
         .disabled(model.selectedPage == nil || model.isRecognizing)
         .accessibilityIdentifier("editor-annotate")
+    }
+
+    private var stampButton: some View {
+        Button { stampPage = model.selectedPage } label: {
+            Label(L10n.stampTitle, systemImage: "seal")
+        }
+        .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
+        .accessibilityIdentifier("editor-stamps")
     }
 
     private var shapeButton: some View {
@@ -414,6 +427,7 @@ struct DocumentView: View {
             annotateTextButton
             manageMarkupButton
             shapeButton
+            stampButton
             commentsButton
             Divider()
             deleteButton

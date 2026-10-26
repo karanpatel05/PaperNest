@@ -45,6 +45,8 @@ Create a notebook from **Tools → New Notebook** with blank, lined or grid A4 p
 
 Use **More → Shape** to add an outlined rectangle, ellipse, line or arrow. Drag on the preview or expand Position to place it, then choose its color and line width. Shapes save as ink, appear in PDF/image exports, and support Undo/Redo. Use Manage Markup to recolor or remove saved shapes; dedicated shape resize handles are not included.
 
+Use **More → Stamp** for checkmark, cross, and star symbols. Drag or use Position to place and size the symbol, then choose its ink color and line width. Stamps support the same export, recoloring, removal, and Undo/Redo as shapes. Text and custom-image stamps are not included yet.
+
 Use **More → Comments** to add private comments to the current page. Tap a comment to edit or delete it; the sheet’s More menu offers Undo and Redo. Comments survive reopening and document duplication. They stay in PaperNest and are not included in PDF or image exports.
 
 Real text recognition (English, French and Spanish), recognized-text search and searchable PDF export are implemented. The broader feature request is tracked in [the expansion roadmap](docs/FEATURE_EXPANSION.md): ZIP extraction/creation and Photos/HEIC import are also implemented; richer PDF editing, additional conversions, cloud providers, media, browser and VPN remain future workstreams.
