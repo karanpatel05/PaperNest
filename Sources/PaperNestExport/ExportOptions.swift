@@ -4,12 +4,16 @@ import PaperNestCore
 
 public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     case pdf, jpeg, png
+    /// Plain text, from what the pages really carry. `ExportOptions`' paper,
+    /// resolution and quality do not apply to it.
+    case txt
 
     public var fileExtension: String {
         switch self {
         case .pdf: "pdf"
         case .jpeg: "jpg"
         case .png: "png"
+        case .txt: "txt"
         }
     }
 }
@@ -39,6 +43,21 @@ public enum PDFImageQuality: String, Codable, Sendable, CaseIterable {
         case .compact: 150
         }
     }
+}
+
+/// The resolution and lossy quality raster content is written at.
+///
+/// Separate from `PDFImageQuality` so a compression preset can ask for values
+/// of its own without adding a case to that enum, which is `CaseIterable` and
+/// drives the export sheet's picker.
+struct RasterQuality: Hashable, Sendable {
+    var maxDPI: CGFloat
+    /// Nil means lossless.
+    var jpegQuality: Double?
+}
+
+extension PDFImageQuality {
+    var rasterQuality: RasterQuality { RasterQuality(maxDPI: maxDPI, jpegQuality: jpegQuality) }
 }
 
 public enum ImagePackaging: String, Codable, Sendable, CaseIterable {
@@ -118,6 +137,10 @@ public enum ExportError: Error, Equatable, Sendable {
     case noPages
     case writeFailed
     case archiveTooLarge
+    /// A text export where no page has any text. Writing a file holding
+    /// nothing but page separators would look like a successful export of an
+    /// empty document, which is not what happened.
+    case noTextToExport
 }
 
 /// Filenames for exported files.

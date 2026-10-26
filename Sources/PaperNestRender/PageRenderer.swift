@@ -61,6 +61,14 @@ public struct PageRenderer: Sendable {
         return recognition.lines
     }
 
+    /// The text the page's own PDF carries, for callers exporting text. Nil
+    /// when the page carries none. Beside `recognizedLines(for:)` so the
+    /// exporter reaches stored text through the renderer rather than holding a
+    /// store reference of its own.
+    public func embeddedText(for page: Page) async throws -> String? {
+        try await store.embeddedText(for: page.id)
+    }
+
     /// The page's ink, in paint order.
     public func inkStrokes(for page: Page) async throws -> [InkStroke] {
         try await store.objects(on: page.id).compactMap { object in

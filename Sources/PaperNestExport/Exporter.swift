@@ -27,14 +27,31 @@ public struct Exporter: Sendable {
         options: ExportOptions,
         progress: @Sendable (ExportProgress) -> Void = { _ in }
     ) async throws -> ExportOutput {
+        try await export(itemName: itemName, pages: pages, options: options,
+                         rasterQuality: nil, progress: progress)
+    }
+
+    /// The same export, with the raster resolution and quality chosen
+    /// explicitly rather than taken from `options.pdfImageQuality`. Internal,
+    /// because `RasterQuality` exists so compression presets need not appear
+    /// as cases in the enum the export sheet's picker iterates.
+    func export(
+        itemName: String,
+        pages: [Page],
+        options: ExportOptions,
+        rasterQuality: RasterQuality?,
+        progress: @Sendable (ExportProgress) -> Void = { _ in }
+    ) async throws -> ExportOutput {
         guard !pages.isEmpty else { throw ExportError.noPages }
         let directory = temporaryRoot.appendingPathComponent("PaperNestExport-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         do {
             let base = ExportNaming.baseName(itemName)
             let files: [URL] = switch options.format {
-            case .pdf: [try await writePDF(pages, title: itemName, to: directory.appendingPathComponent("\(base).pdf"), options: options, progress: progress)]
+            case .pdf: [try await writePDF(pages, title: itemName, to: directory.appendingPathComponent("\(base).pdf"),
+                                           options: options, rasterQuality: rasterQuality, progress: progress)]
             case .jpeg, .png: try await writeImages(pages, base: base, in: directory, options: options, progress: progress)
+            case .txt: [try await writeText(pages, to: directory.appendingPathComponent("\(base).txt"), progress: progress)]
             }
             return ExportOutput(directory: directory, files: files)
         } catch {
@@ -85,7 +102,11 @@ public struct Exporter: Sendable {
         ctx.restoreGState()
     }
 
+    /// `rasterQuality` overrides what `options.pdfImageQuality` would ask for,
+    /// so a compression preset can pick its own resolution and quality without
+    /// a new case appearing in the export sheet's picker.
     private func writePDF(_ pages: [Page], title: String, to url: URL, options: ExportOptions,
+                          rasterQuality: RasterQuality? = nil,
                           progress: @Sendable (ExportProgress) -> Void) async throws -> URL {
         var defaultBox = CGRect(x: 0, y: 0, width: 612, height: 792)
         let info: [CFString: Any] = [kCGPDFContextCreator: Brand.pdfCreator, kCGPDFContextTitle: title]
@@ -98,7 +119,8 @@ public struct Exporter: Sendable {
             try Task.checkCancellation()
             let pageSize = page.geometry.pageSize
             let layout = PaperLayout(pageSize: pageSize, paper: options.paperSize)
-            let source = try await pdfSource(for: page, layout: layout, quality: options.pdfImageQuality)
+            let source = try await pdfSource(for: page, layout: layout,
+                                             quality: rasterQuality ?? options.pdfImageQuality.rasterQuality)
             let ink = try await renderer.inkStrokes(for: page)
 
             var box = CGRect(origin: .zero, size: layout.paperSize)
@@ -123,7 +145,7 @@ public struct Exporter: Sendable {
     /// Vector PDF pages pass through untouched; raster content is limited to
     /// the quality's resolution and, for lossy settings, JPEG-encoded so the
     /// PDF embeds it with DCT compression.
-    private func pdfSource(for page: Page, layout: PaperLayout, quality: PDFImageQuality) async throws -> PageRenderer.PreparedSource {
+    private func pdfSource(for page: Page, layout: PaperLayout, quality: RasterQuality) async throws -> PageRenderer.PreparedSource {
         let pageScale = layout.contentRect.width / page.geometry.pageSize.width
         let pixelsPerPoint = quality.maxDPI / 72 * pageScale
         let source = try await renderer.prepareSource(for: page, pixelsPerPoint: pixelsPerPoint)

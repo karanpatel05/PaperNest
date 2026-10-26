@@ -39,6 +39,20 @@ extension LibraryStore {
         }
     }
 
+    /// The text this page's own PDF carries, or nil when it has none.
+    ///
+    /// An empty marker row means "looked, found no text layer", which is not
+    /// text and so reads back as nil. The text is stored normalized for the
+    /// search index, so its whitespace is collapsed and a page comes back as
+    /// one paragraph rather than its original lines — good enough to export,
+    /// but not the page's layout.
+    public func embeddedText(for pageID: PageID) throws -> String? {
+        let found = try db.query("SELECT content FROM search_index WHERE page_id = ? AND field = ?",
+                                 [.text(pageID.rawValue), .text(Self.embeddedTextField)]) { $0.text(0) }
+        guard let words = found.first, !words.isEmpty else { return nil }
+        return words
+    }
+
     /// Live PDF pages whose text has not been looked for yet, newest document
     /// first. Pages of deleted documents, and deleted pages, are left alone,
     /// as are pages whose original is not on this device: fetching those

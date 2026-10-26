@@ -173,8 +173,8 @@ Status as of 2026-10-24, except where a row carries a later date of its own. **D
 | 31 | Images ↔ PDF (JPEG, PNG) | **Done** | M1 |
 | 32 | HEIC and WEBP | **Partial** — HEIC import and conversion to PDF implemented (2026-10-22), verified against ImageIO. HEIC export and WEBP conversion remain planned | F2c/F4 |
 | 33 | Office → PDF (DOCX, XLSX, PPTX), TXT → PDF | **Planned** | F4/F5 |
-| 34 | PDF → Word / Excel / PowerPoint / Text | **Planned** — retain-layout and editable-output are separate modes | F4/F5 |
-| 35 | Compression presets with before/after size | **Partial** — export quality levels exist; no explicit compressor | F2/F4 |
+| 34 | PDF → Word / Excel / PowerPoint / Text | **Partial** (2026-10-26) — PDF/scan → **plain text** works in the engine, from recognized text and the text digital PDFs carry, with form-feed page breaks and a refusal when there is no text; no UI yet, and embedded text exports as one paragraph rather than its original lines. Word, Excel and PowerPoint remain, and retain-layout versus editable-output are still separate modes | F4/F5 |
+| 35 | Compression presets with before/after size | **Partial** (2026-10-26) — engine presets (light/strong/smallest) produce a smaller PDF and report measured before/after bytes, reporting no saving honestly when a source cannot be reduced. No UI yet, and file items, image-format output and folder/archive compression remain | F2/F4 |
 | 36 | Bookmarks, reading mode, book formats | **Planned** — supported formats must be named explicitly | F3/F4 |
 | 37 | iCloud sync | **Planned** — design in ARCHITECTURE.md; needs an Apple team and container | M2/F6 |
 | 38 | Dropbox / Google Drive / other providers | **Planned** | F6 |
