@@ -35,7 +35,7 @@ import PaperNestTestSupport
             return
         }
         // ...and the pass then makes the contents findable.
-        await session.embeddedTextIndexing?.value
+        await session.backgroundTextWork?.value
         let env = try #require(session.environment)
         #expect(try await env.store.search("council") == [itemID])
         #expect(try await env.store.search("plumbing").isEmpty)

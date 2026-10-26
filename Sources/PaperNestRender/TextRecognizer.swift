@@ -37,6 +37,32 @@ public struct TextRecognizer: Sendable {
         case noSupportedLanguage
     }
 
+    /// Recognition, run on a thread of its own.
+    ///
+    /// Vision's task queue dispatches **synchronously** while preserving its
+    /// own capacity, so `recognize(_:)` parks the thread it was called on until
+    /// Vision has room. Called from a task or an actor, that thread is one of
+    /// Swift concurrency's cooperative threads — roughly one per core — and
+    /// enough concurrent recognitions park every one of them, including the
+    /// threads Vision needs to finish the work the others are waiting for.
+    /// That is a deadlock, not a slow run: it was reproduced with sixteen
+    /// concurrent passes on an eight-core machine, every one stuck in
+    /// `semaphore_wait_trap` under `VNControlledCapacityTasksQueue`.
+    ///
+    /// Anything calling this from an actor or a `Task` must use this rather
+    /// than `recognize(_:)`. The queue is serial and shared, so it also keeps
+    /// Vision's own capacity from being oversubscribed.
+    public func recognizeOnADedicatedThread(_ image: CGImage) async throws -> [RecognizedLine] {
+        try await withCheckedThrowingContinuation { continuation in
+            Self.blockingQueue.async {
+                continuation.resume(with: Result { try self.recognize(image) })
+            }
+        }
+    }
+
+    /// Off the cooperative pool, so a blocking Vision call cannot starve it.
+    private static let blockingQueue = DispatchQueue(label: "papernest.text-recognition", qos: .utility)
+
     /// Recognizes `image`, which must be the page's upright, uncropped source.
     public func recognize(_ image: CGImage) throws -> [RecognizedLine] {
         let usable = Self.supportedLanguages(from: languages)
