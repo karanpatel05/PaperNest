@@ -167,7 +167,10 @@ final class Statement {
             case .null: sqlite3_bind_null(stmt, i)
             case .int(let v): sqlite3_bind_int64(stmt, i, v)
             case .double(let v): sqlite3_bind_double(stmt, i, v)
-            case .text(let v): sqlite3_bind_text(stmt, i, v, -1, SQLITE_TRANSIENT)
+            // An explicit byte count, not -1: with -1 SQLite reads to the
+            // first NUL, so text carrying one lost everything after it. Text
+            // off a scan or out of a PDF can contain one.
+            case .text(let v): sqlite3_bind_text(stmt, i, v, Int32(v.utf8.count), SQLITE_TRANSIENT)
             case .blob(let v): v.withUnsafeBytes { buf in
                 sqlite3_bind_blob(stmt, i, buf.baseAddress, Int32(buf.count), SQLITE_TRANSIENT)
             }
@@ -194,9 +197,15 @@ final class Statement {
     func date(_ col: Int32) -> Date { Date(timeIntervalSinceReferenceDate: double(col)) }
     func optionalDate(_ col: Int32) -> Date? { isNull(col) ? nil : date(col) }
 
+    /// The column's text, read by its byte count rather than to a NUL
+    /// terminator, so a stored NUL does not truncate what comes back. The
+    /// `sqlite3_column_bytes` call has to follow `sqlite3_column_text`, which
+    /// is what fixes the column's type and therefore its length.
     func text(_ col: Int32) -> String {
         guard let c = sqlite3_column_text(stmt, col) else { return "" }
-        return String(cString: c)
+        let count = Int(sqlite3_column_bytes(stmt, col))
+        guard count > 0 else { return "" }
+        return String(decoding: UnsafeRawBufferPointer(start: c, count: count), as: UTF8.self)
     }
 
     func optionalText(_ col: Int32) -> String? { isNull(col) ? nil : text(col) }
