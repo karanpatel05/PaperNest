@@ -679,7 +679,11 @@ public actor LibraryStore {
             // The page now shows different paper. Whatever was read off the
             // old content must stop answering searches at once; a rotation or
             // a crop does not do this, because the words are still there.
-            try db.run("DELETE FROM search_index WHERE page_id = ? AND field = 'ocr'", [.text(pageID.rawValue)])
+            // This covers both what was recognized and what a digital PDF
+            // carried; clearing the latter also queues the page to be read
+            // again, since no marker row is left behind.
+            try db.run("DELETE FROM search_index WHERE page_id = ? AND field IN ('ocr', ?)",
+                       [.text(pageID.rawValue), .text(Self.embeddedTextField)])
             try touchItem(page.itemID, at: timestamp)
             return (previous, page)
         }

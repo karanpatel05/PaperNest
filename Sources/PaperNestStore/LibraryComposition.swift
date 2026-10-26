@@ -123,6 +123,7 @@ extension LibraryStore {
             }
             let current = try applyObjectChanges(on: destination.id, saving: copies, deleting: [])
             try copyCompositionRecognition(from: source, to: current)
+            try copyEmbeddedText(from: source, to: current)
 
             // Rebuild derived text rows from current objects rather than
             // carrying stale content or source item/page IDs into the copy.

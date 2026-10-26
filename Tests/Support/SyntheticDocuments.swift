@@ -216,3 +216,25 @@ extension SyntheticDocuments {
         return data as Data
     }
 }
+
+extension SyntheticDocuments {
+    /// A PDF whose pages carry only raster content, the way a scan of paper
+    /// arrives: there is no text layer to extract. Used to check that text
+    /// indexing can tell "looked, found nothing" apart from "not looked at".
+    public static func scannedPDF(pages: Int = 1, size: CGSize = CGSize(width: 612, height: 792)) -> Data {
+        let bitmap = PixelProbe.decode(image(width: 400, height: 560, type: .png))!
+        let data = NSMutableData()
+        var box = CGRect(origin: .zero, size: size)
+        let consumer = CGDataConsumer(data: data as CFMutableData)!
+        let ctx = CGContext(consumer: consumer, mediaBox: &box, [kCGPDFContextTitle: "Synthetic scan"] as CFDictionary)!
+        for _ in 0..<pages {
+            ctx.beginPDFPage(nil)
+            ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+            ctx.fill(CGRect(x: markerInset, y: size.height - markerInset - markerSize, width: markerSize, height: markerSize))
+            ctx.draw(bitmap, in: CGRect(x: 72, y: 100, width: size.width - 144, height: size.height - 240))
+            ctx.endPDFPage()
+        }
+        ctx.closePDF()
+        return data as Data
+    }
+}

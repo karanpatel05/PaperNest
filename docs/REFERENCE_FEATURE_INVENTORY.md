@@ -169,7 +169,7 @@ Status as of 2026-10-24. **Done** = implemented *and* recorded in TEST_MATRIX. *
 | 27 | Set a PDF password / encrypted export | **Partial** — protected PDFs *import*; no encrypted export | F3/F5 |
 | 28 | App lock (passcode / biometric) | **Planned** — distinct from encryption at rest | F3 |
 | 29 | Scanner with OCR, searchable PDF | **Partial** — camera wrapper and import exist; **OCR and searchable-PDF export both work** (2026-10-22); the real-camera test is still open | M4/F4 |
-| 30 | Text search across documents | **Done** for recognized text and titles (2026-10-22); typed notes follow with F3 | F4 |
+| 30 | Text search across documents | **Done** for recognized text and titles (2026-10-22) and for the text digital PDFs already carry (2026-10-25); typed notes follow with F3 | F4 |
 | 31 | Images ↔ PDF (JPEG, PNG) | **Done** | M1 |
 | 32 | HEIC and WEBP | **Partial** — HEIC import and conversion to PDF implemented (2026-10-22), verified against ImageIO. HEIC export and WEBP conversion remain planned | F2c/F4 |
 | 33 | Office → PDF (DOCX, XLSX, PPTX), TXT → PDF | **Planned** | F4/F5 |

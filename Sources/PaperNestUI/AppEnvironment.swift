@@ -48,6 +48,10 @@ public final class LibrarySession {
     public private(set) var state: State = .loading
     /// Incremented after every committed change.
     public private(set) var changeToken = 0
+    /// The background pass that reads text out of PDF pages nobody has looked
+    /// at yet. Internal so tests can wait for it.
+    private(set) var embeddedTextIndexing: Task<Void, Never>?
+    private var embeddedTextNeedsAnotherPass = false
     let thumbnails = ThumbnailCache()
     private let libraryURL: URL?
 
@@ -77,6 +81,7 @@ public final class LibrarySession {
                 return env
             }.value
             state = .ready(env)
+            startIndexingEmbeddedText()
         } catch StoreError.newerSchema {
             state = .failed(title: L10n.libraryErrorTitle, message: L10n.libraryNewer)
         } catch {
@@ -86,6 +91,32 @@ public final class LibrarySession {
 
     public func didChange() {
         changeToken &+= 1
+        startIndexingEmbeddedText()
+    }
+
+    /// Started only once the library is ready, so launch never waits for it,
+    /// and at low priority, because nothing on screen depends on it. Indexing
+    /// records no edit and publishes no change, so this cannot feed itself.
+    ///
+    /// Changes arriving during a pass are coalesced into one more pass at the
+    /// end, rather than queueing a pass each. Most changes — an ink stroke, an
+    /// undo — add no PDF pages at all, so the usual cost is the single indexed
+    /// lookup that finds nothing to do.
+    private func startIndexingEmbeddedText() {
+        guard let store = environment?.store else { return }
+        guard embeddedTextIndexing == nil else {
+            embeddedTextNeedsAnotherPass = true
+            return
+        }
+        embeddedTextIndexing = Task(priority: .utility) { [weak self] in
+            _ = try? await EmbeddedTextIndexer(store: store).indexMissing()
+            guard let self else { return }
+            embeddedTextIndexing = nil
+            if embeddedTextNeedsAnotherPass {
+                embeddedTextNeedsAnotherPass = false
+                startIndexingEmbeddedText()
+            }
+        }
     }
 }
 
