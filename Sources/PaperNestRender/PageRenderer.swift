@@ -69,6 +69,15 @@ public struct PageRenderer: Sendable {
         try await store.embeddedText(for: page.id)
     }
 
+    /// The bytes of the PDF this page came from, or nil when it did not come
+    /// from one. For a caller that needs the original file rather than a
+    /// drawing of it: exporting a page nobody has edited copies it instead of
+    /// reproducing its marks, which is what keeps links and form fields.
+    public func sourcePDFData(for page: Page) async throws -> Data? {
+        guard case .pdfPage(let assetID, _) = page.content else { return nil }
+        return try await cache.pdfData(assetID, store: store)
+    }
+
     /// The page's ink, in paint order.
     public func inkStrokes(for page: Page) async throws -> [InkStroke] {
         try await store.objects(on: page.id).compactMap { object in
@@ -126,7 +135,12 @@ public struct PageRenderer: Sendable {
     /// no more than the resolution needed. PDF pages stay vector unless they
     /// need pixel filters; then only the cropped region is rasterized, so a
     /// tight crop shown large never needs a huge whole-page bitmap.
-    public func prepareSource(for page: Page, pixelsPerPoint: CGFloat) async throws -> PreparedSource {
+    /// `rasterizingPDFPages` turns a PDF page into pixels even when nothing
+    /// about it needs pixel processing. Only compression asks for this, and
+    /// only for a page with no text to lose: rasterizing is how a scanned PDF's
+    /// size can change at all, since vector content is copied as it stands.
+    public func prepareSource(for page: Page, pixelsPerPoint: CGFloat,
+                              rasterizingPDFPages: Bool = false) async throws -> PreparedSource {
         switch page.content {
         case .template(let template):
             return .template(template)
@@ -138,7 +152,9 @@ public struct PageRenderer: Sendable {
             let data = try await cache.pdfData(assetID, store: store)
             guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider),
                   index + 1 <= document.numberOfPages else { throw RenderError.sourceDamaged }
-            guard page.transform.needsPixelProcessing else { return .pdf(document, pageNumber: index + 1) }
+            guard page.transform.needsPixelProcessing || rasterizingPDFPages else {
+                return .pdf(document, pageNumber: index + 1)
+            }
             let region = page.geometry.cropRect
             let raster = try Self.rasterizePDFPage(document, pageNumber: index + 1, sourceSize: page.sourceSize,
                                                    region: region, pixelsPerPoint: pixelsPerPoint)
@@ -146,8 +162,45 @@ public struct PageRenderer: Sendable {
         }
     }
 
+    /// The page's content as an upright raster, with **no transform applied**:
+    /// no crop, no rotation, no filter, and the whole sheet rather than the
+    /// visible part of it.
+    ///
+    /// Redaction needs the paper exactly as it is. Its rectangles are given in
+    /// uncropped source space, and the page keeps its transform afterwards, so
+    /// a raster that had already been cropped or filtered would apply those
+    /// edits a second time and move the rectangles off their words.
+    public func uprightSourceRaster(for page: Page, pixelsPerPoint: CGFloat) async throws -> CGImage {
+        let whole = CGRect(origin: .zero, size: page.sourceSize)
+        switch page.content {
+        case .image(let assetID):
+            let needed = Int((max(page.sourceSize.width, page.sourceSize.height) * pixelsPerPoint).rounded(.up))
+            return try await cache.uprightImage(assetID, maxPixelSize: needed, store: store)
+        case .pdfPage(let assetID, let index):
+            let data = try await cache.pdfData(assetID, store: store)
+            guard let provider = CGDataProvider(data: data as CFData),
+                  let document = CGPDFDocument(provider),
+                  index + 1 <= document.numberOfPages else { throw RenderError.sourceDamaged }
+            return try Self.rasterizePDFPage(document, pageNumber: index + 1, sourceSize: page.sourceSize,
+                                             region: whole, pixelsPerPoint: pixelsPerPoint)
+        case .template(let template):
+            let width = max(1, Int((whole.width * pixelsPerPoint).rounded()))
+            let height = max(1, Int((whole.height * pixelsPerPoint).rounded()))
+            guard width * height <= Self.maxPixelCount else { throw RenderError.outputTooLarge }
+            return try Self.bitmap(width: width, height: height) { ctx in
+                ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+                ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+                ctx.scaleBy(x: CGFloat(width) / whole.width, y: CGFloat(height) / whole.height)
+                Self.drawTemplate(template, size: whole.size, in: ctx)
+            }
+        }
+    }
+
     /// Rasterizes `region` (source points) of a PDF page onto white.
-    static func rasterizePDFPage(_ document: CGPDFDocument, pageNumber: Int, sourceSize: CGSize,
+    ///
+    /// Public so compression can reduce a PDF kept as a loose file, which has
+    /// no `Page` and no store to go through, without a second rasterizer.
+    public static func rasterizePDFPage(_ document: CGPDFDocument, pageNumber: Int, sourceSize: CGSize,
                                  region: CGRect, pixelsPerPoint: CGFloat) throws -> CGImage {
         let width = max(1, Int((region.width * pixelsPerPoint).rounded()))
         let height = max(1, Int((region.height * pixelsPerPoint).rounded()))

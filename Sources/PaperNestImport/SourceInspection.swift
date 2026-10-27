@@ -16,11 +16,21 @@ public enum FileTypeSniffer {
         return ["heic", "heix", "heim", "heis", "hevc", "hevm", "hevs", "mif1", "msf1"].contains(brand)
     }
 
+    /// A RIFF container whose payload is WebP: `RIFF` at 0, `WEBP` at 8.
+    /// `RIFF` alone is not enough — WAV and AVI open identically, and
+    /// claiming one of those would import an audio file as a page.
+    static func isWebP(_ bytes: [UInt8]) -> Bool {
+        bytes.count >= 12
+            && Array(bytes[0..<4]) == Array("RIFF".utf8)
+            && Array(bytes[8..<12]) == Array("WEBP".utf8)
+    }
+
     public static func kind(of data: Data) -> AssetKind? {
         let bytes = [UInt8](data.prefix(1024))
         if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) { return .png }
         if bytes.starts(with: [0xFF, 0xD8, 0xFF]) { return .jpeg }
         if isHEIC(bytes) { return .heic }
+        if isWebP(bytes) { return .webp }
         // "%PDF-" may be preceded by junk bytes; readers accept it within the first 1 KB.
         let pdfMarker: [UInt8] = Array("%PDF-".utf8)
         if bytes.count >= pdfMarker.count {
@@ -97,6 +107,13 @@ extension ImageInspector {
             // ISO-BMFF has no end marker. The boxes are walked instead: a
             // truncated file runs past its own last box.
             return boxChainIsComplete(bytes)
+        case .webp:
+            // RIFF carries its own length: a 32-bit little-endian size at
+            // offset 4, counting everything after it. A truncated file claims
+            // more than it has.
+            guard bytes.count >= 12 else { return false }
+            let declared = UInt32(bytes[4]) | UInt32(bytes[5]) << 8 | UInt32(bytes[6]) << 16 | UInt32(bytes[7]) << 24
+            return Int(declared) + 8 <= bytes.count
         case .pdf:
             return true
         case .file:

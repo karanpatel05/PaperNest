@@ -25,20 +25,20 @@ extension Exporter {
         progress(ExportProgress(completedPages: 0, totalPages: pages.count))
         var body: [String] = []
         var foundAnyText = false
+        let sources = try await sourceDocuments(for: pages)
 
         for (index, page) in pages.enumerated() {
             try Task.checkCancellation()
             if index > 0 { body.append(Self.docxPageBreak) }
 
             let recognized = try await renderer.recognizedLines(for: page)
-            let lines: [String]
-            if !recognized.isEmpty {
-                lines = recognized.map(\.text)
-            } else if let embedded = try await renderer.embeddedText(for: page) {
-                lines = [embedded]
-            } else {
-                lines = []
-            }
+            // A digital PDF's text is read from its own file, so each line of
+            // the page becomes a paragraph. Taking it from the search index
+            // gave one paragraph for the whole page — the layout a Word export
+            // exists to keep, thrown away at the last step.
+            let lines = recognized.isEmpty
+                ? Self.textLines(of: page, in: sources)
+                : recognized.map(\.text)
 
             for line in lines {
                 let escaped = Self.xmlEscaped(line)

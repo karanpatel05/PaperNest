@@ -38,13 +38,12 @@ import PaperNestTestSupport
         XMLParser(data: xml).parse()
     }
 
+    /// The text goes in the PDF, which is where a digital PDF's text lives.
+    /// This used to import pages reading "page" and then index the wanted text
+    /// against them, which tested the search index rather than the document.
     private func seeded(_ fixture: ExportFixture, _ texts: [String]) async throws
         -> (PaperNestCore.LibraryItem, [Page]) {
-        let (item, pages) = try await fixture.importPDF(texts.map { _ in "page" })
-        for (page, text) in zip(pages, texts) {
-            try await fixture.store.indexEmbeddedText(text, for: page.id, expecting: page.content)
-        }
-        return (item, pages)
+        try await fixture.importPDF(texts)
     }
 
     @Test func theFileIsAZipHoldingThePartsAWordProcessorNeeds() async throws {
@@ -152,11 +151,32 @@ import PaperNestTestSupport
 
     @Test func aDocumentWithNoTextIsRefusedRatherThanWritingAnEmptyWordFile() async throws {
         let fixture = try ExportFixture()
-        let (item, pages) = try await fixture.importPDF(["Nothing indexed"])
+        // A scan: no recognition, and no text of its own either. This used to
+        // be a text page nobody had indexed, which only looked textless.
+        let item = try await fixture.importer.importItem(
+            .data(SyntheticDocuments.scannedPDF(), name: "Scan"))
+        let pages = try await fixture.store.pages(of: item.id)
 
         await #expect(throws: ExportError.noTextToExport) {
             try await fixture.exporter.export(itemName: item.name, pages: pages,
                                               options: ExportOptions(format: .docx))
         }
+    }
+
+    /// The same limitation on the Word side: a digital PDF's text arrived as a
+    /// single paragraph, which is exactly the layout a Word export exists to
+    /// keep.
+    @Test func aDigitalPDFBecomesOneParagraphPerLine() async throws {
+        let fixture = try ExportFixture()
+        let (item, pages) = try await fixture.importPDF(["Invoice 2026-114\nDue 30 November\nTotal 1234 EUR"])
+
+        let (_, documentXML, output) = try await exportDocx(fixture, item.name, pages)
+        defer { output.removeTemporaryFiles() }
+
+        let text = String(decoding: documentXML, as: UTF8.self)
+        #expect(text.contains("Invoice 2026-114"))
+        #expect(text.contains("Total 1234 EUR"))
+        #expect(text.components(separatedBy: "<w:p>").count - 1 >= 3,
+                "three lines should be three paragraphs")
     }
 }

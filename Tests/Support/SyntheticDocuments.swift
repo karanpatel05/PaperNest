@@ -221,8 +221,24 @@ extension SyntheticDocuments {
     /// A PDF whose pages carry only raster content, the way a scan of paper
     /// arrives: there is no text layer to extract. Used to check that text
     /// indexing can tell "looked, found nothing" apart from "not looked at".
-    public static func scannedPDF(pages: Int = 1, size: CGSize = CGSize(width: 612, height: 792)) -> Data {
-        let bitmap = PixelProbe.decode(image(width: 400, height: 560, type: .png))!
+    /// `raster` is the bitmap the page is a photograph of. The default is small
+    /// and nearly flat, which is enough to stand for "a PDF whose marks are an
+    /// image". Pass a large, detailed one when the test is about *size* — a
+    /// 400×560 near-flat PNG is already more compact than any re-encode of it,
+    /// so it cannot show compression working.
+    /// A 16×16 lossless WebP: the top-left quadrant red, the rest white.
+    ///
+    /// A literal rather than drawn, because it cannot be drawn: ImageIO lists
+    /// no WebP type among the ones it can *write*, so there is no way to
+    /// encode one on this platform. The colours are the point — they let a
+    /// test prove the file is really decoded rather than merely accepted.
+    public static func webPImage() -> Data {
+        Data(base64Encoded: "UklGRioAAABXRUJQVlA4TB4AAAAvD8ADAA/wiv93/7/if/7jAWLBJH/pzilE9H8CThw=")!
+    }
+
+    public static func scannedPDF(pages: Int = 1, size: CGSize = CGSize(width: 612, height: 792),
+                                  raster: Data? = nil) -> Data {
+        let bitmap = PixelProbe.decode(raster ?? image(width: 400, height: 560, type: .png))!
         let data = NSMutableData()
         var box = CGRect(origin: .zero, size: size)
         let consumer = CGDataConsumer(data: data as CFMutableData)!
@@ -236,5 +252,29 @@ extension SyntheticDocuments {
         }
         ctx.closePDF()
         return data as Data
+    }
+}
+
+extension SyntheticDocuments {
+    /// A PDF carrying the things a redraw silently loses: a link and a text
+    /// form field. Used to check that an unedited page is copied rather than
+    /// reproduced as marks on a blank page.
+    public static func annotatedPDF(linkURL: URL = URL(string: "https://example.com/invoice")!,
+                                    fieldName: String = "customer") -> Data {
+        let document = PDFDocument(data: textPDF(pages: ["Signed agreement"]))!
+        let page = document.page(at: 0)!
+
+        let link = PDFAnnotation(bounds: CGRect(x: 72, y: 600, width: 140, height: 22),
+                                 forType: .link, withProperties: nil)
+        link.url = linkURL
+        page.addAnnotation(link)
+
+        let field = PDFAnnotation(bounds: CGRect(x: 72, y: 540, width: 160, height: 24),
+                                  forType: .widget, withProperties: nil)
+        field.widgetFieldType = .text
+        field.fieldName = fieldName
+        page.addAnnotation(field)
+
+        return document.dataRepresentation()!
     }
 }

@@ -229,5 +229,23 @@ enum Schema {
         ALTER TABLE page_objects_v7 RENAME TO page_objects;
         CREATE INDEX page_objects_by_page ON page_objects(page_id, z_key, id);
         """, rebuildsTables: true),
+        // WebP, the same way HEIC arrived in v6 and for the same reason: the
+        // format was checked against ImageIO before being offered. The answer
+        // was narrower this time — it reads WebP and cannot write it — so this
+        // widens what may be *stored*, and nothing anywhere produces one.
+        Migration(version: 8, sql: """
+        CREATE TABLE assets_v8 (
+            id TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('pdf', 'jpeg', 'png', 'heic', 'webp', 'file')),
+            byte_count INTEGER NOT NULL,
+            original_filename TEXT,
+            availability TEXT NOT NULL CHECK (availability IN ('local', 'remoteOnly')),
+            created_at REAL NOT NULL
+        );
+        INSERT INTO assets_v8 (id, kind, byte_count, original_filename, availability, created_at)
+            SELECT id, kind, byte_count, original_filename, availability, created_at FROM assets;
+        DROP TABLE assets;
+        ALTER TABLE assets_v8 RENAME TO assets;
+        """, rebuildsTables: true),
     ]
 }

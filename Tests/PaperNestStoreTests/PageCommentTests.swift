@@ -83,7 +83,7 @@ import PaperNestCore
         try raw.run("INSERT INTO page_objects VALUES ('old','p','V','text',?,1)", [.text(json)])
         raw.close()
         let store = try LibraryStore(directory: dir.url)
-        #expect(try await store.schemaVersion() == 7)
+        #expect(try await store.schemaVersion() == Schema.latestVersion)
         let pageID = PageID(rawValue: "p")
         #expect(try await store.objects(on: pageID).first?.payload == payload)
         _ = try await store.setPageComment(on: pageID, replacing: nil, text: "New comment")

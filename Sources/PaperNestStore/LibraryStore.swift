@@ -730,6 +730,84 @@ public actor LibraryStore {
         }
     }
 
+    /// Deletes one asset — its row and its file — but only when nothing in
+    /// the library still points at it. Returns whether it went.
+    ///
+    /// Redaction needs exactly this, and `sweepOrphanAssets` will not do: that
+    /// sweep's grace period protects assets staged but not yet referenced, so
+    /// calling it with no grace period to collect a single file could take
+    /// another operation's freshly staged bytes with it. This touches one
+    /// asset and refuses if anything still shows it.
+    ///
+    /// The row goes before the file, as the sweep does it. A crash between the
+    /// two leaves an orphan file, which the sweep collects later; the other
+    /// order would leave a row pointing at nothing, which is a broken library.
+    @discardableResult
+    public func deleteAssetIfUnreferenced(_ id: AssetID) throws -> Bool {
+        guard let record = try assetRecord(id) else { return false }
+        guard try !isAssetReferenced(id) else { return false }
+        _ = try db.transaction { try db.run("DELETE FROM assets WHERE id = ?", [.text(id.sha256)]) }
+        try? assets.remove(id, kind: record.kind)
+        return true
+    }
+
+    /// Forgets the undo history that kept one page's previous content, so the
+    /// asset behind it can be swept away. Returns how many history rows went.
+    ///
+    /// Redaction needs this and is the reason it exists. While the history row
+    /// is there the original is still referenced, so `sweepOrphanAssets` keeps
+    /// it — correctly, because the replacement is still undoable. A redaction
+    /// is not finished until the page cannot be put back.
+    ///
+    /// This is deliberately per page. `purgeReplacedPageContent` clears the
+    /// whole table as launch housekeeping, which would throw away every other
+    /// page's undo along with it.
+    @discardableResult
+    public func forgetReplacedContent(for pageID: PageID) throws -> Int {
+        try db.transaction {
+            try db.run("DELETE FROM page_content_history WHERE page_id = ?", [.text(pageID.rawValue)])
+        }
+    }
+
+    /// Deletes what was read off a page, rather than only unindexing it.
+    ///
+    /// `replacePageContent` already removes the page's rows from
+    /// `search_index`, so the words stop answering searches the moment the
+    /// content changes — but the recognition row itself still physically holds
+    /// them, with the old `source_revision`. Export refuses it and search
+    /// cannot see it, yet the words are on disk, which is not redaction.
+    public func deleteRecognition(for pageID: PageID) throws {
+        try db.transaction {
+            try db.run("DELETE FROM page_recognition WHERE page_id = ?", [.text(pageID.rawValue)])
+            try db.run("DELETE FROM search_index WHERE page_id = ? AND field = 'ocr'", [.text(pageID.rawValue)])
+        }
+    }
+
+    /// Whether anything in the library still points at this asset: a page, a
+    /// page's undo history, a file item or an image placed on a page.
+    ///
+    /// Redaction reports this rather than assuming. Assets are content
+    /// addressed, so two pages of identical paper share one; when another page
+    /// still shows it, the sweep keeps it and the content remains reachable.
+    /// That is correct, and saying "removed" anyway would be a lie.
+    public func isAssetReferenced(_ id: AssetID) throws -> Bool {
+        let direct = try db.query("""
+            SELECT 1 FROM assets a
+            WHERE a.id = ?
+              AND (EXISTS (SELECT 1 FROM pages p WHERE p.asset_id = a.id)
+                OR EXISTS (SELECT 1 FROM page_content_history h WHERE h.asset_id = a.id)
+                OR EXISTS (SELECT 1 FROM file_items f WHERE f.asset_id = a.id))
+            """, [.text(id.sha256)]) { $0.int(0) }
+        if !direct.isEmpty { return true }
+        let placed = try db.query("SELECT payload_json FROM page_objects WHERE kind = 'image'") {
+            try decoder.decode(PageObject.Payload.self, from: Data($0.text(0).utf8))
+        }.contains { payload in
+            if case .image(let image) = payload { return image.assetID == id }
+            return false
+        }
+        return placed
+    }
+
     /// Launch housekeeping: forgets content replaced in a previous session
     /// (no undo stack survives a relaunch). Run before `sweepOrphanAssets`.
     @discardableResult

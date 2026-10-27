@@ -58,7 +58,8 @@ Remaining (in order):
 
 ## Known limitations (current code)
 
-- Links, form fields and annotations inside imported PDFs may not survive export.
+- Links and annotations inside imported PDFs survive export only on a page nobody has edited, at `.original` paper, with no ink and no searchable-text layer: such a page is copied from its source rather than redrawn. Any edit, Letter or A4 paper, ink, or an OCR layer redraws the page and drops them, and a test pins that trade. Under a compression preset a text-free page is re-encoded rather than copied, so it loses its annotations too — that is the point of compressing it. Form fields: the widget and its name survive on an unedited page, but no document-level form dictionary is written, so fillability in other readers is unverified.
+- Compression shrinks a scanned PDF only when the page carries **no text of its own**, and only when the re-encode really comes out smaller than the page already is. Measured on a 1600×2000 scan in a 612×792 page: Strong 193,043 → 113,235 bytes (−41%), Smallest → 56,430 (−71%). **Light (300 dpi) upsamples most scans**, so it is thrown away and the page is copied untouched — 193,103, the same as a plain export. A page with text is never rasterized, because that would destroy every word; most scanner apps (Notes, Adobe Scan, ScanSnap) embed an invisible OCR layer, which counts as text, so **only image-only scans compress**. A blank page is left alone for the same size reason.
 - Black & White uses a global threshold.
 - Localization uses `.strings`/`.stringsdict`. Migrate to String Catalogs once Xcode tooling is available. French and Spanish need review by a native speaker.
 - Page objects (ink and text) are stored as JSON. A compact binary encoding may be needed for very dense notebooks; measure in M3.

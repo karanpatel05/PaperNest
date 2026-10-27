@@ -1,7 +1,9 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import PDFKit
 import PaperNestCore
+import PaperNestRender
 import UniformTypeIdentifiers
 
 /// How hard to try when reducing a document's size.
@@ -19,6 +21,34 @@ public enum CompressionPreset: String, Codable, Sendable, CaseIterable {
         case .light: RasterQuality(maxDPI: 300, jpegQuality: 0.85)
         case .strong: RasterQuality(maxDPI: 150, jpegQuality: 0.6)
         case .smallest: RasterQuality(maxDPI: 110, jpegQuality: 0.4)
+        }
+    }
+}
+
+/// What a compressed image file is written as.
+///
+/// JPEG is the default and that is a decision, not an oversight: compression
+/// exists to make a file easier to send, and handing back something the
+/// recipient cannot open is a worse outcome than a larger file that works.
+public enum CompressionFormat: String, Codable, Sendable, CaseIterable {
+    /// Opens everywhere.
+    case jpeg
+    /// About a third of the JPEG at the same quality — 94,742 bytes against
+    /// 284,377, measured — but older systems, many Windows installs and
+    /// plenty of upload forms cannot read one. The caller opts in.
+    case heic
+
+    var type: UTType {
+        switch self {
+        case .jpeg: .jpeg
+        case .heic: .heic
+        }
+    }
+
+    var fileExtension: String {
+        switch self {
+        case .jpeg: "jpg"
+        case .heic: "heic"
         }
     }
 }
@@ -115,9 +145,27 @@ extension Exporter {
     /// in its own temporary directory and never replaces what the library
     /// stores — the caller removes the directory when it is done.
     ///
-    /// Throws `CompressionError.unsupportedFormat` for bytes that are not a
-    /// re-encodable image, having written nothing.
-    public func compress(fileNamed name: String, data: Data, preset: CompressionPreset) async throws -> CompressionResult {
+    /// A PDF is handled page by page instead: pages that carry text are copied
+    /// untouched, and pages that do not are re-encoded at the preset and kept
+    /// only when they beat the page they would replace. A PDF whose pages all
+    /// carry text therefore comes back readable and reports no saving — it is
+    /// a file this can read and simply cannot make smaller, which is not the
+    /// same as one it cannot read.
+    ///
+    /// Throws `CompressionError.unsupportedFormat` for bytes that are neither
+    /// a re-encodable image nor a readable PDF, having written nothing.
+    public func compress(fileNamed name: String, data: Data, preset: CompressionPreset,
+                         format: CompressionFormat = .jpeg) async throws -> CompressionResult {
+        // `format` does not apply here: HEIC is not a PDF image filter, so a
+        // document's pages cannot use it whatever the caller asked for.
+        //
+        // A PDF is reduced page by page rather than re-encoded as one image:
+        // its pages are not all photographs, and the ones that carry text must
+        // keep carrying it.
+        if let document = PDFDocument(data: data), document.pageCount > 0 {
+            return try Self.compressPDF(named: name, document: document, data: data,
+                                        preset: preset, temporaryRoot: temporaryRoot)
+        }
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
         else { throw CompressionError.unsupportedFormat }
@@ -125,7 +173,7 @@ extension Exporter {
         // Everything that can fail happens before a directory exists, so a
         // refusal leaves nothing behind.
         let reduced = try Self.downsample(image, maxPixelSize: preset.maxPixelSize)
-        guard let encoded = Self.encode(reduced, type: .jpeg,
+        guard let encoded = Self.encode(reduced, type: format.type,
                                         quality: preset.rasterQuality.jpegQuality ?? 0.85, dpi: nil)
         else { throw ExportError.writeFailed }
 
@@ -133,7 +181,7 @@ extension Exporter {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         do {
             let base = ExportNaming.baseName((name as NSString).deletingPathExtension)
-            let url = directory.appendingPathComponent("\(base).jpg")
+            let url = directory.appendingPathComponent("\(base).\(format.fileExtension)")
             try encoded.write(to: url)
             return CompressionResult(preset: preset, originalByteCount: Int64(data.count),
                                      output: ExportOutput(directory: directory, files: [url]))
@@ -141,5 +189,116 @@ extension Exporter {
             try? FileManager.default.removeItem(at: directory)
             throw error
         }
+    }
+}
+
+
+extension Exporter {
+    /// Reduces a PDF held as loose bytes, page by page.
+    ///
+    /// The output is assembled fresh in PDFKit and the untouched pages are
+    /// `copy()`d, so whatever they carry — links, annotations, a form field's
+    /// name — comes with them. Everything that can fail happens before the
+    /// temporary directory exists, so a refusal still writes nothing.
+    static func compressPDF(named name: String, document: PDFDocument, data: Data,
+                            preset: CompressionPreset, temporaryRoot: URL) throws -> CompressionResult {
+        // A protected PDF is refused, measured rather than assumed. A locked
+        // document hands back no text, so every page looks like a scan; the
+        // locked `CGPDFDocument` then draws nothing, and the resulting white
+        // page beats any budget — a blank sheet reported as a 99% saving (845
+        // bytes from 8,110, one grey level). Even where the content does come
+        // through, as with an owner password that only restricts copying,
+        // assembling the output fresh drops the author's restrictions and
+        // hands back an unrestricted copy. Neither is ours to do.
+        guard !document.isEncrypted, !document.isLocked else {
+            throw CompressionError.unsupportedFormat
+        }
+        guard let provider = CGDataProvider(data: data as CFData),
+              let readable = CGPDFDocument(provider) else { throw CompressionError.unsupportedFormat }
+
+        let output = PDFDocument()
+        output.documentAttributes = document.documentAttributes
+        // A copied page is read lazily from the document it came from, so each
+        // rebuilt page's document has to stay alive until the output has been
+        // serialized. Letting one go out of scope leaves a blank page behind,
+        // and the file still looks like a triumph of compression.
+        var rebuilt: [PDFDocument] = []
+        for index in 0..<document.pageCount {
+            guard let page = document.page(at: index) else { throw ExportError.writeFailed }
+            if !Self.carriesText(document, at: index),
+               let reduced = Self.reEncodedPage(readable, pageNumber: index + 1, page: page,
+                                                preset: preset, keeping: &rebuilt) {
+                output.insert(reduced, at: output.pageCount)
+                continue
+            }
+            guard let copy = page.copy() as? PDFPage else { throw ExportError.writeFailed }
+            output.insert(copy, at: output.pageCount)
+        }
+        guard output.pageCount == document.pageCount,
+              let encoded = output.dataRepresentation() else { throw ExportError.writeFailed }
+        withExtendedLifetime(rebuilt) {}
+
+        let directory = temporaryRoot.appendingPathComponent("PaperNestExport-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        do {
+            let base = ExportNaming.baseName((name as NSString).deletingPathExtension)
+            let url = directory.appendingPathComponent("\(base).pdf")
+            try encoded.write(to: url)
+            return CompressionResult(preset: preset, originalByteCount: Int64(data.count),
+                                     output: ExportOutput(directory: directory, files: [url]))
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
+    }
+
+    /// One page as a JPEG at the preset, or nil to keep the page as it is.
+    ///
+    /// Nil whenever the page cannot be rasterized at this resolution (an A0
+    /// page at 300 dpi is past the 100M-pixel cap), cannot be encoded, or —
+    /// the common case — comes out no smaller than the page it would replace.
+    /// Light is 300 dpi, which upsamples most scans, so it usually declines.
+    private static func reEncodedPage(_ readable: CGPDFDocument, pageNumber: Int, page: PDFPage,
+                                      preset: CompressionPreset,
+                                      keeping rebuilt: inout [PDFDocument]) -> PDFPage? {
+        // The size has to be the *upright* crop box, not PDFKit's media box.
+        // `drawPDFContent` scales content to the upright crop box and applies
+        // the page's rotation, so taking 612×792 from a `/Rotate 90` page —
+        // an ordinary landscape phone scan — squeezes 792×612 of content into
+        // a portrait bitmap and puts it on an unrotated portrait page.
+        guard let cgPage = readable.page(at: pageNumber) else { return nil }
+        let box = cgPage.getBoxRect(.cropBox)
+        let upright = PageGeometry.uprightPDFSize(box: box, rotationDegrees: Int(cgPage.rotationAngle))
+        guard upright.width > 0, upright.height > 0 else { return nil }
+        let quality = preset.rasterQuality
+        let region = CGRect(origin: .zero, size: upright)
+        guard let raster = try? PageRenderer.rasterizePDFPage(
+                  readable, pageNumber: pageNumber, sourceSize: upright,
+                  region: region, pixelsPerPoint: quality.maxDPI / 72),
+              let jpeg = Self.encode(raster, type: .jpeg, quality: quality.jpegQuality ?? 0.85, dpi: nil),
+              let source = CGDataProvider(data: jpeg as CFData),
+              let image = CGImage(jpegDataProviderSource: source, decode: nil,
+                                  shouldInterpolate: true, intent: .defaultIntent),
+              let encoded = Self.singlePagePDF(image, size: upright),
+              let budget = Self.byteCount(of: page),
+              encoded.count < budget,
+              let source = PDFDocument(data: encoded),
+              let replacement = source.page(at: 0)?.copy() as? PDFPage
+        else { return nil }
+        rebuilt.append(source)
+        return replacement
+    }
+
+    /// A one-page PDF of `image` filling a page of `size`.
+    private static func singlePagePDF(_ image: CGImage, size: CGSize) -> Data? {
+        let data = NSMutableData()
+        var box = CGRect(origin: .zero, size: size)
+        guard let consumer = CGDataConsumer(data: data as CFMutableData),
+              let ctx = CGContext(consumer: consumer, mediaBox: &box, nil) else { return nil }
+        ctx.beginPDFPage(nil)
+        ctx.draw(image, in: box)
+        ctx.endPDFPage()
+        ctx.closePDF()
+        return data as Data
     }
 }

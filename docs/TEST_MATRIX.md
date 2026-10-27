@@ -1,5 +1,101 @@
 # Test matrix
 
+## 2026-10-27 — Codex Notes toolbar and first-launch welcome (verification in progress)
+
+- Notes actions now appear side by side in a labeled horizontal scrolling row; main actions do not require More. Rotate/filter retain parameter menus. Existing localized labels reused. Toolbar remains when empty so Add Notebook Page/Undo stay available. Compact page viewer receives drawing state.
+- Notes phone: `/private/tmp/papernest-note-bar-phone-final.log`, **passed**, exit 0: en/fr/es direct Shape save, Undo/Redo, Add Page/cancel, Comments, delete last page, Undo and add again. First run `/private/tmp/papernest-note-bar-phone.log` failed on offscreen hittability; helper fixed to check geometry before dragging inside the row. Initial English screenshot saved/inspected. Final result bundle was pruned before its localized screenshots could be exported; those images are not claimed reviewed.
+- Notes iPad initial `/private/tmp/papernest-note-bar-ipad.log`: **1 failed, 1 passed**, exit 65. Imported-document shape/history passed. Notebook test failed revealing Comments because the reported scroll frame includes the sidebar; helper now clips gestures to the editor column. Rerun pending.
+- Welcome: native one-screen introduction, persistent Get started, no account/permission demand; en/fr/es copy, Mac-specific import wording. Existing UI tests bypass via debug-only flag; welcome tests use isolated persistent keys.
+- Current-tree `./scripts/test.sh`: `/private/tmp/papernest-welcome-unit.log`, **423 passed**, exit 0 (64 UI, 127 Store, 89 Import, 101 Export, 42 Core); Mac build `/private/tmp/papernest-welcome-mac.log` passed exit 0. No Swift compiler warnings/errors. Claude's concurrent backend additions account for count changes; Codex changed no backend. Welcome simulator checks pending.
+- Welcome phone first run `/private/tmp/papernest-welcome-phone.log` failed: an identifier on the outer container propagated to the button and ScrollView, hiding their test identifiers. Removed that container identifier. `/private/tmp/papernest-welcome-phone-final.log`: **2 tests passed**, exit 0, localized first-launch/continue/relaunch and French largest-type continue. Screenshot review prompted smaller illustration spacing and clipping at the safe-area edge; final polish rerun pending.
+- `/private/tmp/papernest-welcome-notes-ipad-final.log`: **2 welcome tests passed, 1 Notes test failed**, exit 65. Welcome en/fr/es persistence and largest French type passed in dark mode; screenshots exported. Notes completed English but the French selector used the localized system label “Sidebar”, so dragging again landed outside the editor. Changed it to locate the sidebar by the stable Home button identifier; rerun pending.
+- Final welcome phone polish `/private/tmp/papernest-welcome-phone-polished.log`: **2 passed**, exit 0. Inspected en/fr/es and maximum French type screenshots: English/Spanish full intro fits, French third feature requires scrolling, CTA stays fixed; scrolled text now clips below the status area. Final Mac compile `/private/tmp/papernest-welcome-mac-polished.log` passed, no Swift warnings/errors. `/private/tmp/papernest-welcome-unit-final.log` again passed **423 tests** after localized copy changes. Standard Xcode AppIntents metadata/OS-version diagnostics remain toolchain messages, not Swift compiler warnings.
+- Fresh read-only reviews: Notes empty-page toolbar loss fixed and covered by deletion/undo workflow. Welcome Mac subtitle no longer mentions camera scanning in French/Spanish. No additional concrete review findings.
+- Native Mac interaction, VoiceOver, new largest-type Notes audit, real Pencil/camera, prior rotation and annotation-audit failures are not cleared by these runs.
+
+
+## Premium reference redesign — Codex, 2026-10-27 (implemented; open verification findings)
+
+- Owner deferred Vault and VPN to the next version. No protection UI or fake states added. Live dashboard uses real summaries and existing notebook/import/folder flows.
+- First Mac build passed, exit 0: `/private/tmp/papernest-premium-build.log`. Later navigation changes still being checked.
+- Full unit command `/private/tmp/papernest-premium-unit.log` exited 1: UI 64, Store 123, Import 77, Core 42 passed; Export ran 89 with two assertions failing in Claude’s active `aMixedDocumentExportedWithAPasswordKeepsEveryPage` at EncryptedExportTests:161/163 (drawn second-page text and title missing). Backend left untouched; this is not a green full run.
+- After Claude’s backend fix, `/private/tmp/papernest-premium-unit-final.log` passed 397 tests. Following the accessibility-layout revision and newer shared-tree backend changes, `/private/tmp/papernest-premium-unit-accessible.log` passed **411 tests** (64 UI + 126 Store + 86 Import + 93 Export + 42 Core), exit 0, no compiler warnings/errors.
+- Initial phone run: localized notebook creation/reopening and grid/list/crop/export passed; Home Recent failed because the new VStack did not expose a containing accessibility element. Added `.accessibilityElement(children: .contain)`. Xcode subsequently stalled in post-test `simctl diagnose`; interrupted only this run/diagnostic child (exit 75). Later runs use `-collect-test-diagnostics never` plus 900-second timeout; no test failures are suppressed.
+- `/private/tmp/papernest-premium-phone-final.log`: **5 tests passed**, exit 0. Recent opening/See All, grid/list → rotate/crop/export, en/fr/es dashboard notebook creation/reopening, actual folder creation, and largest-type notebook entry. `/private/tmp/papernest-premium-ipad.log`: **4 passed**, exit 0, dark mode: same localized dashboard flow, folder creation, largest-type entry, and Home → Favorites → Home → same Favorites plus multi-character global search. Screenshots inspected in all three languages.
+- Screenshot review found poor largest-text phone branding/tab wrapping despite the interaction test passing. Revised header to stacked text/settings, bottom navigation to a full-width menu at accessibility sizes, shortened localized compact action labels, made decorative action icons fixed-size, replaced the large-type Recent segmented picker with a menu, and hid large-type sidebar badges to free label width. New phone regression assertion rejects a fragmented multi-line brand. Final phone rerun `/private/tmp/papernest-premium-phone-accessible.log` passed both localized dashboard and largest-type tests, exit 0; inspected and replaced screenshots. Brand now fits on one line; compact en/fr/es action labels fit. Final Mac build `/private/tmp/papernest-premium-mac-accessible.log` passed, exit 0, no Swift compiler warnings/errors.
+- Read-only independent review found retained Home selection, search field destruction after the first character, and missing dashboard drop/paste import. Fixed with an explicit sidebar binding, search submission into All Documents, and dashboard drop/paste handlers. Native Mac drop/paste interaction remains unrun.
+
+
+### Final coverage and limits
+
+- `/private/tmp/papernest-premium-ipad-accessible.log` passed the largest-type interaction and an initial rotation smoke check. **Do not count that initial rotation check as landscape coverage:** screenshot inspection showed portrait. Strengthened the test to rotate after launch and assert actual window dimensions. `/private/tmp/papernest-premium-ipad-landscape.log` then **failed**, exit 65: app remained 1024×1366 after requesting landscape. Both source and built Info.plist allow all four iPad orientations. Cause remains unresolved; no orientation entitlement or fullscreen workaround was added. `testPremiumLandscapeDashboard` remains an unsuppressed regression check. Screenshot retained as `premium-home-rotation-attempt-ipad.png`, not advertised as landscape.
+- Final iPad largest-type screenshot shows readable dashboard controls and an adaptive Recent menu; **sidebar “All Documents” still hyphenates awkwardly** in the system-constrained column, even with badges removed. Not claimed fixed. Phone maximum-type header and bottom navigation no longer fragment their words. These are visual/interaction checks, not a passing full accessibility audit.
+- Saved/inspected `docs/screenshots/premium-home-{en,fr,es}-{iphone,ipad}.png`, matching library images and both largest-type images. Phone light, iPad dark. iPad appearance restored to light. No real documents or invented production folders/users were used.
+- Native Mac build is verified; native Mac clicking, keyboard shortcut/focus/hover behavior, drag/paste interaction, VoiceOver, Reduce Motion/Transparency interaction, narrow multitasking windows and real camera capture remain unrun. Computer-use tools are still unavailable. Existing annotation audit failures and the prior Thick-width test failure remain open in the preceding audit record.
+- Reference differences are deliberate where no service exists: owner deferred Vault/VPN; no fake profile/avatar, Shared collaborators or encrypted storage. Note action opens the real notebook editor, not a new rich-text service. Native camera remains VisionKit; Mac has no camera shortcut without a capture implementation. Folder names/data stay user-owned; no sample folders are seeded. Global search uses the native search field, without a new ⌘K command. The entire reference brief is **not claimed complete**.
+- All changes left uncommitted and unstaged. Review findings resolved in UI only; Claude’s backend changes untouched. Build/test timeouts: 600 seconds units/Mac, 900 seconds XCUITest. Xcode logs its existing AppIntents metadata and OS-build diagnostics; no Swift compiler warnings found in the final builds.
+
+## UI readability polish — Codex, 2026-10-26 (superseded by reference redesign; open audit findings)
+
+- UI-only: adaptive shape/stamp chooser at ordinary sizes, full-width stroke-width rows at accessibility sizes, primary-contrast wrapping help and Add Comment text, wider text-first iPad sidebar at accessibility sizes. Existing L10n en/fr/es strings reused; no backend changes.
+- Full unit suite **360 passed** (64 UI + 123 Store + 77 Import + 54 Export + 42 Core), exit 0, no compiler warnings/errors: `/private/tmp/papernest-polish-unit-final.log`. Mac build exit 0, no compiler warnings: `/private/tmp/papernest-polish-mac.log`. Both bounded to 600 seconds.
+- Localized shape/stamp/comment flows passed on phone (light) and iPad (dark), en/fr/es. Reviewed source units and Mac build also passed: `papernest-polish-unit-reviewed.log`, `papernest-polish-mac-reviewed.log`.
+- `/private/tmp/papernest-polish-ipad.log` failed overall: the unsuppressed four-sheet accessibility audit still flags Dynamic Type, Style contrast and comment clipping. The largest-type flow reached Line width but lost the sheet after tapping Thick; cause not resolved, and that flow is **not passed**. Its slider screenshot confirms wider text-first sidebar labels. Keep this separate from later dashboard tests. New reference redesign supersedes colors; native Mac/VoiceOver and real-device camera are still unrun. Nothing staged or committed.
+
+## Text to PDF — Claude, 2026-10-26
+
+Half of ledger row 33, and the reference converter's "Text to PDF". A `.txt` was kept as an opaque file item — previewable and shareable, but with no pages, so it could not be annotated, cropped, reordered or exported. `TextToPDF.render` lays it out with CoreText and `DocumentImporter.importTextAsDocument` puts the result through the ordinary import path, so it becomes a normal document. No schema change, no new strings.
+
+- **Pagination is real, not estimated, and that is the point of the slice.** `CTFramesetter` breaks the lines and `CTFrameGetVisibleStringRange` reports how much of the string each page actually consumed. Estimating by character count falls apart as soon as a line wraps, and whatever runs past the bottom of the frame is silently lost — a conversion that looks clean and is not. `textLongerThanAPageBreaksAcrossPagesWithNothingLost` probes lines 1, 50, 99, 100, 101, 150 and 200 **by number** across the break, so a dropped line is obvious rather than plausible.
+- A line wider than the page wraps rather than clipping — all 80 occurrences of the probe word survive — and a single unbreakable 400-character word still appears, so CoreText's character fallback is exercised rather than assumed.
+- **The pages carry real text, not a picture of it**, proved by extracting it back with `PDFTextExtractor` from the vector-PDF indexing slice. A converted document is therefore searchable by its own words with no recognition involved, which `theConvertedDocumentIsSearchableByItsOwnWords` asserts alongside `recognition(for:) == nil`. That round trip is the strongest available evidence that nothing was dropped.
+- **Conversion is explicit.** Importing a `.txt` still stores it as a file item exactly as before; `importingATextFileNormallyStillKeepsItAsAFile` pins that, because keeping a file as the bytes it arrived with is the right default and existing behaviour depends on it.
+- Empty or whitespace-only text is refused with `ImportError.empty` rather than producing a blank one-page document, and the refusal leaves nothing in the library.
+- Test-first reds: 16 × missing `TextToPDF`, then 8 × missing `importTextAsDocument`. A missing `import PaperNestCore` was corrected before the green run. Greens: `green-txt2pdf.log` (7), `green-txtconv2.log` (12).
+- **Final full suite: 360 passed** (64 UI + 123 Store + 77 Import + 54 Export + 42 Core), exit 0, **0 warnings**, 0 failures: `verify-txt2pdf.log`. Final Mac build passed and the `PaperNestUI` iOS Simulator build reported BUILD SUCCEEDED.
+- **Not run / not claimed:** **no UI offers the conversion** — there is no "Text to PDF" action in any screen, so this is not user-reachable. No independent reviewer pass; no native Mac, iOS interaction or real-device check. Helvetica at 11pt on A4 with 54pt margins is hard-coded: no font, size, paper or margin choice, and no right-to-left or vertical-script handling has been tested beyond the Cyrillic and Japanese strings in `accentsAndNonLatinTextSurvive`. DOCX, XLSX and PPTX to PDF are not here; they need a real Office renderer and belong to the F5 decision.
+- Plan: `docs/superpowers/plans/2026-10-26-text-to-pdf.md`. Nothing committed.
+
+## SQLite text truncation at a NUL — Claude, 2026-10-26
+
+The finding from the DOCX slice, fixed. `SQLiteDatabase.bind` passed `-1` to `sqlite3_bind_text`, and `Statement.text` read with `String(cString:)`, so **both directions stopped at the first NUL** and one unprintable character took the rest of the string with it, silently. Both now use explicit byte counts.
+
+- **The blast radius was narrowed before choosing a fix**, rather than patching the call site that happened to surface it: item and folder names are already sanitized at the edge (`LibraryModels.swift:118` filters control characters); `original_filename` comes from a filesystem where NUL cannot occur; and a recognition result travels as JSON, where a NUL is the escape `\u0000` and survives. What was genuinely reachable was text from recognition or a PDF flowing into `search_index.content`, which made a document **silently and partly unsearchable**.
+- **Fixed the mechanism, not that one path.** `-1` plus `String(cString:)` is a trap for every text column anyone adds next, and the store is meant to be the single authority for metadata — one that does not return what it was given undermines that. `sqlite3_column_bytes` is called after `sqlite3_column_text`, which is the order that fixes the column's type and so its length.
+- **The open question was whether FTS5 tolerates a NUL in content, and the test decided it rather than a guess.** It does: `wordsAfterANULAreStillFindable` passes, so `unicode61` treats it as a separator and the word after it indexes normally. The planned fallback — sanitizing indexed text at the edge, following the precedent names set — is therefore **not** needed, and no lossy cleanup was added that nothing requires.
+- Test-first red, unusually legible: `red-nul.log` shows `"Before\u{0}After" → "Before"`, with round-trip, searchability and reopen-persistence failing while the ordinary-text control passed — which is what showed the defect was narrow rather than a general text regression. Green: `green-nul.log` (4 tests).
+- **Final full suite: 348 passed** (64 UI + 123 Store + 65 Import + 54 Export + 42 Core), exit 0, **0 warnings**, 0 failures: `verify-nul.log`. Final Mac build passed and the `PaperNestUI` iOS Simulator build reported BUILD SUCCEEDED. **This is the point of that run:** the change sits in the hot path of every text read and write — names, OCR, comments, tags, migrations, the search index, localization parity, the pixel-probe export checks — and nothing moved. Four focused tests would not have been evidence that it is safe.
+- **Not run / not claimed:** no independent reviewer pass. No existing library has been opened with the new read path, only libraries created during the tests, so a migration-era database with unusual bytes is unexercised; nothing in the change is schema-dependent, but that is reasoning rather than a test. No native Mac, iOS interaction or real-device check. A NUL can now be stored, so anything that later renders stored text should strip control characters at its own edge the way the DOCX writer does — that is presentation, not storage.
+
+## Basic DOCX export — Claude, 2026-10-26
+
+F4's last export deliverable ("TXT and basic DOCX") and half of ledger row 34. A `.docx` is a ZIP of XML parts, so this writes the three a word processor needs — `[Content_Types].xml`, `_rels/.rels`, `word/document.xml` — through the existing `ZipWriter` rather than adding a dependency. Text follows the plain-text writer's precedence: recognition first, then the text a digital PDF carries; one paragraph per recognized line, an explicit page break between pages. **Basic means the words in a real Word file, not layout**: tables, columns and positioned images stay F5 rather than being approximated.
+
+- **Escaping is the correctness story.** Recognized text is whatever was printed on the paper, so an ampersand is ordinary; one unescaped `&` or `<` yields a file no word processor can open. `ampersandsAndAnglesAreEscapedSoTheFileStillParses` feeds it `Tom & Jerry <b> "quoted" 5 > 3` and then parses the output with `XMLParser`. Characters XML 1.0 forbids are dropped rather than written, since one would make the whole document unreadable.
+- Structure is verified **independently of the writer**: `/usr/bin/unzip` lists the parts and extracts them, and `XMLParser` parses `word/document.xml`, `[Content_Types].xml` and `_rels/.rels`. Same refusal as TXT: a document with no text throws `noTextToExport` instead of producing an empty Word file.
+- Test-first red: 4 × missing `ExportFormat.docx`. Green: `green-docx3.log` (8 tests).
+- **A finding in the store, recorded not fixed.** `SQLiteDatabase.bind` calls `sqlite3_bind_text(stmt, i, v, -1, SQLITE_TRANSIENT)` at `SQLite.swift:170`. Length `-1` makes the C API read to the NUL terminator, so **any string containing a NUL is silently truncated on the way into the database.** Found because a control-character test fed text through `indexEmbeddedText` and the text arrived as `Before` instead of `Before\0After\1End`. Not changed here: storing raw NULs in text columns is not obviously better than dropping them, item names are already sanitized deliberately (`cleansControlCharactersAndEmptyNames`), and changing bind semantics mid-feature would touch every text column. Worth a decision of its own. The test now uses the path where the escaper genuinely matters — a recognition result travels as JSON in `page_recognition`, where a NUL is the escape `\u0000`, survives storage and decodes back — so the drop behaviour is really exercised.
+- **A build failure of my own making, worth knowing about.** The first run died on `codesign: invalid or unsupported format for signature` for `PaperNestImportTests.xctest`, with no compile error and no concurrent build. The bundle had been corrupted when I killed `swift-test` mid-build during the Vision deadlock investigation hours earlier, in the build cache both sessions share. Removing that one bundle fixed it. Killing a build here leaves debris that resurfaces later looking unrelated.
+- **Final full suite: 344 passed** (64 UI + 119 Store + 65 Import + 54 Export + 42 Core), exit 0, **0 warnings**, 0 failures: `verify-docx.log`. Final Mac build passed and the `PaperNestUI` iOS Simulator build reported BUILD SUCCEEDED.
+- **Not run / not claimed — the important one: nobody has opened the file in a word processor.** Structure is checked by `unzip` and `XMLParser`, which proves it is a well-formed OOXML package, **not** that Word, Pages or Google Docs renders it. That is whole-app verification and is recorded as owed in `docs/CODEX_BRIEF.md`; this must not be offered in any screen until someone has opened one. Also not here: no UI (no DOCX tile), no independent reviewer pass, no native Mac or iOS interaction check. Ink, text boxes and page comments are not exported; only recognized and embedded text is. Layout, fonts, styles, headers, images and tables are absent by design.
+- Plan: `docs/superpowers/plans/2026-10-26-docx-export.md`. Nothing committed.
+
+## App verification backlog — Codex, 2026-10-26 (first pass; open findings)
+
+- Read CODEX_BRIEF, current ownership/claims and Vision trap before editing. No backend files changed; no staging or commit. Manual recognition in `DocumentModel` now awaits `recognizeOnADedicatedThread` instead of calling synchronous Vision on MainActor. Source inspection confirmed the blocking call; no before/after latency measurement is claimed.
+- Full `./scripts/test.sh`: **336 passed** (64 UI + 119 Store + 65 Import + 46 Export + 42 Core), exit 0, no compiler warning/error matches. Log `/private/tmp/papernest-audit-unit.log`. `./scripts/build-mac-app.sh`: exit 0, no compiler warnings, `/private/tmp/papernest-audit-mac.log`. Both ran under 600-second process-group timeouts.
+- **iPhone 17 Pro, dark mode: 3 interaction tests passed**, exit 0: `/private/tmp/papernest-audit-phone2.log`, xcresult `Test-PaperNest-iOS-2026.10.26_13-29-53--0500.xcresult`. Largest accessibility text category (`UICTContentSizeCategoryAccessibilityXXXL`) verified visually; notebook creation, shape start-X slider changes its accessible value, system custom-colour grid selection changes the sheet value, shape saves and appears in Manage Markup. Manual Recognize Text → content search also passes (not a latency benchmark).
+- **Failed-save UI observed:** a second SQLite connection holds `BEGIN IMMEDIATE` on a unique disposable library. Shape save shows the localized error after the real database timeout, keeps the ellipse draft, and retry after rollback saves exactly one markup row. This is database contention, **not injected disk I/O failure**; disk-full/unwritable-file behavior remains unrun. No production failure hooks or backend changes were added.
+- Initial iPhone run failed because the test matched `Close` while UIKit exposed `close`. Captured hierarchy established the cause; corrected to a case-insensitive match, then tested actual colour selection and dismissal. Initial log `/private/tmp/papernest-audit-phone.log`, exit 65. Not an application defect. Xcode emits an AppIntents metadata-extraction warning (no framework dependency) and OS-build parsing diagnostics; no Swift compiler warnings.
+- Three iPhone screenshots saved under `docs/screenshots/audit-*-iphone.png`; inspected large-text slider, selected system colour and failure alert. Initial iPad run `/private/tmp/papernest-audit-ipad.log` exits 65: failed-save/retry passes, large-text test fails locating an offscreen menu entry (test must scroll), and automated audit **fails Dynamic Type** on the native Shape toolbar Add button. Audit attachment says the user cannot change this element's font size; its element screenshot shows Add. The audit stopped at the first surface, so the other sheets were not audited in that run. Investigation and full finding collection are in progress; this is not a passing accessibility check.
+- **Expanded iPad automated audit remains failing:** `/private/tmp/papernest-audit-ipad2.log` collected all four surfaces rather than stopping at the first failure. Findings: Shape Add/Cancel Dynamic Type; Stamp Add/Cancel and placement-help Dynamic Type, Style contrast and a clipping flag; Comments Done Dynamic Type, Add Comment contrast/clipping; Manage Markup Done Dynamic Type. These are audit findings requiring triage, not a VoiceOver certification. Normal-size screenshots show readable content; some flags concern scroll-boundary content, so do not assume every flag is visible truncation. Evidence: `docs/screenshots/audit-accessibility-audit-editor-*-ipad.png` and xcresult attachments. No audit issue filter or expected-failure suppression was added.
+- A controlled typography experiment set Shape/Stamp toolbar buttons to `.font(.body)`; `/private/tmp/papernest-audit-ipad3.log` still reported toolbar Dynamic Type failures. **Rejected and reverted**, so no unsupported typography fix remains. The large-text iPad automation also needed to scroll inside the visible menu viewport (not the offscreen Manage Markup row), and to select the presented Form rather than the background Pages collection. Final control rerun passed; see below.
+- **Current-tree recheck after Claude’s backend additions:** 360 unit tests pass (64 UI + 123 Store + 77 Import + 54 Export + 42 Core), exit 0, no compiler warnings/errors: `/private/tmp/papernest-audit-unit-final.log`. Mac build also exit 0, no compiler warnings: `/private/tmp/papernest-audit-mac-final.log`. Both bounded to 600 seconds. These are build/unit outcomes, not a passing accessibility audit.
+- iPad custom-picker run `/private/tmp/papernest-audit-ipad-controls.log` reached and adjusted the slider, selected azure from the system grid, then failed trying to tap an AX `close` control that is not visually present in the iPad popover. The screenshot and hierarchy confirm a `PopoverDismissRegion`; test updated to dismiss by tapping outside the popover on iPad, retaining close-button dismissal on iPhone. **Final iPad control rerun passed**, exit 0: `/private/tmp/papernest-audit-ipad-controls-final.log`, xcresult `Test-PaperNest-iOS-2026.10.26_19-03-52--0500.xcresult`. This covers the largest text category in dark mode, menu/form scrolling, changed start-X slider value, actual system colour selection, popover dismissal, save and the resulting markup row. Three iPad screenshots (including the earlier passing failure/retry flow) saved as `audit-*-ipad.png` and inspected. Simulator appearance restored to light after testing.
+- Scope limits: these new interactions are **English only**; the older en/fr/es flows were not rerun here. Start-X slider was driven, not all four endpoint sliders. Largest-type coverage is notebook creation and shape/custom-picker navigation, not every recent sheet. Text-markup, notebook-page insertion and comment-editor accessibility still need their own passes. The four-sheet automated audit is intentionally unsuppressed and currently fails; do not report the full XCUITest suite as green.
+- **Additional visual finding:** at the largest text category, iPad sidebar labels wrap into short word fragments in the narrow sidebar (visible behind the sheet in the final screenshots). This is a readability issue to address in the next design pass; it was not changed here.
+- **Blocked / not run:** no computer-use tools available to this session, so native Mac annotation interaction, VoiceOver listening/navigation and native two-window conflict interaction have not been performed. A successful Mac build does not close these checks. `xcrun xctrace list devices` found only the Mac and simulators, no attached physical iPhone/iPad; real camera capture and M1 gate remain blocked on a device/provisioning. Other save-failure surfaces and injected disk I/O failure still unrun. No new feature surfaces added before this backlog pass.
+
 ## Text export (TXT) — Claude, 2026-10-26
 
 F4's outstanding TXT deliverable and row 34's "PDF to Text". A document's words could be searched inside PaperNest but never got out: every export was a PDF or an image. `ExportFormat` gains `.txt`, `ExportError` gains `.noTextToExport`, and a new `TextExport.swift` writes one section per page. No schema change, no new strings.
@@ -345,3 +441,718 @@ The resumed chat referenced the old DOCS PRO checkout and unfinished Tools toolb
 - iPhone 17 Pro: `testToolsScreenPicksTwoDocumentsAndMergesThem` and `testAFolderMadeInTheSidebarHoldsAMovedDocument` both passed, 0 failures; `TEST SUCCEEDED`. Log: `/private/tmp/papernest-tools-resume-ui.log`. Result: cache `build-17de0868e51d/xcodeproj/Logs/Test/Test-PaperNest-iOS-2026.10.24_13-10-01--0500.xcresult`.
 - This run covers Tools merge and the folder regression on iPhone. It does not newly verify iPad, Mac UI, all Tools actions, or real camera access. Xcode emitted operating-system-build parsing diagnostics after the successful tests.
 - Existing work and Qwen reservations remain intact. No commit or push. No test process remains active from this continuation.
+
+## PDF pass-through on export — 2026-10-26 (Claude, backend)
+
+An unedited imported PDF page is now copied from its source file instead of being
+redrawn, so its links and annotations survive export. Pages that *have* been
+changed keep going down the drawing path.
+
+- Full `./scripts/test.sh`: **371 tests passed** (64 + 123 + 77 + 65 + 42), **0 warnings**.
+  Log: `scratchpad/suite.log` (session scratchpad).
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings — built and signed
+  `~/Library/Caches/PaperNest/build-17de0868e51d/dist/PaperNest.app`.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+- 11 tests in `PDFPassThroughTests`, all passed: a link survives with its URL; a
+  form widget survives with its `/T` name; title and creator are preserved; text
+  and page count unchanged; a cropped page is redrawn and loses its annotations
+  (the honest trade, pinned); Letter paper redraws every page; a mixed document
+  keeps order and treats each page on its own; a passed-through page does not
+  disturb a drawn OCR layer on its neighbour; the export carries the source's
+  form dictionary; compressing an unedited page still keeps its link; a page
+  getting a recognised-text layer is redrawn.
+
+### What this does **not** establish
+
+- **Interactive form fields are not verified, and ledger row 24 stays Planned.**
+  The widget and its name survive, read back through PDFKit. Read back through
+  Core Graphics, the exported file has **no** catalog `AcroForm` — and neither
+  does the synthetic fixture, because PDFKit writes a widget's `/T` without
+  building a form dictionary. So nothing here shows a real form staying
+  fillable in another reader. That needs a hand-built fixture with a real
+  `/AcroForm`.
+- **Behaviour change to note:** compressing an unedited PDF now keeps its links,
+  because the page is copied rather than drawn.
+- **Pre-existing limitation found while measuring, not introduced here:**
+  compression cannot shrink a scanned PDF. An unedited PDF page is never
+  re-encoded, so every preset returns it as it was — 8521 bytes copied against
+  8531 drawn, identical at `.light` and `.smallest`. It reports no saving rather
+  than a fake one.
+- No UI was involved; this is export-path logic only. Nothing committed.
+
+## Compressing a scanned PDF — 2026-10-26 (Claude, backend)
+
+Compression can now shrink a PDF whose pages are photographs. A `.pdfPage`
+carrying no text of its own is re-encoded as a JPEG at the preset, and the
+re-encode is kept **only when it is smaller than the page already is**.
+
+- Full `./scripts/test.sh`: **378 tests passed** (64 + 123 + 77 + 72 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings — built and signed
+  `~/Library/Caches/PaperNest/build-17de0868e51d/dist/PaperNest.app`.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Measured, on a 1600×2000 raster inside a 612×792 page
+
+| source | original | plain export | light | strong | smallest |
+|---|---|---|---|---|---|
+| scan | 193,043 | 193,103 | 193,103 | 113,235 (−41%) | 56,430 (−71%) |
+| digital text PDF | 8,007 | 8,044 | 8,044 | 8,044 | 8,044 |
+| blank page | 2,140 | 2,207 | 2,207 | 2,207 | 2,207 |
+
+Seven new tests in `CompressionTests`: a scanned PDF gets smaller at Smallest;
+a stronger preset shrinks it further and keeps both pages; the compressed file
+differs from a plain export (so the page really is re-encoded, not copied); a
+preset that would enlarge the page leaves it alone; a blank page is not
+rasterized into something larger (with a precondition asserting the fixture
+really is text-free, so the test cannot pass for the wrong reason); a cropped
+scanned page is re-encoded **and keeps its crop**; a page too large to
+rasterize is left alone rather than failing the export. The two existing guards
+still pass — `aVectorPDFKeepsItsTextInsteadOfBeingRasterizedToSaveBytes` and
+`anAlreadyCompactOriginalReportsNoSavingRatherThanAFakeOne`.
+
+### A regression caught before it shipped
+
+The first working version rasterized every text-free page at the preset's dpi.
+Light is 300 dpi, which **upsamples** a scan of lower resolution: it produced
+**416,360 bytes from a 193,043-byte page** — a "compression" that more than
+doubled the file, where the old code had simply copied the page. A re-encode is
+now measured against the page it would replace, per page, by writing the copied
+page alone into a document. Light therefore falls back to copying.
+`aPresetThatWouldEnlargeAScannedPageLeavesItAlone` pins it.
+
+### Two more bugs the fixtures found
+
+- **A protected PDF came back as a blank page reported as a 99% saving.** A
+  locked document hands back no text, so `carriesText` is false and every page
+  looks like a scan; the locked `CGPDFDocument` then draws nothing and the
+  white page beats any budget — **845 bytes from 8,110, one grey level**. The
+  output also had its encryption stripped. Compression now refuses an
+  encrypted or locked PDF outright, which also covers an owner password that
+  restricts copying: assembling the output fresh drops that restriction, and
+  handing back an unrestricted copy is not ours to do. **Documents are
+  unaffected** — the importer stores a decrypted copy and verifies it.
+- **A rotated page was distorted.** Sizing the re-encoded page from PDFKit's
+  media box ignores `/Rotate`, so a landscape phone scan (portrait media box,
+  `/Rotate 90`) had 792×612 of content squeezed into a portrait page: the
+  input rendered 396×306 and the output 306×396. The size now comes from
+  `PageGeometry.uprightPDFSize` of the crop box.
+
+### What this does **not** do
+
+- **Only image-only scans compress.** A page with text is never rasterized,
+  because that destroys every word for a reader, a search and an export. Most
+  scanner apps — Notes, Adobe Scan, ScanSnap — embed an invisible OCR layer,
+  and that counts as text here, so **those PDFs still will not compress**. This
+  bounds how often the feature helps, and it is not a tunable threshold: any
+  text at all means the page is left alone.
+- **Light rarely helps a scan**, for the upsampling reason above. The savings
+  are at Strong and Smallest.
+- A page too large to rasterize (over 100M pixels) is left alone rather than
+  failing the export — now covered by a test using an 8000pt-square page, about
+  1.1 billion pixels at Light's 300 dpi.
+- A page that already needs pixel processing (filter, brightness, contrast) is
+  excluded from the measurement, because the ordinary path rasterizes it at the
+  same quality anyway and measuring would rasterize it twice for identical
+  bytes. Its behaviour is unchanged by this slice.
+- Only synthetic fixtures were used. **No PDF from a real scanner app has been
+  compressed**, so the OCR-layer claim above is reasoned from the rule, not
+  measured on a real file.
+- No UI: there is still no Compress action in any screen, so none of this is
+  user-reachable. Whoever adds one owns showing these real before/after bytes.
+- Nothing committed.
+
+## Compressing a PDF kept as a file — 2026-10-27 (Claude, backend)
+
+`compress(fileNamed:data:preset:)` used to refuse a PDF outright. It now
+reduces one page by page: pages that carry text are copied untouched, pages
+that do not are re-encoded at the preset and kept only when they beat the page
+they would replace.
+
+- Full `./scripts/test.sh`: **385 tests passed** (64 + 123 + 77 + 79 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Measured, on a loose PDF file
+
+| source | original | light | strong | smallest |
+|---|---|---|---|---|
+| 1600×2000 scan in a 612×792 page | 193,043 | 193,092 | 111,920 (−42%) | 55,115 (−71%) |
+| digital text PDF | 8,007 | 8,028 | 8,028 | 8,028 |
+
+Seven new tests in `FileCompressionTests`: a scanned PDF file is reduced rather
+than refused (with the output page rendered and checked for content, and a size
+floor); a digital PDF keeps its text and reports no saving; pages keep their
+order; a preset that would enlarge the file leaves its pages alone; an
+encrypted PDF is refused rather than returned blank; a restricted PDF is
+refused rather than stripped of its restrictions, leaving no directory behind;
+a rotated scanned page keeps its orientation. Both existing refusal guards
+still pass — non-image, non-PDF bytes throw `unsupportedFormat` and leave no
+directory behind.
+
+### A bug my own test failed to catch
+
+The first version returned **869 bytes from a 193 KB scan** and the test passed,
+because it asserted only `isSmaller` — and a blank page is the smallest file of
+all. The re-encoded page was built in a one-page `PDFDocument` that was a local
+variable, so it was deallocated on return; **a copied `PDFPage` is read lazily
+from the document it came from**, and the page serialized empty. The rebuilt
+documents are now held until the output has been serialized. This is the same
+trap recorded for the pass-through slice, written down there and then walked
+into here.
+
+The test now renders the output page and asserts it has more than 8 distinct
+grey levels, plus a floor of 10% of the original size. Either assertion fails
+at 869 bytes.
+
+### What this does **not** do
+
+- **Only image-only scans benefit.** A page with text is never rasterized. Most
+  scanner apps embed an invisible OCR layer, which counts as text, so most real
+  PDFs will report no saving. This is the usual answer for PDFs, not the
+  exception.
+- **Light usually does nothing to a scan** — 300 dpi upsamples most of them, so
+  the re-encode is discarded.
+- Only synthetic fixtures. **No PDF from a real scanner app has been compressed.**
+- **A password-protected or restricted PDF cannot be compressed at all**, by
+  choice. Preserving an owner's restrictions through a rebuild is unsolved, so
+  it is refused rather than quietly stripped.
+- Replacing the stored file with its reduced copy is still a separate decision,
+  not taken here. Folder and archive compression remain.
+- No UI: there is still no Compress action in any screen.
+- Nothing committed.
+
+## Encrypted PDF export — Set Password, row 27 — 2026-10-27 (Claude, backend)
+
+`Exporter.export` takes an optional password and writes a PDF that requires it
+to open. Row 27 goes from "no encrypted export" to an engine that has one.
+
+- Full `./scripts/test.sh`: **397 tests passed** (64 + 123 + 77 + 91 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### What the encryption is — measured, not assumed
+
+Read out of the `/Encrypt` dictionary in the written bytes. Both `CGPDFContext`
+and `PDFDocument.write(to:withOptions:)` produce the same thing:
+
+```
+/Encrypt  /V 4  /R 4  /Length 128  /AESV2  /StmF /StdCF  /EncryptMetadata true
+```
+
+- `/AESV2` is **AES-128 in CBC mode**. **Not RC4** — which was the outcome that
+  would have made this dishonest to ship at all.
+- Revision 4, **not** revision 6 (AES-256, PDF 2.0). Apple's APIs do not expose
+  revision 6.
+- Revision 4's key derivation is MD5-based and fast, so **the strength is the
+  password**, not the cipher. A short password falls to an offline attack.
+- A test reads the bytes back and fails if the handler stops being AES, so the
+  documented claim cannot quietly become false after an OS update.
+
+**Sayable:** "encrypted with AES-128", "needs this password to open".
+**Not sayable:** "secure", "military-grade", or anything implying a weak
+password is safe. This wording is in `docs/CODEX_BRIEF.md` for whoever builds
+the screen.
+
+### Eleven tests in `EncryptedExportTests`
+
+The file needs the password to open, rejects a wrong one and opens with the
+right one with its text intact; an **empty** password does not open it; without
+a password nothing is encrypted; an untouched (passed-through) page still
+arrives encrypted and still has its link; a **mixed** document keeps every page
+and its title; a document with **no** untouched page is encrypted by the
+context itself; the handler is AES; a password is refused for JPEG, PNG, TXT
+and DOCX; an empty password is refused; a non-ASCII password is refused; and
+only the first 32 bytes of a password are honoured.
+
+### Password limits — measured, and they affect the French and Spanish builds
+
+- **ASCII only.** `"été-Ñandú-2026"` failed to write *even though every
+  character is Latin-1*, and PDFKit refused `"contraseña-密码-1"` outright. So
+  Latin-1 is not the boundary in practice, and non-ASCII is refused up front
+  with `ExportError.passwordNotRepresentable` rather than surfacing later as a
+  write error. An accented password is a realistic thing for an fr/es user to
+  type, so the screen has to say what is allowed before they type it.
+- **Only the first 32 bytes count.** A 32-character prefix opens a file written
+  with a 44-character password. The full password still works, so this is a
+  documentation point rather than a failure — but a longer passphrase is not
+  stronger. A test pins it.
+
+### Three traps this had to avoid
+
+- **The owner password matters.** A PDF opens with *either* password. Setting
+  only the user password leaves an empty owner password, which opens the file
+  regardless — protection that is not protection. Both are set to the same
+  value, and a test asserts an empty password fails.
+- **Pass-through re-writes the finished file and would have dropped the
+  encryption.** `writePDF` encrypts through the context, then pass-through
+  assembles the document in PDFKit and writes it to a staged file that replaces
+  the encrypted one. The password is re-applied on that write. Same shape as
+  compression stripping an owner's restrictions, found yesterday.
+- **The reopened file is locked, and a locked document yields blank pages.**
+  `replaceWithSourcePages` reopens the encrypted file and copies every page
+  that did not pass through out of it. A **mixed** document came back with its
+  drawn page blank and **its title gone**, while the passed-through page looked
+  perfect — so the single-page test passed and hid it. `drawn` is now unlocked
+  before anything is copied. This is the third instance of this same shape in
+  two days.
+
+### What this does **not** do
+
+- **No UI.** There is no Set Password action in any screen, so this is not
+  user-reachable. It must not appear until the wording above is right.
+- **Permissions are not settable** — only whether a password is needed to open.
+  No print/copy flags.
+- **No non-ASCII password**, which is a real restriction for fr/es users.
+- **No password recovery.** A lost password is a lost file. Whoever builds the
+  screen owns saying so before the file is written.
+- A password-protected PDF still **cannot be compressed** (refused, 2026-10-27),
+  so offering both actions needs an explanation rather than a silent failure.
+- Not opened in Preview, Acrobat or any other reader — PDFKit and raw-byte
+  checks only.
+- Nothing committed.
+
+## A digital PDF's text keeps its lines on export — 2026-10-27 (Claude, backend)
+
+TXT and DOCX export read a digital PDF's text from the page's own file instead
+of from the search index.
+
+- Full `./scripts/test.sh`: **399 tests passed** (64 + 123 + 77 + 93 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Two faults, one cause
+
+The recorded limitation was that embedded PDF text exported as **one run-on
+paragraph**, because `LibraryStore.embeddedText` returns what was indexed for
+FTS, normalized for matching. In DOCX that meant a whole page in a single
+`<w:p>` — the layout a Word export exists to carry, discarded at the last step.
+
+Writing the test exposed a second fault nobody had recorded: the index is
+written by a **background pass**, so a PDF exported soon after import had no
+indexed text and the export was refused as `noTextToExport` — for a document
+whose every word was sitting in the file. Reading the page's own file fixes
+both, and the text is current by construction, since `page.content` names the
+asset the page shows now.
+
+The earlier note said this needed `PDFTextExtractor` moved so
+`PaperNestExport` could reach it. It did not: `PDFPage.string` gives the lines,
+and `PaperNestExport` already opens source PDFs with PDFKit for pass-through.
+No module graph change.
+
+### The existing tests were asserting on fiction
+
+Every embedded-text export test seeded the search index with text that was **not
+in the PDF** — indexing "Council tax notice for 2026" against a page whose text
+was "Council tax notice", or "First page words" against a page reading "One".
+They tested the path from index to file, never that a real digital PDF's words
+come out. Two of them asserted a document had *no* text while importing a PDF
+that plainly had some, and passed only because nothing had been indexed.
+
+They now put the text in the PDF, and the two "no text" tests use a scan, which
+genuinely carries none. Same intent, honest fixtures.
+
+### What this does **not** do
+
+- The search index keeps its normalized copy, which is correct for matching.
+  Nothing in search changed.
+- A cropped page still exports the whole page's text. A crop is a display
+  transform, not a redaction — true of the indexed copy too.
+- **Still nobody has opened a .docx in a word processor.** Unchanged and still
+  owed.
+- No UI for either format.
+- Nothing committed.
+
+### The shared temporary root bit again
+
+`cancellingKeepsTheLibraryIdleAndLeavesNoArchiveBehind` failed once during this
+work, on residue — one `PaperNestExport-…` directory left by *my own* failing
+test earlier in the session. A test that expects a refusal and instead receives
+an `ExportOutput` has no `defer` to clean it up, so it leaks. Verified by
+listing the directory and matching the UUID before re-running, rather than
+assuming. Worth knowing when writing refusal tests.
+
+## Permanent redaction, engine — row 26 — 2026-10-27 (Claude, backend)
+
+Redaction that removes content rather than covering it. Engine only: there is
+no screen and no orchestration, because `DocumentModel` is Codex's file.
+
+- Full `./scripts/test.sh`: **406 tests passed** (64 + 126 + 81 + 93 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### The design question, answered by the code
+
+The worry was that redaction conflicts with "originals are never modified". It
+does not. The library already supports *deleting* an original, which is a
+different thing: `replacePageContent` files the old content in
+`page_content_history`, and `sweepOrphanAssets` deletes any asset referenced by
+no page, history row, file item or placed image. So redaction is render →
+replace → forget that page's history → sweep. A redaction-only export path was
+the alternative and is the weaker promise; it is not needed.
+
+`replacePageContent` already deletes the page's `ocr` and `pdfText` rows from
+`search_index`, so redacted words stop answering searches the moment the
+content changes. That part was already right.
+
+### Seven tests, written to fail for a redaction that only looks right
+
+Four on the bytes (`PageRedactionTests`): the redacted words are not in the
+output at all; the pixels where they were are black across the whole band while
+the rest of the page survives; redacting no rectangles is refused rather than
+silently rewriting the page; a scanned page redacts too. Three on the library
+(`RedactionStoreTests`): forgetting the history lets the original be swept; a
+**shared** original is kept and `isAssetReferenced` says so; the recognised
+words are deleted rather than merely unindexed.
+
+### Three limits, each one load-bearing
+
+- **A digital PDF loses selectable text across the whole page**, not only the
+  redacted part. Text under a painted rectangle survives any amount of drawing
+  on top, so the only honest mechanism is to flatten the page to pixels. The
+  page becomes a picture of itself and stops being searchable.
+- **A shared original cannot be deleted.** Assets are content-addressed, so two
+  pages of identical paper share one; if another page still shows it, the sweep
+  correctly keeps it and the content stays reachable through that page.
+  `isAssetReferenced` exists so a caller can find this out *before* promising
+  anything.
+- **Deleting a file does not scrub the disk.** The bytes may persist until
+  overwritten, and on a copy-on-write filesystem that is not controllable from
+  here. Nothing may say "securely erased" or "unrecoverable".
+
+### What this does **not** do
+
+- **No UI and no orchestration.** Nothing calls `PageRedaction` yet. The
+  wording a screen must carry is in `docs/CODEX_BRIEF.md`.
+- **Ink, comments and stamps under a rectangle are untouched.** They are
+  separate rows; a note containing the redacted thing survives.
+- `sweepOrphanAssets` has a one-hour grace period by default, so an original
+  survives until the next sweep unless the caller asks for none. Stated rather
+  than changed.
+- PNG, chosen so a lossy encode cannot leave ringing around a painted edge —
+  reasoned, not measured against a recovery tool.
+- Nothing committed.
+
+## WebP import — row 32 — 2026-10-27 (Claude, backend)
+
+The row carried a standing instruction: *add WEBP only after codec
+verification.* The verification came first and decided the shape of the work.
+
+- Full `./scripts/test.sh`: **411 tests passed** (64 + 126 + 86 + 93 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### What ImageIO actually supports
+
+```
+CGImageSourceCopyTypeIdentifiers      → includes org.webmproject.webp
+CGImageDestinationCopyTypeIdentifiers → no webp entry
+CGImageDestinationCreateWithData(…webp…) → nil
+```
+
+**It decodes WebP and cannot encode it.** So:
+
+- Importing a `.webp` is supportable, and now works.
+- **Converting *to* WebP is not possible with system frameworks.** That is
+  settled, not pending: it needs a third-party encoder (libwebp) and the
+  licensing and binary-size decision that comes with one. Row 32 says so now
+  rather than leaving a to-do that looks small.
+- A WebP fixture cannot be generated at runtime, which is why
+  `SyntheticDocuments.webPImage()` is a 50-byte literal rather than drawn. It
+  was produced once with Pillow, outside the build.
+
+### Five tests
+
+WebP bytes are recognised; other RIFF files (WAV, AVI) are **not** claimed as
+WebP; a `.webp` imports as one image page stored under its own kind with a
+`webp` extension; the fixture decodes to the right pixels — its top-left
+quadrant red and the rest white, so the test proves a real decode rather than
+mere acceptance; and an imported WebP prepares as an image for rendering and
+export.
+
+### A wrong assumption, caught by the test
+
+I recorded in the plan that `AssetKind` is a plain string enum needing no
+migration. That was wrong: `assets.kind` carries a SQL `CHECK` constraint, and
+the import failed with *CHECK constraint failed: kind IN ('pdf','jpeg','png',
+'heic','file')*. **Schema v8** widens it, following the v6 migration that added
+HEIC exactly. The next migration must be v9.
+
+`PageCommentTests` asserted `schemaVersion() == 7` literally; it now uses
+`Schema.latestVersion`, as the three other version assertions already did, so
+it stops being a tripwire for every future migration. That file is Codex's
+area — the change is one line and mechanical, noted here and in the handoff.
+
+### What this does **not** do
+
+- **No WebP output of any kind**, and no UI change: import simply accepts one
+  more type.
+- **Animated WebP decodes to its first frame.** That is not animation support
+  and must not be described as such.
+- Only the 16×16 literal was tried. **No photograph-sized or animated WebP, and
+  no file from a real camera or website, has been imported.**
+- Nothing committed.
+
+## Native Mac run — 2026-10-27 (Claude, manual)
+
+The first native Mac interaction actually performed in this project. Previous
+entries recorded it as unrun and blocked: Codex has no computer-use tools, and
+this session's app-access request had been denied twice. It was granted today,
+for `com.example.papernest.dev`.
+
+Run against a **throwaway library** at `/tmp/papernest-dev-library`, seeded
+fresh from `Samples/` by `scripts/run-mac-app.sh` — 7 documents (oio,
+whiteboard-300dpi, transparent-ink, receipt-portrait-exif6, rotated-page,
+password-protected and one more). No real library was opened.
+
+### Verified by doing it
+
+- **Home screen** renders with the library: sidebar (Home; Library with All
+  Documents 7, Favorites, Recently Deleted; Folders) and a Recent grid whose
+  thumbnails draw. **No Scan card on Mac**, which is correct — there is no
+  document camera — leaving New Notebook, Import… and New Folder.
+- **A document opens and renders** (transparent-ink), with a native toolbar
+  exposed as named accessibility elements: Back, Rotate Right, Crop, Filters,
+  Export…, More, Zoom Out, Zoom to Fit, Zoom In, Hide Sidebar, and an "Add or
+  Replace Pages" control.
+- **The menu bar exists and is app-specific:** PaperNest, File, Edit, View,
+  **Page**, Window, Help. Page holds Rotate Left, Rotate Right, Replace Page
+  with File…, Crop…, Move Page Up, Move Page Down, Revert to Original, Delete
+  Page.
+- **A menu command works end to end.** Page ▸ Rotate Right applied the quarter
+  turn — content moved as expected and **both the canvas and the sidebar
+  thumbnail re-rendered** — and Page ▸ Revert to Original restored it. The
+  library was left as seeded.
+- **The export sheet opens** with PDF / JPEG / PNG, All Pages / Current Page /
+  Range, Paper Size and Image Quality, matching iOS.
+
+### The "launched but no window" scare — diagnosed, and the script is fine
+
+Recorded first as a possible fault in `scripts/run-mac-app.sh`: it exited 0 and
+reported the app opened, the process was alive, and yet there was **no window**;
+`app_list_windows` returned empty twice, including after an explicit relaunch.
+Running the binary directly produced a window at once, which made the script
+look guilty.
+
+**It is not the script.** Reproduced and tested:
+
+| Launch | Window? |
+|---|---|
+| `open -n` from a foreground shell, warm bundle | yes, at once |
+| `open -n` after a rebuild and re-sign | yes, at once |
+| `open -n` from a **backgrounded** task | yes, at once |
+| full script, **fresh library**, backgrounded | yes — but `is_off_space: true` |
+
+The last run is the answer. The window **is** created, on a regular desktop
+Space; `app_bring_to_current_space` then refused with the reason: *the current
+Space is a full-screen app, and a window cannot be moved into a full-screen
+Space.* So the app launches correctly and its window lands on a desktop Space
+that is not the one being looked at — which from the front looks exactly like
+"launched, no window". A screenshot of that window by id shows it healthy, with
+the seeded library listed.
+
+Three hypotheses were tested and **disproved** on the way: the `open -n` launch
+method, a cold signature after rebuild, and launching from a detached shell with
+no GUI session. Each one produced a window immediately.
+
+Not proven: the very first attempts returned an *empty* window list rather than
+reporting an off-Space window. That is consistent with the same cause, before
+the window could be enumerated, but it was not reproduced and is not claimed.
+
+**If the Mac app seems not to launch:** check a regular desktop Space (Mission
+Control, or click the Dock icon) before suspecting the build or the script.
+
+### Not done
+
+- **No export was completed on Mac.** The sheet was opened and closed; the
+  file-writing path was exercised on iPhone instead (below).
+- **VoiceOver, Dynamic Type, the two-window conflict pass and localized (fr/es)
+  Mac runs remain unrun.** This entry does not close those.
+- No markup, shapes, stamps or comments were exercised on Mac.
+- Only one document of the seven was opened.
+
+### Same build, same day, on iOS
+
+The iOS Simulator build from this tree was also run by hand: on **iPhone 17
+Pro**, Home and the document editor render and **an export completed** — all 5
+pages as PDF at Original Size, which is the pass-through path, producing a real
+file the system save sheet previewed, reported as "Ready: 35 KB"; nothing was
+saved. On **iPad Air 13-inch (M4)**, the three-column layout renders and
+creating a grid notebook saved and opened with the template drawing correctly.
+On both, Scan is correctly disabled and the export sheet offers only PDF/JPEG/
+PNG — no TXT, DOCX, Compress, Set Password or Redact — which matches the
+"engine exists, no UI" notes rather than contradicting them.
+
+## Redaction as an operation — row 26 — 2026-10-27 (Claude, backend)
+
+The redaction engine landed this morning and **nothing called it**. Composing
+the steps is now one operation, so a caller cannot do three of the four and
+believe the job is done.
+
+- Full `./scripts/test.sh`: **415 tests passed** (64 + 127 + 89 + 93 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Why it is one call and not four
+
+Rendering alone leaves the original in the library. Replacing the content alone
+leaves the recognised words in `page_recognition`. Forgetting the undo history
+alone leaves the file on disk. `PageRedactor.redact` does all of it: render,
+stage the asset durably, `replacePageContent`, `deleteRecognition`,
+`forgetReplacedContent`, then delete the original if nothing else shows it.
+
+### Two decisions about not misleading the caller
+
+- **`originalStillInLibrary` is named so the unsafe answer is `true`.** Assets
+  are content-addressed, so two pages of identical paper share one file.
+  Redacting one page cannot delete it and the words stay reachable through the
+  other page. A caller has to read that flag before claiming anything, and the
+  naming puts the dangerous case where it will be noticed.
+- **`deleteAssetIfUnreferenced` is targeted, not a sweep.** `sweepOrphanAssets`
+  has a one-hour grace period protecting assets staged but not yet referenced;
+  calling it with no grace period to collect one file could take another
+  operation's freshly staged bytes. The new call touches one asset and refuses
+  if anything still points at it. **Row before file**, as the sweep does: a
+  crash between leaves an orphan file the sweep collects, while the other order
+  would leave a row pointing at nothing.
+
+### Four new tests
+
+The unreferenced asset is deleted — row *and* file — while a referenced one is
+refused and kept; after redacting, the page shows the new image, the words do
+not answer searches, the recognition row is gone and the original file is off
+disk; a **shared** original survives and the outcome says so, with the second
+document's paper still present; and the page keeps its id, sort key, crop and
+source size.
+
+### What this does **not** do
+
+- **Still no UI.** `DocumentView`/`DocumentModel` are Codex's, and the wording
+  any screen must carry is in `docs/CODEX_BRIEF.md`.
+- Ink, comments and stamps under a rectangle are untouched — separate rows.
+- A digital PDF still loses selectable text across the whole page: flattening
+  is the mechanism.
+- **It does not scrub the disk.** Deleting a file unlinks it; the bytes may
+  persist until overwritten. Nothing may say "securely erased".
+- Nothing committed.
+
+### A warning-free build is part of done
+
+The first green run passed every test but raised **4 warnings** — unnecessary
+`await`/`try` markers (`store.assets` is not isolated) and an unused
+`transaction` result. Fixed before claiming the slice, and the final run is
+back to 0 across tests and both builds.
+
+## HEIC export — row 32 — 2026-10-27 (Claude, backend)
+
+Row 32's remaining half. HEIC *import* landed in F2c; writing one has never
+been possible, so an exported photo was a JPEG about three times larger than
+it needed to be.
+
+- Full `./scripts/test.sh`: **420 tests passed** (64 + 127 + 89 + 98 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Measured before anything was written
+
+The WebP slice earlier today found ImageIO's support can be **asymmetric** —
+it reads WebP and cannot write it — so HEIC was checked the same way instead of
+being assumed from the import note:
+
+```
+CGImageDestinationCopyTypeIdentifiers → public.heic, public.heics
+CGImageSourceCopyTypeIdentifiers      → public.heic, public.heics, public.heif
+```
+
+Symmetric. The same 1600×2000 page, same quality setting:
+
+| format | bytes |
+|---|---|
+| HEIC | 94,742 |
+| PNG | 209,699 |
+| JPEG | 284,377 |
+
+About a third of the JPEG, round-tripping to the same dimensions, with the
+requested 200 dpi coming back as 200.
+
+### The trap, and the test that catches it
+
+`writeImages` chose its type with `options.format == .jpeg ? .jpeg : .png`. A
+new case falls into that `else`, so HEIC export would have written **PNG bytes
+into a file named `.heic`** — a lie on disk that every filename-based check
+would have passed. The switch is now exhaustive, and
+`theFileIsReallyHEICAndNotPNGWearingTheExtension` reads the written bytes back
+and asserts `CGImageSourceGetType` is `public.heic`. The name is not the
+evidence.
+
+### Six tests
+
+The bytes really are HEIC; it decodes back at the requested resolution with its
+dpi intact; it is less than half the size of the same page as PNG; PDF, JPEG
+and PNG are each unchanged; and several pages still package as a ZIP holding
+`.heic` entries.
+
+### What this does **not** do
+
+- **No UI tile**, as with every format added this way. `ExportFormat` is
+  `CaseIterable` but **nothing iterates `allCases`** (checked, as when TXT and
+  DOCX were added); the sheet's tiles are hand-written and `contentType(for:)`
+  derives from the extension, so no screen changed.
+- **Compatibility is the real cost and it is not a footnote.** Exporting exists
+  to send a file somewhere, and HEIC is the format most likely to reach
+  somewhere that cannot open it — older systems, many Windows installs, web
+  upload forms. **JPEG stays the default**, and the wording any tile must carry
+  is in `docs/CODEX_BRIEF.md`.
+- **Nobody has opened one of these files anywhere but this machine.** The
+  engine is tested; the format's real-world reception is not.
+- Nothing committed.
+
+## Compression output format — row 35 — 2026-10-27 (Claude, backend)
+
+Row 35 named two remainders. This takes the first: `compress(fileNamed:data:
+preset:)` hardcoded JPEG, giving up most of the available saving now that HEIC
+is in and measured.
+
+- Full `./scripts/test.sh`: **423 tests passed** (64 + 127 + 89 + 101 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### JPEG stays the default, deliberately
+
+Compression exists to make a file easier to **send**. Handing back a HEIC the
+recipient cannot open is a worse outcome than a larger JPEG that works, so the
+caller opts in rather than being upgraded silently. `CompressionFormat` carries
+that reasoning where the choice is made, and the wording any screen needs is in
+`docs/CODEX_BRIEF.md` — the warning matters more here than for export, because
+compressing is usually the step right before sending.
+
+### Three tests
+
+The default output is still JPEG, checked by reading the bytes back rather than
+the filename; asking for HEIC gives a real HEIC — `CGImageSourceGetType` says
+`public.heic` — and a materially smaller file than the same photo as JPEG at
+the same preset; and bytes that are not a re-encodable image are still refused,
+whatever format was asked for, with nothing written.
+
+### What this does **not** do
+
+- **A PDF file item ignores the format entirely**, because HEIC is not a PDF
+  image filter. Its behaviour is unchanged: pages carrying text are copied,
+  text-free pages re-encoded, none of it HEIC.
+- **No UI.** Nothing offers the choice.
+- **Folder/archive compression, row 35's other remainder, is deliberately not
+  done here.** It needs an honest "before" for each entry, and for a document
+  that is the originals it is made of — which live in the store, and `Exporter`
+  has no store. Doing it properly means the caller passing those counts in,
+  which is a design question worth its own slice rather than a guess bolted on.
+  Written down rather than quietly skipped.
+- Nothing committed.

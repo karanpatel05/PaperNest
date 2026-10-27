@@ -7,6 +7,14 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     /// Plain text, from what the pages really carry. `ExportOptions`' paper,
     /// resolution and quality do not apply to it.
     case txt
+    /// Images as HEIC, which is a third the size of the same page as JPEG
+    /// (94,742 bytes against 284,377, measured) at the same quality and keeps
+    /// the dpi asked for.
+    ///
+    /// The cost is compatibility, and it is the whole caveat: exporting exists
+    /// to send a file somewhere, and older systems, many Windows installs and
+    /// plenty of web forms cannot open a HEIC. JPEG stays the safe default.
+    case heic
     /// A Word file holding the same text as `.txt`, one paragraph per line.
     /// The words, not the layout: `ExportOptions`' paper, resolution and
     /// quality do not apply to it either.
@@ -17,6 +25,7 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
         case .pdf: "pdf"
         case .jpeg: "jpg"
         case .png: "png"
+        case .heic: "heic"
         case .txt: "txt"
         case .docx: "docx"
         }
@@ -146,6 +155,26 @@ public enum ExportError: Error, Equatable, Sendable {
     /// nothing but page separators would look like a successful export of an
     /// empty document, which is not what happened.
     case noTextToExport
+    /// A password was supplied for a format that cannot carry one. Writing an
+    /// unprotected JPEG, TXT or DOCX when the caller asked for protection
+    /// would be a silent false promise, so it is refused instead.
+    case passwordNotSupported
+    /// An empty password was supplied. It would be written as both the user
+    /// and the owner password, producing a file that opens with nothing while
+    /// the caller believes it is protected. An empty text field is the most
+    /// likely source of exactly this value.
+    case emptyPassword
+    /// A password containing characters the writer cannot store: in practice
+    /// anything outside ASCII. Measured on this platform — PDFKit's
+    /// `write(to:withOptions:)` returned false for `"contraseña-密码-1"`, and
+    /// an export with `"été-Ñandú-2026"` failed to write even though those
+    /// characters are Latin-1. Refused up front so it fails where it can be
+    /// explained, rather than as a write error after the fact.
+    ///
+    /// This is a real limitation for French and Spanish users, and whoever
+    /// builds the screen has to say so rather than rejecting their password
+    /// with a generic error.
+    case passwordNotRepresentable
 }
 
 /// Filenames for exported files.

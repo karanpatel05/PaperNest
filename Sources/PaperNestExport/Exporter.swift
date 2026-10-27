@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreText
 import Foundation
 import ImageIO
+import PDFKit
 import PaperNestCore
 import PaperNestRender
 import UniformTypeIdentifiers
@@ -25,10 +26,11 @@ public struct Exporter: Sendable {
         itemName: String,
         pages: [Page],
         options: ExportOptions,
+        password: String? = nil,
         progress: @Sendable (ExportProgress) -> Void = { _ in }
     ) async throws -> ExportOutput {
         try await export(itemName: itemName, pages: pages, options: options,
-                         rasterQuality: nil, progress: progress)
+                         rasterQuality: nil, password: password, progress: progress)
     }
 
     /// The same export, with the raster resolution and quality chosen
@@ -40,17 +42,34 @@ public struct Exporter: Sendable {
         pages: [Page],
         options: ExportOptions,
         rasterQuality: RasterQuality?,
+        password: String? = nil,
         progress: @Sendable (ExportProgress) -> Void = { _ in }
     ) async throws -> ExportOutput {
         guard !pages.isEmpty else { throw ExportError.noPages }
+        // All refused before a directory exists, so a refusal writes nothing.
+        if let password {
+            guard options.format == .pdf else { throw ExportError.passwordNotSupported }
+            guard !password.isEmpty else { throw ExportError.emptyPassword }
+            // ASCII only, measured rather than inferred from the spec: the
+            // writer refused `"été-Ñandú-2026"` as well as `"contraseña-密码-1"`,
+            // so Latin-1 is not the boundary in practice.
+            //
+            // Separately, only the first 32 bytes are honoured by revision 4.
+            // That is a documentation point rather than a failure, since the
+            // whole password still opens the file.
+            guard password.allSatisfy(\.isASCII) else {
+                throw ExportError.passwordNotRepresentable
+            }
+        }
         let directory = temporaryRoot.appendingPathComponent("PaperNestExport-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         do {
             let base = ExportNaming.baseName(itemName)
             let files: [URL] = switch options.format {
             case .pdf: [try await writePDF(pages, title: itemName, to: directory.appendingPathComponent("\(base).pdf"),
-                                           options: options, rasterQuality: rasterQuality, progress: progress)]
-            case .jpeg, .png: try await writeImages(pages, base: base, in: directory, options: options, progress: progress)
+                                           options: options, rasterQuality: rasterQuality,
+                                           password: password, progress: progress)]
+            case .jpeg, .png, .heic: try await writeImages(pages, base: base, in: directory, options: options, progress: progress)
             case .txt: [try await writeText(pages, to: directory.appendingPathComponent("\(base).txt"), progress: progress)]
             case .docx: [try await writeDocx(pages, to: directory.appendingPathComponent("\(base).docx"), progress: progress)]
             }
@@ -107,22 +126,106 @@ public struct Exporter: Sendable {
     /// so a compression preset can pick its own resolution and quality without
     /// a new case appearing in the export sheet's picker.
     private func writePDF(_ pages: [Page], title: String, to url: URL, options: ExportOptions,
-                          rasterQuality: RasterQuality? = nil,
+                          rasterQuality: RasterQuality? = nil, password: String? = nil,
                           progress: @Sendable (ExportProgress) -> Void) async throws -> URL {
         var defaultBox = CGRect(x: 0, y: 0, width: 612, height: 792)
-        let info: [CFString: Any] = [kCGPDFContextCreator: Brand.pdfCreator, kCGPDFContextTitle: title]
+        var info: [CFString: Any] = [kCGPDFContextCreator: Brand.pdfCreator, kCGPDFContextTitle: title]
+        if let password {
+            // Both, deliberately. A document opens with *either* password, so
+            // leaving the owner password empty would open it with an empty one
+            // and the user password would protect nothing.
+            info[kCGPDFContextUserPassword] = password
+            info[kCGPDFContextOwnerPassword] = password
+        }
         guard let ctx = CGContext(url as CFURL, mediaBox: &defaultBox, info as CFDictionary) else { throw ExportError.writeFailed }
         var closed = false
         defer { if !closed { ctx.closePDF() } }
 
         progress(ExportProgress(completedPages: 0, totalPages: pages.count))
+        // Pages nobody has changed are copied from their source file after the
+        // document is closed; a drawing of a page cannot carry its links, form
+        // fields or annotations. Collected here, applied below.
+        var untouched: [Int: PDFPage] = [:]
+        // Each source file is opened once, and kept open until the copies have
+        // been written: a copied page is read lazily from the document it came
+        // from.
+        var sourceDocuments: [AssetID: PDFDocument] = [:]
         for (index, page) in pages.enumerated() {
             try Task.checkCancellation()
             let pageSize = page.geometry.pageSize
             let layout = PaperLayout(pageSize: pageSize, paper: options.paperSize)
-            let source = try await pdfSource(for: page, layout: layout,
-                                             quality: rasterQuality ?? options.pdfImageQuality.rasterQuality)
             let ink = try await renderer.inkStrokes(for: page)
+            let textLayer = options.includesRecognizedText
+                ? try await renderer.recognizedLines(for: page) : []
+
+            let untouchedCandidate = Self.isUntouched(
+                page, options: options, hasInk: !ink.isEmpty, hasTextLayer: !textLayer.isEmpty)
+
+            // The copy of the source page is two things at once: what
+            // pass-through writes, and the yardstick for whether re-encoding
+            // the page is worth doing at all. Read it only when one of those
+            // is actually in play.
+            var sourceCopy: PDFPage?
+            var carriesText = true
+            if case .pdfPage(let assetID, let sourceIndex) = page.content,
+               untouchedCandidate || rasterQuality != nil {
+                if sourceDocuments[assetID] == nil, let data = try await renderer.sourcePDFData(for: page) {
+                    sourceDocuments[assetID] = PDFDocument(data: data)
+                }
+                if let document = sourceDocuments[assetID] {
+                    sourceCopy = document.page(at: sourceIndex)?.copy() as? PDFPage
+                    carriesText = Self.carriesText(document, at: sourceIndex)
+                }
+            }
+
+            // Under a compression preset, a PDF page with no text of its own is
+            // a scan, and re-encoding it is the only way its size can change:
+            // vector content is copied as it stands, so every preset would
+            // otherwise hand back the page exactly as it arrived. Two things
+            // have to hold. The page must carry no text, because rasterizing
+            // real text destroys every word for a reader, a search and an
+            // export. And the re-encode must actually come out smaller than the
+            // page already is — at 300 dpi a preset *upsamples* most scans, and
+            // a "compression" that doubled the file would be worse than none.
+            //
+            // A page that already needs pixel processing (a filter, brightness
+            // or contrast) is excluded: the ordinary path rasterizes it at the
+            // same quality anyway, so measuring a candidate only to fall back
+            // would rasterize it twice for identical bytes.
+            var reEncoded: PageRenderer.PreparedSource?
+            if let quality = rasterQuality, let sourceCopy, !carriesText,
+               !page.transform.needsPixelProcessing,
+               let budget = Self.byteCount(of: sourceCopy) {
+                reEncoded = try await reEncodedPDFPage(page, layout: layout, quality: quality, under: budget)
+            }
+
+            // Pass-through stands down for a page being re-encoded: a copied
+            // page ignores the preset entirely, which is the whole bug. This
+            // guard has to stay ahead of the pass-through branch.
+            if reEncoded == nil, let copy = sourceCopy, untouchedCandidate {
+                // The copy was taken before the placeholder is committed, so a
+                // source that cannot be read back falls through and is drawn
+                // exactly as it was before pass-through existed, rather than
+                // leaving an empty page where the content should be.
+                var emptyBox = CGRect(origin: .zero, size: layout.paperSize)
+                let emptyBoxData = Data(bytes: &emptyBox, count: MemoryLayout<CGRect>.size)
+                ctx.beginPDFPage([kCGPDFContextMediaBox: emptyBoxData] as CFDictionary)
+                ctx.endPDFPage()
+                untouched[index] = copy
+                progress(ExportProgress(completedPages: index + 1, totalPages: pages.count))
+                continue
+            }
+
+            // Drawn from the candidate that was already measured, so a
+            // compressed page is rasterized once rather than twice.
+            let source: PageRenderer.PreparedSource
+            if let reEncoded {
+                source = reEncoded
+            } else {
+                source = try await pdfSource(
+                    for: page, layout: layout,
+                    quality: rasterQuality ?? options.pdfImageQuality.rasterQuality)
+            }
 
             var box = CGRect(origin: .zero, size: layout.paperSize)
             let boxData = Data(bytes: &box, count: MemoryLayout<CGRect>.size)
@@ -131,15 +234,19 @@ public struct Exporter: Sendable {
             let pageToContext = layout.pageToPaper(pageSize: pageSize)
                 .concatenating(CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: layout.paperSize.height))
             PageRenderer.draw(page, source: source, ink: ink, in: ctx, pageToContext: pageToContext)
-            if options.includesRecognizedText {
-                let lines = try await renderer.recognizedLines(for: page)
-                Self.drawSearchableText(lines, geometry: page.geometry, pageToContext: pageToContext, in: ctx)
+            if !textLayer.isEmpty {
+                Self.drawSearchableText(textLayer, geometry: page.geometry, pageToContext: pageToContext, in: ctx)
             }
             ctx.endPDFPage()
             progress(ExportProgress(completedPages: index + 1, totalPages: pages.count))
         }
         ctx.closePDF()
         closed = true
+        if !untouched.isEmpty { try Self.replaceWithSourcePages(untouched, in: url, password: password) }
+        // The copies are read lazily from the documents they came from, which
+        // must therefore outlive the write. Scope alone is not a guarantee
+        // once the optimizer is involved, and every run here is Debug.
+        withExtendedLifetime(sourceDocuments) {}
         return url
     }
 
@@ -157,6 +264,47 @@ public struct Exporter: Sendable {
               let provider = CGDataProvider(data: data as CFData),
               let jpeg = CGImage(jpegDataProviderSource: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
         else { return source }
+        return .image(jpeg, covering: covering)
+    }
+
+    /// A PDF page re-encoded as a JPEG at `quality`, or nil to leave the page
+    /// exactly as it is.
+    ///
+    /// Nil is a normal answer and often the right one:
+    ///
+    /// - The re-encode came out no smaller than `budget`, the bytes the page
+    ///   already costs. At 300 dpi a preset upsamples most scans, so Light
+    ///   usually lands here and the page is copied untouched instead.
+    /// - The page is too large to rasterize at this resolution (`maxPixelCount`
+    ///   is 100M; an A0 page at 300 dpi is about 139M). Such a page used to
+    ///   compress by being copied, and that has to keep working rather than
+    ///   failing the whole export.
+    /// - JPEG encoding did not produce bytes, so there is nothing to compare.
+    ///
+    /// Cancellation is never swallowed: it is the one error that must travel.
+    private func reEncodedPDFPage(_ page: Page, layout: PaperLayout, quality: RasterQuality,
+                                  under budget: Int) async throws -> PageRenderer.PreparedSource? {
+        guard let jpegQuality = quality.jpegQuality else { return nil }
+        let pageScale = layout.contentRect.width / page.geometry.pageSize.width
+        let pixelsPerPoint = quality.maxDPI / 72 * pageScale
+        let rastered: PageRenderer.PreparedSource
+        do {
+            rastered = try await renderer.prepareSource(for: page, pixelsPerPoint: pixelsPerPoint,
+                                                        rasterizingPDFPages: true)
+        } catch let cancellation as CancellationError {
+            throw cancellation
+        } catch {
+            return nil
+        }
+        guard case .image(let image, let covering) = rastered else { return nil }
+        let maxPixels = Int((max(covering.width, covering.height) * pixelsPerPoint).rounded(.up))
+        guard let limited = try? Self.downsample(image, maxPixelSize: maxPixels),
+              let data = Self.encode(limited, type: .jpeg, quality: jpegQuality, dpi: nil),
+              data.count < budget,
+              let provider = CGDataProvider(data: data as CFData),
+              let jpeg = CGImage(jpegDataProviderSource: provider, decode: nil,
+                                 shouldInterpolate: true, intent: .defaultIntent)
+        else { return nil }
         return .image(jpeg, covering: covering)
     }
 
@@ -180,7 +328,15 @@ public struct Exporter: Sendable {
 
     private func writeImages(_ pages: [Page], base: String, in directory: URL, options: ExportOptions,
                              progress: @Sendable (ExportProgress) -> Void) async throws -> [URL] {
-        let type: UTType = options.format == .jpeg ? .jpeg : .png
+        // Exhaustive on purpose. This was `format == .jpeg ? .jpeg : .png`,
+        // where a new case fell silently into PNG and wrote PNG bytes into a
+        // file named for something else.
+        let type: UTType = switch options.format {
+        case .jpeg: .jpeg
+        case .heic: .heic
+        case .png: .png
+        case .pdf, .txt, .docx: .png
+        }
         let ext = options.format.fileExtension
         let pixelsPerPoint = CGFloat(options.imageDPI) / 72
         let zip: (writer: ZipWriter, url: URL)? = if pages.count > 1, options.packaging == .zip {

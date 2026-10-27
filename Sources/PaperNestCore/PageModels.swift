@@ -176,6 +176,13 @@ public enum AssetKind: String, Codable, Sendable {
     /// Verified against ImageIO on this platform before being offered: it
     /// encodes, decodes and keeps dpi. See the TEST_MATRIX row for F2c.
     case heic
+    /// Verified the same way, and the answer was narrower: ImageIO lists
+    /// `org.webmproject.webp` among the types it *reads* and nothing among
+    /// the types it *writes*. So a WebP can be imported and rendered, and one
+    /// can never be produced — converting *to* WebP needs a third-party
+    /// encoder. A multi-frame (animated) file decodes to its first frame;
+    /// that is not animation support.
+    case webp
     /// Bytes we keep but do not interpret. The real name and type live on the
     /// item, because one asset can be shared by items that name it
     /// differently.
@@ -187,6 +194,7 @@ public enum AssetKind: String, Codable, Sendable {
         case .jpeg: "jpg"
         case .png: "png"
         case .heic: "heic"
+        case .webp: "webp"
         case .file: "bin"
         }
     }

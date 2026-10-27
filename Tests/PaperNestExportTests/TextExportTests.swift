@@ -48,9 +48,7 @@ import PaperNestTestSupport
 
     @Test func aDigitalPDFExportsItsOwnTextWithNoRecognitionAtAll() async throws {
         let fixture = try ExportFixture()
-        let (item, pages) = try await fixture.importPDF(["Council tax notice"])
-        try await fixture.store.indexEmbeddedText("Council tax notice for 2026",
-                                                  for: pages[0].id, expecting: pages[0].content)
+        let (item, pages) = try await fixture.importPDF(["Council tax notice for 2026"])
 
         let (text, output) = try await exportText(fixture, item.name, pages)
         defer { output.removeTemporaryFiles() }
@@ -61,9 +59,7 @@ import PaperNestTestSupport
 
     @Test func recognizedLinesWinWhenAPageHasBoth() async throws {
         let fixture = try ExportFixture()
-        let (item, pages) = try await fixture.importPDF(["Anything"])
-        try await fixture.store.indexEmbeddedText("collapsed embedded paragraph",
-                                                  for: pages[0].id, expecting: pages[0].content)
+        let (item, pages) = try await fixture.importPDF(["The page's own paragraph"])
         try await fixture.store.saveRecognition(completed(pages[0], ["Recognized first line", "Recognized second line"]))
 
         let (text, output) = try await exportText(fixture, item.name, pages)
@@ -71,15 +67,12 @@ import PaperNestTestSupport
 
         // Recognition keeps line structure, so it is the better source.
         #expect(text.contains("Recognized first line\nRecognized second line"))
-        #expect(!text.contains("collapsed embedded paragraph"))
+        #expect(!text.contains("The page's own paragraph"))
     }
 
     @Test func pagesAreSeparatedByAFormFeedInPageOrder() async throws {
         let fixture = try ExportFixture()
-        let (item, pages) = try await fixture.importPDF(["One", "Two", "Three"])
-        try await fixture.store.indexEmbeddedText("First page words", for: pages[0].id, expecting: pages[0].content)
-        try await fixture.store.indexEmbeddedText("Second page words", for: pages[1].id, expecting: pages[1].content)
-        try await fixture.store.indexEmbeddedText("Third page words", for: pages[2].id, expecting: pages[2].content)
+        let (item, pages) = try await fixture.importPDF(["First page words", "Second page words", "Third page words"])
 
         let (text, output) = try await exportText(fixture, item.name, pages)
         defer { output.removeTemporaryFiles() }
@@ -93,9 +86,14 @@ import PaperNestTestSupport
 
     @Test func aPageWithNoTextDoesNotBreakItsNeighbours() async throws {
         let fixture = try ExportFixture()
-        let (item, pages) = try await fixture.importPDF(["One", "Two"])
-        // Only the second page has anything to export.
-        try await fixture.store.indexEmbeddedText("Only these words", for: pages[1].id, expecting: pages[1].content)
+        // A scan carries no text of its own, so only the second page has
+        // anything to export. The first page used to be a text page nobody had
+        // indexed, which tested the index rather than the document.
+        let scan = try await fixture.importer.importItem(
+            .data(SyntheticDocuments.scannedPDF(), name: "Scan"))
+        let scanPages = try await fixture.store.pages(of: scan.id)
+        let (item, textPages) = try await fixture.importPDF(["Only these words"])
+        let pages = [scanPages[0], textPages[0]]
 
         let (text, output) = try await exportText(fixture, item.name, pages)
         defer { output.removeTemporaryFiles() }
@@ -109,7 +107,10 @@ import PaperNestTestSupport
 
     @Test func aDocumentWithNoTextAnywhereIsRefusedRatherThanWritingAnEmptyFile() async throws {
         let fixture = try ExportFixture()
-        let (item, pages) = try await fixture.importPDF(["Nothing indexed"])
+        // A scan: no recognition, and no text of its own either.
+        let item = try await fixture.importer.importItem(
+            .data(SyntheticDocuments.scannedPDF(), name: "Scan"))
+        let pages = try await fixture.store.pages(of: item.id)
 
         await #expect(throws: ExportError.noTextToExport) {
             try await fixture.exporter.export(itemName: item.name, pages: pages,
@@ -119,13 +120,29 @@ import PaperNestTestSupport
 
     @Test func theFileIsValidUTF8IncludingAccents() async throws {
         let fixture = try ExportFixture()
-        let (item, pages) = try await fixture.importPDF(["Accents"])
-        try await fixture.store.indexEmbeddedText("Café Müller reçu 12,50 €",
-                                                  for: pages[0].id, expecting: pages[0].content)
+        let (item, pages) = try await fixture.importPDF(["Café Müller reçu 12,50 €"])
 
         let (text, output) = try await exportText(fixture, item.name, pages)
         defer { output.removeTemporaryFiles() }
 
         #expect(text.contains("Café Müller reçu 12,50 €"))
     }
+
+    /// The limitation this closes. A digital PDF's text used to come from the
+    /// search index, which normalizes it for matching, so a page of lines
+    /// arrived as one run-on paragraph. The lines are now read from the page's
+    /// own PDF, where they are separate.
+    @Test func aDigitalPDFKeepsItsLinesInsteadOfBecomingOneParagraph() async throws {
+        let fixture = try ExportFixture()
+        let (item, pages) = try await fixture.importPDF(["Invoice 2026-114\nDue 30 November\nTotal 1234 EUR"])
+
+        let (text, output) = try await exportText(fixture, item.name, pages)
+        defer { output.removeTemporaryFiles() }
+
+        let lines = text.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        #expect(lines.count == 3, "got \(lines.count) line(s): \(lines)")
+        #expect(lines.first?.contains("Invoice 2026-114") == true)
+        #expect(lines.last?.contains("Total 1234 EUR") == true)
+    }
+
 }

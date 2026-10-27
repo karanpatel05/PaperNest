@@ -10,15 +10,14 @@ extension Exporter {
     /// Writes `pages` as plain text, one section per page.
     ///
     /// A page's text is the best it actually has: current completed
-    /// recognition first, because those lines keep their structure, then the
-    /// text a digital PDF already carries, which is stored normalized for the
-    /// search index and so arrives as a single paragraph. Nothing is invented
-    /// for a page that has neither — it keeps its place between the separators
-    /// so page order stays readable.
+    /// recognition first, because those lines come with positions, then the
+    /// text a digital PDF already carries, read from the page's own file so it
+    /// keeps its lines. Nothing is invented for a page that has neither — it
+    /// keeps its place between the separators so page order stays readable.
     ///
     /// Only text that is current for the page can appear: `recognizedLines`
-    /// refuses a result from an older revision, and a page's embedded text is
-    /// cleared when its content is replaced, so a rescanned page cannot export
+    /// refuses a result from an older revision, and a page's own text is read
+    /// from the asset `page.content` names, so a rescanned page cannot export
     /// words describing paper it no longer shows.
     ///
     /// Throws `ExportError.noTextToExport` when no page has any text, rather
@@ -28,6 +27,7 @@ extension Exporter {
         progress(ExportProgress(completedPages: 0, totalPages: pages.count))
         var sections: [String] = []
         var foundAnyText = false
+        let sources = try await sourceDocuments(for: pages)
 
         for (index, page) in pages.enumerated() {
             try Task.checkCancellation()
@@ -35,10 +35,8 @@ extension Exporter {
             let text: String
             if !recognized.isEmpty {
                 text = recognized.map(\.text).joined(separator: "\n")
-            } else if let embedded = try await renderer.embeddedText(for: page) {
-                text = embedded
             } else {
-                text = ""
+                text = Self.textLines(of: page, in: sources).joined(separator: "\n")
             }
             if !text.isEmpty { foundAnyText = true }
             sections.append(text)
