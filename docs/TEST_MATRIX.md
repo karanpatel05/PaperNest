@@ -1543,6 +1543,7 @@ shape that reproduces it.
 - **Still no UI, and still no real-world form.** Only the hand-built fixture
   has been filled or ticked. A form from a government or bank website is
   untested, and PaperNest writes no AcroForm of its own.
+
 ## A thumbnail of what a file item holds — row 8 — 2026-10-28 (Claude, backend)
 
 Row 8 has said "generated grid/list thumbnails remain open" since 2026-10-22.
@@ -1573,17 +1574,6 @@ Quick Look, asked for a picture of a file's contents.
    `.lowQualityThumbnail` is also left out, because nothing here measured it —
    the first commit asked for it while every measurement and every line of
    these docs described `.thumbnail` alone.
-2. **A missing file is distinguishable from an unpreviewable one.**
-   `NSCocoaErrorDomain` 4 against `QLThumbnailErrorDomain` 0
-   (`QLThumbnailError.Code.generationFailed`, so no magic number in the code).
-   Collapsing them would hide a missing original behind a blank square, so the
-   file's existence is checked here and only Quick Look's own code 0 becomes
-   `nil`. Everything else — a cancelled or invalid request — is thrown.
-3. **The size asked for is a box.** Fresh file per request: asked 120×400 →
-   120×120, asked 400×120 → 120×120, asked 200×200 → 200×200, asked 64×64 at
-   scale 2 → 128×128. So the picture fits inside and keeps the document's own
-   proportions; the parameter is named `boundedBy` because of this, and a
-   caller must lay out what comes back rather than what it asked for.
 2. **A missing file is distinguishable from an unpreviewable one.**
    `NSCocoaErrorDomain` 4 against `QLThumbnailErrorDomain` 0
    (`QLThumbnailError.Code.generationFailed`, so no magic number in the code).
@@ -1633,6 +1623,7 @@ measurement rather than advice.
 - **Concurrency is clean as far as it was pushed** — 16 concurrent requests in
   a standalone task group, plus 5 parallel suite runs — but this is a system
   XPC agent, and that is not proof for every type or load.
+
 ## How long a media file is, and what it calls itself — row 42 — 2026-10-28 (Claude, backend)
 
 Row 42 (audio and video playback, audiobooks, playlists) was confirmed by the
@@ -1662,13 +1653,18 @@ the tags.
    `AVMetadataItem.metadataItems(from:filteredByIdentifier:)` over
    `.metadata`, which does the per-format mapping and turns `caaf/info-title`
    into `.commonIdentifierTitle`. Measured both ways before a line was written.
-2. **`.bin` fails here too.** The same playable bytes are read under a `.wav`
-   name and refused under `.bin` — `AVFoundationErrorDomain` −11828. That is
-   the *same* staging requirement `FileThumbnail` has, reached through
-   completely different machinery, so the two engines agree: stage a copy named
-   from `FilePayload.originalFilename`, or from `UTType(uti)`.
-   `theStoredAssetNameIsNotEnoughToReadIt` writes the same bytes both ways and
-   gets `nil` from one and an answer from the other.
+2. **`.bin` fails here too, and so does a name with no extension at all.**
+   The same playable bytes, measured four ways: `sound.wav` → 1.0s,
+   `sound.bin` → `nil`, a name with no extension → `nil`, and — the one that
+   refines the rule — **`sound.mp3` → 1.0s**, WAV bytes under an MP3 name.
+   So AVFoundation does not demand a *correct* extension; it demands one it
+   treats as media at all, and then reads the actual bytes. `.bin` and no
+   extension are not media types, so it never looks.
+   `theStoredAssetNameIsNotEnoughToReadIt` pins the `.bin` half.
+
+   This is the *same* staging requirement `FileThumbnail` has, reached through
+   completely different machinery, so the two engines agree — see "What a
+   caller still has to do" below for what that actually requires of the UI.
 3. **A missing file is distinguishable from a file that is not media** (−11800
    against −11828), so existence is checked here and only −11828 becomes
    `nil`. Both guards were **run rather than claimed**: breaking the
@@ -1702,3 +1698,29 @@ have been fields no run could demonstrate.
 - **`duration == nil` is unexercised.** No local file declared an indefinite
   length. It is `nil` rather than `0` so a wrong zero is never shown as a
   length.
+- **iOS behaviour is unmeasured.** The Simulator build proves it compiles and
+  nothing more. Whether AVFoundation reads the same formats and surfaces tags
+  the same way on iOS has not been run.
+
+### What a caller still has to do — and nobody does it yet
+
+Both engines need a URL whose extension the system treats as media or as a
+document. **The rule is not "the basename is unusable" — it is "the name's
+extension does not name the item's `uti`."** That matters, because
+`FileKind.prepareTemporaryCopy` falls back to `<sha>.bin` only for `""`, `.`,
+`..` and `/`, and it never reads `uti` at all. So an `originalFilename` with
+no extension, or with one that does not match the bytes, is staged under that
+name — and a name with no extension was measured to give `nil` from both
+engines.
+
+So the `UTType(uti)?.preferredFilenameExtension` fallback that both engines
+recommend **is implemented nowhere**: it lives in these notes and in
+`theRecordedTypeNamesTheFileWhenTheStoredNameCannot`, not in the staging path
+any screen uses. Wiring either engine to a screen means fixing that first.
+
+### Fan-out
+
+16 concurrent `inspect` calls in a task group — the way a playlist or a grid
+would ask — returned all 16 titles. Worth running because this is the trap
+class from the day before, though `AVAsset.load` suspends rather than blocks,
+so a hang was never likely.
