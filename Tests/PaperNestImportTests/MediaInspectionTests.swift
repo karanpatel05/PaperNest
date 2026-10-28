@@ -110,4 +110,60 @@ import PaperNestImport
             try await MediaInspection.inspect(at: directory.appendingPathComponent("gone.wav"))
         }
     }
+
+    /// A real video track, so `hasVideo == true` is a measurement rather than
+    /// an assumption. Before this the only file inspected was audio, and a
+    /// hard-coded `false` would have passed every test.
+    @Test func aVideoFileHasAPictureAsWellAsALength() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = try write(try await SyntheticDocuments.videoClip(frames: 6, framesPerSecond: 10),
+                             named: "clip.mov", in: directory)
+
+        let info = try #require(try await MediaInspection.inspect(at: file))
+
+        #expect(info.hasVideo)
+        #expect(!info.hasAudio)
+        let duration = try #require(info.duration)
+        #expect(abs(duration - 0.6) < 0.1)
+    }
+
+    /// An album and its cover, read from a file that can actually hold them.
+    ///
+    /// Also the second format read here, and the first one not written by
+    /// hand: WAVE for the plain cases, M4A for these.
+    @Test func anAlbumAndItsArtworkAreRead() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cover = SyntheticDocuments.image(width: 16, height: 16, type: .png)
+        let file = try write(
+            try await SyntheticDocuments.taggedAudio(
+                title: "A Quiet Recording", artist: "PaperNest Tests",
+                album: "Fixture Album", artwork: cover),
+            named: "tagged.m4a", in: directory)
+
+        let info = try #require(try await MediaInspection.inspect(at: file))
+
+        #expect(info.title == "A Quiet Recording")
+        #expect(info.artist == "PaperNest Tests")
+        #expect(info.albumName == "Fixture Album")
+        // The bytes the file carries, not a re-render of them.
+        let artwork = try #require(info.artwork)
+        #expect(!artwork.isEmpty)
+    }
+
+    /// Tags that are not there stay absent in a format that could have held
+    /// them, so an empty album is not invented for a file that has none.
+    @Test func anUntaggedM4AHasNoAlbumOrArtwork() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = try write(try await SyntheticDocuments.taggedAudio(title: "Only A Title"),
+                             named: "sparse.m4a", in: directory)
+
+        let info = try #require(try await MediaInspection.inspect(at: file))
+
+        #expect(info.title == "Only A Title")
+        #expect(info.albumName == nil)
+        #expect(info.artwork == nil)
+    }
 }

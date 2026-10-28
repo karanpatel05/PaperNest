@@ -23,12 +23,16 @@ public struct MediaInfo: Hashable, Sendable {
     public let duration: Double?
     public let hasAudio: Bool
     /// Whether there is a picture to show as well as sound.
-    ///
-    /// Measured only as `false`, on audio: no file carrying a video track has
-    /// been inspected, so a `true` here is not yet backed by a run.
     public let hasVideo: Bool
     public let title: String?
     public let artist: String?
+    public let albumName: String?
+    /// The cover the file carries, **as the bytes it carries**.
+    ///
+    /// Not decoded or re-rendered here: handing back the original bytes means
+    /// nothing is lost or invented on the way, and the caller decides what
+    /// size it wants to draw.
+    public let artwork: Data?
 }
 
 /// What a media file is, before anything plays it.
@@ -61,7 +65,9 @@ public enum MediaInspection {
                 hasAudio: tracks.contains { $0.mediaType == .audio },
                 hasVideo: tracks.contains { $0.mediaType == .video },
                 title: await string(.commonIdentifierTitle, in: metadata),
-                artist: await string(.commonIdentifierArtist, in: metadata))
+                artist: await string(.commonIdentifierArtist, in: metadata),
+                albumName: await string(.commonIdentifierAlbumName, in: metadata),
+                artwork: await data(.commonIdentifierArtwork, in: metadata))
         } catch let error as NSError where error.isNotRecognisedAsMedia {
             return nil
         }
@@ -79,9 +85,20 @@ public enum MediaInspection {
     /// `caaf/info-title` into a title.
     private static func string(_ identifier: AVMetadataIdentifier,
                                in items: [AVMetadataItem]) async -> String? {
-        let matching = AVMetadataItem.metadataItems(from: items, filteredByIdentifier: identifier)
-        guard let item = matching.first else { return nil }
+        guard let item = first(identifier, in: items) else { return nil }
         return try? await item.load(.stringValue) ?? nil
+    }
+
+    /// The same lookup, for a field whose value is bytes rather than words.
+    private static func data(_ identifier: AVMetadataIdentifier,
+                             in items: [AVMetadataItem]) async -> Data? {
+        guard let item = first(identifier, in: items) else { return nil }
+        return try? await item.load(.dataValue) ?? nil
+    }
+
+    private static func first(_ identifier: AVMetadataIdentifier,
+                              in items: [AVMetadataItem]) -> AVMetadataItem? {
+        AVMetadataItem.metadataItems(from: items, filteredByIdentifier: identifier).first
     }
 }
 

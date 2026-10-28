@@ -1724,3 +1724,68 @@ any screen uses. Wiring either engine to a screen means fixing that first.
 would ask — returned all 16 titles. Worth running because this is the trap
 class from the day before, though `AVAsset.load` suspends rather than blocks,
 so a hang was never likely.
+## Closing row 42's measurement gaps — row 42 — 2026-10-28 (Claude, backend)
+
+The entry above shipped only what a hand-built WAV could demonstrate, which
+left two honest holes: **`hasVideo == true` was never run** — a hard-coded
+`false` would have passed every test — and album and artwork were left
+unshipped because nothing could prove them. Both are now measured, so the
+"does not do" list above is superseded on those three points.
+
+- Full `./scripts/test.sh`: **476 tests passed** (64 + 131 + 115 + 118 + 48), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Two generated fixtures, and one API rejected on the way
+
+- `SyntheticDocuments.videoClip` writes a few frames through `AVAssetWriter`
+  with a pixel-buffer adaptor: a **1.3 KB** `.mov` that reads back as 0.600s
+  with one video track and no audio. Hand-written bytes cannot make a real
+  video track, and without one there is no honest way to test that a file
+  reports having a picture. Still synthetic — flat grey frames, nobody's
+  recording.
+- `SyntheticDocuments.taggedAudio` transcodes `wavAudio` with an
+  `AVAssetReader` into an `AVAssetWriter`: a **1.5 KB** `.m4a` whose title,
+  artist, album and 174 bytes of artwork all come back. M4A because a RIFF
+  file cannot hold these at all — AVFoundation drops a WAV `IPRD` album chunk
+  without even listing it, and there is no standard place in one for a picture.
+- **`AVAssetExportSession` was rejected**, although it was the first thing that
+  worked in a probe. `exportAsynchronously`, `status` and `error` are all
+  deprecated in macOS 15 while this package still supports macOS 14, so there
+  is no version of it that compiles without warnings. The reader-to-writer
+  transcode compiles clean and does the same job.
+
+### What is now measured
+
+- `hasVideo == true` and `hasAudio == false` on a real video track, and
+  **the test was proven able to fail**: hard-coding `hasVideo: false` breaks
+  `aVideoFileHasAPictureAsWellAsALength`, as hard-coding the error
+  classification breaks the two "not media" guards.
+- `albumName` and `artwork` round-trip. Artwork is handed back as **the bytes
+  the file carries**, not decoded or re-rendered, so nothing is lost or
+  invented on the way and the caller picks its own size.
+- Tags that are absent from a format that *could* have held them stay `nil`:
+  an M4A with only a title reports no album and no artwork rather than empty
+  strings.
+- A second format, and the first not written by hand: M4A as well as WAVE,
+  plus QuickTime for the video.
+
+### What this still does **not** do
+
+- **Nothing plays.** No seek, speed, background audio, resume, playlists,
+  shuffle, system controls or picture-in-picture. Nothing calls `inspect`.
+  Row 42 stays Planned.
+- **MP3 and MOV-with-audio are untested**, and so is anything with more than
+  one track of a kind. Three container formats have been read (WAVE, M4A,
+  QuickTime) out of the many a library will meet.
+- **iOS behaviour is still unmeasured.** The Simulator build proves
+  compilation. Whether the same formats read, and whether `AVAssetWriter`
+  produces these fixtures there, has not been run.
+- **The fixtures depend on the system's H.264 and AAC encoders.** They are
+  generated at test time rather than checked in, which keeps binaries out of
+  the repository but means these three tests need a machine with those
+  encoders.
+- **Artwork is not validated as an image.** The test asserts bytes came back,
+  not that they decode — the file is asked what it carries, and that is all
+  that is claimed.

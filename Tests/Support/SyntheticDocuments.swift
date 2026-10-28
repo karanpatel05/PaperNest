@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreGraphics
 import CoreText
 import Foundation
@@ -417,4 +418,128 @@ extension SyntheticDocuments {
         body += chunk("data", Data(count: Int(Double(sampleRate) * seconds) * 2))
         return chunk("RIFF", body)
     }
+
+    /// A few frames of generated video, as a QuickTime movie.
+    ///
+    /// Written by the system's own encoder, because no hand-written bytes make
+    /// a real video track — and without a real one there is no honest way to
+    /// test that a file reports having a picture. Still synthetic: the frames
+    /// are flat grey, and this is nobody's recording. About 1.3 KB.
+    public static func videoClip(frames: Int = 6, framesPerSecond: Int32 = 10) async throws -> Data {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SyntheticVideo-\(UUID().uuidString).mov")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: 64,
+            AVVideoHeightKey: 64,
+        ])
+        input.expectsMediaDataInRealTime = false
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input,
+                                                           sourcePixelBufferAttributes: nil)
+        writer.add(input)
+        guard writer.startWriting() else { throw writer.error ?? FixtureError.couldNotWrite }
+        writer.startSession(atSourceTime: .zero)
+
+        for frame in 0..<frames {
+            var buffer: CVPixelBuffer?
+            CVPixelBufferCreate(nil, 64, 64, kCVPixelFormatType_32BGRA,
+                                [kCVPixelBufferCGImageCompatibilityKey: true] as CFDictionary, &buffer)
+            guard let buffer else { throw FixtureError.couldNotWrite }
+            CVPixelBufferLockBaseAddress(buffer, [])
+            // A different flat grey per frame, so the frames are not identical.
+            memset(CVPixelBufferGetBaseAddress(buffer), Int32(40 + frame * 20),
+                   CVPixelBufferGetBytesPerRow(buffer) * 64)
+            CVPixelBufferUnlockBaseAddress(buffer, [])
+            while !input.isReadyForMoreMediaData { try await Task.sleep(nanoseconds: 2_000_000) }
+            adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(frame),
+                                                                timescale: framesPerSecond))
+        }
+        input.markAsFinished()
+        await writer.finishWriting()
+        if let error = writer.error { throw error }
+        return try Data(contentsOf: url)
+    }
+
+    /// Silent audio as an M4A, carrying whichever tags are given.
+    ///
+    /// M4A rather than WAVE because a RIFF file cannot hold these: AVFoundation
+    /// drops a WAV `IPRD` album chunk entirely, and there is no standard place
+    /// in one for a picture. Made by transcoding `wavAudio` with an
+    /// `AVAssetReader` into an `AVAssetWriter`, **not** with
+    /// `AVAssetExportSession`, whose `exportAsynchronously` is deprecated in
+    /// macOS 15 while this package still supports 14 — it would cost warnings.
+    public static func taggedAudio(seconds: Double = 1.0,
+                                   title: String? = nil,
+                                   artist: String? = nil,
+                                   album: String? = nil,
+                                   artwork: Data? = nil) async throws -> Data {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SyntheticAudio-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("source.wav")
+        let destination = directory.appendingPathComponent("tagged.m4a")
+        // 44.1 kHz, which the AAC encoder is asked to write.
+        try wavAudio(seconds: seconds, sampleRate: 44_100).write(to: source)
+
+        let asset = AVURLAsset(url: source)
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+            throw FixtureError.couldNotWrite
+        }
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+        ])
+        reader.add(output)
+
+        let writer = try AVAssetWriter(outputURL: destination, fileType: .m4a)
+        let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: 44_100,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: 64_000,
+        ])
+        input.expectsMediaDataInRealTime = false
+        writer.metadata = [
+            tag(.commonIdentifierTitle, title.map { $0 as NSString }, kCMMetadataBaseDataType_UTF8),
+            tag(.commonIdentifierArtist, artist.map { $0 as NSString }, kCMMetadataBaseDataType_UTF8),
+            tag(.commonIdentifierAlbumName, album.map { $0 as NSString }, kCMMetadataBaseDataType_UTF8),
+            tag(.commonIdentifierArtwork, artwork.map { $0 as NSData }, kCMMetadataBaseDataType_PNG),
+        ].compactMap { $0 }
+        writer.add(input)
+
+        guard reader.startReading(), writer.startWriting() else {
+            throw writer.error ?? reader.error ?? FixtureError.couldNotWrite
+        }
+        writer.startSession(atSourceTime: .zero)
+        while let buffer = output.copyNextSampleBuffer() {
+            while !input.isReadyForMoreMediaData { try await Task.sleep(nanoseconds: 2_000_000) }
+            if !input.append(buffer) { break }
+        }
+        input.markAsFinished()
+        await writer.finishWriting()
+        if let error = writer.error { throw error }
+        if reader.status == .failed, let error = reader.error { throw error }
+        return try Data(contentsOf: destination)
+    }
+
+    private static func tag(_ identifier: AVMetadataIdentifier,
+                            _ value: (any NSCopying & NSObjectProtocol)?,
+                            _ dataType: CFString) -> AVMetadataItem? {
+        guard let value else { return nil }
+        let item = AVMutableMetadataItem()
+        item.identifier = identifier
+        item.value = value
+        item.dataType = dataType as String
+        return item
+    }
+
+    public enum FixtureError: Error { case couldNotWrite }
 }
