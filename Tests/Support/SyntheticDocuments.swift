@@ -363,4 +363,58 @@ extension SyntheticDocuments {
 
         return document.dataRepresentation()!
     }
+
+    /// Silent audio as a **hand-built RIFF/WAVE file**, optionally carrying its
+    /// own title and artist in a `LIST`/`INFO` chunk.
+    ///
+    /// Hand-built rather than generated or checked in as a blob for two
+    /// reasons: the length is then exactly known — 1.5 seconds reads back as
+    /// 1.500 — and there is no opaque binary in the repository to wonder about.
+    ///
+    /// Only `INAM` (title) and `IART` (artist) are written, because those are
+    /// the only two AVFoundation was measured to surface: `IPRD` for an album
+    /// is dropped on the floor, and nothing here can carry artwork.
+    public static func wavAudio(seconds: Double = 1.5,
+                                sampleRate: Int = 8_000,
+                                title: String? = nil,
+                                artist: String? = nil) -> Data {
+        func littleEndian32(_ value: Int) -> Data {
+            var bits = UInt32(value).littleEndian
+            return withUnsafeBytes(of: &bits) { Data($0) }
+        }
+        func littleEndian16(_ value: Int) -> Data {
+            var bits = UInt16(value).littleEndian
+            return withUnsafeBytes(of: &bits) { Data($0) }
+        }
+        /// RIFF chunks are padded to an even length.
+        func chunk(_ identifier: String, _ body: Data) -> Data {
+            var out = Data(identifier.utf8) + littleEndian32(body.count) + body
+            if body.count % 2 == 1 { out.append(0) }
+            return out
+        }
+
+        var format = Data()
+        format += littleEndian16(1)                  // PCM
+        format += littleEndian16(1)                  // mono
+        format += littleEndian32(sampleRate)
+        format += littleEndian32(sampleRate * 2)     // bytes per second
+        format += littleEndian16(2)                  // bytes per frame
+        format += littleEndian16(16)                 // bits per sample
+
+        var body = Data("WAVE".utf8)
+        body += chunk("fmt ", format)
+        let tags = [("INAM", title), ("IART", artist)].compactMap { key, value in
+            value.map { (key, $0) }
+        }
+        if !tags.isEmpty {
+            var info = Data("INFO".utf8)
+            for (key, value) in tags {
+                info += chunk(key, Data((value + "\u{0}").utf8))
+            }
+            body += chunk("LIST", info)
+        }
+        // Silence: the samples are all zero, so only the count matters.
+        body += chunk("data", Data(count: Int(Double(sampleRate) * seconds) * 2))
+        return chunk("RIFF", body)
+    }
 }

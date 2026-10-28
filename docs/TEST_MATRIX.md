@@ -1633,3 +1633,72 @@ measurement rather than advice.
 - **Concurrency is clean as far as it was pushed** — 16 concurrent requests in
   a standalone task group, plus 5 parallel suite runs — but this is a system
   XPC agent, and that is not proof for every type or load.
+## How long a media file is, and what it calls itself — row 42 — 2026-10-28 (Claude, backend)
+
+Row 42 (audio and video playback, audiobooks, playlists) was confirmed by the
+owner on 2026-10-23. `MediaInspection.inspect(at:)` is the part a player needs
+before it can draw anything: the file's own length, whether there is a picture
+as well as sound, and what it calls itself. **Playing it is a view and is not
+this.**
+
+- Full `./scripts/test.sh`: **473 tests passed** (64 + 131 + 112 + 118 + 48), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### The fixture is hand-built, and that was measured first
+
+A **RIFF/WAVE file written by hand** is enough: 1.5 seconds of silence reads
+back as 1.500, and 2.0 as 2.000. So there is no opaque audio blob in the
+repository and no generated file whose length has to be taken on trust — the
+same reasoning as the hand-built AcroForm PDF. A `LIST`/`INFO` chunk carries
+the tags.
+
+### Three findings that changed the design
+
+1. **`asset.load(.commonMetadata)` is empty for a file whose tags are plainly
+   there.** The obvious reader — load the common metadata, look for a title —
+   finds *nothing* on this file. The items only come back through
+   `AVMetadataItem.metadataItems(from:filteredByIdentifier:)` over
+   `.metadata`, which does the per-format mapping and turns `caaf/info-title`
+   into `.commonIdentifierTitle`. Measured both ways before a line was written.
+2. **`.bin` fails here too.** The same playable bytes are read under a `.wav`
+   name and refused under `.bin` — `AVFoundationErrorDomain` −11828. That is
+   the *same* staging requirement `FileThumbnail` has, reached through
+   completely different machinery, so the two engines agree: stage a copy named
+   from `FilePayload.originalFilename`, or from `UTType(uti)`.
+   `theStoredAssetNameIsNotEnoughToReadIt` writes the same bytes both ways and
+   gets `nil` from one and an answer from the other.
+3. **A missing file is distinguishable from a file that is not media** (−11800
+   against −11828), so existence is checked here and only −11828 becomes
+   `nil`. Both guards were **run rather than claimed**: breaking the
+   classification makes `aFileThatIsNotMediaIsNotAnError` and
+   `theStoredAssetNameIsNotEnoughToReadIt` fail with the real −11828 in hand.
+
+### Only what could be measured is shipped
+
+`duration`, `hasAudio`, `hasVideo`, `title`, `artist` — and nothing else.
+**`albumName` and `artwork` were left out on purpose.** A WAV `IPRD` chunk for
+the album is dropped by AVFoundation entirely — it does not even appear among
+the raw items — and nothing hand-buildable here carries artwork, so both would
+have been fields no run could demonstrate.
+
+### What this does **not** do
+
+- **Nothing plays.** No seek, speed, background audio, resume, playlists,
+  shuffle, system controls or picture-in-picture — row 42 stays Planned, and
+  this only clears its groundwork. Nothing calls `inspect` yet.
+- **No file with a video track has been inspected.** `hasVideo` is measured
+  only as `false`, on audio. A `true` from it is not yet backed by a run, and a
+  video fixture needs a real encoder rather than hand-written bytes.
+- **Artwork and album are not read at all**, as above. Row 42 asks for
+  artwork; it needs a fixture in a format that can carry one.
+- **One format has been read: WAV.** MP3, M4A, AAC, MOV and MP4 are untested
+  here. The metadata path is format-independent by construction, but that is an
+  argument rather than a measurement.
+- **A file AVFoundation recognises but cannot parse is thrown, not reported as
+  "not media".** Only −11828 was measured, so only −11828 is treated as an
+  answer; a corrupt media file's code is unknown and would surface as an error.
+- **`duration == nil` is unexercised.** No local file declared an indefinite
+  length. It is `nil` rather than `0` so a wrong zero is never shown as a
+  length.
