@@ -1789,3 +1789,51 @@ unshipped because nothing could prove them. Both are now measured, so the
 - **Artwork is not validated as an image.** The test asserts bytes came back,
   not that they decode — the file is asked what it carries, and that is all
   that is claimed.
+## Row 43's codec review, answered by measurement — 2026-10-28 (Claude, backend)
+
+Row 43 is "Convert media to MP3 / extract audio", and has said **"codec and
+licensing review first"** since it was confirmed on 2026-10-23. This is that
+review. **No engine was built and nothing in the app changed** — it is a
+finding, recorded so the decision it forces is made with numbers rather than
+recollection.
+
+### What this machine can encode
+
+`AudioFormatGetProperty(kAudioFormatProperty_EncodeFormatIDs)` returns **16**
+formats:
+
+    aac  aace aacf aacg aach aacl aacp alac apac flac opus lpcm alaw ulaw ilbc ima4
+
+- **MP3 is not among them.** `kAudioFormatMPEGLayer3` is absent from the
+  encode list.
+- **MP3 *decoding* is available** — it is in the decode list. So a library can
+  read an MP3 a user imports and cannot write one.
+- AAC, Apple Lossless, FLAC, Opus and plain PCM can all be written.
+
+`AVAssetWriter` agrees from the other side: constructing one with
+`AVFileType.mp3` raises `NSInvalidArgumentException`, and the exception names
+every type it *will* write — m4a, mp4, mov, caf, wav, aiff, aifc, 3gpp, amr
+and the caption formats. No MP3.
+
+### What that means for row 43
+
+- **"Convert to MP3" cannot be built on Apple's frameworks.** It needs a
+  third-party encoder bundled into the app, which is the licensing question the
+  row anticipated — now a certainty rather than a worry.
+- **"Extract audio" can be built today**, to M4A/AAC, or losslessly to Apple
+  Lossless, FLAC or WAV. The transcode route is already proven in
+  `SyntheticDocuments.taggedAudio`: `AVAssetReader` into `AVAssetWriter`,
+  warning-free, and small.
+
+**This is an owner decision and is deliberately left open**, because the two
+answers lead to different work: ship "Extract audio" in a format the system
+can write, or license an MP3 encoder and carry it in the app. Nothing should
+be labelled "MP3" in any screen until that is settled.
+
+### What this does **not** establish
+
+- **One machine, one OS version.** The encoder list is what this Mac reports
+  today. It is a strong signal about Apple's platforms but not a guarantee for
+  every iOS device, and the same probe has not been run on iOS.
+- **Nothing was extracted.** No audio has actually been pulled out of a video
+  file; only the available encoders and container types were read.
