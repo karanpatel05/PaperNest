@@ -1508,13 +1508,32 @@ shape that reproduces it.
   helped: a thread stuck in `mach_msg` never reaches a cancellation point, so
   no `.timeLimit` fires, and the starved pool cannot run the harness either. A
   hang at `manyFillsAtOnceAllFinish` is the warning; the comment there says so.
-- **The same trap is still open elsewhere, unchecked.** `PDFPage.copy()` in
-  `Compression.swift:234` and `:286` and `Exporter.swift:176` loads a form
-  PDF's annotations too, outside this lock. Nothing in the product fans out —
-  there is no `withTaskGroup`, `concurrentPerform` or `async let` anywhere in
-  `Sources` — so nothing enters it concurrently **today**. That is a property
-  of today's callers, not of that code. The first screen to export several
-  form PDFs at once could hang, and no test covers it.
+- **Corrected — the first version of this entry got the blast radius wrong.**
+  It said `PDFPage.copy()` in `Compression.swift` and `Exporter.swift` was the
+  same exposed path, and that nothing in the product fans out anyway. Both
+  claims were guesses from a grep, and both are wrong. The app fans out
+  heavily: **87 `Task {}` / `.task {}` sites across 21 files in
+  `PaperNestUI`**, which is exactly why this matters. And the trap is narrower
+  than `PDFPage`. Probed at 16 concurrent callers each, on the form fixture:
+
+  | concurrent PDFKit work | result |
+  | --- | --- |
+  | `page.annotations` | **hangs**, no caller finishes |
+  | `page.copy()` | all finish |
+  | `page.string` | all finish |
+  | `outlineRoot` | all finish |
+
+  So **reading `.annotations` is the trigger** — that is what instantiates the
+  widget objects and resolves their `/DA` font. Copying a page, reading its
+  text and reading the outline do not. `PDFForm` is the only code in `Sources`
+  that reads `.annotations` (`PDFForm.swift:59` and `:88`), so the lock covers
+  the product and not merely the test. `PageRenderer`, the hot path, is pure
+  Core Graphics — `CGPDFDocument` and `ctx.drawPDFPage`, which draws page
+  content without annotations — so the library grid rendering many pages at
+  once never enters it.
+- **What is still unchecked:** only those four PDFKit calls were measured. If
+  some other PDFKit path loads annotations implicitly, it would hang the same
+  way and no test would catch it.
 - **Why the pool cannot recover is not known.** It is inside CoreText and
   libFontRegistry, and nothing here claims an explanation — only what was
   measured.
