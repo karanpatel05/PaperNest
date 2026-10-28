@@ -1724,6 +1724,7 @@ any screen uses. Wiring either engine to a screen means fixing that first.
 would ask — returned all 16 titles. Worth running because this is the trap
 class from the day before, though `AVAsset.load` suspends rather than blocks,
 so a hang was never likely.
+
 ## Closing row 42's measurement gaps — row 42 — 2026-10-28 (Claude, backend)
 
 The entry above shipped only what a hand-built WAV could demonstrate, which
@@ -1789,6 +1790,7 @@ unshipped because nothing could prove them. Both are now measured, so the
 - **Artwork is not validated as an image.** The test asserts bytes came back,
   not that they decode — the file is asked what it carries, and that is all
   that is claimed.
+
 ## Row 43's codec review, answered by measurement — 2026-10-28 (Claude, backend)
 
 Row 43 is "Convert media to MP3 / extract audio", and has said **"codec and
@@ -1837,6 +1839,7 @@ be labelled "MP3" in any screen until that is settled.
   every iOS device, and the same probe has not been run on iOS.
 - **Nothing was extracted.** No audio has actually been pulled out of a video
   file; only the available encoders and container types were read.
+
 ## A placed image is painted and exported — row 21 — 2026-10-28 (Claude, backend)
 
 **The owner narrowed the queue on 2026-10-28: documents and images only, leave
@@ -1890,8 +1893,32 @@ the ink editor paints its own strokes and the page must not appear to lose the
 image the moment someone draws; and it reaches both an exported PDF and an
 exported PNG.
 
-Placing reuses the imported image's own asset rather than storing the bytes
-twice, which is what a screen would do.
+Two more cases were added after the first commit, because every test until
+then used an **unrotated, uncropped page**, where several wrong orders of flip
+and rotation give the right pixels anyway: one on a page the file itself
+rotates a quarter turn, and one whose stamp is stored sideways and upright only
+by its EXIF orientation, as a phone photo is. Removing the flip in
+`drawPlacedImage` fails **7 of the 8 tests**, these two included, so they are
+live guards — though it should be said plainly that they fail for the same
+reason the flat case does rather than catching something it cannot.
+
+### Corrected: how a screen would actually place one
+
+The first commit's note here said placing reuses the imported image's asset
+"which is what a screen would do". That is **not true**, and the correction
+matters more than the claim did. The test gets its `AssetID` by importing the
+stamp as a library item; a screen placing a photo from outside the library that
+way would leave a stray item behind. And there is **no public API that stages an
+asset and writes the object together**: `AssetFileStore.store` stages the file
+durably, but inserting the asset row is private, and between staging and the
+object being written `sweepOrphanAssets` could take the file away.
+
+`saveObject` is also the *unguarded* write. Every other object kind has a
+guarded one — ink has `applyInkChanges`, which checks the objects it expects;
+comments have `setPageComment(replacing:)`; markup has `addTextMarkup`. A
+guarded `placeImage` that stages the asset and writes the object in one
+transaction is the next piece of store work, and it is what turns "the engine
+draws a placed image" into "a screen can place one".
 
 ### What this does **not** do
 
@@ -1911,3 +1938,29 @@ twice, which is what a screen would do.
 - **`PageRenderer.inkStrokes(for:)` still exists and is now used by nothing.**
   It is kept because Codex's editor may want it, with a doc comment saying not
   to draw from it; drawing from it is precisely how a placed image gets lost.
+- **The image is stretched to fill its frame.** `drawPlacedImage` draws into
+  the rectangle it is given, and every test places a square image in a square
+  frame, so nothing here establishes what a mismatched aspect does — it will
+  distort. Saved signatures letterbox instead (`SavedSignature.placed(in:on:)`);
+  this does not, and which is wanted is a product question.
+- **`includingInk: false` has changed meaning, and `ThumbnailCache` passes it.**
+  It used to mean "no overlays", because ink was the only one; it now means
+  what it says — no ink, placed images kept. Nothing can show one yet, since no
+  screen places an image, so there is no live defect. But a caller that wanted
+  the bare page needs a different flag, and `Sources/PaperNestUI/ThumbnailCache.swift`
+  is the one to look at when images can be placed.
+- **Redaction does not touch a placed image's own bytes.** `PageRedaction`
+  flattens and repaints the page's *source* through `uprightSourceRaster`, so
+  overlays are neither baked in twice nor removed. That is right for ink, and
+  it means a placed image covering a redacted region still shows whatever it
+  shows — the words are gone from the source, which is what redaction promises,
+  but a picture carrying the same words is not redacted. Untested and
+  unaddressed.
+- **No sibling of the `hasInk` bug was found in this lane.** Everything that
+  decides a page's original can be copied instead of drawn goes through
+  `isUntouched`; `EmbeddedPageText` and `DocumentOutline` read a source for text
+  and an outline rather than to copy it, and compression works on a finished PDF
+  where overlays are already drawn in. The `case .ink` filters in
+  `PaperNestUI` — `DocumentView`, `MarkupManagerSheet`, `InkCanvas` — are list
+  and manager concerns rather than copy decisions, and they are Codex's to
+  judge.
