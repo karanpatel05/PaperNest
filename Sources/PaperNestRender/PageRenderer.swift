@@ -12,6 +12,21 @@ public enum RenderError: Error, Equatable, Sendable {
     case contextCreationFailed
 }
 
+/// One thing painted over a page's own content.
+///
+/// A page's objects come back from `LibraryStore.objects(on:)` in `zKey`
+/// order and this list keeps that order, so an image placed over a stroke
+/// covers it and a stroke drawn over an image covers that — whichever the
+/// page says came last. There is no rule that images sit beneath ink.
+///
+/// `@unchecked Sendable` for the same reason as `PreparedSource`: the image
+/// is decoded once and only read afterwards.
+public enum PageLayer: @unchecked Sendable {
+    case ink(InkStroke)
+    /// A decoded image and the frame it fills, in upright source points.
+    case image(CGImage, CGRect)
+}
+
 /// Draws pages for display, thumbnails and export. Every path goes through
 /// `draw(_:source:in:pageToContext:)`, so what is exported matches what is
 /// shown.
@@ -38,11 +53,11 @@ public struct PageRenderer: Sendable {
         let height = max(1, Int((size.height * pixelsPerPoint).rounded()))
         guard width * height <= Self.maxPixelCount else { throw RenderError.outputTooLarge }
         let source = try await prepareSource(for: page, pixelsPerPoint: pixelsPerPoint)
-        let ink = includingInk ? try await inkStrokes(for: page) : []
+        let layers = try await layers(for: page, pixelsPerPoint: pixelsPerPoint, includingInk: includingInk)
         return try Self.bitmap(width: width, height: height) { ctx in
             let pageToContext = CGAffineTransform(a: CGFloat(width) / size.width, b: 0, c: 0, d: -CGFloat(height) / size.height,
                                                   tx: 0, ty: CGFloat(height))
-            Self.draw(page, source: source, ink: ink, in: ctx, pageToContext: pageToContext)
+            Self.draw(page, source: source, layers: layers, in: ctx, pageToContext: pageToContext)
         }
     }
 
@@ -79,10 +94,47 @@ public struct PageRenderer: Sendable {
     }
 
     /// The page's ink, in paint order.
+    /// A page's ink alone.
+    ///
+    /// **Not what to draw with.** `draw` takes `layers(for:pixelsPerPoint:)`,
+    /// which carries placed images as well and keeps the page's own order;
+    /// painting from this would silently leave a placed image out, which is
+    /// the fault that `isUntouched` used to have.
     public func inkStrokes(for page: Page) async throws -> [InkStroke] {
         try await store.objects(on: page.id).compactMap { object in
             if case .ink(let stroke) = object.payload { stroke } else { nil }
         }
+    }
+
+    /// Everything painted over the page, in the page's own order, with any
+    /// placed image already decoded at a size that suits `pixelsPerPoint`.
+    ///
+    /// `includingInk: false` is for the ink editor, which paints the strokes it
+    /// is editing itself. A placed image is not ink and stays either way, or
+    /// the page would appear to lose it the moment someone started drawing.
+    ///
+    /// A placed image whose asset is not on this device throws rather than
+    /// being skipped: a page quietly missing part of itself is worse than one
+    /// that says it cannot be drawn.
+    public func layers(for page: Page, pixelsPerPoint: CGFloat,
+                       includingInk: Bool = true) async throws -> [PageLayer] {
+        var layers: [PageLayer] = []
+        for object in try await store.objects(on: page.id) {
+            switch object.payload {
+            case .ink(let stroke):
+                if includingInk { layers.append(.ink(stroke)) }
+            case .image(let placed):
+                let longestEdge = max(placed.frame.width, placed.frame.height) * pixelsPerPoint
+                let image = try await cache.uprightImage(
+                    placed.assetID, maxPixelSize: max(1, Int(longestEdge.rounded(.up))), store: store)
+                layers.append(.image(image, placed.frame))
+            case .text, .comment:
+                // Text boxes are not painted yet (row 21), and a page comment
+                // is private — it belongs in neither a rendering nor an export.
+                break
+            }
+        }
+        return layers
     }
 
     static func bitmap(width: Int, height: Int, draw: (CGContext) -> Void) throws -> CGImage {
@@ -223,7 +275,7 @@ public struct PageRenderer: Sendable {
     /// bounds and painted on white so transparent originals never lose dark
     /// content. Ink is in source space, so it follows crop and rotation.
     /// `ink` has no default: every caller decides, so none drops it silently.
-    public static func draw(_ page: Page, source: PreparedSource, ink: [InkStroke], in ctx: CGContext, pageToContext: CGAffineTransform) {
+    public static func draw(_ page: Page, source: PreparedSource, layers: [PageLayer], in ctx: CGContext, pageToContext: CGAffineTransform) {
         let geometry = page.geometry
         ctx.saveGState()
         defer { ctx.restoreGState() }
@@ -246,7 +298,26 @@ public struct PageRenderer: Sendable {
         case .template(let template):
             drawTemplate(template, size: page.sourceSize, in: ctx)
         }
-        for stroke in ink { drawInk(stroke, in: ctx) }
+        for layer in layers {
+            switch layer {
+            case .ink(let stroke): drawInk(stroke, in: ctx)
+            case .image(let image, let frame): drawPlacedImage(image, in: frame, in: ctx)
+            }
+        }
+    }
+
+    /// Draws a placed image into its frame in source space.
+    ///
+    /// The flip is the same one the page's own raster content uses, so there
+    /// is one mapping from source space to the context and no second idea of
+    /// which way is up in here.
+    static func drawPlacedImage(_ image: CGImage, in frame: CGRect, in ctx: CGContext) {
+        guard frame.width > 0, frame.height > 0 else { return }
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
+        ctx.concatenate(PageGeometry.yUpToYDown(in: frame))
+        ctx.interpolationQuality = .high
+        ctx.draw(image, in: frame)
     }
 
     /// Draws one stroke in source space. Pen ink is opaque, its width

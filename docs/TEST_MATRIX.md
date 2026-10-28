@@ -1837,3 +1837,77 @@ be labelled "MP3" in any screen until that is settled.
   every iOS device, and the same probe has not been run on iOS.
 - **Nothing was extracted.** No audio has actually been pulled out of a video
   file; only the available encoders and container types were read.
+## A placed image is painted and exported — row 21 — 2026-10-28 (Claude, backend)
+
+**The owner narrowed the queue on 2026-10-28: documents and images only, leave
+media alone.** Rows 42 and 43 stop where they are. Row 21 says "placed images
+remain planned; models for text/image objects exist", and that was exactly the
+state — `PageObject.Payload.image(PlacedImage)` existed, `page_objects` stored
+it, and `isAssetReferenced` and `deleteUnreferencedAssetRows` already counted
+it, so an asset under a placed image was never swept. **Nothing painted it, and
+`PageRenderer.draw` did not even take one.**
+
+- Full `./scripts/test.sh`: **482 tests passed** (64 + 131 + 119 + 120 + 48), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### The trap it closes, which was a silent one
+
+`PDFPassThrough.isUntouched` asked `hasInk`. An unedited PDF page at its
+original paper size with a placed image and **no** ink satisfied every
+condition, so export copied it straight from its source file — and the image,
+which exists nowhere in that source, **was gone from the export without a
+word**. No error, no warning, just a page missing what someone put on it.
+
+The fix is not a `hasPlacedImage` flag beside `hasInk`. The parameter is now
+`hasPaintedObjects`, because the condition that matters is "anything is painted
+over this page": a text box or a stamp, both named in row 21 as coming, would
+have walked into the same hole. `aPageCarryingAPlacedImageIsDrawnRatherThanCopied`
+is the test, and it failed before the change.
+
+### Order is the page's, not a rule about kinds
+
+`draw` now takes `[PageLayer]` — `.ink` or `.image` — built from
+`LibraryStore.objects(on:)`, which returns a page's objects in `zKey` order.
+So an image placed over a stroke covers it and a stroke drawn over an image
+covers that, whichever the page says came last. The easy wrong version, images
+always painted last, **was tried**: it makes `inkDrawnOverAnImageCoversIt` fail.
+That test had passed trivially while nothing drew images at all, which is why it
+was worth breaking on purpose.
+
+Only two places called `draw`, both in this lane, so the signature could change
+rather than gaining a defaulted parameter that kept the old shape alive.
+
+### Six tests, and what each would catch
+
+The fixture image is white with a **red square across its top-left fifth**, so
+every probe reads a point just inside the placed frame's corner — an image drawn
+in the wrong place, at the wrong size, or flipped fails. It is painted on the
+page; nothing is painted outside its frame; an image over ink covers it; ink
+over an image covers that; `includingInk: false` still shows the image, because
+the ink editor paints its own strokes and the page must not appear to lose the
+image the moment someone draws; and it reaches both an exported PDF and an
+exported PNG.
+
+Placing reuses the imported image's own asset rather than storing the bytes
+twice, which is what a screen would do.
+
+### What this does **not** do
+
+- **No UI.** Nothing places an image yet — that is a screen, and screens are
+  Codex's. Row 21 stays Partial. A caller would write a `PageObject` with an
+  `.image` payload and a `zKey` above the existing ones.
+- **No undo, no resize, no rotation.** `PlacedImage` carries an asset and a
+  frame, and that is all it carries: no angle, no opacity, no crop. A placed
+  image cannot be rotated because the model has nowhere to put the angle.
+- **Text boxes and stamps are still not painted.** `.text` payloads are skipped
+  in `layers`, as page comments are — deliberately, and the comment there says
+  so, but it means row 21's other halves remain open.
+- **A placed image whose asset is not on this device throws**, rather than being
+  left out of the drawing. That is the honest choice — a page quietly missing
+  part of itself is worse than one that says it cannot be drawn — but it means
+  one unavailable overlay fails the whole page, and no test covers that path.
+- **`PageRenderer.inkStrokes(for:)` still exists and is now used by nothing.**
+  It is kept because Codex's editor may want it, with a doc comment saying not
+  to draw from it; drawing from it is precisely how a placed image gets lost.

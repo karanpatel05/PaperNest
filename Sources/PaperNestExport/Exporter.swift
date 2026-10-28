@@ -154,12 +154,19 @@ public struct Exporter: Sendable {
             try Task.checkCancellation()
             let pageSize = page.geometry.pageSize
             let layout = PaperLayout(pageSize: pageSize, paper: options.paperSize)
-            let ink = try await renderer.inkStrokes(for: page)
+            // The resolution the page will be drawn at, which also decides
+            // how large a placed image needs decoding. Same arithmetic as
+            // `pdfSource`, which is where the page's own content gets it.
+            let pageScale = layout.contentRect.width / pageSize.width
+            let drawnQuality = rasterQuality ?? options.pdfImageQuality.rasterQuality
+            let layers = try await renderer.layers(
+                for: page, pixelsPerPoint: drawnQuality.maxDPI / 72 * pageScale)
             let textLayer = options.includesRecognizedText
                 ? try await renderer.recognizedLines(for: page) : []
 
             let untouchedCandidate = Self.isUntouched(
-                page, options: options, hasInk: !ink.isEmpty, hasTextLayer: !textLayer.isEmpty)
+                page, options: options, hasPaintedObjects: !layers.isEmpty,
+                hasTextLayer: !textLayer.isEmpty)
 
             // The copy of the source page is two things at once: what
             // pass-through writes, and the yardstick for whether re-encoding
@@ -233,7 +240,7 @@ public struct Exporter: Sendable {
             // Paper space is y-down in our model; PDF user space is y-up.
             let pageToContext = layout.pageToPaper(pageSize: pageSize)
                 .concatenating(CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: layout.paperSize.height))
-            PageRenderer.draw(page, source: source, ink: ink, in: ctx, pageToContext: pageToContext)
+            PageRenderer.draw(page, source: source, layers: layers, in: ctx, pageToContext: pageToContext)
             if !textLayer.isEmpty {
                 Self.drawSearchableText(textLayer, geometry: page.geometry, pageToContext: pageToContext, in: ctx)
             }

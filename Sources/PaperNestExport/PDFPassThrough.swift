@@ -20,8 +20,13 @@ extension Exporter {
     ///   export the page without it.
     /// - The paper is `.original`. Letter or A4 re-lays the page onto a sheet
     ///   of a different size, which is a new page.
-    /// - It carries no ink. Ink is drawn by the exporter and lives nowhere in
-    ///   the source file, so a copy would lose it.
+    /// - **Nothing is painted over it.** Ink, a placed image and anything else
+    ///   that lands on a page are drawn by the exporter and live nowhere in the
+    ///   source file, so a copy would lose them without a word. The condition
+    ///   is deliberately "any painted object" rather than a list of kinds: a
+    ///   placed image once slipped through a `hasInk` check that knew only
+    ///   about strokes, and the next kind — a text box, a stamp — would have
+    ///   done the same.
     /// - No searchable-text layer is being written for it. That layer is drawn
     ///   too, and a copy would drop what was asked for.
     ///
@@ -33,11 +38,11 @@ extension Exporter {
     /// preset, is a scan, and it is re-encoded instead of copied whenever the
     /// re-encode actually comes out smaller.
     static func isUntouched(_ page: Page, options: ExportOptions,
-                            hasInk: Bool, hasTextLayer: Bool) -> Bool {
+                            hasPaintedObjects: Bool, hasTextLayer: Bool) -> Bool {
         guard case .pdfPage = page.content else { return false }
         guard page.transform == .identity else { return false }
         guard options.paperSize == .original else { return false }
-        guard !hasInk, !hasTextLayer else { return false }
+        guard !hasPaintedObjects, !hasTextLayer else { return false }
         return true
     }
 
