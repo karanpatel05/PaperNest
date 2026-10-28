@@ -6,6 +6,14 @@ This is a multi-release expansion. The table is a coverage ledger, not a stateme
 
 ## Owner-confirmed pipeline — 2026-10-23
 
+> **Narrowed twice since, by the owner.** On **2026-10-28**: *"Live media just focus on documents and image"* — media
+> (rows 42–44) is parked where it stands. Then, the same day: *"I guess we can drop idea for file conversion"* — the
+> **Office-format conversions below are closed in both directions**, which were also the ones no engine could do
+> honestly. What this does **not** touch: **images ↔ PDF**, which is how the app imports a photo and exports a
+> document rather than a converter feature; and the three conversion engines that already ship — TXT → PDF, PDF →
+> plain text, PDF → basic Word — which stay unless the owner says otherwise. The lines below are left as written,
+> because they record what was asked for on 2026-10-23.
+
 After reviewing the feature list and the Convert Files / Enjoy Media screenshot, the owner explicitly requested: **“All features to pipeline including media.”** All identified capabilities below and in the 48-row reference inventory are included in the product pipeline. This confirms scope; it does not change implementation status or move media ahead of the current document work.
 
 - **Convert to PDF:** Image to PDF, Spreadsheet to PDF, Document to PDF, Presentation to PDF, Text to PDF, Merge to PDF.
