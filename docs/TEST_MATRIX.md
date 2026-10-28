@@ -1372,3 +1372,53 @@ signatures outlive reopening the library, at the current schema version.
   exported like any other ink — and equally removable by anyone with the file.
 - Nothing committed to a page by this slice: it produces strokes, and saving
   them onto a page goes through the existing ink APIs.
+
+## Filling a PDF form — row 24 — 2026-10-27 (Claude, backend)
+
+The Tools screen's *Fill Form*. Row 24 had stayed Planned because PaperNest
+writes no document-level AcroForm and the synthetic fixture had none either,
+so nothing was known about real forms.
+
+- Full `./scripts/test.sh`: **455 tests passed** (64 + 131 + 99 + 113 + 48), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Two probes unblocked it
+
+1. **A real AcroForm can be hand-built.** PDFKit cannot create one, so the
+   fixture is raw PDF bytes with computed xref offsets: catalog
+   `/AcroForm << /Fields [...] >>` and `/FT /Tx` widgets. Core Graphics reads
+   it as `[("customer", "")]` — a genuine form, not a loose widget.
+2. **PDFKit preserves an AcroForm it did not create.** Setting
+   `widgetStringValue` and writing gives, read back through Core Graphics:
+   `[("customer", "Jane Appleseed")]`.
+
+The earlier conclusion — *PaperNest writes no AcroForm* — remains true and is a
+different statement from *PDFKit cannot keep one*. Both are now recorded so
+neither gets mistaken for the other again.
+
+**Every assertion goes through Core Graphics, never PDFKit**, because PDFKit
+reports a `fieldName` whether or not the document has a form, which misled this
+project once already.
+
+### Seven tests
+
+A real form reports its field names, values and types; a PDF with no form
+reports none; a filled value is in the written file's AcroForm as another
+reader would see it; filling a field the form does not have is **refused**;
+filling a form-less PDF is refused; other fields are left alone; and the field
+is still a field afterwards.
+
+### What this does **not** do
+
+- **Only text fields can be filled.** Checkboxes and choice fields are
+  *reported* with `isFillable == false` rather than hidden, so a caller can say
+  "this form has parts I cannot fill" instead of implying the form is complete.
+  Appearance-state handling is not built.
+- **Filling does not flatten.** The field stays a field and the next reader can
+  change it. The result must not be described as locked or final.
+- **PaperNest still writes no AcroForm of its own**, so a form can be filled
+  but not created, and a PDF exported from PaperNest has no fields to fill.
+- **No UI**, and no real-world form — only the hand-built fixture — has been
+  filled. A form from a government or bank website is untested.

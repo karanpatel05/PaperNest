@@ -226,6 +226,62 @@ extension SyntheticDocuments {
     /// image". Pass a large, detailed one when the test is about *size* — a
     /// 400×560 near-flat PNG is already more compact than any re-encode of it,
     /// so it cannot show compression working.
+    /// One field of a hand-built form.
+    public struct FormFieldSpec: Sendable {
+        /// `/FT` — `Tx` for text, `Btn` for a checkbox, `Ch` for a choice.
+        public var type: String
+        public var name: String
+        public var value: String
+
+        public init(type: String = "Tx", name: String, value: String = "") {
+            self.type = type
+            self.name = name
+            self.value = value
+        }
+    }
+
+    /// A PDF with a **real** document-level `/AcroForm`.
+    ///
+    /// Written as raw bytes with computed xref offsets because PDFKit cannot
+    /// create a form: it keeps one it is given, but never makes one. Without
+    /// this there is no honest way to test form filling at all — a widget
+    /// annotation on its own is not a form, and PDFKit reports a `fieldName`
+    /// for one either way, which misled this project once.
+    public static func acroFormPDF(fields: [FormFieldSpec] = [FormFieldSpec(name: "customer")]) -> Data {
+        let content = Data("BT /Helv 14 Tf 72 700 Td (Agreement) Tj ET\n".utf8)
+        // Objects 1...5 are fixed; each field is an object after them.
+        let fieldStart = 6
+        let fieldRefs = fields.indices.map { "\(fieldStart + $0) 0 R" }.joined(separator: " ")
+        var objects: [String] = [
+            "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [\(fieldRefs)] /DA (/Helv 0 Tf 0 g) >> >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /Helv 5 0 R >> >> "
+                + "/Annots [\(fieldRefs)] /Contents 4 0 R >>",
+            "<< /Length \(content.count) >>\nstream\n" + String(decoding: content, as: UTF8.self) + "endstream",
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+        ]
+        for (index, field) in fields.enumerated() {
+            let top = 630 - index * 40
+            objects.append("<< /Type /Annot /Subtype /Widget /FT /\(field.type) /T (\(field.name)) "
+                + "/V (\(field.value)) /Rect [72 \(top - 30) 300 \(top)] /P 3 0 R /F 4 /DA (/Helv 12 Tf 0 g) >>")
+        }
+
+        var out = Data("%PDF-1.7\n".utf8)
+        out.append(contentsOf: [0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A])
+        var offsets: [Int] = []
+        for (index, object) in objects.enumerated() {
+            offsets.append(out.count)
+            out.append(Data("\(index + 1) 0 obj\n\(object)\nendobj\n".utf8))
+        }
+        let xrefAt = out.count
+        out.append(Data("xref\n0 \(objects.count + 1)\n0000000000 65535 f \n".utf8))
+        for offset in offsets {
+            out.append(Data(String(format: "%010d 00000 n \n", offset).utf8))
+        }
+        out.append(Data("trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(xrefAt)\n%%EOF\n".utf8))
+        return out
+    }
+
     /// A PDF carrying the table of contents its author wrote.
     ///
     /// `entries` are `(title, pageIndex, children)`: a child becomes a nested
