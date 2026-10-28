@@ -16,6 +16,11 @@ public struct LibraryExportItem: Sendable {
 /// app shows it; a file is copied exactly as it was given to us, because
 /// re-encoding someone's video or spreadsheet would be a lie about what they
 /// got back.
+///
+/// The single exception is an explicit compression preset, which reaches only
+/// what can genuinely be re-encoded — an image. Everything else still arrives
+/// byte for byte even then, and a re-encoded image changes extension, which is
+/// a real change to what someone gets back and is said rather than hidden.
 public enum LibraryExportEntry: Sendable {
     case document(LibraryExportItem)
     case file(name: String, originalFilename: String, url: URL)
@@ -55,10 +60,21 @@ extension Exporter {
     /// Packs a mixed selection into one ZIP: documents as PDFs, files as the
     /// bytes they arrived with. Entries that hold nothing are skipped, and an
     /// archive with nothing in it is an error rather than an empty file.
+    /// `preset` makes the archive smaller. It returns the ordinary
+    /// `ExportOutput` rather than a `CompressionResult`, deliberately: a
+    /// saving needs a "before", and for a document that is the originals it
+    /// is made of, which live in the store this cannot see. The caller
+    /// already knows what it had, so nothing here invents a baseline.
+    ///
+    /// Two rules: **nothing is dropped** — anything that cannot be compressed
+    /// goes in as it was, because an archive missing a file is data loss that
+    /// stays invisible until someone looks for it — and **nothing is grown**,
+    /// so a re-encode that came out bigger is discarded and the original kept.
     public func exportArchive(
         _ entries: [LibraryExportEntry],
         archiveName: String,
         pdfOptions: ExportOptions = ExportOptions(format: .pdf, paperSize: .original, pdfImageQuality: .balanced),
+        preset: CompressionPreset? = nil,
         progress: @Sendable (ExportProgress) -> Void = { _ in }
     ) async throws -> ExportOutput {
         let exportable = entries.filter { $0.weight > 0 }
@@ -81,7 +97,8 @@ extension Exporter {
                 case .document(let item):
                     let base = NameDeduplicator.uniqueName(ExportNaming.baseName(item.name), existing: usedNames)
                     usedNames.append(base)
-                    let pdf = try await export(itemName: item.name, pages: item.pages, options: pdfOptions) { inner in
+                    let pdf = try await export(itemName: item.name, pages: item.pages, options: pdfOptions,
+                                               rasterQuality: preset?.rasterQuality) { inner in
                         progress(ExportProgress(completedPages: offset + inner.completedPages, totalPages: totalPages))
                     }
                     defer { pdf.removeTemporaryFiles() }
@@ -92,7 +109,10 @@ extension Exporter {
                     let ext = (filename as NSString).pathExtension
                     let base = NameDeduplicator.uniqueName(sanitized, existing: usedNames)
                     usedNames.append(base)
-                    try zip.addFile(named: ext.isEmpty ? base : "\(base).\(ext)", data: Data(contentsOf: url))
+                    let original = try Data(contentsOf: url)
+                    let (data, extension_) = try await reduced(original, named: filename,
+                                                               extension: ext, preset: preset)
+                    try zip.addFile(named: extension_.isEmpty ? base : "\(base).\(extension_)", data: data)
                 }
                 completed += entry.weight
                 progress(ExportProgress(completedPages: completed, totalPages: totalPages))
@@ -103,5 +123,28 @@ extension Exporter {
             try? FileManager.default.removeItem(at: directory)
             throw error
         }
+    }
+}
+
+extension Exporter {
+    /// One loose file, re-encoded if a preset was asked for and it is actually
+    /// worth it. Returns the bytes to archive and the extension they should
+    /// carry.
+    ///
+    /// Three ways to end up with the original, all of them normal: no preset
+    /// was given; the bytes are not something that can be re-encoded (a video,
+    /// a spreadsheet, a protected PDF), which `compress` refuses outright; or
+    /// the re-encode came out no smaller, which is the common case for an
+    /// already-compact photo.
+    private func reduced(_ original: Data, named filename: String, extension ext: String,
+                         preset: CompressionPreset?) async throws -> (Data, String) {
+        guard let preset else { return (original, ext) }
+        guard let result = try? await compress(fileNamed: filename, data: original, preset: preset) else {
+            return (original, ext)
+        }
+        defer { result.output.removeTemporaryFiles() }
+        guard let compressed = try? Data(contentsOf: result.output.files[0]),
+              compressed.count < original.count else { return (original, ext) }
+        return (compressed, result.output.files[0].pathExtension)
     }
 }

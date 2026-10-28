@@ -107,6 +107,22 @@ do not keep it after the export. There is no password recovery: a lost password 
 should say so before writing, not after. Note also that PaperNest cannot *compress* a protected PDF — it refuses
 one — so if both actions are offered, the combination needs an explanation rather than a silent failure.
 
+### Compressing an archive (engine done 2026-10-27)
+
+`exportArchive(…preset:)` makes a whole selection smaller. It returns the ordinary output, not a saving: the
+screen already knows what it had, and inventing a baseline would be a number nobody measured.
+
+Two things a screen must not promise away:
+
+- **Nothing is dropped.** A file that cannot be compressed — a video, a spreadsheet, a protected PDF — still goes
+  into the archive exactly as it was. Do not show it as "skipped".
+- **An image that is re-encoded changes extension**, so a `.png` can come back as a `.jpg` inside the archive.
+  That is a real change to what someone gets back. If the archive is a backup rather than a share, say so, or do
+  not offer the preset there.
+
+A compressed entry that came out bigger is silently kept as the original, so "compress" can legitimately produce
+an archive the same size as the plain one. Report the measured result, never a promised percentage.
+
 ### Compressing to HEIC (engine done 2026-10-27)
 
 `compress(fileNamed:data:preset:format:)` takes a format. **It defaults to JPEG and should stay that way in any

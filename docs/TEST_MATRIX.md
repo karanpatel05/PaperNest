@@ -1212,3 +1212,54 @@ nothing.
   owner's work.
 - Only synthetic fixtures — **no real book or scanned PDF with a publisher's
   outline has been read.**
+
+## Compressing an archive — row 35 — 2026-10-27 (Claude, backend)
+
+Row 35's last remainder, which closes the row's engine work. `exportArchive`
+packed a selection into one ZIP and could not make any of it smaller; ZIP's own
+deflate does nearly nothing to a PDF or a JPEG.
+
+- Full `./scripts/test.sh`: **433 tests passed** (64 + 127 + 94 + 106 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### The design question that deferred this, and its answer
+
+The earlier slice left this alone because a `CompressionResult` needs an honest
+"before", and for a document that is the originals it is made of — which live
+in the store `Exporter` cannot see. Threading those in made the API ugly.
+
+**The answer was not to invent a before at all.** `exportArchive(…preset:)`
+returns the ordinary `ExportOutput`. The caller already knows what it had and
+can compare; nothing fabricates a baseline, and no store dependency appears.
+
+### Two rules, each with a test
+
+- **Nothing is dropped.** An archive missing a file is data loss that stays
+  invisible until someone looks for it, so anything that cannot be compressed
+  goes in as it was. The test packs a scanned document, a `.txt`, a `.mov` and
+  a `.png`, and counts four entries with the preset and four without.
+- **Nothing is grown.** A re-encode that came out bigger is discarded and the
+  original kept — so "compress" can legitimately produce an archive the same
+  size as the plain one, which the already-compact-PNG test pins.
+
+### Five tests
+
+An archive of scans is smaller with a preset; nothing is dropped from a mixed
+selection; a non-image file comes back **byte-identical** after a round trip
+through the archive; an already-compact image is not grown; and without a
+preset the archive is unchanged, entry list included.
+
+### What this does **not** do
+
+- **A re-encoded image changes extension** — a `.png` can come back as `.jpg`
+  inside the archive. That is a real change to what someone gets back, so it is
+  stated in `LibraryExportEntry`'s own documentation and in `CODEX_BRIEF.md`
+  rather than left to be discovered.
+- **Non-image files are never re-encoded**, preserving the promise the entry
+  type already made: re-encoding someone's video or spreadsheet would be a lie
+  about what they got back.
+- **No UI.** Nothing offers an archive preset.
+- Synthetic fixtures only; no real multi-gigabyte selection has been archived,
+  so nothing is known about time or memory at that scale.
