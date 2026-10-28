@@ -1156,3 +1156,59 @@ whatever format was asked for, with nothing written.
   which is a design question worth its own slice rather than a guess bolted on.
   Written down rather than quietly skipped.
 - Nothing committed.
+
+## A document's outline — row 36 — 2026-10-27 (Claude, backend)
+
+Row 36's **navigation** half, for one explicitly named format: a PDF's own
+table of contents. Not user-created bookmarks, which need storage and a screen.
+
+- Full `./scripts/test.sh`: **428 tests passed** (64 + 127 + 94 + 101 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Verified before designing
+
+An outline written with `PDFOutline`, serialized and reopened, comes back with
+its labels and page indices intact, and a PDF with no outline returns
+`outlineRoot == nil` — so "this file has no contents page" is distinguishable
+from "nobody looked". That is what made a synthetic fixture possible, which is
+what decides whether this can be tested honestly at all.
+
+### The part that is not bookkeeping
+
+A PDF's outline points at pages of **that file**. A PaperNest document is a
+list of pages that may have been reordered, cropped, deleted, or drawn from
+several PDFs at once. So every entry is resolved through the document's current
+pages by (asset, source index), never by trusting the index:
+
+- **An entry whose page was deleted is dropped.** An outline leading somewhere
+  the document no longer has is worse than no outline.
+- **Two merged PDFs each keep their own contents page**, resolving to their own
+  pages.
+- **Entries keep the order and nesting their author wrote**, because that is
+  what a table of contents is. If the pages were reordered the outline will not
+  ascend through the document — a true description of the file rather than
+  something quietly re-sorted. A child whose parent was dropped keeps its own
+  depth for the same reason.
+
+### Five tests
+
+Titles come back in the author's order with the right pages and nesting
+(`[0, 1, 0, 0]`, so flattening fails the test); a PDF without an outline yields
+none rather than failing; an entry whose page was deleted is dropped, with an
+assertion that no returned entry points outside the document's pages; a
+document built from two outlined PDFs yields both; and a scan contributes
+nothing.
+
+### What this does **not** do
+
+- **PDF only.** Nothing here claims EPUB or any other book format, and row 36
+  keeps its condition that formats be named explicitly.
+- **User-created bookmarks and reading mode remain Planned.**
+- Read-only: no schema change, nothing stored or cached, so the outline cannot
+  describe paper a page no longer shows.
+- **No UI.** Reading the outline is the engine; presenting it is the screen
+  owner's work.
+- Only synthetic fixtures — **no real book or scanned PDF with a publisher's
+  outline has been read.**

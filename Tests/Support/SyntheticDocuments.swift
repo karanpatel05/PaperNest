@@ -226,6 +226,36 @@ extension SyntheticDocuments {
     /// image". Pass a large, detailed one when the test is about *size* — a
     /// 400×560 near-flat PNG is already more compact than any re-encode of it,
     /// so it cannot show compression working.
+    /// A PDF carrying the table of contents its author wrote.
+    ///
+    /// `entries` are `(title, pageIndex, children)`: a child becomes a nested
+    /// outline entry under its parent, so depth can be checked rather than
+    /// assumed. Verified to survive serialization — labels and page indices
+    /// come back intact after a write and reopen.
+    public static func outlinedPDF(pages: [String],
+                                   entries: [(String, Int, [(String, Int)])]) -> Data {
+        let document = PDFDocument(data: textPDF(pages: pages))!
+        let root = PDFOutline()
+        for (index, entry) in entries.enumerated() {
+            let node = PDFOutline()
+            node.label = entry.0
+            if let page = document.page(at: entry.1) {
+                node.destination = PDFDestination(page: page, at: CGPoint(x: 0, y: 792))
+            }
+            root.insertChild(node, at: index)
+            for (childIndex, child) in entry.2.enumerated() {
+                let leaf = PDFOutline()
+                leaf.label = child.0
+                if let page = document.page(at: child.1) {
+                    leaf.destination = PDFDestination(page: page, at: CGPoint(x: 0, y: 792))
+                }
+                node.insertChild(leaf, at: childIndex)
+            }
+        }
+        document.outlineRoot = root
+        return document.dataRepresentation()!
+    }
+
     /// A 16×16 lossless WebP: the top-left quadrant red, the rest white.
     ///
     /// A literal rather than drawn, because it cannot be drawn: ImageIO lists
