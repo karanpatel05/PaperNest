@@ -1422,3 +1422,105 @@ is still a field afterwards.
   but not created, and a PDF exported from PaperNest has no fields to fill.
 - **No UI**, and no real-world form — only the hand-built fixture — has been
   filled. A form from a government or bank website is untested.
+## Ticking a box, and the hang that came with it — row 24 — 2026-10-27 (Claude, backend)
+
+Checkboxes join text fields in `PDFForm`. Partway through, the suite stopped
+finishing at all — and the cause turned out to predate this change.
+
+- Full `./scripts/test.sh`: **460 tests passed** (64 + 131 + 99 + 118 + 48), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Checkboxes, probed before they were designed
+
+Setting `buttonWidgetState = .onState` makes PDFKit write **both** `/V` and
+`/AS`, as names, using the widget's **own** on-state name rather than an
+assumed `/Yes`. Measured on the fixture: before `V=[""] AS=["—"]`, after
+`V=["/Yes"] AS=["/Yes"]`, and reopened `state=1`.
+
+So `FormValue` is typed — `.text(String)` or `.checked(Bool)` — instead of a
+bare string. Text offered for a checkbox, or a tick for a text field, is
+**refused** (`FormError.wrongKind`) rather than coerced: writing "true" into a
+name field, or ticking a box because some string was non-empty, is a guess
+about what was meant. Kinds are checked up front, so a refusal leaves the file
+untouched instead of half filled. `FormField.isCheckbox` says which is which.
+
+Four new tests: a tick is visible to another reader (`/V` and `/AS` read as
+names through Core Graphics); a box can be left unticked; a mismatched kind is
+refused; and a refusal writes nothing at all.
+
+### The hang, and what actually caused it
+
+`./scripts/test.sh --filter PDFFormTests` never returned. Build finished, then
+no test output at all, killed at the watchdog. `/usr/bin/sample` of the stuck
+process put every thread in the same place:
+
+    PDFForm.filled -> PDFPage.lazilyLoadAnnotations
+      -> PDFAnnotationTextWidget init -> getFontFromAppearanceString
+      -> NSFont fontWithName: -> CoreText -> TAutoActivationManager
+      -> XTypeXPCClient XTCopyFontProviders
+      -> __NSXPCCONNECTION_IS_WAITING_FOR_A_SYNCHRONOUS_REPLY__ -> mach_msg2_trap
+
+Reading a page's annotations makes PDFKit build each widget, and building one
+makes it resolve the font named in the field's `/DA` — `/Helv`, the AcroForm
+abbreviation, which is not a real PostScript name, so CoreText goes looking for
+it over **synchronous XPC**.
+
+**Three guesses were wrong and are recorded so they are not made again:**
+
+- *A wedged font daemon.* `fontd` and `fontworker` were both alive, and a
+  standalone binary resolved the same name promptly: `NSFont(name: "Helv")`
+  → nil in 0.009s, `"Helvetica"` → 0.001s.
+- *The checkbox change.* `git diff` touched only `fields(in:)`. The hanging
+  line is unchanged since commit `10a49b2`, and the three tests that passed at
+  that commit hang too.
+- *"Several at once."* The first regression test ran 8 concurrent fills on
+  plain `Thread`s and **passed with no fix at all**, in 0.066s. That reading
+  was wrong, and a test that cannot fail is worth nothing.
+
+The variable is Swift concurrency's **cooperative pool**, and only that:
+
+| 8 concurrent `filled` calls | result |
+| --- | --- |
+| on plain `Thread`s | all finish, 0.066s |
+| in a `withTaskGroup` | hangs; not one task finishes |
+
+The sample says which story it is: 9 threads, 9 lazy annotation loads, 9
+threads each waiting on **its own** unanswered reply, and **0** lock-contention
+frames. Nine independent stuck calls, not one stuck call with eight waiters.
+
+**The fix is one `NSLock` in `PDFForm`**, held across the whole PDFKit stretch
+of both `fields(in:)` and `filled(_:with:)`, so that path is entered one caller
+at a time. Verified against the harshest case rather than assumed: with the
+lock the task-group probe finishes all 8 in 0.066s, and the command that hung
+forever passed **5 runs in a row** (12 tests, ~0.08s each). A dedicated thread
+would also have worked — the plain-thread result proves it — but the lock is
+smaller, and one-at-a-time is exactly what was measured to be enough. Neither
+method calls the other, so a non-recursive lock is safe.
+
+`manyFillsAtOnceAllFinish` now pins this with a task group, which is the only
+shape that reproduces it.
+
+### What this does **not** do
+
+- **If that lock is removed, the test hangs rather than fails.** It cannot be
+  helped: a thread stuck in `mach_msg` never reaches a cancellation point, so
+  no `.timeLimit` fires, and the starved pool cannot run the harness either. A
+  hang at `manyFillsAtOnceAllFinish` is the warning; the comment there says so.
+- **The same trap is still open elsewhere, unchecked.** `PDFPage.copy()` in
+  `Compression.swift:234` and `:286` and `Exporter.swift:176` loads a form
+  PDF's annotations too, outside this lock. Nothing in the product fans out —
+  there is no `withTaskGroup`, `concurrentPerform` or `async let` anywhere in
+  `Sources` — so nothing enters it concurrently **today**. That is a property
+  of today's callers, not of that code. The first screen to export several
+  form PDFs at once could hang, and no test covers it.
+- **Why the pool cannot recover is not known.** It is inside CoreText and
+  libFontRegistry, and nothing here claims an explanation — only what was
+  measured.
+- **Choice fields still cannot be filled**, and are reported with
+  `isFillable == false`. Picking a value means picking from the options the
+  form declares, which this does not read.
+- **Still no UI, and still no real-world form.** Only the hand-built fixture
+  has been filled or ticked. A form from a government or bank website is
+  untested, and PaperNest writes no AcroForm of its own.
