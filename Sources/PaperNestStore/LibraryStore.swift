@@ -730,6 +730,37 @@ public actor LibraryStore {
         }
     }
 
+    // MARK: - Saved signatures
+
+    /// Keeps a signature, or replaces one already kept under the same id.
+    ///
+    /// A saved signature is a **picture** of a handwritten signature. It
+    /// attests to nothing: no certificate, no timestamp, no tamper-evidence,
+    /// and anyone with the file can copy the image onto another. Nothing built
+    /// on this may describe a document as "signed" or "verified".
+    public func saveSignature(_ signature: SavedSignature) throws {
+        _ = try db.transaction {
+            try db.run("""
+                INSERT OR REPLACE INTO signatures (id, name, strokes_json, created_at)
+                VALUES (?, ?, ?, ?)
+                """, [.text(signature.id), .text(signature.name),
+                      .text(try json(signature.strokes)), .date(signature.createdAt)])
+        }
+    }
+
+    /// Every kept signature, oldest first.
+    public func signatures() throws -> [SavedSignature] {
+        try db.query("SELECT id, name, strokes_json, created_at FROM signatures ORDER BY created_at, id") {
+            SavedSignature(id: $0.text(0), name: $0.text(1),
+                           strokes: try decoder.decode([InkStroke].self, from: Data($0.text(2).utf8)),
+                           createdAt: $0.date(3))
+        }
+    }
+
+    public func deleteSignature(_ id: String) throws {
+        _ = try db.transaction { try db.run("DELETE FROM signatures WHERE id = ?", [.text(id)]) }
+    }
+
     /// Deletes one asset — its row and its file — but only when nothing in
     /// the library still points at it. Returns whether it went.
     ///

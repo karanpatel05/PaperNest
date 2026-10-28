@@ -247,5 +247,17 @@ enum Schema {
         DROP TABLE assets;
         ALTER TABLE assets_v8 RENAME TO assets;
         """, rebuildsTables: true),
+        // Row 23: ink a person drew once, kept so it can be placed again.
+        // A picture of a signature, not a cryptographic one — the strokes are
+        // ordinary ink and nothing here attests to anything.
+        Migration(version: 9, sql: """
+        CREATE TABLE signatures (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            strokes_json TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
+        CREATE INDEX signatures_by_created ON signatures(created_at, id);
+        """),
     ]
 }

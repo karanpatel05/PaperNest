@@ -53,6 +53,8 @@ Export never changes the library. Users choose the format, the pages (all, curre
 - A PDF export can be given a password that is required to open it (2026-10-27). It is encrypted with **AES-128** — the standard security handler, revision 4 — which is what Apple's APIs produce. The cipher is sound; the key derivation is fast, so the protection is only as good as the password. It is not AES-256. Say that plainly wherever it is offered: never "secure" or "military-grade". The password is not stored anywhere.
 - Known limitations: a password-protected PDF cannot be compressed; permissions (allow printing, allow copying) cannot be set, only whether a password is needed to open; the password must be **ASCII**, so an accented one is refused — measured, as even a Latin-1 password failed to write; and only its first 32 bytes are honoured.
 
+- A signature can be drawn once, kept and placed on any page (2026-10-27, engine only). **It is a picture of a handwritten signature and nothing more.** PaperNest does not sign documents: there is no certificate, no timestamp and no tamper-evidence, the placed ink proves nothing about who put it there, and anyone with the file can copy it onto another. Never describe a document as "signed", "verified" or "secure" because a signature was placed on it.
+
 ## Settings
 
 iPhone and iPad open Settings from the library's ⋯ menu; the Mac uses the standard Settings window (⌘,). There is **no login or user profile**. Identity comes from the user's Apple account: iCloud for sync (M2) and the App Store for purchases (M5). The brief rules out a separate account system.

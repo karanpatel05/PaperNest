@@ -1319,3 +1319,56 @@ round trip.
   words, and a caller must expect that.
 - Only synthetic English text was recognised. **No handwriting, no real scan,
   and no French or Spanish line has been checked for word boxes.**
+
+## Saved signatures — row 23 — 2026-10-27 (Claude, backend)
+
+Ink a person drew once, kept, and placeable again on any page. Checkmarks
+already existed as symbol stamps, which are *generated shapes*; this is
+different in kind.
+
+- Full `./scripts/test.sh`: **448 tests passed** (64 + 131 + 99 + 106 + 48), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### What this is, stated before anything else
+
+A saved signature is **a picture of a handwritten signature**. It is not a
+cryptographic signature: no certificate, no timestamp, no tamper-evidence, it
+proves nothing about who placed it, and anyone holding the file can copy the
+image onto another document. **Nothing may say "signed", "verified",
+"authenticated" or "secure" — the honest verb is "placed".** That wording is in
+the type's own documentation, in `CODEX_BRIEF.md` and in `PRODUCT_SPEC.md`,
+because it decides vocabulary rather than being a caveat to add afterwards.
+
+### A design fault the test caught
+
+The first version normalised captured ink into a **unit box** — each axis
+scaled to 0...1 independently. That destroys the signature's shape: a 4:1
+signature came out square before placement ever saw it, and the aspect-ratio
+test failed with *"aspect became 1.0, not 4"*. Both axes are now divided by the
+**same** number, the longer side of the ink's bounds, so the shape is part of
+what is stored. Had the test only checked that placed ink lands inside its
+target, this would have shipped looking subtly wrong on every document.
+
+### Ten tests
+
+**Model (6):** capture normalises by the ink's own bounds and keeps its
+proportion; an empty signature is refused; placing puts every point inside the
+target; aspect survives placement, so a wide signature in a square target is
+letterboxed rather than stretched; the same placement on two page sizes is
+proportionally identical; placing does not change the stored signature.
+
+**Store (4):** a signature round-trips with its ink intact; saving the same id
+again replaces rather than duplicates; deleting removes only that one;
+signatures outlive reopening the library, at the current schema version.
+
+### What this does **not** do
+
+- **Schema is now v9; the next migration must be v10.**
+- **No UI.** Drawing a signature and choosing where it goes is the screen
+  owner's work. Initials and typed fill-in from row 23 are not built.
+- Placed strokes are ordinary ink, so they are editable, erasable, undoable and
+  exported like any other ink — and equally removable by anyone with the file.
+- Nothing committed to a page by this slice: it produces strokes, and saving
+  them onto a page goes through the existing ink APIs.

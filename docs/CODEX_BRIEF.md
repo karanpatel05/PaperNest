@@ -151,6 +151,21 @@ Windows installs, plenty of web upload forms. So:
 Everything else is unchanged: it reuses the existing quality slider, `contentType(for:)` resolves `.heic` from
 the file extension on its own, and several pages still package as a ZIP.
 
+### Saved signatures, when a screen for them arrives (engine done 2026-10-27)
+
+A signature is captured as ink and placed again with `SavedSignature`. The engine is done; the words are the
+hard part, and they are not negotiable.
+
+- **It is a picture of a signature.** No certificate, no timestamp, no tamper-evidence. It proves nothing about
+  who placed it, and anyone with the file can lift the image onto another document. **Never** label a document
+  "signed", "verified", "authenticated" or "secure" because ink was placed on it. The verb is **placed**.
+- A screen that implies legal weight is worse than no feature. If a user needs a document actually signed, this
+  is not that, and saying so plainly is the right behaviour.
+- **Aspect ratio is preserved on placement** — a signature fitted into a box is letterboxed, never stretched. Do
+  not add a free-resize handle that breaks that; a stretched signature is a different shape from the person's.
+- Placed strokes are ordinary ink: editable, erasable and undoable like anything else drawn, which also means
+  anyone can remove one.
+
 ### Redaction, when a screen for it arrives (engine done 2026-10-27)
 
 Redaction is the one place in this app where a convincing lie is worse than no feature. A black rectangle drawn
