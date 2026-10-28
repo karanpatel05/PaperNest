@@ -34,16 +34,22 @@ public enum FileThumbnailError: Error, Equatable, Sendable {
 /// `FileKind.prepareTemporaryCopy` already makes such a copy for the full
 /// preview, so this deliberately does not add a second way to stage files.
 public enum FileThumbnail {
-    /// Pictures of the contents, and deliberately **not** `.icon`.
+    /// A picture of the contents, and deliberately **not** `.icon`.
     ///
     /// Asked for `.all`, Quick Look answers anything it cannot read with a
     /// generic 512×512 icon for the file's type — measured on a `.bin`, a file
     /// with no extension and an unknown extension alike. That icon is the
     /// symbol the grid already draws from `uti`, so returning it here would
-    /// dress a type symbol up as a preview of the contents. Both of these are
-    /// real renderings of the file; a low-quality one is still the file.
+    /// dress a type symbol up as a preview of the contents. Proven, not
+    /// assumed: set this to `.all` and
+    /// `aFileTheSystemCannotReadGivesNothingRatherThanAnIcon` fails with the
+    /// icon in hand.
+    ///
+    /// `.lowQualityThumbnail` is left out because nothing here has measured
+    /// it. It would only ever differ where `.thumbnail` fails and it succeeds,
+    /// and that has not been seen happen.
     private static let contentPreviews: QLThumbnailGenerator.Request.RepresentationTypes =
-        [.thumbnail, .lowQualityThumbnail]
+        .thumbnail
 
     /// A thumbnail of the file's contents, or `nil` when the system has none
     /// for that kind of file.

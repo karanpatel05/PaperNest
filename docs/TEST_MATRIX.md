@@ -1566,7 +1566,24 @@ Quick Look, asked for a picture of a file's contents.
    `uti`, so returning it would dress a type symbol up as a preview of the
    contents. Asked only for `.thumbnail`, the same three files **error**
    instead, which is the honest answer. `aFileTheSystemCannotReadGivesNothingRatherThanAnIcon`
-   is the guard: widen the representation types and it fails.
+   is the guard, and the guard was **run rather than claimed**: set the
+   representation types to `.all` and it fails with
+   `Expectation failed: image == nil`, holding the icon. A guard nobody has
+   seen fail is a claim, and the first commit of this slice only claimed it.
+   `.lowQualityThumbnail` is also left out, because nothing here measured it —
+   the first commit asked for it while every measurement and every line of
+   these docs described `.thumbnail` alone.
+2. **A missing file is distinguishable from an unpreviewable one.**
+   `NSCocoaErrorDomain` 4 against `QLThumbnailErrorDomain` 0
+   (`QLThumbnailError.Code.generationFailed`, so no magic number in the code).
+   Collapsing them would hide a missing original behind a blank square, so the
+   file's existence is checked here and only Quick Look's own code 0 becomes
+   `nil`. Everything else — a cancelled or invalid request — is thrown.
+3. **The size asked for is a box.** Fresh file per request: asked 120×400 →
+   120×120, asked 400×120 → 120×120, asked 200×200 → 200×200, asked 64×64 at
+   scale 2 → 128×128. So the picture fits inside and keeps the document's own
+   proportions; the parameter is named `boundedBy` because of this, and a
+   caller must lay out what comes back rather than what it asked for.
 2. **A missing file is distinguishable from an unpreviewable one.**
    `NSCocoaErrorDomain` 4 against `QLThumbnailErrorDomain` 0
    (`QLThumbnailError.Code.generationFailed`, so no magic number in the code).
