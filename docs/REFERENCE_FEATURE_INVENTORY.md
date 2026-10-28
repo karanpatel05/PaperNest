@@ -147,7 +147,7 @@ Status as of 2026-10-24, except where a row carries a later date of its own. **D
 | 5 | Extract pages into a new editable document | **Done** | F1 |
 | 6 | Split a document into one file per page | **Done** (2026-10-22) | F1 follow-up |
 | 7 | Bulk share / export a selection as one ZIP | **Done** (2026-10-22). Size-reduction presets are row 35, not this | F1 follow-up |
-| 8 | Arbitrary file items (any type) with real size and previews | **Partial** (2026-10-22) — any type imports, shows its size/type symbol and opens in system Quick Look; generated grid/list thumbnails remain open | F2a |
+| 8 | Arbitrary file items (any type) with real size and previews | **Partial** (2026-10-22) — any type imports, shows its size/type symbol and opens in system Quick Look. **Engine for grid/list thumbnails done 2026-10-28:** `FileThumbnail.image(at:boundedBy:scale:)` asks Quick Look for a picture of the contents and answers `nil` when there is none — it asks only for `.thumbnail`, never `.icon`, because `.all` returns a generic 512×512 type icon for anything unreadable and that is the symbol the grid already draws. A stored asset is `<sha>.bin`, which Quick Look refuses, so the caller stages a copy named from `originalFilename` or from `UTType(uti)`. **No UI calls it yet, nothing is cached, and iOS behaviour is unmeasured**, so this stays Partial. | F2a |
 | 9 | File details / "Show Info" sheet | **Done** (2026-10-22) — kind, original name, size, dates, Share, Save a Copy | F2a |
 | 10 | Import from Photos | **Done** for images (2026-10-22); video needs a streaming transfer and is still open | F2c |
 | 11 | System Inbox folder | **Planned** | F2 |

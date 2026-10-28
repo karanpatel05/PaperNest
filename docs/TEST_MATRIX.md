@@ -1543,3 +1543,76 @@ shape that reproduces it.
 - **Still no UI, and still no real-world form.** Only the hand-built fixture
   has been filled or ticked. A form from a government or bank website is
   untested, and PaperNest writes no AcroForm of its own.
+## A thumbnail of what a file item holds — row 8 — 2026-10-28 (Claude, backend)
+
+Row 8 has said "generated grid/list thumbnails remain open" since 2026-10-22.
+`FileThumbnail.image(at:boundedBy:scale:)` is the engine for them: the system's
+Quick Look, asked for a picture of a file's contents.
+
+- Full `./scripts/test.sh`: **466 tests passed** (64 + 131 + 105 + 118 + 48), **0 warnings**.
+- The new suite run **5 times in parallel**: 6 tests, ~0.05s each, no hang and
+  no orphaned helpers. Worth doing because this goes through a system XPC
+  agent, the same family as the PDFKit trap found the day before.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Measured before anything was designed
+
+1. **Ask only for `.thumbnail`, never `.icon`.** Asked for `.all`, Quick Look
+   answers a file it cannot read with a generic **512×512 type icon**
+   (`type=0`) — measured alike on a `.bin`, a file with no extension and an
+   unknown extension. That icon is the symbol the grid already draws from
+   `uti`, so returning it would dress a type symbol up as a preview of the
+   contents. Asked only for `.thumbnail`, the same three files **error**
+   instead, which is the honest answer. `aFileTheSystemCannotReadGivesNothingRatherThanAnIcon`
+   is the guard: widen the representation types and it fails.
+2. **A missing file is distinguishable from an unpreviewable one.**
+   `NSCocoaErrorDomain` 4 against `QLThumbnailErrorDomain` 0
+   (`QLThumbnailError.Code.generationFailed`, so no magic number in the code).
+   Collapsing them would hide a missing original behind a blank square, so the
+   file's existence is checked here and only Quick Look's own code 0 becomes
+   `nil`. Everything else — a cancelled or invalid request — is thrown.
+3. **The size asked for is a box.** Fresh file per request: asked 120×400 →
+   120×120, asked 400×120 → 120×120, asked 200×200 → 200×200, asked 64×64 at
+   scale 2 → 128×128. So the picture fits inside and keeps the document's own
+   proportions; the parameter is named `boundedBy` because of this, and a
+   caller must lay out what comes back rather than what it asked for.
+
+### The `.bin` problem, which is the whole reason this needs care
+
+A stored asset is named `<sha256>.bin`, because `AssetKind.file` covers every
+type. Quick Look decides what a file is from its extension and refuses `.bin`,
+so pointing it at the asset's own path **always** answers `nil`. The URL has to
+carry the real extension: `FilePayload.originalFilename` first, and when that
+basename is unusable — `prepareTemporaryCopy` falls back to `<sha>.bin` for an
+empty or `/` name — the item's recorded `uti` gives one through
+`UTType(uti)?.preferredFilenameExtension` (`public.plain-text` → `txt`,
+`org.openxmlformats.wordprocessingml.document` → `docx`).
+`theRecordedTypeNamesTheFileWhenTheStoredNameCannot` writes the same bytes both
+ways and gets `nil` from one and a picture from the other, so that is a
+measurement rather than advice.
+
+### What this does **not** do
+
+- **No UI, so row 8 stays Partial.** Nothing calls this yet; the grid and list
+  cells are Codex's. It also deliberately **does not stage files** — a second
+  way to do that would compete with `FileKind.prepareTemporaryCopy`, which the
+  full preview already uses.
+- **Nothing is cached.** Every call asks the system again, so a grid that
+  scrolls will re-ask for pictures it has already had. Quick Look has a cache
+  of its own, which is why repeats are fast, but nothing here depends on that.
+  A thumbnail cache of our own is unbuilt and undecided.
+- **iOS behaviour is unmeasured.** It compiles for the Simulator and that is
+  all that has been established. Which types Quick Look previews on iOS, and
+  whether it previews the same ones as macOS, has not been run.
+- **Few types have actually been tried.** `.txt` in the tests, and a `.docx`
+  in a probe outside them (`type=2`, 485×792). Spreadsheets, presentations,
+  video, audio and archives are untested, and nothing says the system can
+  preview any particular one of them.
+- **An item whose `uti` is `public.data` gets nothing** when its filename is
+  also unusable: that type has no preferred extension, so there is no name to
+  stage it under. Measured, and there is no honest way around it.
+- **Concurrency is clean as far as it was pushed** — 16 concurrent requests in
+  a standalone task group, plus 5 parallel suite runs — but this is a system
+  XPC agent, and that is not proof for every type or load.
