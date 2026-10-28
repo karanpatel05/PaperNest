@@ -1964,6 +1964,7 @@ draws a placed image" into "a screen can place one".
   `PaperNestUI` — `DocumentView`, `MarkupManagerSheet`, `InkCanvas` — are list
   and manager concerns rather than copy decisions, and they are Codex's to
   judge.
+
 ## Placing an image, safely — row 21 — 2026-10-28 (Claude, backend)
 
 The entry above drew and exported a placed image, and then had to correct its
@@ -2009,6 +2010,36 @@ already there, as putting something down does.
 Each refusal writes **nothing**: the tests check that no object and no asset
 row are left behind, so a refusal leaves unreferenced bytes for the sweeper
 rather than a half-written placement.
+
+### Three things a screen hits immediately, added after the first pass
+
+The first version of this had twelve fewer tests and two real gaps, both found
+by asking what a screen would do on its second call rather than its first.
+
+1. **It returns the page as well as the object now.** Writing an object bumps
+   the page's revision, and `addShape(to expected:)` compares the **whole**
+   page — so a caller holding the `Page` it started with is refused.
+   Confirmed rather than reasoned about: with the page from before the
+   placement, `addShape` throws `pageObjectsChanged`; with the page
+   `placeImage` returns, it succeeds. Without this, placing an image would
+   break the very next edit someone made.
+2. **The same image on two pages shares one copy.** The fixture staged unique
+   bytes per placement — `"stamp bytes \(UUID())"` — which quietly hid the
+   commonest real case: one logo or signature put on several pages. Content
+   addressing gives those the same `AssetID`, so the asset row is written
+   twice. `insertAssetRows` already handles that (`ON CONFLICT(id) DO UPDATE`),
+   and it is now tested end to end: both placements land, removing one keeps
+   the bytes because the other page still needs them, and only removing both
+   lets them go. Placing a picture that is already a page's **own content** is
+   covered too — deleting that placement must not sweep the page's content out
+   from under it.
+3. **Placing something does not stale what was read off the page.** The
+   revision bump could have: `recognizedLines` only answers when
+   `sourceRevision == page.revision`, so putting a signature on a scan might
+   have dropped its searchable text from export. `bumpRevision` already
+   carries a *current completed* result forward with the page, deliberately
+   and with a comment saying why; there is now a test saying so from outside,
+   because that is a feature-level promise and not an implementation detail.
 
 ### What this does **not** do
 

@@ -36,7 +36,7 @@ import PaperNestCore
         let (store, page) = try await seeded(at: dir.url)
         let staged = try stamp(store)
 
-        let object = try await store.placeImage(staged, on: page.id, frame: frame)
+        let (_, object) = try await store.placeImage(staged, on: page.id, frame: frame)
 
         let objects = try await store.objects(on: page.id)
         #expect(objects.map(\.id) == [object.id])
@@ -77,7 +77,7 @@ import PaperNestCore
                                     points: [InkPoint(x: 10, y: 10), InkPoint(x: 20, y: 20)])),
             modifiedAt: Date()))
 
-        let object = try await store.placeImage(try stamp(store), on: page.id, frame: frame)
+        let (_, object) = try await store.placeImage(try stamp(store), on: page.id, frame: frame)
 
         let objects = try await store.objects(on: page.id)
         #expect(objects.count == 2)
@@ -90,8 +90,8 @@ import PaperNestCore
         let dir = TempDirectory()
         let (store, page) = try await seeded(at: dir.url)
 
-        let first = try await store.placeImage(try stamp(store), on: page.id, frame: frame)
-        let second = try await store.placeImage(
+        let (_, first) = try await store.placeImage(try stamp(store), on: page.id, frame: frame)
+        let (_, second) = try await store.placeImage(
             try store.assets.store(Data("other stamp bytes".utf8),
                                    kind: .png, originalFilename: "other.png"),
             on: page.id, frame: frame.offsetBy(dx: 20, dy: 20))
@@ -147,11 +147,108 @@ import PaperNestCore
         let dir = TempDirectory()
         let (store, page) = try await seeded(at: dir.url)
         let staged = try stamp(store)
-        let object = try await store.placeImage(staged, on: page.id, frame: frame)
+        let (_, object) = try await store.placeImage(staged, on: page.id, frame: frame)
 
         try await store.deleteObject(object.id)
         _ = try await store.sweepOrphanAssets(gracePeriod: 0)
 
         #expect(try await store.assetRecord(staged.id) == nil, "the bytes outlived the placement")
+    }
+
+    /// The common real case, and the one the unique bytes above were hiding:
+    /// the same logo or signature put on more than one page. Content
+    /// addressing gives both the same `AssetID`, so the row is written twice.
+    @Test func theSameImageOnTwoPagesSharesOneCopyOfIt() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let document = try store.assets.store(Data("a PDF".utf8), kind: .pdf, originalFilename: nil)
+        let item = try await store.createItem(kind: .document, name: "Statement",
+                                              pages: samplePages(document, count: 2), assets: [document])
+        let pages = try await store.pages(of: item.id)
+        // Identical bytes staged twice: the same asset by content address.
+        let logo = Data("one logo".utf8)
+        let first = try store.assets.store(logo, kind: .png, originalFilename: "logo.png")
+        let second = try store.assets.store(logo, kind: .png, originalFilename: "logo.png")
+        #expect(first.id == second.id, "content addressing should give one id")
+
+        let (_, one) = try await store.placeImage(first, on: pages[0].id, frame: frame)
+        let (_, two) = try await store.placeImage(second, on: pages[1].id, frame: frame)
+
+        #expect(try await store.objects(on: pages[0].id).map(\.id) == [one.id])
+        #expect(try await store.objects(on: pages[1].id).map(\.id) == [two.id])
+        // One placement removed, the bytes stay: the other page still needs them.
+        try await store.deleteObject(one.id)
+        _ = try await store.sweepOrphanAssets(gracePeriod: 0)
+        #expect(try await store.assetRecord(first.id) != nil, "the second page lost its image")
+        // Both gone, and only then do the bytes go.
+        try await store.deleteObject(two.id)
+        _ = try await store.sweepOrphanAssets(gracePeriod: 0)
+        #expect(try await store.assetRecord(first.id) == nil)
+    }
+
+    /// Placing a picture that is already a page's own content — someone places
+    /// a photo the library already holds. One row, two kinds of reference.
+    @Test func placingAnImageThatIsAlreadyAPagesContentSharesIt() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let photo = try store.assets.store(Data("a photo".utf8), kind: .png, originalFilename: "photo.png")
+        let item = try await store.createItem(
+            kind: .document, name: "Photo",
+            pages: [LibraryStore.NewPage(sourceSize: CGSize(width: 400, height: 300),
+                                         content: .image(photo.id))],
+            assets: [photo])
+        let page = try await store.pages(of: item.id)[0]
+
+        let (_, object) = try await store.placeImage(photo, on: page.id, frame: frame)
+
+        // Removing the placement must not take the page's own content with it.
+        try await store.deleteObject(object.id)
+        _ = try await store.sweepOrphanAssets(gracePeriod: 0)
+        #expect(try await store.assetRecord(photo.id) != nil, "the page's own content was swept")
+    }
+
+    /// Writing an object bumps the page's revision, so the `Page` a caller
+    /// started with is stale and the next guarded edit refuses it. The page
+    /// that comes back has to be usable instead, or placing an image would
+    /// break the very next thing someone did.
+    @Test func thePageThatComesBackIsGoodForTheNextEdit() async throws {
+        let dir = TempDirectory()
+        let (store, page) = try await seeded(at: dir.url)
+
+        let (updated, _) = try await store.placeImage(try stamp(store), on: page.id, frame: frame)
+
+        // The page from before the placement is refused, which is why the call
+        // returns a fresh one.
+        await #expect(throws: StoreError.pageObjectsChanged) {
+            try await store.addShape(to: page, kind: .rectangle,
+                                     start: CGPoint(x: 0.1, y: 0.1), end: CGPoint(x: 0.4, y: 0.4),
+                                     color: .black, width: 2)
+        }
+        _ = try await store.addShape(to: updated, kind: .rectangle,
+                                     start: CGPoint(x: 0.1, y: 0.1), end: CGPoint(x: 0.4, y: 0.4),
+                                     color: .black, width: 2)
+        #expect(try await store.objects(on: page.id).count == 2)
+    }
+
+    /// Placing something on a page does not change the paper, so words already
+    /// read off it must stay current — otherwise putting a signature on a scan
+    /// would drop its searchable text. `bumpRevision` carries a current
+    /// completed result forward with the page; this is that, from outside.
+    @Test func placingAnImageDoesNotStaleWhatWasReadOffThePage() async throws {
+        let dir = TempDirectory()
+        let (store, page) = try await seeded(at: dir.url)
+        try await store.saveRecognition(PageRecognition(
+            pageID: page.id, sourceRevision: page.revision, engineVersion: "test",
+            status: .completed, languages: ["en"],
+            lines: [RecognizedLine(text: "ACCOUNT 1234",
+                                   box: NormalizedRect.exact(x: 0.1, y: 0.1, width: 0.5, height: 0.05),
+                                   confidence: 0.9)]))
+
+        let (updated, _) = try await store.placeImage(try stamp(store), on: page.id, frame: frame)
+
+        let recognition = try #require(try await store.recognition(for: page.id))
+        #expect(recognition.status == .completed)
+        #expect(recognition.sourceRevision == updated.revision,
+                "the page's words went stale because something was placed on it")
     }
 }

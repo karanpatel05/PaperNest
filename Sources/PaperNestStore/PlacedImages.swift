@@ -23,9 +23,15 @@ extension LibraryStore {
     /// to the page. The image is **stretched** to fill it, so a caller that
     /// wants the picture's own proportions kept has to work the frame out
     /// itself.
+    ///
+    /// Returns the page as it now is along with the object, the way `addShape`
+    /// does, because writing an object bumps the page's revision: a caller
+    /// holding the `Page` it started with would be refused by the next guarded
+    /// edit — `addShape` compares the whole page — and must carry this one
+    /// forward instead.
     @discardableResult
     public func placeImage(_ staged: AssetFileStore.StagedAsset, on pageID: PageID,
-                           frame: CGRect) throws -> PageObject {
+                           frame: CGRect) throws -> (page: Page, object: PageObject) {
         // Refused here rather than at drawing time. The renderer would only
         // find out when someone opened the page, and by then the object is
         // saved and the page cannot be drawn at all.
@@ -45,8 +51,7 @@ extension LibraryStore {
             let object = PageObject(pageID: pageID, zKey: key,
                                     payload: .image(PlacedImage(assetID: staged.id, frame: frame)),
                                     modifiedAt: timestamp)
-            try applyObjectChanges(on: pageID, saving: [object], deleting: [])
-            return object
+            return (try applyObjectChanges(on: pageID, saving: [object], deleting: []), object)
         }
     }
 }
