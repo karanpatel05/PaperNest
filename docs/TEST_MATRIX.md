@@ -1263,3 +1263,59 @@ preset the archive is unchanged, entry list included.
 - **No UI.** Nothing offers an archive preset.
 - Synthetic fixtures only; no real multi-gigabyte selection has been archived,
   so nothing is known about time or memory at that scale.
+
+## Word-level text boxes — row 20 — 2026-10-27 (Claude, backend)
+
+Markup worked on whole recognised lines, so highlighting one word highlighted
+the sentence around it. Recognition was the reason: a `RecognizedLine` carried
+one box and nothing smaller.
+
+- Full `./scripts/test.sh`: **438 tests passed** (64 + 127 + 99 + 106 + 42), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### Measured before building
+
+Vision was asked directly, on a page reading `Invoice total 1234 EUR`:
+
+```
+line              x=0.080 w=0.412
+  "Invoice"       x=0.080 w=0.129
+  "total"         x=0.213 w=0.087
+  "1234"          x=0.305 w=0.096
+  "EUR"           x=0.405 w=0.087
+```
+
+Ordered, non-overlapping, and the last word ends exactly at the line's right
+edge (0.405 + 0.087 = 0.492 = 0.080 + 0.412). That is what justified building
+it rather than approximating by dividing the line box on character count, which
+drifts on any proportional font and would put a highlight over the wrong ink.
+
+### Existing stored results
+
+`page_recognition` holds results written before this field existed.
+`RecognizedLine` now has a hand-written `init(from:)` that decodes a missing
+`words` as empty, so those results still load and a reader falls back to the
+line. **Nothing is recomputed behind the user's back, and no migration was
+needed** — recognition is JSON, not columns. A test decodes real old-shape JSON
+and asserts no words are invented.
+
+### Five tests
+
+Words come back in reading order and each word's text is part of its line;
+every word box sits inside its line's box with positive size; words do not
+overlap; old JSON decodes with no words; and words survive an encode/decode
+round trip.
+
+### What this does **not** do
+
+- **No UI.** Selecting a word is the screen owner's work; this gives it
+  something to select. Row 20's selection interface, moving or resizing marks
+  outside PencilKit, and semantic annotation objects all remain planned.
+- **A word Vision will not box is dropped, not faked.** The only box available
+  to invent from is the line's, and a highlight drawn there would cover text
+  the user did not select. So `words` can hold fewer entries than the line has
+  words, and a caller must expect that.
+- Only synthetic English text was recognised. **No handwriting, no real scan,
+  and no French or Spanish line has been checked for word boxes.**

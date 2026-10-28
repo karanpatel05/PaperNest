@@ -83,10 +83,37 @@ public struct TextRecognizer: Sendable {
                 // Vision's origin is bottom-left; ours is top-left.
                 box: .exact(x: Double(box.minX), y: Double(1 - box.maxY),
                             width: Double(box.width), height: Double(box.height)),
-                confidence: Double(candidate.confidence)
+                confidence: Double(candidate.confidence),
+                words: Self.words(of: candidate)
             )
         }
         // Reading order: top to bottom, then left to right.
         .sorted { ($0.box.y, $0.box.x) < ($1.box.y, $1.box.x) }
+    }
+
+    /// Each whitespace-separated word of a recognised line, with the box
+    /// Vision places it in.
+    ///
+    /// A word Vision will not box is **dropped rather than given one**: the
+    /// only box available to invent from is the line's, and a highlight drawn
+    /// there would cover text the user did not select. So this can return
+    /// fewer words than the line contains, which a caller must expect.
+    static func words(of candidate: VNRecognizedText) -> [RecognizedWord] {
+        let text = candidate.string
+        var words: [RecognizedWord] = []
+        var start = text.startIndex
+        while start < text.endIndex {
+            guard let wordStart = text[start...].firstIndex(where: { !$0.isWhitespace }) else { break }
+            let wordEnd = text[wordStart...].firstIndex(where: \.isWhitespace) ?? text.endIndex
+            if let observed = try? candidate.boundingBox(for: wordStart..<wordEnd)?.boundingBox {
+                words.append(RecognizedWord(
+                    text: String(text[wordStart..<wordEnd]),
+                    // Same flip the line's box gets: Vision is bottom-left.
+                    box: .exact(x: Double(observed.minX), y: Double(1 - observed.maxY),
+                                width: Double(observed.width), height: Double(observed.height))))
+            }
+            start = wordEnd
+        }
+        return words
     }
 }

@@ -171,15 +171,51 @@ public struct PageRecognition: Hashable, Codable, Sendable {
     public var text: String { lines.map(\.text).joined(separator: "\n") }
 }
 
+/// One word of a recognised line, with its own place on the page.
+///
+/// Boxes come from Vision rather than from dividing the line's box by
+/// character count: a proportional font makes that drift, and a highlight
+/// that drifts lands on the wrong ink.
+public struct RecognizedWord: Hashable, Codable, Sendable {
+    public var text: String
+    public var box: NormalizedRect
+
+    public init(text: String, box: NormalizedRect) {
+        self.text = text
+        self.box = box
+    }
+}
+
 public struct RecognizedLine: Hashable, Codable, Sendable {
     public var text: String
     public var box: NormalizedRect
     public var confidence: Double
+    /// The line's words, where Vision could place them.
+    ///
+    /// Empty for every result recognised before this existed — those are still
+    /// stored, and a reader treats empty as "fall back to the whole line"
+    /// rather than as a failure. Nothing is recomputed behind the user's back.
+    ///
+    /// It can also hold fewer entries than the line has words: Vision does not
+    /// always return a box for a range, and a word without one is dropped
+    /// rather than given an invented box.
+    public var words: [RecognizedWord]
 
-    public init(text: String, box: NormalizedRect, confidence: Double) {
+    public init(text: String, box: NormalizedRect, confidence: Double,
+                words: [RecognizedWord] = []) {
         self.text = text
         self.box = box
         self.confidence = confidence
+        self.words = words
+    }
+
+    // Written by hand so a result stored before `words` existed still decodes.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        text = try container.decode(String.self, forKey: .text)
+        box = try container.decode(NormalizedRect.self, forKey: .box)
+        confidence = try container.decode(Double.self, forKey: .confidence)
+        words = try container.decodeIfPresent([RecognizedWord].self, forKey: .words) ?? []
     }
 }
 
