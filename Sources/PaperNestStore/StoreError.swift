@@ -12,6 +12,11 @@ public enum StoreError: Error, Equatable, Sendable {
     case assetChecksumMismatch(String)
     case invalidComment
     case invalidOrder
+    /// Something was offered for a page that could not be put on one: bytes
+    /// the renderer cannot decode as an image, or a frame with no area. Both
+    /// are refused at the write, because the alternative is finding out when
+    /// someone opens the page and the object is already saved.
+    case invalidPlacement
     case notebookPageChanged
     /// Recognition or the page changed while a text-markup picker was open.
     case recognitionChanged

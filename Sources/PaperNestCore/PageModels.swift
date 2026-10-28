@@ -188,6 +188,19 @@ public enum AssetKind: String, Codable, Sendable {
     /// differently.
     case file
 
+    /// Whether the renderer can decode this as an image and draw it.
+    ///
+    /// Exhaustive on purpose, so a new kind has to decide rather than inherit
+    /// an answer. `pdf` is drawable, but as a page's own content through Core
+    /// Graphics rather than as a picture placed on one; `file` is whatever
+    /// someone imported and may be anything at all.
+    public var isDrawableImage: Bool {
+        switch self {
+        case .jpeg, .png, .heic, .webp: true
+        case .pdf, .file: false
+        }
+    }
+
     public var fileExtension: String {
         switch self {
         case .pdf: "pdf"

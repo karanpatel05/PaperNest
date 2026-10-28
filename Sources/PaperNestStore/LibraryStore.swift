@@ -1036,7 +1036,7 @@ public actor LibraryStore {
             ])
     }
 
-    private func insertAssetRows(_ staged: [AssetFileStore.StagedAsset], at timestamp: Date) throws {
+    func insertAssetRows(_ staged: [AssetFileStore.StagedAsset], at timestamp: Date) throws {
         for asset in staged {
             // A row must never describe a file that is not durably present.
             guard FileManager.default.fileExists(atPath: assets.url(for: asset.id, kind: asset.kind).path) else {

@@ -1964,3 +1964,71 @@ draws a placed image" into "a screen can place one".
   `PaperNestUI` — `DocumentView`, `MarkupManagerSheet`, `InkCanvas` — are list
   and manager concerns rather than copy decisions, and they are Codex's to
   judge.
+## Placing an image, safely — row 21 — 2026-10-28 (Claude, backend)
+
+The entry above drew and exported a placed image, and then had to correct its
+own advice: a screen could not safely *write* one. `AssetFileStore.store`
+stages the file durably, but inserting the asset row was private, and between
+staging and the object being saved `sweepOrphanAssets` was entitled to take the
+file. `saveObject` was also the unguarded write, while every other object kind
+has a guarded one. `LibraryStore.placeImage(_:on:frame:)` closes that.
+
+- Full `./scripts/test.sh`: **492 tests passed** (64 + 139 + 121 + 120 + 48), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### One write
+
+The asset row and the page object go in inside **one transaction**, following
+`replacePageContent`: the caller stages the bytes (file written durably first),
+and the store inserts the row. `aPlacedImageIsNotSweptAway` is the test that
+matters, and it was **proven able to fail** — take `insertAssetRows` out, which
+is exactly the naive stage-then-`saveObject` path the earlier note recommended,
+and it throws because the sweep took the bytes, while
+`placingAnImageWritesTheBytesAndTheRowTogether` fails for want of a row.
+
+The order key is worked out **inside** the write from what the page holds at
+that moment, so two placements in a row cannot claim the same place —
+`twoImagesInARowBothLandInOrder` pins that. A new image lands on top of what is
+already there, as putting something down does.
+
+### Refused rather than stored
+
+- **Bytes the renderer cannot decode as an image.** `AssetKind.isDrawableImage`
+  is an exhaustive switch — jpeg, png, heic, webp yes; pdf and file no — so a
+  new kind has to decide rather than inherit an answer. Offering a `.pdf`
+  asset is `StoreError.invalidPlacement`. Without this the renderer would
+  only find out when someone opened the page, by which time the object is
+  saved and the page cannot be drawn at all.
+- **A frame with no area**, or a non-finite one. `frame.width > 0` alone does
+  not catch a NaN origin, so the origin is checked too.
+- **A page that is gone, or whose item is deleted** — `pageNotFound`, the same
+  guard `addShape` uses.
+
+Each refusal writes **nothing**: the tests check that no object and no asset
+row are left behind, so a refusal leaves unreferenced bytes for the sweeper
+rather than a half-written placement.
+
+### What this does **not** do
+
+- **Still no UI.** Row 21 stays Partial. What exists now is the whole engine
+  path — stage, place, draw, export — with nothing calling it.
+- **No undo.** `placeImage` returns the `PageObject` it wrote, so a caller can
+  undo by deleting that id, and `deletingAPlacedImageLetsItsBytesGo` shows the
+  bytes then go with it. But there is no undo *entry*: the ink editor's
+  `applyInkChanges` records an edit for the undo stack and this does not join
+  it, so a placement and an ink stroke do not share one history.
+- **No move, resize, rotate or re-layer after the fact.** Changing a placement
+  means deleting the object and writing another, which is not the same thing
+  and has no test.
+- **The bytes in these tests are not images.** Nothing in this path decodes
+  them — only the declared kind and the frame matter — so the store tests use
+  plain bytes, as `DocumentSplitTests` does. Real images are drawn in
+  `PlacedImageRenderTests`. It also keeps AVFoundation, which
+  `PaperNestTestSupport` now links for the media fixtures, out of
+  `PaperNestStoreTests`, which does not depend on that target.
+- **Nothing checks the frame against the page.** A frame may sit entirely off
+  the page; drawing clips it away and the object stays. That is deliberate — a
+  caller may want an image hanging over an edge — but it means a placement can
+  be invisible with no complaint.
