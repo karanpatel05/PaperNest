@@ -2558,3 +2558,77 @@ readable text width on a phone.
   damaged file and a plain one look alike here.
 - **Depth beyond four levels is flattened visually** only — the entries are all
   still listed, in order.
+
+## Driving the Mac app: two UI features verified, one bug found — 2026-11-02 (Claude)
+
+The iOS UI tests cannot run here, but **the Mac app needs no simulator**. Both
+UI features committed today were driven in it against a throwaway library
+seeded with a generated 3-page PDF carrying a real outline and a plain-text
+file item. This is the first interaction check since 2026-10-29.
+
+- Full `./scripts/test.sh`: **513 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### Verified by looking at it
+
+- **A file item shows its contents.** The details sheet's header shows a real
+  Quick Look preview of the text file — a small page with its words on it — and
+  not the blue type symbol. Zoomed in to be sure.
+- **Contents lists the document's sections and jumps.** All three entries
+  appeared in order, and pressing *Payment Schedule* dismissed the sheet,
+  moved the editor to page 3 and selected page 3 in the sidebar.
+- Incidentally: **Codex's first-launch welcome screen** appeared on a fresh
+  library and dismissed on *Get started*, and stayed dismissed on relaunch.
+
+### The bug this found, which no unit test could
+
+The sheet first reported **"This document doesn't carry contents of its own."**
+for a document that plainly had three. Traced rather than guessed:
+
+| checked | result |
+| --- | --- |
+| the generated fixture on disk | outline root, **3 children**, destinations → pages 0,1,2 |
+| the copy the library stored | same, **3 children** — import preserves it |
+| `pages` rows in SQLite | three `pdfPage` rows on that asset, indices 0,1,2 |
+
+So the file, the import and the engine's inputs were all correct. The fault was
+mine, in the sheet: it took `[Page]` **at construction**. SwiftUI builds a
+sheet's content when it is presented, so a sheet opened before the document's
+pages had loaded kept an empty snapshot for ever and answered "no contents".
+It now takes the `DocumentModel` and reads `model.pages` live, keyed on the
+page count so a document still loading is read again when its pages arrive.
+
+**This is exactly the failure the unit tests could not see** — they call the
+engine and the one pure helper, neither of which knows when a sheet is built.
+
+### Two things added to make it checkable at all
+
+- **Contents is in the Mac menu bar**, at the top of the Page menu. The
+  in-window More menu cannot be opened while the app is in the background, and
+  the error said so. A document command belongs in the menu bar on macOS
+  anyway. **Deliberately without a keyboard shortcut**: this project has been
+  bitten by clashes with system ones, and the simulator that logs them cannot
+  run today.
+  Worth recording so nobody reads it as a defect: the menu item is **disabled
+  while the app is in the background**, and the pre-existing *Crop…* was
+  checked and behaves identically — it is how `@FocusedValue` works, not a
+  fault in the new item.
+- **`-PaperNestDebugShowOutline YES`**, beside the existing
+  `-PaperNestDebugShowExport`, `…ShowCrop` and `…ShowMarkup` hooks. It opens
+  the sheet at launch, which is both how this was driven in the background and
+  how an XCUITest will reach it when the simulator works. **It is also what
+  exposed the bug**, by getting to the sheet before the pages loaded.
+
+### What this does **not** establish
+
+- **Still no XCUITest.** Nothing is automated; this was a person-equivalent
+  driving the app once. The hook above is in place for when `simctl` works.
+- **Mac only.** The iPhone and iPad layouts of the Contents sheet, and its
+  behaviour at large text sizes and in French and Spanish, are unchecked.
+- **The empty state still cannot be told from a read failure.** A file whose
+  outline cannot be read says "no contents", exactly as a file with none does.
+  That is unchanged, and it is what made the bug above look like an ordinary
+  answer.
+- **One document, one outline shape.** Flat, three entries, one asset. Nested
+  outlines, multi-source documents and deleted pages are covered by unit tests
+  only.

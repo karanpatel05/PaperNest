@@ -129,11 +129,12 @@ struct DocumentView: View {
         .task(id: model.selectedPageID) { await model.loadSelectedPageObjects() }
         #if DEBUG
         // Dev/screenshot hooks: `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`,
-        // `-PaperNestDebugShowMarkup YES` (iPad).
+        // `-PaperNestDebugShowMarkup YES` (iPad), `-PaperNestDebugShowOutline YES`.
         .task {
             isShowingExport = UserDefaults.standard.bool(forKey: "PaperNestDebugShowExport")
             isShowingCrop = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCrop")
             isMarkingUp = UserDefaults.standard.bool(forKey: "PaperNestDebugShowMarkup")
+            isShowingOutline = UserDefaults.standard.bool(forKey: "PaperNestDebugShowOutline")
         }
         #endif
         .alert(model.presentedError?.title ?? "", isPresented: errorBinding, presenting: model.presentedError) { _ in
@@ -145,7 +146,7 @@ struct DocumentView: View {
             ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID)
         }
         .sheet(isPresented: $isShowingOutline) {
-            DocumentOutlineSheet(pages: model.pages) { model.selectedPageID = $0 }
+            DocumentOutlineSheet(model: model) { model.selectedPageID = $0 }
         }
         .sheet(isPresented: $isShowingCrop) {
             if let page = model.selectedPage {
@@ -233,7 +234,8 @@ struct DocumentView: View {
             showExport: { isShowingExport = true },
             showAddPages: { openFilePicker(.add) },
             showReplacePage: { openFilePicker(.replace) },
-            showCrop: { isShowingCrop = true }
+            showCrop: { isShowingCrop = true },
+            showOutline: { isShowingOutline = true }
         ))
     }
 

@@ -25,6 +25,15 @@ public struct PaperNestCommands: Commands {
         }
 
         CommandMenu(L10n.menuPage) {
+            // Contents is document-level rather than page-level, but this is
+            // the menu that already carries the document's structure — moving
+            // and deleting pages — and jumping to a section belongs with
+            // those. Deliberately without a keyboard shortcut: this project
+            // has been bitten by clashes with system ones, and the simulator
+            // that logs them cannot run here today.
+            Button(L10n.outline) { document?.showOutline() }
+                .disabled(document?.model.pages.isEmpty ?? true)
+            Divider()
             Button(L10n.rotateLeft) { run { await $0.model.rotate(clockwise: false, undoManager: $0.undoManager) } }
                 .keyboardShortcut("l", modifiers: .command)
                 .disabled(document?.model.selectedPage == nil)

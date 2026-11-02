@@ -11,7 +11,14 @@ import SwiftUI
 /// ascend — that is a true description of the file rather than a re-sort, and
 /// inventing an order here would be a worse answer than the real one.
 struct DocumentOutlineSheet: View {
-    let pages: [Page]
+    /// The document itself rather than a copy of its pages.
+    ///
+    /// Taking `[Page]` at construction looked simpler and was wrong: SwiftUI
+    /// builds a sheet's content when it is presented, so a sheet opened before
+    /// the document's pages had loaded kept an empty snapshot and reported
+    /// "no contents" for a document that plainly has some. Found by opening it
+    /// through the `-PaperNestDebugShowOutline` hook, which gets there first.
+    let model: DocumentModel
     let select: (PageID) -> Void
 
     @Environment(LibrarySession.self) private var session
@@ -31,7 +38,9 @@ struct DocumentOutlineSheet: View {
                             .accessibilityIdentifier("outline-done")
                     }
                 }
-                .task { await load() }
+                // Keyed on the page count so a document still
+                // loading is read again once its pages arrive.
+                .task(id: model.pages.count) { await load() }
         }
         #if os(macOS)
         .frame(minWidth: 380, idealWidth: 420, minHeight: 320, idealHeight: 420)
@@ -54,7 +63,7 @@ struct DocumentOutlineSheet: View {
                 List {
                     ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
                         Button {
-                            if let pageID = Self.pageToSelect(entry, in: pages) { select(pageID) }
+                            if let pageID = Self.pageToSelect(entry, in: model.pages) { select(pageID) }
                             dismiss()
                         } label: {
                             Text(entry.title)
@@ -93,6 +102,6 @@ struct DocumentOutlineSheet: View {
         // A file this cannot read has no contents to show, which is the same
         // answer as a file that carries none; neither is worth an alert over a
         // view whose whole job is navigation.
-        entries = (try? await renderer.outline(for: pages)) ?? []
+        entries = (try? await renderer.outline(for: model.pages)) ?? []
     }
 }
