@@ -29,6 +29,7 @@ struct DocumentView: View {
     #endif
     @State private var isShowingAdjustments = false
     @State private var isShowingPageOrganizer = false
+    @State private var isShowingOutline = false
     @State private var isShowingCrop = false
     @State private var annotationPage: Page?
     @State private var managedMarkupPage: Page?
@@ -142,6 +143,9 @@ struct DocumentView: View {
         }
         .sheet(isPresented: $isShowingExport) {
             ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID)
+        }
+        .sheet(isPresented: $isShowingOutline) {
+            DocumentOutlineSheet(pages: model.pages) { model.selectedPageID = $0 }
         }
         .sheet(isPresented: $isShowingCrop) {
             if let page = model.selectedPage {
@@ -358,6 +362,7 @@ struct DocumentView: View {
             stampButton
             commentsButton
             Divider()
+            outlineButton
             deleteButton
         } label: {
             Label(L10n.more, systemImage: "ellipsis.circle")
@@ -402,6 +407,14 @@ struct DocumentView: View {
         }
         .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
         .accessibilityIdentifier("editor-shapes")
+    }
+
+    private var outlineButton: some View {
+        Button { isShowingOutline = true } label: {
+            Label(L10n.outline, systemImage: "list.bullet.indent")
+        }
+        .disabled(model.pages.isEmpty)
+        .accessibilityIdentifier("editor-outline")
     }
 
     private var commentsButton: some View {
@@ -474,6 +487,7 @@ struct DocumentView: View {
             stampButton
             commentsButton
             Divider()
+            outlineButton
             deleteButton
         } label: {
             Label(L10n.more, systemImage: "ellipsis.circle")

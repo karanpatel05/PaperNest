@@ -472,3 +472,9 @@ extension L10n {
     static var premiumImport: String { tr("premium.import") }
     static var premiumFolder: String { tr("premium.folder") }
 }
+
+// Document outline — ledger row 36.
+extension L10n {
+    static var outline: String { tr("outline.title") }
+    static var outlineEmpty: String { tr("outline.empty") }
+}

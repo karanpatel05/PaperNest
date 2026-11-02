@@ -401,3 +401,7 @@
 "welcome.noAccount" = "Aucun compte nécessaire.";
 "welcome.import.detail" = "Importez des PDF, des images et d’autres fichiers.";
 "welcome.mac.subtitle" = "Importez un document, commencez une note et rassemblez le tout.";
+
+/* Sommaire du document */
+"outline.title" = "Sommaire";
+"outline.empty" = "Ce document ne contient pas de sommaire.";

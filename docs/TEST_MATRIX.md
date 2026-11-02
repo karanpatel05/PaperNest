@@ -2505,3 +2505,56 @@ in a running app.
 - **`grep` is a shell function wrapping `ugrep`.** It has already emitted
   `ugrep: warning:` in place of a plain grep error. Anything depending on exact
   grep behaviour should call `/usr/bin/grep`.
+
+## Jump to a section by the document's own contents — row 36 — 2026-11-02 (Claude, UI)
+
+`PageRenderer.outline(for:)` shipped on 2026-10-27 and nothing called it. The
+editor's More menu now has **Contents**: the document's own table of contents,
+with a tap jumping to that page.
+
+- Full `./scripts/test.sh`: **513 tests passed** (0 warnings), `LocalizationTests`
+  included — which is the check that the three new-key languages agree, that no
+  key is unused, and that French typography is right.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+- **No interaction test.** `scripts/ui-test-ios.sh` cannot run on this machine —
+  see the entry above for why — so **nobody has opened this menu, tapped an
+  entry or watched the page change.** That is the honest state of it.
+
+### Read from the file, never rearranged
+
+The entries are what the PDF declares, in the author's order and nesting. A
+reordered document's contents will therefore not ascend, and that is deliberate:
+it is a true description of the file, and sorting it here would invent an
+answer the document does not give. The engine already drops entries whose page
+was deleted, so an entry points at a page the document still shows.
+
+### The one decision the sheet makes for itself
+
+The sheet holds the outline it read when it opened. A page deleted *while* it is
+open would otherwise select an id the document no longer has, leaving the editor
+showing nothing — so `pageToSelect` returns nil for an entry whose page has
+gone, and the two tests cover both halves: an entry opens the page it points at,
+and one whose page has gone opens nothing while its siblings still work.
+
+Nesting is indented but capped at four steps, so a deeply nested heading keeps a
+readable text width on a phone.
+
+### What this does **not** do
+
+- **Nothing has been driven.** The menu item, the sheet, the empty state and
+  the jump are all unexercised in a running app. The Mac app would still run
+  (`scripts/run-mac-app.sh` needs no simulator) and was **not** used to check
+  this; that route is open if the owner wants it driven before the simulator is
+  fixed.
+- **Only PDF outlines.** A notebook, a scan or an image has no outline to read,
+  so the sheet correctly says the document carries none — but there is no
+  user-made bookmark here, which is the other half of row 36 and still Planned.
+- **No current-section highlight**, no jump-to-nearest-heading, and the sheet
+  does not follow the page you are on.
+- **A file that cannot be read shows "no contents"** rather than an error. For
+  a navigation sheet that seemed better than an alert, but it does mean a
+  damaged file and a plain one look alike here.
+- **Depth beyond four levels is flattened visually** only — the entries are all
+  still listed, in order.
