@@ -1,6 +1,8 @@
+import CoreGraphics
 import Foundation
 import Testing
 import PaperNestCore
+import PaperNestRender
 import PaperNestStore
 import PaperNestTestSupport
 @testable import PaperNestUI
@@ -64,5 +66,48 @@ import PaperNestTestSupport
             return try await FileKind.prepareTemporaryCopy(of: payload, in: store)
         }
         await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
+    /// A copy with **no extension** tells Quick Look nothing, and it refuses to
+    /// look inside: measured, such a file yields no thumbnail at all. The item
+    /// already records what it is, so the staged copy borrows the extension
+    /// from that type — which is what makes a thumbnail possible for a file
+    /// whose name never had one.
+    @Test func aCopyWithNoExtensionBorrowsOneFromTheRecordedType() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PaperNestPreviewTest-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try LibraryStore(directory: root)
+        let bytes = Data("a plain note with no extension on its name\n".utf8)
+        let staged = try store.assets.store(bytes, kind: .file, originalFilename: "scan")
+        _ = try await store.createFileItem(named: "Scan", asset: staged, uti: "public.plain-text", originalFilename: "scan")
+        let payload = FilePayload(assetID: staged.id, uti: "public.plain-text",
+                                  originalFilename: "scan", byteCount: Int64(bytes.count))
+
+        let copy = try await FileKind.prepareTemporaryCopy(of: payload, in: store)
+
+        #expect(copy.url.lastPathComponent == "scan.txt")
+        // And that is the whole point: the system will now look inside it.
+        let thumbnail = try await FileThumbnail.image(
+            at: copy.url, boundedBy: CGSize(width: 88, height: 88), scale: 1)
+        #expect(thumbnail != nil, "a staged copy still gave no thumbnail")
+    }
+
+    /// A name that already has an extension is left exactly as it is, even when
+    /// it disagrees with the recorded type. This copy is what the share sheet
+    /// hands over, and quietly renaming someone's file to match its bytes is
+    /// not this function's business.
+    @Test func aNameThatAlreadyHasAnExtensionIsNotRewritten() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PaperNestPreviewTest-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try LibraryStore(directory: root)
+        let bytes = Data("plain text under a misleading name\n".utf8)
+        let staged = try store.assets.store(bytes, kind: .file, originalFilename: "notes.doc")
+        _ = try await store.createFileItem(named: "Notes", asset: staged, uti: "public.plain-text", originalFilename: "notes.doc")
+        let payload = FilePayload(assetID: staged.id, uti: "public.plain-text",
+                                  originalFilename: "notes.doc", byteCount: Int64(bytes.count))
+
+        let copy = try await FileKind.prepareTemporaryCopy(of: payload, in: store)
+
+        #expect(copy.url.lastPathComponent == "notes.doc")
     }
 }

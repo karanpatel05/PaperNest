@@ -2209,3 +2209,78 @@ the configured instance rather than making its own.
   space into one row, which is right for matching and is not the page's layout.
 - **Nothing is indexed per word or position**, so there is no highlight-the-hit
   behaviour here, only "this document matches".
+## A file item shows what it holds — row 8 UI — 2026-11-02 (Claude, UI by owner's direction)
+
+The owner asked Claude to take UI while Codex is out of usage. `FileThumbnail`
+shipped on 2026-10-28 with **nothing calling it**; the file details sheet now
+shows a real picture of the file's contents where it showed the symbol for its
+type.
+
+- Full `./scripts/test.sh`: **511 tests passed** (0 warnings).
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+- **`./scripts/ui-test-ios.sh` had not reported when this was committed.** It
+  was started and was still running; the owner asked for the commit before it
+  finished. **So the interaction run for this change is unverified**, and that
+  is the one check this project asks for on UI work that the rest cannot stand
+  in for. It is recorded here as unrun rather than assumed, and the result will
+  be added when it lands.
+
+### What limited the choice of slice at all
+
+Codex has 193 uncommitted files, 14 of them in `PaperNestUI` and
+`Apps/iOS/UITests`. For a file with uncommitted changes on both sides,
+**whoever commits last silently reverts the other**, so every one of those is
+off-limits — including `Localization.swift` and all three `Localizable.strings`.
+**That rules out any UI work with new on-screen text**, which is why the Fill
+Form, outline and compression screens were not candidates: this slice needed
+**no new `L10n` keys**, and that is most of why it was the one available.
+
+The library grid still shows the type symbol. That is one line,
+`LibraryView.swift:570`, in a file Codex has open — left for whoever commits it
+next rather than changed and lost.
+
+### The fallback is the ordinary case
+
+Most types have no preview, so the symbol stays most of the time. It is a
+different claim rather than a worse thumbnail — "this is a spreadsheet" instead
+of "this is what the spreadsheet looks like" — and the engine is still asked
+only for a real rendering of the contents, never for the generic type icon the
+system offers, because that icon *is* the symbol dressed up as a preview.
+
+The header keeps a fixed 44-point box either way, so the row does not change
+height when a thumbnail arrives after the copy is staged. The image stays
+`accessibilityHidden`, as the symbol was, with the name and size beside it
+carrying the meaning — so nothing VoiceOver reads has changed.
+
+### It implements the fallback recorded on 2026-10-28 as "implemented nowhere"
+
+`prepareTemporaryCopy` left a name with no extension exactly as it was, and the
+system refuses to look inside such a file — measured then, and `nil` from both
+the thumbnail and media engines. The staged copy now borrows the extension from
+the item's recorded `uti`.
+
+A name that **already** has an extension is left alone, even one that disagrees
+with the recorded type. That copy is what the share sheet hands over, and
+renaming someone's file to match its bytes is not that function's business —
+`aNameThatAlreadyHasAnExtensionIsNotRewritten` pins that narrowing, and it
+passed before the change as well as after, which is worth saying: it guards the
+new behaviour from going further than intended rather than proving it.
+
+### What this does **not** do
+
+- **The interaction test is unrun**, as above. Nothing here has been driven in
+  a running app.
+- **No thumbnail in the library grid or list**, which is where most people
+  would look for one.
+- **Nothing is cached.** The sheet asks the system each time it opens. The
+  staged copy it uses was already being made for sharing, so no file is copied
+  twice, but a grid would need a cache this does not have.
+- **A thumbnail for a large file still costs a full staged copy**, because the
+  system needs a real file with a usable name and the stored asset is
+  `<sha>.bin`.
+- **No test asserts what is on screen.** The naming fix is covered, and the
+  engine was covered in October; the view's own choice between picture and
+  symbol is not, because the image is `accessibilityHidden` and so invisible to
+  a UI test as well as to VoiceOver.

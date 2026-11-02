@@ -49,7 +49,20 @@ enum FileKind {
             let directory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("PaperNestFile-\(UUID().uuidString)", isDirectory: true)
             let basename = (payload.originalFilename as NSString).lastPathComponent
-            let name = ["", ".", "..", "/"].contains(basename) ? "\(payload.assetID.sha256).bin" : basename
+            var name = ["", ".", "..", "/"].contains(basename) ? "\(payload.assetID.sha256).bin" : basename
+            // A name with no extension tells the system nothing about what the
+            // file is, and it will not look inside: measured, such a copy gives
+            // no thumbnail and AVFoundation refuses it outright. The item
+            // already records its type, so borrow the extension from that.
+            //
+            // A name that *has* an extension is left exactly as it is, even one
+            // that disagrees with the recorded type. This copy is what the
+            // share sheet hands over, and quietly renaming someone's file to
+            // match its bytes is not this function's business.
+            if (name as NSString).pathExtension.isEmpty,
+               let fromRecordedType = UTType(payload.uti)?.preferredFilenameExtension {
+                name += ".\(fromRecordedType)"
+            }
             let copy = PreparedFileCopy(url: directory.appendingPathComponent(name), directory: directory)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try FileManager.default.copyItem(at: source, to: copy.url)
@@ -104,11 +117,7 @@ struct FileDetailsSheet: View {
                 if let payload {
                     Section {
                         HStack(spacing: 14) {
-                            Image(systemName: FileKind.symbol(for: payload.uti))
-                                .font(.largeTitle)
-                                .foregroundStyle(Theme.accent)
-                                .frame(width: 44)
-                                .accessibilityHidden(true)
+                            FileThumbnailView(url: shareURL, uti: payload.uti)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(request.summary.item.name).font(.headline)
                                 Text(verbatim: FileKind.size(payload.byteCount))
