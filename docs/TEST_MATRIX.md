@@ -2453,3 +2453,55 @@ which would end any running simulator session. That is the owner's machine and
 their call, so it has not been done. Until it is, UI work can be built and
 compiled but its interactions cannot be driven, and nothing here should be
 described as verified in the app.
+
+## Why the iOS UI tests hang — the actual cause — 2026-11-02 (Claude)
+
+The entry above said CoreSimulator was "wedged" and that the remedy was
+restarting `CoreSimulatorService`. **That was a guess, and it was wrong.** The
+service was restarted, came back on a new pid, and `simctl list` still hung —
+so here is what it really is, found by taking the wrapper apart.
+
+`.../Xcode.app/Contents/Developer/usr/bin/simctl` is a **bash wrapper**. It
+reads the installed CoreSimulator version, compares it against the version it
+expects, and if the installed one is older it runs:
+
+    "${DEVELOPER_DIR}/usr/bin/xcodebuild" -runFirstLaunch
+
+**synchronously, before exec'ing the real `simctl`.** That command installs
+Xcode's system components and asks for an **administrator password**. Nothing
+was there to answer it, so it waited — which is why the log stayed at zero
+bytes for four and a half hours rather than printing an error.
+
+Measured:
+
+| | |
+| --- | --- |
+| installed CoreSimulator | **1174.9.2** |
+| the `simctl` wrapper expects | **1174.21** |
+| `xcodebuild -checkFirstLaunchStatus` | **exit 69** — components still need installing |
+| Xcode | 27.2 |
+
+So Xcode was updated and its first-launch component install was never
+completed. Codex's last good run was 2026-10-29, which places the update
+between then and now.
+
+### The fix needs the owner, and cannot be done from here
+
+    sudo xcodebuild -runFirstLaunch
+
+It needs an administrator password, so no agent can run it. Opening Xcode once
+and letting it install components does the same thing. **Until that happens,
+every simulator-dependent check stays blocked** — `scripts/ui-test-ios.sh`,
+screenshots, every XCUITest — and no UI change can honestly be called verified
+in a running app.
+
+### Two things this turned up on the way, worth knowing
+
+- **`sample` on this machine's PATH is not macOS's.** It resolves to a Python
+  script in `/Library/Frameworks/Python.framework/Versions/3.11/bin`, which
+  fails with `ModuleNotFoundError`. Use `/usr/bin/sample` by full path — the
+  PDFKit deadlock in October was only found because that call used the full
+  path.
+- **`grep` is a shell function wrapping `ugrep`.** It has already emitted
+  `ugrep: warning:` in place of a plain grep error. Anything depending on exact
+  grep behaviour should call `/usr/bin/grep`.
