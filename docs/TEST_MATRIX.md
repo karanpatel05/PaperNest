@@ -2418,3 +2418,38 @@ new behaviour from going further than intended rather than proving it.
   engine was covered in October; the view's own choice between picture and
   symbol is not, because the image is `accessibilityHidden` and so invisible to
   a UI test as well as to VoiceOver.
+
+## iOS UI tests cannot run on this machine — 2026-11-02 (Claude)
+
+**No interaction test has run since 2026-10-29.** This is an environment
+failure, not a code one, and it is recorded because it means every UI change
+from 2026-11-02 onwards is unverified in the one way this project says counts.
+
+- `./scripts/ui-test-ios.sh` was started for the file-thumbnail change and sat
+  for **4 hours 23 minutes with zero output**, no `xcodebuild` process beneath
+  it, and was killed.
+- The cause is its first real step. `xcrun simctl list devices available -j`
+  **hangs**: killed at 60 seconds, 0 bytes written, nothing on stderr. The
+  script selects a simulator that way before it echoes anything, which is why
+  the log was empty rather than showing a failure.
+- So CoreSimulator is wedged on this machine. Codex ran these tests
+  successfully on 2026-10-29, so it has gone wrong since.
+
+### What still works, and what does not
+
+- **Unaffected:** `./scripts/test.sh` (511 tests, 0 warnings) and
+  `./scripts/build-mac-app.sh`. Neither touches CoreSimulator.
+- **Also unaffected:** `xcodebuild -scheme PaperNestUI -destination
+  'generic/platform=iOS Simulator' build`, which succeeded today. A *generic*
+  destination needs no device enumeration, so iOS **compilation** is still
+  verifiable.
+- **Blocked:** anything needing a booted simulator — `scripts/ui-test-ios.sh`,
+  `scripts/run-mac-app.sh`'s iOS counterpart, screenshots, and every XCUITest.
+
+### Not fixed
+
+The usual remedy is to restart `com.apple.CoreSimulator.CoreSimulatorService`,
+which would end any running simulator session. That is the owner's machine and
+their call, so it has not been done. Until it is, UI work can be built and
+compiled but its interactions cannot be driven, and nothing here should be
+described as verified in the app.
