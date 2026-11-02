@@ -2126,3 +2126,86 @@ it reads the bitmap once now and the suite is back to milliseconds.
   uses one short line, so nothing establishes what a paragraph does.
 - **iOS is unmeasured**, as for the other engines: the Simulator build proves
   it compiles. Whether Helvetica resolves the same way there has not been run.
+## Typed text becomes findable — row 21 — 2026-11-02 (Claude, backend)
+
+Text boxes paint and export as of yesterday, and the words went nowhere near
+search — the first thing someone would notice about their own typing. They are
+indexed now, on the same page write that saves them.
+
+- Full `./scripts/test.sh`: **509 tests passed** (64 + 150 + 125 + 122 + 48), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### The privacy test was worthless at first, and that is the finding here
+
+A page comment is private. It is typed on the same page, by the same person,
+into the same objects table, so `aPrivateCommentIsNeverFindable` is the test
+that matters most in this slice. It **passed while the reindex was deliberately
+changed to gather comments** — so it was proving nothing.
+
+The reason is worth keeping: writing a comment does not bump the page's
+revision, on purpose, so that an undone comment does not invalidate page
+history. No bump means no reindex, so the comment was safe **by accident of
+timing** rather than by the rule the test claimed to check. The test now saves
+an ink stroke after the comment, which does bump the revision and rebuilds the
+index while the comment is sitting on the page. Verified both ways round: it
+passes as written, and making the reindex gather comments fails it.
+
+So the promise rests on two independent facts, and only one of them was ever
+tested before.
+
+### No migration, checked rather than assumed
+
+`search_index` is an FTS5 table whose `field` column is `UNINDEXED` and carries
+no `CHECK`, and the index is derived and rebuildable — so a field value needs no
+schema change. This was checked rather than assumed because `assets.kind` went
+the other way earlier in this project: its `CHECK` constraint did need a
+migration, and the plan that said otherwise was wrong.
+
+### Corrected mid-slice: it is the field that already existed
+
+A fifth field, `typed`, was written first. That was wrong.
+`LibraryComposition` **already** gathered text boxes into a `text` row — but
+only while duplicating, extracting or merging, which is why typing on an
+ordinary page indexed nothing. A new name would have left a composed item
+carrying the same words twice under two names, and it broke
+`DocumentCompositionTests`, which counts the index rows an item owns. That
+failure is what surfaced the existing field at all.
+
+So this uses `text`, and composition's hand-rolled copy is **deleted**: the
+objects it writes already go through `applyObjectChanges` → `bumpRevision` →
+the reindex, which does the same "rebuild from the copy's own objects rather
+than carry stale content or source IDs" that comment described, in one place
+that also covers simply typing.
+
+### Where it hooks, and what that costs
+
+`bumpRevision` is called from exactly the three object-write paths and nothing
+else, so it is the one place that means "this page's objects changed".
+
+It therefore runs on **every** object write, an ink stroke included. The gather
+asks for `kind = 'text'` rows only, rather than reading the page's objects
+through `objects(on:)`: that would decode every stroke's JSON to discover the
+page has no text boxes, costing one decode of everything per stroke through a
+drawing session. What remains is one narrow query plus a delete and an insert
+per write, which is not free and has not been measured under a real drawing
+load.
+
+`LibraryStore.decoder` went from `private` to internal so a second file can use
+the configured instance rather than making its own.
+
+### What this does **not** do
+
+- **Seven tests, no UI.** Nothing types on a page yet, so in practice nothing
+  is indexed through the app. Row 21 stays Partial.
+- **No backfill.** A library whose text boxes predate this change will not find
+  them until something writes that page's objects again. In practice no library
+  has any, because nothing could create one until yesterday — but there is no
+  pass to repair one, unlike `pdfText`, which has a backfill indexer.
+- **Search answers with items, not pages.** `search(_:)` returns `[ItemID]`, so
+  a hit says the document contains the words and not which page or which box.
+- **The words are stored run together.** Several boxes on a page join with a
+  space into one row, which is right for matching and is not the page's layout.
+- **Nothing is indexed per word or position**, so there is no highlight-the-hit
+  behaviour here, only "this document matches".

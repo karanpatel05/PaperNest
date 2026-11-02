@@ -125,13 +125,12 @@ extension LibraryStore {
             try copyCompositionRecognition(from: source, to: current)
             try copyEmbeddedText(from: source, to: current)
 
-            // Rebuild derived text rows from current objects rather than
-            // carrying stale content or source item/page IDs into the copy.
-            let text = sourceObjects.compactMap { object -> String? in
-                if case .text(let box) = object.payload { return box.text }
-                return nil
-            }.joined(separator: "\n")
-            try indexCompositionText(text, field: "text", on: current)
+            // Typed text needs nothing here any more. The objects were
+            // written through `applyObjectChanges` above, which bumps the
+            // page's revision, which rebuilds the `text` row from the copy's
+            // own objects — the same "rebuild rather than carry stale content
+            // or source IDs" this used to do by hand, now in one place that
+            // also covers simply typing on a page.
         }
         // Object and label mutations may have advanced modifiedAt; return the
         // committed metadata as it now stands, rather than createItem's snapshot.
@@ -165,9 +164,4 @@ extension LibraryStore {
         try saveRecognition(recognition)
     }
 
-    private func indexCompositionText(_ text: String, field: String, on page: Page) throws {
-        guard !text.isEmpty else { return }
-        try db.run("INSERT INTO search_index (item_id, page_id, field, content) VALUES (?, ?, ?, ?)",
-                   [.text(page.itemID.rawValue), .text(page.id.rawValue), .text(field), .text(text)])
-    }
 }

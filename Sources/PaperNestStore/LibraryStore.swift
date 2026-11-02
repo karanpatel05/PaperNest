@@ -20,7 +20,7 @@ public actor LibraryStore {
         e.outputFormatting = [.sortedKeys]
         return e
     }()
-    private let decoder = JSONDecoder()
+    let decoder = JSONDecoder()
 
     public static let databaseFilename = "Library.sqlite"
 
@@ -1082,6 +1082,12 @@ public actor LibraryStore {
     private func bumpRevision(_ page: Page) throws {
         let timestamp = now()
         try db.run("UPDATE pages SET revision = revision + 1, modified_at = ? WHERE id = ?", [.date(timestamp), .text(page.id.rawValue)])
+        // The three object-write paths all land here and nothing else does, so
+        // this is the one place that means "this page's objects changed" —
+        // which is exactly when what someone typed on it may have changed.
+        // `persistCommentChange` deliberately does not bump, so a private
+        // comment never reaches the index.
+        try reindexTypedText(on: page)
         // Object edits don't change the underlying paper. Preserve only a
         // current completed result; never make already-stale OCR current.
         if var recognition = try recognition(for: page.id), recognition.status == .completed,
