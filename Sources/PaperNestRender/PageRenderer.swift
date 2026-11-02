@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreText
 import Foundation
 import ImageIO
 import PaperNestCore
@@ -25,6 +26,7 @@ public enum PageLayer: @unchecked Sendable {
     case ink(InkStroke)
     /// A decoded image and the frame it fills, in upright source points.
     case image(CGImage, CGRect)
+    case text(TextBox)
 }
 
 /// Draws pages for display, thumbnails and export. Every path goes through
@@ -128,9 +130,11 @@ public struct PageRenderer: Sendable {
                 let image = try await cache.uprightImage(
                     placed.assetID, maxPixelSize: max(1, Int(longestEdge.rounded(.up))), store: store)
                 layers.append(.image(image, placed.frame))
-            case .text, .comment:
-                // Text boxes are not painted yet (row 21), and a page comment
-                // is private — it belongs in neither a rendering nor an export.
+            case .text(let textBox):
+                layers.append(.text(textBox))
+            case .comment:
+                // A page comment is private: it belongs in neither a rendering
+                // nor an export, which `PageCommentWorkflowTests` pins.
                 break
             }
         }
@@ -302,8 +306,56 @@ public struct PageRenderer: Sendable {
             switch layer {
             case .ink(let stroke): drawInk(stroke, in: ctx)
             case .image(let image, let frame): drawPlacedImage(image, in: frame, in: ctx)
+            case .text(let textBox): drawTextBox(textBox, in: ctx)
             }
         }
+    }
+
+    /// Draws a text box in source space, as **real text**.
+    ///
+    /// Not glyph outlines. Into a PDF context this emits text operators, so
+    /// the words someone typed can be selected, copied and searched in the
+    /// exported file — a picture of text would look identical and be useless,
+    /// and `textInABoxIsRealTextInTheExportedPDF` reads them back out to say
+    /// which one this is.
+    ///
+    /// The flip is the one `drawSearchableText` uses rather than a second idea
+    /// of which way is up: translate to the box's bottom edge in y-down source
+    /// space and scale y by −1, which leaves `CTFrameDraw` laying the first
+    /// line against the box's top and running down the page.
+    ///
+    /// Text longer than its box is **clipped** by the frame path, with nothing
+    /// to say so.
+    static func drawTextBox(_ textBox: TextBox, in ctx: CGContext) {
+        guard !textBox.text.isEmpty, textBox.fontSize > 0,
+              textBox.frame.width > 0, textBox.frame.height > 0 else { return }
+        let font = CTFontCreateWithName("Helvetica" as CFString, CGFloat(textBox.fontSize), nil)
+        var alignment: CTTextAlignment = switch textBox.alignment {
+        case .leading: .left
+        case .center: .center
+        case .trailing: .right
+        }
+        let style = withUnsafeMutablePointer(to: &alignment) { pointer -> CTParagraphStyle in
+            var setting = CTParagraphStyleSetting(spec: .alignment,
+                                                  valueSize: MemoryLayout<CTTextAlignment>.size,
+                                                  value: pointer)
+            return CTParagraphStyleCreate(&setting, 1)
+        }
+        let color = textBox.color
+        let attributed = NSAttributedString(string: textBox.text, attributes: [
+            NSAttributedString.Key(kCTFontAttributeName as String): font,
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String):
+                CGColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: color.alpha),
+            NSAttributedString.Key(kCTParagraphStyleAttributeName as String): style,
+        ])
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
+        ctx.translateBy(x: textBox.frame.minX, y: textBox.frame.maxY)
+        ctx.scaleBy(x: 1, y: -1)
+        let path = CGPath(rect: CGRect(origin: .zero, size: textBox.frame.size), transform: nil)
+        let frame = CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(attributed),
+                                             CFRange(location: 0, length: 0), path, nil)
+        CTFrameDraw(frame, ctx)
     }
 
     /// Draws a placed image into its frame in source space.

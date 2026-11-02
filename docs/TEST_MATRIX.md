@@ -2063,3 +2063,66 @@ by asking what a screen would do on its second call rather than its first.
   the page; drawing clips it away and the object stays. That is deliberate — a
   caller may want an image hanging over an edge — but it means a placement can
   be invisible with no complaint.
+## Text typed onto a page — row 21 — 2026-11-01 (Claude, backend)
+
+The last piece of row 21 that had a model and no paint. `TextBox` existed in
+Core and `page_objects` stored it; `layers` **skipped** `.text`, so nothing
+drew it. It joins `PageLayer` now, which also means `hasPaintedObjects` covers
+it without a new flag — the point of generalising that condition when placed
+images needed it.
+
+- Full `./scripts/test.sh`: **502 tests passed** (64 + 143 + 125 + 122 + 48), **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+- `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`:
+  `** BUILD SUCCEEDED **`, 0 warnings.
+
+### It is real text, and that is the whole decision
+
+Drawn with CoreText into the export's PDF context, so the words come out as
+**text operators rather than glyph outlines**: selectable, copyable and
+searchable in the written file. A picture of text would look identical on
+screen and be useless to a reader, so the test does not take it on trust —
+`textInABoxIsRealTextInTheExportedPDF` reads the words back out with
+`PDFDocument.page(at:)?.string`.
+
+The flip is `drawSearchableText`'s and not a second idea of which way is up:
+translate to the box's bottom edge in y-down source space, scale y by −1, and
+`CTFrameDraw` then lays the first line against the box's **top** and runs down
+the page.
+
+### Six tests, and what each would catch
+
+Text is painted inside its box and nowhere outside it; it starts at the **top**
+of the box, which is the only one of these that catches an upside-down flip,
+since text drawn the wrong way up is still dark pixels in the right box;
+`.trailing` puts it at the right edge and not the left; an empty box paints
+nothing; the words are real text in the exported PDF; and a page carrying only
+a text box is **drawn rather than copied**, which is the trap that was losing
+placed images.
+
+The pixel probes scan a **region** rather than a point, because one sample can
+land in the gap between two letters and report nothing about text that is
+plainly there. The first version of that helper called `PixelProbe.pixel` per
+sample, which redraws the whole image each time and took **a minute per test**;
+it reads the bitmap once now and the suite is back to milliseconds.
+
+### What this does **not** do
+
+- **No UI.** Nothing lets anyone type on a page — row 21 stays Partial, with
+  stickers and stamps still open. A caller writes a `PageObject` with a
+  `.text` payload; there is no guarded `placeText` the way `placeImage` exists
+  for images, so the asset-free path is the unguarded `saveObject`.
+- **One font, Helvetica, hard-coded.** `TextBox` carries a size, a colour and
+  an alignment and has nowhere to put a typeface, so nothing here chooses one
+  and no other font has been tried.
+- **Text longer than its box is clipped**, with nothing to say so. The frame
+  path cuts it off; there is no ellipsis, no shrink-to-fit and no indication to
+  a caller that some of what was typed is not shown.
+- **The words do not reach the search index.** Someone's own typing is exactly
+  what they would expect to find by searching, and it will not be found. That
+  is a store question — a new `search_index` field and a migration — not a
+  render one, and it is not done.
+- **No wrapping test.** CoreText wraps inside the frame, but every test here
+  uses one short line, so nothing establishes what a paragraph does.
+- **iOS is unmeasured**, as for the other engines: the Simulator build proves
+  it compiles. Whether Helvetica resolves the same way there has not been run.
