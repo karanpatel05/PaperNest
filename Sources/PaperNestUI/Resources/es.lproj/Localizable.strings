@@ -185,7 +185,7 @@
 "sort.dateModified" = "Fecha de modificación";
 "sort.dateAdded" = "Fecha de adición";
 "sort.name" = "Nombre";
-"library.home.title" = "Documentos";
+"library.home.title" = "Inicio";
 "library.home.recent" = "Recientes";
 "library.home.seeAll" = "Ver todo";
 
@@ -365,3 +365,39 @@
 "stamp.invalid" = "Amplía el sello para añadirlo.";
 "stamp.help" = "Los sellos de símbolos se guardan como tinta y se incluyen en las exportaciones. Usa Gestionar anotaciones para cambiar su color o eliminarlos.";
 "stamp.saveFailed" = "No se pudo guardar el sello. Si la página cambió, cierra esta ventana e inténtalo de nuevo.";
+
+// Premium reference dashboard
+"premium.morning" = "Buenos días";
+"premium.afternoon" = "Buenas tardes";
+"premium.evening" = "Buenas noches";
+"premium.welcome" = "Un espacio para todo lo que importa.";
+"premium.new" = "Nuevo";
+"premium.notesHint" = "Escribe y dibuja";
+"premium.scanHint" = "Del papel al PDF";
+"premium.importHint" = "PDF, imágenes y archivos";
+"premium.folderHint" = "Organiza tus ideas";
+"premium.search" = "Buscar";
+"premium.empty" = "Tu próxima idea empieza aquí";
+"premium.emptyDetail" = "Crea un cuaderno o importa un archivo para empezar.";
+
+"premium.notes" = "Notas";
+
+"premium.note" = "Nota";
+"premium.scan" = "Escanear";
+"premium.import" = "Importar";
+"premium.folder" = "Carpeta";
+
+/* First-launch welcome */
+"welcome.brand" = "PaperNest";
+"welcome.title" = "Un lugar para tus ideas y documentos.";
+"welcome.subtitle" = "Escanea una página, empieza una nota y reúne todo en un lugar.";
+"welcome.capture.title" = "Reúne tus páginas";
+"welcome.capture.detail" = "Escanea con la cámara o importa tus archivos.";
+"welcome.note.title" = "Da espacio a tus ideas";
+"welcome.note.detail" = "Crea cuadernos y añade formas y comentarios.";
+"welcome.organize.title" = "Encuentra lo importante";
+"welcome.organize.detail" = "Organiza en carpetas y busca en tu biblioteca.";
+"welcome.continue" = "Empezar";
+"welcome.noAccount" = "No necesitas una cuenta.";
+"welcome.import.detail" = "Importa PDF, imágenes y otros archivos.";
+"welcome.mac.subtitle" = "Importa un documento, empieza una nota y reúne todo en un lugar.";

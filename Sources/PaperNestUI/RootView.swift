@@ -9,10 +9,13 @@ import UIKit
 /// stack from the library grid into documents. Adapts from iPhone (stacked)
 /// to iPad and Mac (side by side).
 public struct RootView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage("PaperNestWelcomeCompleted") private var welcomeCompleted = false
     @State private var model: LibraryModel
     @State private var folderPrompt: FolderPrompt?
     @State private var folderName = ""
     @State private var deletingFolder: Folder?
+    @State private var dashboardVisible = true
     @State private var homeFilePreview: FilePreviewRequest?
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -32,6 +35,12 @@ public struct RootView: View {
     }
 
     public init(session: LibrarySession) {
+        #if DEBUG
+        // Isolate first-launch persistence checks from the user's app settings.
+        if let key = UserDefaults.standard.string(forKey: "PaperNestDebugWelcomeKey") {
+            _welcomeCompleted = AppStorage(wrappedValue: false, key)
+        }
+        #endif
         #if os(iOS)
         let startsAtHome = UIDevice.current.userInterfaceIdiom == .phone
         #else
@@ -59,7 +68,11 @@ public struct RootView: View {
             case .failed(let title, let message):
                 ContentUnavailableView(title, systemImage: "exclamationmark.triangle", description: Text(message))
             case .ready:
-                splitView
+                if shouldShowWelcome {
+                    WelcomeView { welcomeCompleted = true }
+                } else {
+                    splitView
+                }
             }
         }
         .modifier(FilePreviewPresentation(request: $homeFilePreview))
@@ -68,24 +81,43 @@ public struct RootView: View {
         .task { await model.session.bootstrap() }
     }
 
+    private var shouldShowWelcome: Bool {
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "PaperNestDebugSkipWelcome") { return false }
+        #endif
+        return !welcomeCompleted
+    }
+
     private var splitView: some View {
         NavigationSplitView {
-            List(selection: $model.sidebarSelection) {
+            ScrollViewReader { proxy in
+            List(selection: sidebarBinding) {
                 if showsHome {
-                    LibraryHomeSections(model: model) { summary in
-                        homeFilePreview = FilePreviewRequest(summary: summary)
+                    Section {} header: {
+                        dashboard(compact: true).textCase(nil).id("dashboard-top")
                     }
+                } else {
+                    Button {
+                        model.sidebarSelection = .all
+                        model.sidebarSelection = nil
+                        model.path = []
+                        dashboardVisible = true
+                    } label: {
+                        Label(L10n.homeTitle, systemImage: "house.fill")
+                    }
+                    .listRowBackground(dashboardVisible ? Theme.accent.opacity(0.12) : .clear)
+                    .accessibilityIdentifier("sidebar-home")
                 }
                 Section(L10n.sidebarLibrary) {
-                    Label(L10n.allDocuments, systemImage: "doc.on.doc").badge(model.counts.all).tag(LibraryStore.Scope.all)
-                    Label(L10n.favorites, systemImage: "star").badge(model.counts.favorites).tag(LibraryStore.Scope.favorites)
-                    Label(L10n.recentlyDeleted, systemImage: "trash").badge(model.counts.recentlyDeleted)
+                    sidebarLabel(L10n.allDocuments, symbol: "doc.on.doc").badge(usesLargeSidebar ? 0 : model.counts.all).tag(LibraryStore.Scope.all)
+                    sidebarLabel(L10n.favorites, symbol: "star").badge(usesLargeSidebar ? 0 : model.counts.favorites).tag(LibraryStore.Scope.favorites)
+                    sidebarLabel(L10n.recentlyDeleted, symbol: "trash").badge(usesLargeSidebar ? 0 : model.counts.recentlyDeleted)
                         .tag(LibraryStore.Scope.recentlyDeleted)
                 }
                 Section {
                     ForEach(model.folders) { folder in
-                        Label(folder.name, systemImage: "folder")
-                            .badge(model.counts.folders[folder.id, default: 0])
+                        sidebarLabel(folder.name, symbol: "folder")
+                            .badge(usesLargeSidebar ? 0 : model.counts.folders[folder.id, default: 0])
                             .tag(LibraryStore.Scope.folder(folder.id))
                             .contextMenu {
                                 Button(L10n.rename) {
@@ -98,7 +130,7 @@ public struct RootView: View {
                     }
                 } header: {
                     HStack {
-                        Text(L10n.folders)
+                        Text(L10n.folders).id("folders-section")
                         Spacer()
                         Button {
                             folderName = ""
@@ -114,6 +146,11 @@ public struct RootView: View {
                 }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .background(Theme.sidebar)
+            .onChange(of: model.sidebarSelection) { _, selected in
+                if selected != nil { dashboardVisible = false }
+            }
             .task(id: model.session.changeToken) { await model.reloadSidebar() }
             .navigationDestination(item: $model.homeDocument) { id in
                 DocumentView(itemID: id, session: model.session)
@@ -129,14 +166,7 @@ public struct RootView: View {
                         }
                         .accessibilityIdentifier("library-tools")
                     }
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            model.isShowingSettings = true
-                        } label: {
-                            Label(L10n.settingsTitle, systemImage: "gearshape")
-                        }
-                        .accessibilityIdentifier("library-settings")
-                    }
+
                 }
             }
             #endif
@@ -158,11 +188,76 @@ public struct RootView: View {
             } message: { _ in
                 Text(L10n.deleteFolderMessage)
             }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 240)
             .navigationTitle(showsHome ? L10n.homeTitle : Brand.displayName)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if showsHome {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Menu {
+                            Button(L10n.homeTitle) { proxy.scrollTo("dashboard-top", anchor: .top) }
+                            Button(L10n.folders) { proxy.scrollTo("folders-section", anchor: .top) }
+                            Button(L10n.premiumNew) { model.isShowingTools = true }
+                            Button(L10n.premiumSearch) { dashboardVisible = false; model.sidebarSelection = .all }
+                        } label: {
+                            HStack {
+                                Text(L10n.homeTitle).font(.body)
+                                Spacer()
+                                Image(systemName: "chevron.up").font(.body)
+                            }.padding(16).background(Theme.surface)
+                        }.accessibilityIdentifier("home-navigation-menu")
+                    } else {
+                    HStack(spacing: 12) {
+                        Button { proxy.scrollTo("dashboard-top", anchor: .top) } label: {
+                            tabLabel(L10n.homeTitle, symbol: "house.fill")
+                        }
+                        Button { proxy.scrollTo("folders-section", anchor: .top) } label: {
+                            tabLabel(L10n.folders, symbol: "folder")
+                        }.accessibilityIdentifier("home-folders")
+                        Button { model.isShowingTools = true } label: {
+                            Image(systemName: "plus").font(.title2.weight(.medium))
+                                .foregroundStyle(.white).frame(width: 50, height: 50)
+                                .background(Theme.gradient, in: Circle())
+                        }.accessibilityLabel(L10n.premiumNew).accessibilityIdentifier("home-create")
+                        Button { dashboardVisible = false; model.sidebarSelection = .all } label: {
+                            tabLabel(L10n.premiumSearch, symbol: "magnifyingglass")
+                        }.accessibilityIdentifier("home-search-tab")
+                    }
+                    .buttonStyle(.plain).padding(.horizontal, 20).padding(.vertical, 10)
+                    .background(Theme.surface)
+                    }
+                }
+            }
+            }
+            .navigationSplitViewColumnWidth(min: usesLargeSidebar ? 420 : 200,
+                                            ideal: usesLargeSidebar ? 460 : 240)
         } detail: {
             NavigationStack(path: $model.path) {
-                LibraryView(model: model)
+                Group {
+                    if dashboardVisible && !showsHome {
+                        ScrollView {
+                            dashboard(compact: false).padding(28)
+                                .frame(maxWidth: 1400).frame(maxWidth: .infinity)
+                        }
+                        .background(Theme.libraryBackground)
+                        .navigationTitle(L10n.homeTitle)
+                        .searchable(text: $model.searchText, prompt: L10n.searchPrompt)
+                        .onSubmit(of: .search) {
+                            model.sidebarSelection = .all
+                            dashboardVisible = false
+                        }
+                        .toolbar {
+                            ToolbarItem(placement: .primaryAction) {
+                                Button { model.isShowingTools = true } label: {
+                                    Label(L10n.toolsTitle, systemImage: "wrench.and.screwdriver")
+                                }.accessibilityIdentifier("library-tools")
+                            }
+                        }
+                    } else {
+                        LibraryView(model: model)
+                    }
+                }
                     .navigationDestination(for: ItemID.self) { id in
                         DocumentView(itemID: id, session: model.session)
                     }
@@ -173,6 +268,45 @@ public struct RootView: View {
         #if DEBUG
         .task { await openDebugItemIfRequested() }
         #endif
+    }
+
+    private var sidebarBinding: Binding<LibraryStore.Scope?> {
+        Binding(get: {
+            dashboardVisible && !showsHome ? nil : model.sidebarSelection
+        }, set: { selected in
+            if selected != nil { dashboardVisible = false }
+            model.sidebarSelection = selected
+        })
+    }
+
+    private func tabLabel(_ title: String, symbol: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: symbol).font(.title3)
+            Text(title).font(.caption2).fixedSize(horizontal: false, vertical: true)
+        }.frame(maxWidth: .infinity, minHeight: 44)
+    }
+
+    private func dashboard(compact: Bool) -> some View {
+        DashboardView(model: model, compact: compact, openFile: { summary in
+            homeFilePreview = FilePreviewRequest(summary: summary)
+        }, showLibrary: {
+            dashboardVisible = false
+            model.sidebarSelection = .all
+        }, newFolder: {
+            folderName = ""
+            folderPrompt = .create
+        })
+    }
+
+    private var usesLargeSidebar: Bool { dynamicTypeSize.isAccessibilitySize && !showsHome }
+
+    @ViewBuilder
+    private func sidebarLabel(_ title: String, symbol: String) -> some View {
+        if usesLargeSidebar {
+            Text(title).fixedSize(horizontal: false, vertical: true)
+        } else {
+            Label(title, systemImage: symbol)
+        }
     }
 
     private var folderPromptTitle: String {

@@ -536,6 +536,8 @@ struct ItemCell: View {
                         .padding(.trailing, reservesMenuSpace ? 36 : 0)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .padding(10)
+                .modifier(PremiumCard())
             } else {
                 HStack(spacing: 14) {
                     preview.frame(width: 60, height: 76).clipShape(RoundedRectangle(cornerRadius: 6))
@@ -543,8 +545,7 @@ struct ItemCell: View {
                 }
                 .padding(10)
                 .padding(.trailing, 36)
-                .background(Theme.preview)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .modifier(PremiumCard())
                 .overlay {
                     if isSelected { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent, lineWidth: 2) }
                 }
@@ -599,8 +600,9 @@ struct ItemCell: View {
         if showsDeletionDate, let deleted = summary.item.deletedAt {
             return L10n.deletedOn(deleted.formatted(date: .abbreviated, time: .omitted))
         }
-        let date = summary.item.modifiedAt.formatted(date: .abbreviated, time: .omitted)
-        return date
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: summary.item.modifiedAt, relativeTo: .now)
     }
 }
 

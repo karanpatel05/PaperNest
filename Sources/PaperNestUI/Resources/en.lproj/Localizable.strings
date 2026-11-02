@@ -185,7 +185,7 @@
 "sort.dateModified" = "Date Modified";
 "sort.dateAdded" = "Date Added";
 "sort.name" = "Name";
-"library.home.title" = "Documents";
+"library.home.title" = "Home";
 "library.home.recent" = "Recent";
 "library.home.seeAll" = "See All";
 
@@ -365,3 +365,39 @@
 "stamp.invalid" = "Make the stamp larger to add it.";
 "stamp.help" = "Symbol stamps are saved as ink and included in exports. Use Manage Markup to recolor or remove them.";
 "stamp.saveFailed" = "Couldn’t save this stamp. If the page changed, close this sheet and try again.";
+
+// Premium reference dashboard
+"premium.morning" = "Good morning";
+"premium.afternoon" = "Good afternoon";
+"premium.evening" = "Good evening";
+"premium.welcome" = "A little space for everything that matters.";
+"premium.new" = "New";
+"premium.notesHint" = "Write and draw";
+"premium.scanHint" = "Paper to PDF";
+"premium.importHint" = "PDF, images and files";
+"premium.folderHint" = "Make room for ideas";
+"premium.search" = "Search";
+"premium.empty" = "Your next idea starts here";
+"premium.emptyDetail" = "Create a notebook or import a file to begin.";
+
+"premium.notes" = "Notes";
+
+"premium.note" = "Note";
+"premium.scan" = "Scan";
+"premium.import" = "Import";
+"premium.folder" = "Folder";
+
+/* First-launch welcome */
+"welcome.brand" = "PaperNest";
+"welcome.title" = "A home for your ideas and documents.";
+"welcome.subtitle" = "Capture a page, start a note, and keep everything together.";
+"welcome.capture.title" = "Bring your pages in";
+"welcome.capture.detail" = "Scan with your camera or import existing files.";
+"welcome.note.title" = "Make room for ideas";
+"welcome.note.detail" = "Create notebooks and add shapes and comments.";
+"welcome.organize.title" = "Find what matters";
+"welcome.organize.detail" = "Organize with folders and search your library.";
+"welcome.continue" = "Get started";
+"welcome.noAccount" = "No account needed.";
+"welcome.import.detail" = "Import PDFs, images and other files.";
+"welcome.mac.subtitle" = "Import a document, start a note, and keep everything together.";

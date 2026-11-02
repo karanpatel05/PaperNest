@@ -1,4 +1,16 @@
+# Premium reference redesign — 2026-10-27
+
+The owner’s new primary specification is `DesignReferences/paper-nest-reference.png`, superseding the older clean/native mockups below. Reproduce the interfaces inside the devices using the existing working app. SF typography, indigo #5264FF and lavender #9667FF, ice #F8F9FF canvas, #F0F2FF sidebar, translucent rounded surfaces, restrained borders and shadows. Dark mode uses dark navy surfaces and lighter accent contrast. Respect Reduce Motion and Reduce Transparency.
+
+Preserve immutable assets, SQLite authority, existing document navigation/import/export and real thumbnails. Never populate production with reference documents or invented folder counts. The owner subsequently deferred Vault and VPN to the next version: neither appears in this version. Collaboration and rich text are also absent; private page comments and notebook ink are real.
+
 # Clean & Native UI
+
+## Readability pass — 2026-10-26
+
+Owner requested a better UI after the app audit. Keep SF, semantic system backgrounds, white paper and the system blue accent. Improve hierarchy and readability using the existing screens and strings: at accessibility sizes, give iPad navigation a wider text-first column instead of oversized icons crowding words; use full-width stroke-weight choices instead of fixed-height segments; make annotation instructions and the Add Comment action use primary-text contrast. Keep normal-size navigation and compact segmented controls. Normal-size shape/stamp choices use an adaptive grid with a quiet selected tint and checkmark so the paper preview stays higher on the sheet; at accessibility sizes the choices remain full-width rows. No backend capabilities or placeholder controls are added in this pass.
+
+Validation: existing large-text/dark-mode control workflow on both devices, localized annotation-style screenshots and interactions, full unit suite and Mac build under timeouts. Retain and report known toolbar accessibility-audit failures separately; no automatic claim that this pass fixes them.
 
 ## Source of truth
 
@@ -207,3 +219,13 @@ When you finish a pass, update this table and the "Who is editing what" line in 
 - Add a UI test for each new interaction (sort, folder create/open, export destination).
 - Take iPhone screenshots in en, fr and es, in Dark Mode and with large text. Inspect iPad when a runtime is available.
 - Record the real outcomes in `TEST_MATRIX.md`. Name screenshots `docs/screenshots/design-<pass>-<screen>-<lang>.png`.
+
+Owner clarification 2026-10-27: leave Vault and VPN for the next version. They are omitted from current navigation/actions; no status placeholders ship. Shared collaboration also lacks a service. No invented profiles or default folders are added.
+
+## Notes tools — 2026-10-27
+
+Owner requested visible tools side by side instead of a dropdown. Notes now use a labeled horizontal tool row below the title on phone, iPad and Mac. The row scrolls on narrow screens, keeps all editing/page actions reachable, and remains available when the note is empty so Add Notebook Page and Undo are not lost. Rotate/filter retain their parameter choices; the main editing actions no longer require More. Existing en/fr/es labels are reused. Export remains in the navigation bar.
+
+## First-launch welcome — 2026-10-27
+
+One introductory screen appears before Home until Get started is pressed. It reuses the approved adaptive indigo/lavender palette and rounded system title, with a stack of ruled paper as the focal illustration and three unboxed explanations. Wide windows pair the introduction with feature copy; phone and accessibility sizes stack and scroll. The primary action stays below the scroll content. At accessibility sizes the decorative illustration is omitted. Mac wording describes importing rather than camera capture. Completion is local app preference state, not library metadata. Debug UI tests can bypass the screen or use an isolated completion key. No sign-in, subscription or permission is required to continue.

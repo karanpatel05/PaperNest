@@ -69,7 +69,8 @@ struct DocumentView: View {
                 }
             } else if isCompact {
                 VStack(spacing: 0) {
-                    PageViewer(model: model, zoom: $zoom, showsZoomButtons: false)
+                    PageViewer(model: model, zoom: $zoom, showsZoomButtons: false,
+                               isMarkingUp: isMarkingUp, fingerDrawing: isFingerDrawing, undoManager: undoManager)
                     pageNavigation
                 }
             } else {
@@ -103,7 +104,7 @@ struct DocumentView: View {
         // iPad: title at the leading edge, editing tools in the middle.
         .toolbarRole(isCompact ? .automatic : .editor)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if isCompact, !model.pages.isEmpty {
+            if isCompact, !isNotebook, !model.pages.isEmpty {
                 VStack(spacing: 0) {
                     if isShowingFilterStrip { filterStrip }
                     compactTools
@@ -111,6 +112,9 @@ struct DocumentView: View {
             }
         }
         #endif
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if isNotebook { notebookTools }
+        }
         .toolbar { toolbar }
         .alert(L10n.renameTitle, isPresented: $isRenaming) {
             TextField(L10n.renamePlaceholder, text: $renameText)
@@ -229,22 +233,28 @@ struct DocumentView: View {
         ))
     }
 
+    private var isNotebook: Bool { model.item?.kind == .notebook }
+
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        #if os(iOS)
-        if isCompact {
-            ToolbarItemGroup(placement: .primaryAction) {
-                addPagesButton
-                exportButton
-            }
+        if isNotebook {
+            ToolbarItem(placement: .primaryAction) { exportButton }
         } else {
-            ToolbarItemGroup(placement: .secondaryAction) { editingTools }
+            #if os(iOS)
+            if isCompact {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    addPagesButton
+                    exportButton
+                }
+            } else {
+                ToolbarItemGroup(placement: .secondaryAction) { editingTools }
+                ToolbarItemGroup(placement: .primaryAction) { trailingActions }
+            }
+            #else
+            ToolbarItemGroup(placement: .principal) { editingTools }
             ToolbarItemGroup(placement: .primaryAction) { trailingActions }
+            #endif
         }
-        #else
-        ToolbarItemGroup(placement: .principal) { editingTools }
-        ToolbarItemGroup(placement: .primaryAction) { trailingActions }
-        #endif
     }
 
     @ViewBuilder
@@ -295,6 +305,40 @@ struct DocumentView: View {
         rotateMenu
         cropButton
         filterMenu
+    }
+
+    /// Keep notebook actions in the content area so native toolbars never
+    /// collapse them into an overflow menu. The row scrolls at narrow widths.
+    private var notebookTools: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 18) {
+                shapeButton
+                stampButton
+                commentsButton
+                annotateTextButton
+                manageMarkupButton
+                NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
+                editingTools
+                recognizeTextButton
+                addPagesItems
+                #if os(iOS)
+                Button { isShowingPageOrganizer = true } label: {
+                    Label(L10n.pages, systemImage: "square.grid.2x2")
+                }
+                .accessibilityIdentifier("editor-pages")
+                #endif
+                deleteButton
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .labelStyle(EditorToolLabelStyle())
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.accent)
+        .background(Theme.surface)
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityIdentifier("notebook-tool-bar")
     }
 
     /// A labeled Export button, then everything else in ⋯.
@@ -568,6 +612,7 @@ struct DocumentView: View {
             Label(L10n.deletePage, systemImage: "trash")
         }
         .disabled(model.selectedPage == nil)
+        .accessibilityIdentifier("editor-delete-page")
     }
 
     /// Add pages (camera on iPhone/iPad, files everywhere) or replace the
@@ -610,7 +655,7 @@ struct DocumentView: View {
         } label: {
             Label(L10n.addPages, systemImage: "doc.badge.plus")
         }
-        Divider()
+        if !isNotebook { Divider() }
         #if os(iOS)
         Button {
             cameraPurpose = .replace

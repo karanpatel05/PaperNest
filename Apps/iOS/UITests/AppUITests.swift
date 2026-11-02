@@ -1,4 +1,5 @@
 import XCTest
+import SQLite3
 
 /// Drives the real app in the iOS Simulator. Run with `scripts/ui-test-ios.sh`,
 /// which seeds the library at `libraryPath` with a page named "Crop target".
@@ -6,9 +7,9 @@ import XCTest
 final class AppUITests: XCTestCase {
     static let libraryPath = "/tmp/papernest-uitest-library"
 
-    private func launch(_ extra: [String], libraryPath: String = AppUITests.libraryPath, language: String = "en") -> XCUIApplication {
+    private func launch(_ extra: [String], libraryPath: String = AppUITests.libraryPath, language: String = "en", skipWelcome: Bool = true) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-PaperNestLibraryPath", libraryPath, "-AppleLanguages", "(\(language))", "-AppleLocale", "en_US", "-libraryLayout", "grid"] + extra
+        app.launchArguments = ["-PaperNestLibraryPath", libraryPath, "-AppleLanguages", "(\(language))", "-AppleLocale", "en_US", "-libraryLayout", "grid", "-PaperNestDebugSkipWelcome", skipWelcome ? "YES" : "NO"] + extra
         app.launch()
         return app
     }
@@ -16,8 +17,110 @@ final class AppUITests: XCTestCase {
     /// iPhone opens on the home (Scan/Import, Recent, library, folders).
     /// Tests that need the full grid go to All Documents first.
     private func showAllDocuments(_ app: XCUIApplication) {
-        let row = app.staticTexts["All Documents"]
-        if UIDevice.current.userInterfaceIdiom == .phone, row.waitForExistence(timeout: 15) { row.tap() }
+        let seeAll = app.buttons["home-see-all"]
+        if seeAll.waitForExistence(timeout: 15) { seeAll.tap() }
+    }
+
+    func testDashboardCanReturnToTheSameSidebarScope() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("wide sidebar") }
+        let app = launch([])
+        XCTAssertTrue(app.buttons["sidebar-home"].waitForExistence(timeout: 15))
+        for _ in 0..<2 {
+            app.staticTexts["Favorites"].firstMatch.tap()
+            XCTAssertTrue(app.navigationBars["Favorites"].waitForExistence(timeout: 5))
+            app.buttons["sidebar-home"].tap()
+            XCTAssertTrue(app.buttons["home-new-note"].waitForExistence(timeout: 5))
+        }
+        let search = app.searchFields.firstMatch
+        search.tap()
+        search.typeText("Crop")
+        XCTAssertEqual(search.value as? String, "Crop")
+        search.typeText("\n")
+        XCTAssertTrue(app.segmentedControls["library-layout"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Crop target, 1 page"].waitForExistence(timeout: 5))
+        app.terminate()
+    }
+
+    func testPremiumFolderActionCreatesARealFolder() throws {
+        let app = launch([], libraryPath: "/tmp/papernest-premium-folder-\(UUID().uuidString)")
+        XCTAssertTrue(app.buttons["home-new-folder"].waitForExistence(timeout: 15))
+        app.buttons["home-new-folder"].tap()
+        let name = app.alerts.textFields.firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.typeText("Design folder")
+        app.alerts.buttons["OK"].tap()
+        XCTAssertTrue(app.staticTexts["This Folder Is Empty"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Design folder"].exists)
+        app.terminate()
+    }
+
+    func testPremiumLandscapeDashboard() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad landscape") }
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = launch([])
+        XCTAssertTrue(app.buttons["home-new-note"].waitForExistence(timeout: 15))
+        XCUIDevice.shared.orientation = .landscapeLeft
+        for _ in 0..<20 {
+            if app.frame.width > app.frame.height { break }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        XCTAssertGreaterThan(app.frame.width, app.frame.height, "Verify the app actually rotated")
+        XCTAssertTrue(app.buttons["home-new-folder"].isHittable)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "premium-home-rotation-attempt"
+        shot.lifetime = .keepAlways
+        add(shot)
+        app.terminate()
+    }
+
+    func testPremiumHomeAtLargestTextSize() throws {
+        let app = launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        XCTAssertTrue(app.buttons["home-new-note"].waitForExistence(timeout: 15))
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertLessThan(app.staticTexts["PaperNest"].firstMatch.frame.height, 130,
+                              "The brand must not wrap into character fragments")
+            XCTAssertTrue(app.buttons["home-navigation-menu"].isHittable)
+        }
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "premium-home-largest-text"
+        shot.lifetime = .keepAlways
+        add(shot)
+        app.buttons["home-new-note"].tap()
+        XCTAssertTrue(app.textFields["notebook-name"].waitForExistence(timeout: 5))
+        app.terminate()
+    }
+
+    func testPremiumDashboardActionsAndLocalizedLayout() throws {
+        continueAfterFailure = false
+        for language in ["en", "fr", "es"] {
+            let app = launch([], language: language)
+            let note = app.buttons["home-new-note"]
+            XCTAssertTrue(note.waitForExistence(timeout: 15))
+            XCTAssertTrue(app.buttons["library-import"].isHittable)
+            XCTAssertTrue(app.buttons["home-new-folder"].isHittable)
+            XCTAssertFalse(app.buttons["home-vault"].exists)
+            XCTAssertFalse(app.buttons["home-vpn"].exists)
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "premium-home-\(language)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            note.tap()
+            XCTAssertTrue(app.textFields["notebook-name"].waitForExistence(timeout: 5))
+            app.textFields["notebook-name"].tap()
+            app.textFields["notebook-name"].typeText("Dashboard \(language)")
+            app.buttons["notebook-create"].tap()
+            XCTAssertTrue(app.scrollViews["notebook-tool-bar"].waitForExistence(timeout: 10))
+            app.terminate()
+            let reopened = launch([], language: language)
+            XCTAssertTrue(reopened.buttons["home-see-all"].waitForExistence(timeout: 15))
+            reopened.buttons["home-see-all"].tap()
+            XCTAssertTrue(reopened.segmentedControls["library-layout"].waitForExistence(timeout: 5))
+            let library = XCTAttachment(screenshot: reopened.screenshot())
+            library.name = "premium-library-\(language)"
+            library.lifetime = .keepAlways
+            add(library)
+            reopened.terminate()
+        }
     }
 
     /// "70% wide by 75% tall" → (70, 75)
@@ -841,11 +944,7 @@ final class AppUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
 
             func openAdd() {
-                if app.buttons["editor-add-pages"].exists {
-                    app.buttons["editor-add-pages"].tap()
-                } else {
-                    app.buttons["editor-more"].tap()
-                }
+                revealEditorTool(app, identifier: "editor-add-notebook-page")
                 app.buttons["editor-add-notebook-page"].tap()
                 XCTAssertTrue(app.buttons["add-page-create"].waitForExistence(timeout: 5))
             }
@@ -861,12 +960,12 @@ final class AppUITests: XCTestCase {
             add(shot)
             app.buttons["add-page-create"].tap()
             XCTAssertTrue(app.descendants(matching: .any)[two].firstMatch.waitForExistence(timeout: 10))
-            app.buttons["editor-more"].tap()
+            revealEditorTool(app, identifier: "notebook-undo")
             let undo = app.buttons["notebook-undo"]
             XCTAssertTrue(undo.isEnabled)
             undo.tap()
             XCTAssertTrue(app.descendants(matching: .any)[one].firstMatch.waitForExistence(timeout: 10))
-            app.buttons["editor-more"].tap()
+            revealEditorTool(app, identifier: "notebook-redo")
             let redo = app.buttons["notebook-redo"]
             XCTAssertTrue(redo.isEnabled)
             redo.tap()
@@ -894,7 +993,7 @@ final class AppUITests: XCTestCase {
             app.buttons["notebook-create"].tap()
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
             func openComments(_ app: XCUIApplication) {
-                app.buttons["editor-more"].tap()
+                revealEditorTool(app, identifier: "editor-comments")
                 app.buttons["editor-comments"].tap()
                 XCTAssertTrue(app.buttons["comment-add"].waitForExistence(timeout: 5))
             }
@@ -971,12 +1070,12 @@ final class AppUITests: XCTestCase {
             app.buttons["notebook-create"].tap()
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
             func openShapes() {
-                app.buttons["editor-more"].tap()
+                revealEditorTool(app, identifier: "editor-shapes")
                 app.buttons["editor-shapes"].tap()
                 XCTAssertTrue(app.buttons["shape-save"].waitForExistence(timeout: 5))
             }
             func checkMarkup(empty: Bool) {
-                app.buttons["editor-more"].tap()
+                revealEditorTool(app, identifier: "editor-manage-markup")
                 app.buttons["editor-manage-markup"].tap()
                 if empty {
                     XCTAssertTrue(app.staticTexts["markup-empty"].waitForExistence(timeout: 5))
@@ -1021,10 +1120,10 @@ final class AppUITests: XCTestCase {
             app.buttons["shape-save"].tap()
             XCTAssertTrue(app.buttons["shape-save"].waitForNonExistence(timeout: 10))
             checkMarkup(empty: false)
-            app.buttons["editor-more"].tap()
+            revealEditorTool(app, identifier: "notebook-undo")
             app.buttons["notebook-undo"].tap()
             checkMarkup(empty: true)
-            app.buttons["editor-more"].tap()
+            revealEditorTool(app, identifier: "notebook-redo")
             app.buttons["notebook-redo"].tap()
             checkMarkup(empty: false)
             app.terminate()
@@ -1039,23 +1138,23 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         let app = launch(["-PaperNestDebugOpenItem", "Markup target"], libraryPath: "/tmp/papernest-text-markup-library")
         XCTAssertTrue(app.navigationBars["Markup target"].waitForExistence(timeout: 15))
-        app.buttons["editor-more"].tap()
+        revealEditorTool(app, identifier: "editor-shapes")
         app.buttons["editor-shapes"].tap()
         XCTAssertTrue(app.buttons["shape-save"].waitForExistence(timeout: 5))
         app.buttons["shape-save"].tap()
         XCTAssertTrue(app.buttons["shape-save"].waitForNonExistence(timeout: 10))
-        app.buttons["editor-more"].tap()
+        revealEditorTool(app, identifier: "notebook-undo")
         let undo = app.buttons["notebook-undo"]
         XCTAssertTrue(undo.waitForExistence(timeout: 5), "Imported documents need accessible shape history too")
         XCTAssertTrue(undo.isEnabled)
         undo.tap()
-        app.buttons["editor-more"].tap()
+        revealEditorTool(app, identifier: "editor-manage-markup")
         app.buttons["editor-manage-markup"].tap()
         XCTAssertTrue(app.staticTexts["markup-empty"].waitForExistence(timeout: 5))
         app.buttons["markup-done"].tap()
-        app.buttons["editor-more"].tap()
+        revealEditorTool(app, identifier: "notebook-redo")
         app.buttons["notebook-redo"].tap()
-        app.buttons["editor-more"].tap()
+        revealEditorTool(app, identifier: "editor-manage-markup")
         app.buttons["editor-manage-markup"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "markup-row-")).firstMatch.waitForExistence(timeout: 5))
         app.terminate()
@@ -1077,12 +1176,12 @@ final class AppUITests: XCTestCase {
             app.buttons["notebook-create"].tap()
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
             func openStamps() {
-                app.buttons["editor-more"].tap()
+                revealEditorTool(app, identifier: "editor-stamps")
                 app.buttons["editor-stamps"].tap()
                 XCTAssertTrue(app.buttons["stamp-save"].waitForExistence(timeout: 5))
             }
             func checkMarkup(empty: Bool) {
-                app.buttons["editor-more"].tap()
+                revealEditorTool(app, identifier: "editor-manage-markup")
                 app.buttons["editor-manage-markup"].tap()
                 if empty {
                     XCTAssertTrue(app.staticTexts["markup-empty"].waitForExistence(timeout: 5))
@@ -1095,7 +1194,7 @@ final class AppUITests: XCTestCase {
                 XCTAssertTrue(app.buttons["markup-done"].waitForNonExistence(timeout: 5))
             }
             // The shared sheet must still open ordinary shapes in shape mode.
-            app.buttons["editor-more"].tap()
+            revealEditorTool(app, identifier: "editor-shapes")
             app.buttons["editor-shapes"].tap()
             XCTAssertTrue(app.buttons["shape-kind-rectangle"].waitForExistence(timeout: 5))
             XCTAssertEqual(app.buttons["shape-kind-rectangle"].value as? String, selected)
@@ -1135,10 +1234,10 @@ final class AppUITests: XCTestCase {
             app.buttons["stamp-save"].tap()
             XCTAssertTrue(app.buttons["stamp-save"].waitForNonExistence(timeout: 10))
             checkMarkup(empty: false)
-            app.buttons["editor-more"].tap()
+            revealEditorTool(app, identifier: "notebook-undo")
             app.buttons["notebook-undo"].tap()
             checkMarkup(empty: true)
-            app.buttons["editor-more"].tap()
+            revealEditorTool(app, identifier: "notebook-redo")
             app.buttons["notebook-redo"].tap()
             checkMarkup(empty: false)
             app.terminate()
@@ -1149,5 +1248,387 @@ final class AppUITests: XCTestCase {
         }
     }
 
+
+    // Verification backlog: exercise controls not covered by the preset flows.
+    func testLargeTextShapeSlidersAndSystemColorPicker() throws {
+        continueAfterFailure = false
+        let library = "/tmp/papernest-accessibility-ui-\(UUID().uuidString)"
+        let app = launch(["-PaperNestDebugShowTools", "YES",
+                          "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"],
+                         libraryPath: library)
+        XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 15))
+        app.buttons["tool-notebook"].tap()
+        let name = app.textFields["notebook-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("Accessibility notebook")
+        app.buttons["notebook-create"].tap()
+        XCTAssertTrue(app.scrollViews["notebook-tool-bar"].waitForExistence(timeout: 10))
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            let sidebar = app.collectionViews["Sidebar"]
+            XCTAssertGreaterThanOrEqual(sidebar.frame.width, 400, "Large text needs a readable navigation column")
+        }
+        revealEditorTool(app, identifier: "editor-shapes")
+        XCTAssertTrue(app.buttons["editor-shapes"].waitForExistence(timeout: 5))
+        app.buttons["editor-shapes"].tap()
+        XCTAssertTrue(app.buttons["shape-save"].waitForExistence(timeout: 5))
+        func reveal(_ element: XCUIElement) {
+            for _ in 0..<16 {
+                // Hittable can be true below an iPad sheet's visible bounds.
+                // Require the entire control inside the presented Form before tapping.
+                let form = app.collectionViews.matching(
+                    NSPredicate(format: "label != %@ AND label != %@", "Sidebar", "Pages")).firstMatch
+                XCTAssertTrue(form.exists, "Presented shape Form must exist")
+                let frame = form.frame.intersection(app.frame)
+                let navigation = app.navigationBars["Shape"].frame
+                let viewport = CGRect(x: max(frame.minX, navigation.minX),
+                                      y: max(frame.minY, navigation.maxY),
+                                      width: min(frame.maxX, navigation.maxX) - max(frame.minX, navigation.minX),
+                                      height: frame.maxY - max(frame.minY, navigation.maxY))
+                if element.exists && !element.frame.isEmpty && viewport.contains(element.frame) && element.isHittable {
+                    return
+                }
+                let start = app.coordinate(withNormalizedOffset: .zero).withOffset(
+                    CGVector(dx: viewport.minX + 8, dy: viewport.midY + min(100, viewport.height * 0.2)))
+                start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -200)),
+                            withVelocity: .slow, thenHoldForDuration: 0.3)
+            }
+            XCTFail("Control did not become fully visible: \(element.debugDescription)")
+        }
+        let position = app.buttons["Position"]
+        reveal(position)
+        position.tap()
+        let slider = app.sliders["shape-position-start-x"]
+        reveal(slider)
+        let before = slider.value as? String
+        slider.adjust(toNormalizedSliderPosition: 0.15)
+        XCTAssertNotEqual(slider.value as? String, before)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "large-text-shape-position"
+        shot.lifetime = .keepAlways
+        add(shot)
+        let widthHeading = app.staticTexts["Line width"]
+        reveal(widthHeading)
+        XCTAssertTrue(widthHeading.isHittable)
+        let thick = app.buttons["shape-width-4"]
+        reveal(thick)
+        thick.tap()
+        XCTAssertEqual(thick.value as? String, "Selected")
+        let styleShot = XCTAttachment(screenshot: app.screenshot())
+        styleShot.name = "readable-large-text-width"
+        styleShot.lifetime = .keepAlways
+        add(styleShot)
+        let custom = app.descendants(matching: .any)["markup-custom-color"].firstMatch
+        reveal(custom)
+        let previousColor = custom.value as? String
+        custom.tap()
+        let close = app.buttons.matching(NSPredicate(format: "label ==[c] %@", "close")).firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 5), app.debugDescription)
+        let color = app.otherElements["azure 77"]
+        XCTAssertTrue(color.waitForExistence(timeout: 5))
+        color.tap()
+        let picker = XCTAttachment(screenshot: app.screenshot())
+        picker.name = "large-text-system-color-picker"
+        picker.lifetime = .keepAlways
+        add(picker)
+        let popover = app.popovers.firstMatch
+        if popover.exists {
+            // iPad hides the floating picker's close control visually but
+            // leaves it in AX; dismiss its popover by tapping outside it.
+            app.coordinate(withNormalizedOffset: .zero).withOffset(
+                CGVector(dx: max(10, popover.frame.minX - 20), dy: popover.frame.midY)).tap()
+            XCTAssertTrue(popover.waitForNonExistence(timeout: 5))
+        } else {
+            close.tap()
+        }
+        XCTAssertNotEqual(custom.value as? String, previousColor)
+        XCTAssertTrue(app.buttons["shape-save"].isEnabled)
+        app.buttons["shape-save"].tap()
+        XCTAssertTrue(app.buttons["shape-save"].waitForNonExistence(timeout: 10))
+        revealEditorTool(app, identifier: "editor-manage-markup")
+        app.buttons["editor-manage-markup"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "markup-row-")).firstMatch.waitForExistence(timeout: 5))
+        app.terminate()
+    }
+
+    /// A second connection holds a real write transaction. The app must keep
+    /// the draft after SQLite refuses its save, then allow retry after release.
+    func testShapeSaveFailureKeepsDraftAndCanRetry() throws {
+        continueAfterFailure = false
+        let library = "/tmp/papernest-save-failure-ui-\(UUID().uuidString)"
+        let app = launch(["-PaperNestDebugShowTools", "YES"], libraryPath: library)
+        XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 15))
+        app.buttons["tool-notebook"].tap()
+        let name = app.textFields["notebook-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("Save failure")
+        app.buttons["notebook-create"].tap()
+        XCTAssertTrue(app.scrollViews["notebook-tool-bar"].waitForExistence(timeout: 10))
+        revealEditorTool(app, identifier: "editor-shapes")
+        app.buttons["editor-shapes"].tap()
+        XCTAssertTrue(app.buttons["shape-kind-ellipse"].waitForExistence(timeout: 5))
+        app.buttons["shape-kind-ellipse"].tap()
+        var database: OpaquePointer?
+        XCTAssertEqual(sqlite3_open_v2(library + "/Library.sqlite", &database, SQLITE_OPEN_READWRITE, nil), SQLITE_OK)
+        defer { sqlite3_exec(database, "ROLLBACK", nil, nil, nil); sqlite3_close(database) }
+        XCTAssertEqual(sqlite3_exec(database, "BEGIN IMMEDIATE", nil, nil, nil), SQLITE_OK)
+        app.buttons["shape-save"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.alerts.staticTexts["Couldn’t save this shape. If the page changed, close this sheet and try again."].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "shape-save-failure"
+        shot.lifetime = .keepAlways
+        add(shot)
+        app.alerts.buttons["OK"].tap()
+        XCTAssertEqual(app.buttons["shape-kind-ellipse"].value as? String, "Selected")
+        XCTAssertEqual(sqlite3_exec(database, "ROLLBACK", nil, nil, nil), SQLITE_OK)
+        app.buttons["shape-save"].tap()
+        XCTAssertTrue(app.buttons["shape-save"].waitForNonExistence(timeout: 10))
+        revealEditorTool(app, identifier: "editor-manage-markup")
+        app.buttons["editor-manage-markup"].tap()
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "markup-row-"))
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(rows.count, 1)
+        app.terminate()
+    }
+
+    func testAnnotationSheetsAccessibilityAudit() throws {
+        continueAfterFailure = true
+        let app = launch(["-PaperNestDebugOpenItem", "Markup target"],
+                         libraryPath: "/tmp/papernest-text-markup-library")
+        XCTAssertTrue(app.buttons["editor-more"].waitForExistence(timeout: 15))
+        for (entry, close) in [("editor-shapes", "shape-cancel"),
+                               ("editor-stamps", "stamp-cancel"),
+                               ("editor-comments", "comments-done"),
+                               ("editor-manage-markup", "markup-done")] {
+            app.buttons["editor-more"].tap()
+            app.buttons[entry].tap()
+            XCTAssertTrue(app.buttons[close].waitForExistence(timeout: 10))
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "accessibility-audit-\(entry)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            // Automated audit is complementary to, not a substitute for,
+            // navigating and listening with VoiceOver on real hardware.
+            try app.performAccessibilityAudit(for: [.contrast, .textClipped, .dynamicType])
+            app.buttons[close].tap()
+        }
+        app.terminate()
+    }
+
+    func testAnnotationStyleLayoutInAllLanguages() throws {
+        continueAfterFailure = false
+        for language in ["en", "fr", "es"] {
+            let app = launch(["-PaperNestDebugOpenItem", "Markup target"],
+                             libraryPath: "/tmp/papernest-text-markup-library", language: language)
+            XCTAssertTrue(app.buttons["editor-more"].waitForExistence(timeout: 15))
+            for (entry, prefix) in [("editor-shapes", "shape"), ("editor-stamps", "stamp")] {
+                app.buttons["editor-more"].tap()
+                app.buttons[entry].tap()
+                XCTAssertTrue(app.buttons["\(prefix)-save"].waitForExistence(timeout: 5))
+                let first = app.buttons[prefix == "shape" ? "shape-kind-rectangle" : "stamp-kind-checkmark"]
+                let second = app.buttons[prefix == "shape" ? "shape-kind-ellipse" : "stamp-kind-cross"]
+                XCTAssertTrue(first.isHittable)
+                XCTAssertTrue(second.isHittable)
+                XCTAssertEqual(first.frame.midY, second.frame.midY, accuracy: 2, "Normal text uses a compact chooser")
+                second.tap()
+                let shot = XCTAttachment(screenshot: app.screenshot())
+                shot.name = "readable-\(prefix)-\(language)"
+                shot.lifetime = .keepAlways
+                add(shot)
+                app.buttons["\(prefix)-cancel"].tap()
+            }
+            revealEditorTool(app, identifier: "editor-comments")
+            app.buttons["editor-comments"].tap()
+            XCTAssertTrue(app.buttons["comment-add"].waitForExistence(timeout: 5))
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "readable-comments-\(language)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.buttons["comment-add"].tap()
+            XCTAssertTrue(app.textViews["comment-text"].waitForExistence(timeout: 5))
+            app.buttons["comment-cancel"].tap()
+            app.buttons["comments-done"].tap()
+            app.terminate()
+        }
+    }
+
+    /// Documents keep their More menu; Notes expose the same actions in a row.
+    private func revealEditorTool(_ app: XCUIApplication, identifier: String) {
+        let bar = app.scrollViews["notebook-tool-bar"]
+        if bar.exists {
+            let tool = app.buttons[identifier]
+            let sidebar = app.collectionViews.containing(.button, identifier: "sidebar-home").firstMatch
+            let minX = sidebar.exists ? max(bar.frame.minX, sidebar.frame.maxX) : bar.frame.minX
+            let viewport = CGRect(x: minX, y: bar.frame.minY,
+                                  width: bar.frame.maxX - minX, height: bar.frame.height)
+            for _ in 0..<16 {
+                if tool.exists && !tool.frame.isEmpty && viewport.contains(tool.frame) && tool.isHittable { return }
+                // The safe-area ScrollView's AX frame includes the navigation
+                // bar. Drag through the tool row, not the title above it.
+                let y = min(bar.frame.maxY - 12, max(bar.frame.minY + 12, tool.frame.midY))
+                let left = app.coordinate(withNormalizedOffset: .zero).withOffset(
+                    CGVector(dx: viewport.minX + viewport.width * 0.18, dy: y))
+                let right = app.coordinate(withNormalizedOffset: .zero).withOffset(
+                    CGVector(dx: viewport.minX + viewport.width * 0.82, dy: y))
+                // A full-width drag can overshoot a large label repeatedly.
+                // Move only its clipped distance once it approaches the viewport.
+                let maximumDrag = viewport.width * 0.64
+                if tool.exists && tool.frame.minX < viewport.minX {
+                    let distance = min(maximumDrag, max(24, viewport.minX - tool.frame.minX + 12))
+                    left.press(forDuration: 0.05, thenDragTo: left.withOffset(CGVector(dx: distance, dy: 0)),
+                                 withVelocity: .slow, thenHoldForDuration: 0.3)
+                } else {
+                    let distance = tool.exists
+                        ? min(maximumDrag, max(24, tool.frame.maxX - viewport.maxX + 12))
+                        : maximumDrag
+                    right.press(forDuration: 0.05, thenDragTo: right.withOffset(CGVector(dx: -distance, dy: 0)),
+                                  withVelocity: .slow, thenHoldForDuration: 0.3)
+                }
+            }
+            XCTFail("Could not reveal editor tool: \(identifier)")
+        } else {
+            app.buttons["editor-more"].tap()
+        }
+    }
+
+    func testNotebookToolsAreSideBySide() throws {
+        continueAfterFailure = false
+        for language in ["en", "fr", "es"] {
+            let app = launch([], libraryPath: "/tmp/papernest-note-bar-\(UUID().uuidString)", language: language)
+            XCTAssertTrue(app.buttons["home-new-note"].waitForExistence(timeout: 15))
+            app.buttons["home-new-note"].tap()
+            let name = app.textFields["notebook-name"]
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            name.tap()
+            name.typeText("Note tools")
+            app.buttons["notebook-create"].tap()
+            let bar = app.scrollViews["notebook-tool-bar"]
+            XCTAssertTrue(bar.waitForExistence(timeout: 10))
+            XCTAssertFalse(app.buttons["editor-more"].exists)
+            let shape = app.buttons["editor-shapes"]
+            let stamp = app.buttons["editor-stamps"]
+            XCTAssertTrue(shape.isHittable)
+            XCTAssertTrue(stamp.isHittable)
+            XCTAssertEqual(shape.frame.midY, stamp.frame.midY, accuracy: 2)
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "notebook-tool-bar-\(language)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            shape.tap()
+            XCTAssertTrue(app.buttons["shape-save"].waitForExistence(timeout: 5))
+            app.buttons["shape-save"].tap()
+            XCTAssertTrue(app.buttons["shape-save"].waitForNonExistence(timeout: 10))
+            revealEditorTool(app, identifier: "notebook-undo")
+            XCTAssertTrue(app.buttons["notebook-undo"].isEnabled)
+            app.buttons["notebook-undo"].tap()
+            revealEditorTool(app, identifier: "notebook-redo")
+            XCTAssertTrue(app.buttons["notebook-redo"].isEnabled)
+            app.buttons["notebook-redo"].tap()
+            revealEditorTool(app, identifier: "editor-add-notebook-page")
+            app.buttons["editor-add-notebook-page"].tap()
+            XCTAssertTrue(app.buttons["add-page-create"].waitForExistence(timeout: 5))
+            app.buttons["add-page-cancel"].tap()
+            revealEditorTool(app, identifier: "editor-comments")
+            app.buttons["editor-comments"].tap()
+            XCTAssertTrue(app.buttons["comment-add"].waitForExistence(timeout: 5))
+            app.buttons["comments-done"].tap()
+            revealEditorTool(app, identifier: "editor-delete-page")
+            app.buttons["editor-delete-page"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)["document-page-image"].firstMatch.waitForNonExistence(timeout: 5))
+            XCTAssertTrue(bar.exists, "Empty notes must keep Add Page and Undo available")
+            revealEditorTool(app, identifier: "notebook-undo")
+            XCTAssertTrue(app.buttons["notebook-undo"].isEnabled)
+            app.buttons["notebook-undo"].tap()
+            revealEditorTool(app, identifier: "editor-add-notebook-page")
+            app.buttons["editor-add-notebook-page"].tap()
+            XCTAssertTrue(app.buttons["add-page-create"].waitForExistence(timeout: 5))
+            app.buttons["add-page-create"].tap()
+            XCTAssertTrue(app.buttons["add-page-create"].waitForNonExistence(timeout: 10))
+            app.terminate()
+        }
+    }
+
+    func testFirstLaunchWelcomeAndRelaunchInAllLanguages() throws {
+        continueAfterFailure = false
+        for language in ["en", "fr", "es"] {
+            let library = "/tmp/papernest-welcome-\(UUID().uuidString)"
+            let args = ["-PaperNestDebugWelcomeKey", "WelcomeTest-\(UUID().uuidString)"]
+            var app = launch(args, libraryPath: library, language: language, skipWelcome: false)
+            let start = app.buttons["welcome-continue"]
+            XCTAssertTrue(start.waitForExistence(timeout: 15))
+            XCTAssertTrue(start.isHittable)
+            XCTAssertTrue(app.staticTexts["welcome-title"].exists)
+            XCTAssertFalse(app.buttons["home-new-note"].exists)
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "welcome-\(language)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            start.tap()
+            XCTAssertTrue(app.buttons["home-new-note"].waitForExistence(timeout: 10))
+            app.terminate()
+            app = launch(args, libraryPath: library, language: language, skipWelcome: false)
+            XCTAssertTrue(app.buttons["home-new-note"].waitForExistence(timeout: 15))
+            XCTAssertFalse(app.buttons["welcome-continue"].exists)
+            app.terminate()
+        }
+    }
+
+    func testWelcomeLargestTextKeepsContinueReachable() throws {
+        continueAfterFailure = false
+        let app = launch(["-PaperNestDebugWelcomeKey", "WelcomeLargeTest-\(UUID().uuidString)",
+                          "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"],
+                         libraryPath: "/tmp/papernest-welcome-large-\(UUID().uuidString)",
+                         language: "fr", skipWelcome: false)
+        let start = app.buttons["welcome-continue"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        XCTAssertTrue(start.isHittable)
+        let scroll = app.scrollViews["welcome-content"]
+        scroll.swipeUp()
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "welcome-largest-text-fr"
+        shot.lifetime = .keepAlways
+        add(shot)
+        start.tap()
+        XCTAssertTrue(app.buttons["home-new-note"].waitForExistence(timeout: 10))
+        app.terminate()
+    }
+
+    func testVisibleAnnotationStyleContrast() throws {
+        continueAfterFailure = true
+        let app = launch(["-PaperNestDebugOpenItem", "Markup target"],
+                         libraryPath: "/tmp/papernest-text-markup-library")
+        XCTAssertTrue(app.buttons["editor-more"].waitForExistence(timeout: 15))
+        for (entry, prefix) in [("editor-shapes", "shape"), ("editor-stamps", "stamp")] {
+            app.buttons["editor-more"].tap()
+            app.buttons[entry].tap()
+            XCTAssertTrue(app.buttons["\(prefix)-cancel"].waitForExistence(timeout: 5))
+            let form = app.collectionViews.matching(
+                NSPredicate(format: "label != %@ AND label != %@", "Sidebar", "Pages")).firstMatch
+            XCTAssertTrue(form.exists)
+            let style = app.staticTexts["Style"]
+            for _ in 0..<5 {
+                let viewport = form.frame.intersection(app.frame).insetBy(dx: 8, dy: 60)
+                if style.exists && viewport.contains(style.frame) && style.isHittable { break }
+                let start = app.coordinate(withNormalizedOffset: .zero).withOffset(
+                    CGVector(dx: form.frame.minX + 8, dy: form.frame.midY + 100))
+                start.press(forDuration: 0.1,
+                            thenDragTo: start.withOffset(CGVector(dx: 0, dy: -150)),
+                            withVelocity: .slow, thenHoldForDuration: 0.3)
+            }
+            XCTAssertTrue(style.exists)
+            XCTAssertTrue(form.frame.intersection(app.frame).insetBy(dx: 8, dy: 60).contains(style.frame))
+            XCTAssertTrue(style.isHittable)
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "fully-visible-\(prefix)-style"
+            shot.lifetime = .keepAlways
+            add(shot)
+            // Separate diagnostic: the initial-viewport audit remains unchanged.
+            try app.performAccessibilityAudit(for: [.contrast, .textClipped])
+            app.buttons["\(prefix)-cancel"].tap()
+        }
+        app.terminate()
+    }
 
 }

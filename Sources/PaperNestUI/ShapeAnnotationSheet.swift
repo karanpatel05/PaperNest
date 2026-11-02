@@ -7,6 +7,7 @@ struct ShapeAnnotationSheet: View {
     let undoManager: UndoManager?
     let stampsOnly: Bool
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var kind = ShapeAnnotation.rectangle
     @State private var start = CGPoint(x: 0.25, y: 0.25)
     @State private var end = CGPoint(x: 0.75, y: 0.75)
@@ -37,17 +38,20 @@ struct ShapeAnnotationSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    ForEach(stampsOnly ? ShapeAnnotation.stamps : ShapeAnnotation.shapes, id: \.self) { shape in
-                        Button { kind = shape } label: {
-                            HStack {
-                                Label(shape.title, systemImage: shape.symbol)
-                                Spacer()
-                                if kind == shape { Image(systemName: "checkmark") }
-                            }.contentShape(Rectangle())
+                    if dynamicTypeSize.isAccessibilitySize {
+                        ForEach(stampsOnly ? ShapeAnnotation.stamps : ShapeAnnotation.shapes, id: \.self) { shape in
+                            kindButton(shape)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("\(prefix)-kind-\(shape.rawValue)")
-                        .accessibilityValue(kind == shape ? L10n.selectionOn : L10n.selectionOff)
+                    } else {
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                            ForEach(stampsOnly ? ShapeAnnotation.stamps : ShapeAnnotation.shapes, id: \.self) { shape in
+                                kindButton(shape)
+                                    .padding(.horizontal, 10)
+                                    .background(kind == shape ? Theme.accent.opacity(0.12) : Color.primary.opacity(0.04),
+                                                in: RoundedRectangle(cornerRadius: 10))
+                            }
+                        }
+                        .padding(.vertical, 4)
                     }
                 }
                 Section {
@@ -58,22 +62,49 @@ struct ShapeAnnotationSheet: View {
                         positionSlider(L10n.shapeEndX, value: $end.x, id: "end-x")
                         positionSlider(L10n.shapeEndY, value: $end.y, id: "end-y")
                     }
-                } footer: { Text(stroke == nil ? (stampsOnly ? L10n.stampInvalid : L10n.shapeInvalid) : (stampsOnly ? L10n.stampDrag : L10n.shapeDrag)) }
+                } footer: { Text(stroke == nil ? (stampsOnly ? L10n.stampInvalid : L10n.shapeInvalid) : (stampsOnly ? L10n.stampDrag : L10n.shapeDrag))
+                    .font(.callout).foregroundStyle(Color.primary)
+                    .fixedSize(horizontal: false, vertical: true) }
                 Section {
-                    Picker(L10n.shapeWidth, selection: $width) {
-                        Text(L10n.shapeThin).tag(1.0)
-                        Text(L10n.shapeMedium).tag(2.0)
-                        Text(L10n.shapeThick).tag(4.0)
-                    }.pickerStyle(.segmented)
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text(L10n.shapeWidth).font(.headline)
+                            .accessibilityAddTraits(.isHeader)
+                        ForEach([1.0, 2.0, 4.0], id: \.self) { value in
+                            Button { width = value } label: {
+                                HStack {
+                                    Text(widthTitle(value)).fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 12)
+                                    if width == value {
+                                        Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityValue(width == value ? L10n.selectionOn : L10n.selectionOff)
+                            .accessibilityIdentifier("shape-width-\(Int(value))")
+                        }
+                    } else {
+                        Picker(L10n.shapeWidth, selection: $width) {
+                            Text(L10n.shapeThin).tag(1.0)
+                            Text(L10n.shapeMedium).tag(2.0)
+                            Text(L10n.shapeThick).tag(4.0)
+                        }.pickerStyle(.segmented)
+                    }
                     MarkupColorPicker(color: $color)
-                } header: { Text(L10n.shapeStyle) }
-                  footer: { Text(stampsOnly ? L10n.stampHelp : L10n.shapeHelp) }
+                } header: { Text(L10n.shapeStyle).foregroundStyle(Color.primary) }
+                  footer: { Text(stampsOnly ? L10n.stampHelp : L10n.shapeHelp)
+                      .font(.callout).foregroundStyle(Color.primary)
+                      .fixedSize(horizontal: false, vertical: true) }
             }
             .formStyle(.grouped)
             .disabled(saving)
             .navigationTitle(stampsOnly ? L10n.stampTitle : L10n.shapeTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(uiColor: .secondarySystemBackground), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -94,6 +125,30 @@ struct ShapeAnnotationSheet: View {
         #if os(macOS)
         .frame(minWidth: 500, minHeight: 650)
         #endif
+    }
+
+    private func kindButton(_ shape: ShapeAnnotation) -> some View {
+        Button { kind = shape } label: {
+            HStack(spacing: 8) {
+                Image(systemName: shape.symbol).foregroundStyle(Theme.accent)
+                Text(shape.title).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                if kind == shape { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("\(prefix)-kind-\(shape.rawValue)")
+        .accessibilityValue(kind == shape ? L10n.selectionOn : L10n.selectionOff)
+    }
+
+    private func widthTitle(_ value: Double) -> String {
+        switch value {
+        case 1: L10n.shapeThin
+        case 4: L10n.shapeThick
+        default: L10n.shapeMedium
+        }
     }
 
     private func positionSlider(_ title: String, value: Binding<CGFloat>, id: String) -> some View {

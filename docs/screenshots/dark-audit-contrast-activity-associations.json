@@ -1,0 +1,94 @@
+[
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "3A7508A9-B015-4A87-8A18-64C4CE7EDD92"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_45351150-DE92-42C5-B553-1FC8577AC4F4.png",
+        "payloadId": "0~g-bw2i8mpZp2BPVlaLeyc-H9w2aBrc1PtiF3yGy4WW3vK-K33ThCfgvccsGLeO8bem9ye61Xa5JPSaYhV_NILA==",
+        "timestamp": 1793252139.66,
+        "uuid": "B1533145-A04A-4464-94DC-66FC020504F7"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "Element Screenshot_1_D535C5D7-B280-4416-AFB9-5D7D7C1E8B8E.png",
+        "payloadId": "0~osKMizxTM2d-8FOQwECt25XR6NLE0tRL8Gxs1cV1jD_V5G9yGBwr6y65JrVae2aLqq8hdipPVxGv4JGOlO89Hg==",
+        "timestamp": 1793252139.66,
+        "uuid": "FB9CECE6-9D1A-4F30-9184-35F91D8E92E3"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793252139.66,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793252139.66,
+        "title": "Element Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793252139.66,
+    "title": "Contrast nearly passed"
+  },
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "272304A7-9AFF-4D37-806A-ACAC8A97062D"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_3772DA68-7872-4395-A092-6E20FA9F34A3.png",
+        "payloadId": "0~k_7aCgDVKXrOoKuOxouAXFbb2S3AGLdhlYKZbM3jAdyZsnZRSwAZ72UAwUakUiMEPu61rxMwqzNUTHylPfsgsg==",
+        "timestamp": 1793252150.318,
+        "uuid": "F218F320-0524-4D3A-9BE4-44E6927E7654"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "Element Screenshot_1_2145A4A3-723F-4702-B5D5-6D0D351E1D18.png",
+        "payloadId": "0~osKMizxTM2d-8FOQwECt25XR6NLE0tRL8Gxs1cV1jD_V5G9yGBwr6y65JrVae2aLqq8hdipPVxGv4JGOlO89Hg==",
+        "timestamp": 1793252150.318,
+        "uuid": "0CA46C85-EAA9-4F8B-AB0A-659DCD5E0AF0"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793252150.318,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793252150.318,
+        "title": "Element Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793252150.318,
+    "title": "Contrast nearly passed"
+  }
+]

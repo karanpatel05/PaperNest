@@ -26,6 +26,23 @@ enum ResourceBundle {
 /// `LocalizationTests` checks that each key used here exists in English,
 /// French and Spanish with matching format arguments.
 enum L10n {
+    static var welcomeImportDetail: String { tr("welcome.import.detail") }
+
+    static var welcomeMacSubtitle: String { tr("welcome.mac.subtitle") }
+
+    // First-launch welcome
+    static var welcomeBrand: String { tr("welcome.brand") }
+    static var welcomeTitle: String { tr("welcome.title") }
+    static var welcomeSubtitle: String { tr("welcome.subtitle") }
+    static var welcomeCaptureTitle: String { tr("welcome.capture.title") }
+    static var welcomeCaptureDetail: String { tr("welcome.capture.detail") }
+    static var welcomeNoteTitle: String { tr("welcome.note.title") }
+    static var welcomeNoteDetail: String { tr("welcome.note.detail") }
+    static var welcomeOrganizeTitle: String { tr("welcome.organize.title") }
+    static var welcomeOrganizeDetail: String { tr("welcome.organize.detail") }
+    static var welcomeContinue: String { tr("welcome.continue") }
+    static var welcomeNoAccount: String { tr("welcome.noAccount") }
+
     static func tr(_ key: String) -> String {
         ResourceBundle.ui.localizedString(forKey: key, value: nil, table: nil)
     }
@@ -430,4 +447,28 @@ extension L10n {
     static var commentSaveAsNew: String { tr("comments.saveAsNew") }
     static var commentHistoryChanged: String { tr("comments.historyChanged") }
     static var commentPageUnavailable: String { tr("comments.pageUnavailable") }
+}
+
+// Premium reference dashboard.
+extension L10n {
+    static var premiumNotes: String { tr("premium.notes") }
+    static var premiumMorning: String { tr("premium.morning") }
+    static var premiumAfternoon: String { tr("premium.afternoon") }
+    static var premiumEvening: String { tr("premium.evening") }
+    static var premiumWelcome: String { tr("premium.welcome") }
+    static var premiumNew: String { tr("premium.new") }
+    static var premiumNotesHint: String { tr("premium.notesHint") }
+    static var premiumScanHint: String { tr("premium.scanHint") }
+    static var premiumImportHint: String { tr("premium.importHint") }
+    static var premiumFolderHint: String { tr("premium.folderHint") }
+    static var premiumSearch: String { tr("premium.search") }
+    static var premiumEmpty: String { tr("premium.empty") }
+    static var premiumEmptyDetail: String { tr("premium.emptyDetail") }
+}
+
+extension L10n {
+    static var premiumNote: String { tr("premium.note") }
+    static var premiumScan: String { tr("premium.scan") }
+    static var premiumImport: String { tr("premium.import") }
+    static var premiumFolder: String { tr("premium.folder") }
 }

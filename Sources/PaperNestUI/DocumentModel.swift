@@ -51,7 +51,7 @@ final class DocumentModel {
                                              engineVersion: TextRecognizer.engineVersion, status: .failed,
                                              languages: languages, lines: [])
                 if let image = try await renderer.renderSourceForRecognition(page, pixelsPerPoint: 2) {
-                    result.lines = try recognizer.recognize(image)
+                    result.lines = try await recognizer.recognizeOnADedicatedThread(image)
                     result.status = .completed
                 }
                 try await store.saveRecognition(result)

@@ -1,0 +1,392 @@
+[
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "C76CE2A9-C8FB-4A0B-89BA-74C8459B701D"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_4F6DB80C-AF3E-490B-8790-4224650613D9.png",
+        "payloadId": "0~qR0xx0JHyt0bXwxW9Rl8JUV6lW7u2O1UmWwITYWRALmGZ3me2QhFMvmN0sQ4TriMrlj6P36d_jp65A4_j9nkEw==",
+        "timestamp": 1793274404.137,
+        "uuid": "E60802AB-75C6-4CFD-A35F-86C31962283A"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274404.137,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793274404.137,
+    "title": "Contrast failed"
+  },
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "6EB93FD3-AAEE-4CE0-A830-813549226485"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_6574E405-313A-4B73-858B-3F6C9160C752.png",
+        "payloadId": "0~qR0xx0JHyt0bXwxW9Rl8JUV6lW7u2O1UmWwITYWRALmGZ3me2QhFMvmN0sQ4TriMrlj6P36d_jp65A4_j9nkEw==",
+        "timestamp": 1793274404.139,
+        "uuid": "8C55C4E3-3E91-4717-8990-3C47F862E8E3"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "Element Screenshot_1_92A26BE1-F1FF-48B5-93B0-D940DB02A75B.png",
+        "payloadId": "0~GRGxjlq2RnQJKzb9edKGaqdp8RNqTV7pI9r-6a7ieupubpgXrFiVKsC__yU4tfdI9KzIveZNLKRajrFP1RhsMQ==",
+        "timestamp": 1793274404.139,
+        "uuid": "113A8E0D-5B3C-4884-8677-E7C5E1D580B9"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274404.139,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274404.139,
+        "title": "Element Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793274404.139,
+    "title": "Contrast failed"
+  },
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "B5B4D1B3-7A3D-46C0-933A-0B306F6B711A"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_E3D7BF00-7B39-4B12-BCD8-971D34F81C2D.png",
+        "payloadId": "0~qR0xx0JHyt0bXwxW9Rl8JUV6lW7u2O1UmWwITYWRALmGZ3me2QhFMvmN0sQ4TriMrlj6P36d_jp65A4_j9nkEw==",
+        "timestamp": 1793274404.413,
+        "uuid": "9F637B1B-1E63-484F-A359-55FA811D2ED3"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "Element Screenshot_1_13F0B9CA-A06E-418F-9722-408268EE9272.png",
+        "payloadId": "0~AUbDc4EcSPLarTXOVbbTbzgaZVUpifgObd-bBiOau5fg-9AHIEEtOG5QUKVEvuE_VwxU5qNyUQLCetkGw1mysw==",
+        "timestamp": 1793274404.413,
+        "uuid": "9F84A6D2-10D1-46DE-B2D6-A5A8D620C1CB"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274404.413,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274404.413,
+        "title": "Element Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793274404.413,
+    "title": "Contrast failed"
+  },
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "FD2FDD6E-4F0E-489F-877F-51FABFF66B9F"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_2E481636-D357-4141-AB69-39ADEE2630EA.png",
+        "payloadId": "0~qR0xx0JHyt0bXwxW9Rl8JUV6lW7u2O1UmWwITYWRALmGZ3me2QhFMvmN0sQ4TriMrlj6P36d_jp65A4_j9nkEw==",
+        "timestamp": 1793274404.688,
+        "uuid": "B26D5150-9CC5-471A-A938-681314537CE0"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "Element Screenshot_1_B0F71188-62D4-4218-8073-BAD218A8C58B.png",
+        "payloadId": "0~wI0H8wDYyNOQFY6rAFQnQkXI8__NG_TmZA2QpsrE1-DQnMUPyrTfm_eSAsaUK7rhSfO2kkRA-Hvgw8PRoxyakQ==",
+        "timestamp": 1793274404.688,
+        "uuid": "CEF8D3FF-9B41-4D02-BBA3-F1BDCC0D045F"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274404.688,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274404.688,
+        "title": "Element Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793274404.688,
+    "title": "Contrast failed"
+  },
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "12E2A544-2FCE-44B8-B1C3-70B95C8E8C00"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_EDFC4460-B369-4E92-9BFE-5C08A33355BE.png",
+        "payloadId": "0~qR0xx0JHyt0bXwxW9Rl8JUV6lW7u2O1UmWwITYWRALmGZ3me2QhFMvmN0sQ4TriMrlj6P36d_jp65A4_j9nkEw==",
+        "timestamp": 1793274404.96,
+        "uuid": "681A6728-F81C-440B-BBDA-8EE9BFB1F9EE"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "Element Screenshot_1_85F0DA21-B0E9-413E-B850-E50401C558EC.png",
+        "payloadId": "0~p14fBpFXOl1O2_99dXRoszu7r5bs0YfDt00Qs74yf8mRQf40qTVRMXpaoOee8A0l9sSzk-x4mCXqzO2k1sDi4g==",
+        "timestamp": 1793274404.96,
+        "uuid": "F9A52B13-8D55-49A2-94D4-4D17F842BFE8"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274404.96,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274404.96,
+        "title": "Element Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793274404.96,
+    "title": "Contrast failed"
+  },
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "CFF84F6A-84CB-446F-9220-0B6E36597794"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_5F8DF8CB-FC00-4765-9954-FF3241A4FD75.png",
+        "payloadId": "0~qUgVzDxCjM4XCZWMQ23FhYlcFQvGz6X33lfOVsChpRdefyQskkuxTLtI3XXwooiTq-Qkr54JmttjcV0sfrtvqw==",
+        "timestamp": 1793274416.892,
+        "uuid": "1E3FB6A5-4574-45CA-AD64-962D0C68236A"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274416.892,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793274416.892,
+    "title": "Contrast failed"
+  },
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "2388BCDF-2289-4921-9B02-B78894B6C156"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_0F9BEA61-757F-4006-8353-DE36EF860A32.png",
+        "payloadId": "0~qUgVzDxCjM4XCZWMQ23FhYlcFQvGz6X33lfOVsChpRdefyQskkuxTLtI3XXwooiTq-Qkr54JmttjcV0sfrtvqw==",
+        "timestamp": 1793274416.893,
+        "uuid": "F524E16F-CF92-4FA9-B1C0-E831670FCB04"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "Element Screenshot_1_C7B038B9-8113-46C5-B6AC-39D031495CBE.png",
+        "payloadId": "0~ByYp23RPF7UigHBrVZbpah4-jKx8-GNc78_8E09h2cJrK9Utrqv2HueTUN6-2ZqxDk-W-pCCTA_SdniS8mtaow==",
+        "timestamp": 1793274416.893,
+        "uuid": "1FFCB727-2B9A-4450-89AB-3A837693BBC9"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274416.893,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274416.893,
+        "title": "Element Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793274416.893,
+    "title": "Contrast failed"
+  },
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "7B464366-569B-41A0-A525-B28805A9E9F3"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_C26679E7-9B2C-471D-A3D2-4FE8763E5A4D.png",
+        "payloadId": "0~qUgVzDxCjM4XCZWMQ23FhYlcFQvGz6X33lfOVsChpRdefyQskkuxTLtI3XXwooiTq-Qkr54JmttjcV0sfrtvqw==",
+        "timestamp": 1793274417.167,
+        "uuid": "5DFC728E-0E1E-414B-BC56-85E4CA789313"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "Element Screenshot_1_0F1F4D46-1A0C-4212-B45E-93E4452A54E8.png",
+        "payloadId": "0~ErGpkVQeg2-5-6Tfa22QYOEtCt6HCtA60jfqFdrwR6RsZzrHYks8QS631QppeNs5h3oRCtnxZ0HS07lNTMnLig==",
+        "timestamp": 1793274417.167,
+        "uuid": "D12E6FBF-306B-477B-AB0C-62397CC22F88"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274417.167,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274417.167,
+        "title": "Element Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793274417.167,
+    "title": "Contrast failed"
+  },
+  {
+    "attachments": [
+      {
+        "lifetime": "",
+        "name": "Complete Issue Description.txt",
+        "uuid": "9F09F2CE-1806-41D6-8472-49EB83D39F4C"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "App Screenshot_0_E92B4B44-4DE1-454F-873E-6FA0AC0F3BD1.png",
+        "payloadId": "0~qUgVzDxCjM4XCZWMQ23FhYlcFQvGz6X33lfOVsChpRdefyQskkuxTLtI3XXwooiTq-Qkr54JmttjcV0sfrtvqw==",
+        "timestamp": 1793274417.438,
+        "uuid": "CA1E03F1-E10C-4243-AA5B-326F26C0602D"
+      },
+      {
+        "lifetime": "keepAlways",
+        "name": "Element Screenshot_1_9865D3BC-C009-4357-B57E-F70D0C192442.png",
+        "payloadId": "0~hFK-ljCbmoPtHS64KfCGTWH_sqWbmcuy9LPuJnRrbBSJrvUYUIQ1p67bKW2htovzJ87tUmH-49YcYRpYzk5t_w==",
+        "timestamp": 1793274417.438,
+        "uuid": "7C6EB956-C111-4F11-9F75-7CFCB489D01F"
+      }
+    ],
+    "childActivities": [
+      {
+        "isAssociatedWithFailure": false,
+        "title": "Complete Issue Description"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274417.438,
+        "title": "App Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "startTime": 1793274417.438,
+        "title": "Element Screenshot"
+      },
+      {
+        "isAssociatedWithFailure": false,
+        "title": ""
+      }
+    ],
+    "isAssociatedWithFailure": true,
+    "startTime": 1793274417.438,
+    "title": "Contrast failed"
+  }
+]

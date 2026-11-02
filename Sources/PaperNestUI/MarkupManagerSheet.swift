@@ -33,7 +33,7 @@ struct MarkupManagerSheet: View {
                     if isLoading {
                         ProgressView()
                     } else if objects.isEmpty {
-                        Text(L10n.markupEmpty).foregroundStyle(.secondary).accessibilityIdentifier("markup-empty")
+                        Text(L10n.markupEmpty).foregroundStyle(Color.primary).accessibilityIdentifier("markup-empty")
                     } else {
                         ForEach(Array(objects.enumerated()), id: \.element.id) { index, object in
                             if case .ink(let stroke) = object.payload {
@@ -54,9 +54,9 @@ struct MarkupManagerSheet: View {
                         }
                     }
                 } header: {
-                    Text(L10n.markupSaved)
+                    Text(L10n.markupSaved).foregroundStyle(Color.primary)
                 } footer: {
-                    Text(L10n.markupHelp)
+                    Text(L10n.markupHelp).foregroundStyle(Color.primary)
                 }
                 if !objects.isEmpty {
                     Section(L10n.markupColor) {

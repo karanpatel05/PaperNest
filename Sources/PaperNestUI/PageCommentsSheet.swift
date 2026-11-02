@@ -17,12 +17,23 @@ struct PageCommentsSheet: View {
             Form {
                 Section {
                     Button { draft = PageCommentDraft(model: model, pageID: pageID, original: nil, undoManager: undoManager) } label: {
-                        Label(L10n.commentAdd, systemImage: "plus.bubble")
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Image(systemName: "plus.bubble")
+                                .accessibilityHidden(true)
+                            Text(L10n.commentAdd)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.leading)
+                        }
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                     .accessibilityIdentifier("comment-add")
                     .disabled(!available || model.isChangingNotebookPage)
                     if comments.isEmpty {
-                        Text(L10n.commentEmpty).foregroundStyle(.secondary)
+                        Text(L10n.commentEmpty).foregroundStyle(.primary)
                             .accessibilityIdentifier("comments-empty")
                     }
                     ForEach(comments) { comment in
@@ -39,7 +50,7 @@ struct PageCommentsSheet: View {
                         .accessibilityIdentifier("comment-row-\(comment.id.rawValue)")
                         .disabled(!available || model.isChangingNotebookPage)
                     }
-                } footer: { Text(L10n.commentPrivacy) }
+                } footer: { Text(L10n.commentPrivacy).foregroundStyle(Color.primary) }
             }
             .formStyle(.grouped)
             .navigationTitle(L10n.comments)

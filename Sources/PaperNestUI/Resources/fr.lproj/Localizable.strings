@@ -185,7 +185,7 @@
 "sort.dateModified" = "Date de modification";
 "sort.dateAdded" = "Date d’ajout";
 "sort.name" = "Nom";
-"library.home.title" = "Documents";
+"library.home.title" = "Accueil";
 "library.home.recent" = "Récents";
 "library.home.seeAll" = "Tout afficher";
 
@@ -365,3 +365,39 @@
 "stamp.invalid" = "Agrandissez le tampon pour l’ajouter.";
 "stamp.help" = "Les tampons symboles sont enregistrés comme encre et inclus dans les exports. Utilisez Gérer les annotations pour les recolorer ou les supprimer.";
 "stamp.saveFailed" = "Impossible d’enregistrer ce tampon. Si la page a changé, fermez cette fenêtre et réessayez.";
+
+// Premium reference dashboard
+"premium.morning" = "Bonjour";
+"premium.afternoon" = "Bon après-midi";
+"premium.evening" = "Bonsoir";
+"premium.welcome" = "Un espace pour tout ce qui compte.";
+"premium.new" = "Nouveau";
+"premium.notesHint" = "Écrire et dessiner";
+"premium.scanHint" = "Du papier au PDF";
+"premium.importHint" = "PDF, images et fichiers";
+"premium.folderHint" = "Organisez vos idées";
+"premium.search" = "Rechercher";
+"premium.empty" = "Votre prochaine idée commence ici";
+"premium.emptyDetail" = "Créez un carnet ou importez un fichier pour commencer.";
+
+"premium.notes" = "Notes";
+
+"premium.note" = "Note";
+"premium.scan" = "Scan";
+"premium.import" = "Importer";
+"premium.folder" = "Dossier";
+
+/* First-launch welcome */
+"welcome.brand" = "PaperNest";
+"welcome.title" = "Vos idées et documents ont leur place.";
+"welcome.subtitle" = "Numérisez une page, commencez une note et rassemblez le tout.";
+"welcome.capture.title" = "Rassemblez vos pages";
+"welcome.capture.detail" = "Numérisez avec votre appareil photo ou importez vos fichiers.";
+"welcome.note.title" = "Faites place aux idées";
+"welcome.note.detail" = "Créez des carnets et ajoutez des formes et des commentaires.";
+"welcome.organize.title" = "Retrouvez l’essentiel";
+"welcome.organize.detail" = "Classez vos documents dans des dossiers et recherchez dans votre bibliothèque.";
+"welcome.continue" = "Commencer";
+"welcome.noAccount" = "Aucun compte nécessaire.";
+"welcome.import.detail" = "Importez des PDF, des images et d’autres fichiers.";
+"welcome.mac.subtitle" = "Importez un document, commencez une note et rassemblez le tout.";
