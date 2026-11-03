@@ -3023,9 +3023,13 @@ test and fails that one, which is why both are pinned.
 `clamped` is for a text box, and for a reason: the lasso only takes a stroke it
 can enclose wholly, so handwriting with a tail off the page could never be
 selected again. A selection already bigger than the page is left alone rather
-than pinned. Thirteen tests, every one of which was watched failing — three
-were checked by deliberately breaking the guard they cover (the closure, the
-whole-stroke rule and the rotated transform).
+than pinned. Thirteen tests. They failed to **build** before the API existed,
+which is an error rather than a failure, and **three** were then proven red by
+deliberately breaking the guard they cover: the closure, the whole-stroke rule
+and the rotated transform. The other ten were not shown failing against wrong
+code, and three of those — `nothingSelectedHasNoBox`, `translatingIsForInkOnly`
+and `aSelectionBiggerThanThePageCanStillBeMoved` — would pass against a good
+deal of it.
 
 ### Verified by driving the Mac app
 
@@ -3048,14 +3052,25 @@ two zigzag pen strokes:
 
 ### Found while checking, and **not** caused by this
 
-**The document toolbar's Redo button is left reading enabled after undo
-followed by a fresh edit.** Pressing it does nothing and it then correctly
-disables itself. Reproduced with the pen alone — draw, Undo, draw, and Redo is
-still blue — so it is not the lasso's doing; `UndoManager.canUndo/canRedo` are
-not observable state, and the document toolbar is missing the refresh that
-`NotebookHistoryActions` does with the `NSUndoManager…` notifications. No edit
-is lost or misapplied; it is a stale label. **Recorded, not fixed** — it is
-Codex's toolbar, and the fix belongs with whoever owns that row.
+**The document toolbar's Redo button reads enabled after undo followed by a
+fresh edit.** Reproduced with the pen alone — draw, Undo, draw, and Redo is
+still blue — so it is not the lasso's doing. Pressing it changed nothing on the
+page, and it then disabled itself.
+
+**Why is unestablished, and an earlier draft of this entry got it wrong.** That
+draft said the row lacked the `NSUndoManager…` notification refresh. It does
+not: the document toolbar **is** `NotebookHistoryActions`
+(`DocumentView.swift:392`), which already observes those notifications. So a
+blue Redo may mean `canRedo` was genuinely true — that the redo stack survived
+a fresh edit — and that the press was refused further down rather than being a
+no-op, because `applyInkChanges` refuses a stale write and `try?` swallows it,
+which looks identical from outside.
+
+**The check that tells the two apart has not been run:** draw A, Undo, draw B,
+press Redo, and see whether A comes back. If it does, this is a real fault in
+the document's undo stack and the registration to look at is
+`DocumentModel.registerInkUndo`. Until someone runs it, this is an open
+question, not a cosmetic label, and it should not be written off as one.
 
 ### What this does **not** do
 
@@ -3072,5 +3087,13 @@ Codex's toolbar, and the fix belongs with whoever owns that row.
   rectangle to drag.
 - **Partly-enclosed strokes are simply not selected**, with no hint on screen
   saying why. A loop that catches nothing clears the selection.
+- **Clamped to the uncropped page, not the visible one.** The clamp uses
+  `page.sourceSize`, so on a **cropped** page a selection can still be dragged
+  under the crop, where the canvas cannot reach it and the lasso cannot enclose
+  it — which is the very trap the clamp exists to prevent. The rectangle it
+  should use is `PageGeometry.cropRect`. Known and not fixed.
+- **The accessibility value counts selected ids, not strokes still on the
+  page**, so undoing a stroke's creation while it is lassoed leaves the value
+  reading one more than the dashed box shows. One line, in `MacInkCanvas`.
 - **No XCUITest**, as throughout while the simulator is down — driven by hand
   on Mac, once each in English, French and Spanish, in light mode.
