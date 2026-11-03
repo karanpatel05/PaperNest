@@ -56,5 +56,23 @@
 			<string>%lld strokes</string>
 		</dict>
 	</dict>
+	<key>ink.selectionCount</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@selected@</string>
+		<key>selected</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld stroke selected</string>
+			<key>many</key>
+			<string>%lld strokes selected</string>
+			<key>other</key>
+			<string>%lld strokes selected</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

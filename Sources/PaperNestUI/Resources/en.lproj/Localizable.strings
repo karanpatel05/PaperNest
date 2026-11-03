@@ -429,3 +429,7 @@
 
 /* The Mac eraser */
 "ink.eraser" = "Eraser";
+
+/* The Mac lasso */
+"ink.lasso" = "Lasso";
+"ink.move" = "Move Handwriting";

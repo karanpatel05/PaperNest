@@ -2982,3 +2982,95 @@ two separate pen strokes one above the other:
   for: handwriting cannot be selected and moved there.
 - **No XCUITest**, as throughout while the simulator is down — driven by hand
   on Mac, once, in English, in light mode.
+
+## A lasso on the Mac — row 21 — 2026-11-03 (Claude)
+
+The last of the six tools the owner asked for. Handwriting can now be selected
+and moved on a Mac: **Markup** reads **Pen | Highlighter | Eraser | Lasso**, a
+loop drawn round a stroke selects it, and dragging the selection moves the ink.
+
+- Full `./scripts/test.sh`: **556 tests passed**, **0 warnings**, all five
+  targets green.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### What it does
+
+**The rule is "wholly enclosed".** Every point of a stroke has to fall inside
+the loop, which is what drawing a circle round handwriting means, and it keeps
+a loop from dragging off the neighbouring word by its tail. Point-in-polygon is
+the even-odd rule, written out rather than handed to `CGPath`, so the loop is
+**closed from its last point back to its first** here rather than by whoever
+drew it — a drag ends where the pointer stopped, and nobody closes a lasso by
+hand.
+
+**The selection is held by `PageObjectID`, never by value.** The strokes are
+read back from the model when the move commits. Holding the objects themselves
+would have meant that selecting, moving, undoing and then moving again sends
+stale points as `replacing:`, `applyInkChanges` refuses the write, and `try?`
+swallows it — a drag that silently does nothing. That exact sequence was
+driven in the app (below), because the geometry tests cannot reach it.
+
+The move translates every point, keeps the object's **id**, so undo sees one
+mark moved rather than one deleted and another added, and keeps each point's
+`widthScale` and `time`, so pressure and timing recorded by an Apple Pencil
+survive being moved on a Mac. The drag is converted through the page's own
+transform — two points through the inverse and subtracted, shared now with
+`MovableMarksOverlay` as `DocumentModel.sourceDelta` — so a **rotated** page
+moves ink the way it looks. A hand-rolled divide-by-the-scale passes the zoom
+test and fails that one, which is why both are pinned.
+
+**A selection is clamped to stay wholly on the page**, which is stricter than
+`clamped` is for a text box, and for a reason: the lasso only takes a stroke it
+can enclose wholly, so handwriting with a tail off the page could never be
+selected again. A selection already bigger than the page is left alone rather
+than pinned. Thirteen tests, every one of which was watched failing — three
+were checked by deliberately breaking the guard they cover (the closure, the
+whole-stroke rule and the rotated transform).
+
+### Verified by driving the Mac app
+
+Against a throwaway library (`/tmp/pn-lasso`, since deleted), in a notebook with
+two zigzag pen strokes:
+
+- Switching to **Lasso** hid the width and colour rows, as the eraser does.
+- A loop round the **upper** stroke drew a dashed box tight to that stroke and
+  left the lower one unselected.
+- Dragging from inside the box moved the upper stroke down and left; the lower
+  one stayed, the dashed box followed the ink, and the sidebar thumbnail
+  redrew. The ink is really moved, not previewed.
+- **Undo** put it back, box and all.
+- **Dragging the same selection a second time, after that undo, worked** — the
+  stale-payload failure above.
+- Switching back to **Pen** cleared the dashed box.
+- **French and Spanish**, both launched and looked at: *Stylo | Surligneur |
+  Gomme | Lasso* and *Lápiz | Marcador | Borrador | Lazo*, all four readable
+  in the 420-point row, no truncation.
+
+### Found while checking, and **not** caused by this
+
+**The document toolbar's Redo button is left reading enabled after undo
+followed by a fresh edit.** Pressing it does nothing and it then correctly
+disables itself. Reproduced with the pen alone — draw, Undo, draw, and Redo is
+still blue — so it is not the lasso's doing; `UndoManager.canUndo/canRedo` are
+not observable state, and the document toolbar is missing the refresh that
+`NotebookHistoryActions` does with the `NSUndoManager…` notifications. No edit
+is lost or misapplied; it is a stale label. **Recorded, not fixed** — it is
+Codex's toolbar, and the fix belongs with whoever owns that row.
+
+### What this does **not** do
+
+- **No resize, no rotate, no delete, no copy of a selection.** It can be
+  selected and dragged, nothing else.
+- **No handles.** The dashed box is drawn but cannot be grabbed by a corner.
+- **No lassoing text boxes or images.** Ink only — those move with Markup off,
+  through `MovableMarksOverlay`, and the two never coexist.
+- **No moving across pages**, and no cut and paste anywhere.
+- **The original stays on screen during the drag.** The page renderer keeps
+  drawing the ink where it still is until the commit lands, so the dragged
+  outline and the original are both visible mid-drag. That is the honest cost
+  of previewing in the canvas, and it was chosen over leaving a naked
+  rectangle to drag.
+- **Partly-enclosed strokes are simply not selected**, with no hint on screen
+  saying why. A loop that catches nothing clears the selection.
+- **No XCUITest**, as throughout while the simulator is down — driven by hand
+  on Mac, once each in English, French and Spanish, in light mode.

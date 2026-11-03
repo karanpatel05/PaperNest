@@ -80,10 +80,8 @@ struct MovableMarksOverlay: View {
     private func commit(_ mark: PageObject, viewTranslation: CGSize) {
         guard let frame = Self.frame(of: mark) else { return }
         // The drag happened in view points; the frame lives in source points.
-        let viewToSource = sourceToView.inverted()
-        let origin = CGPoint(x: viewTranslation.width, y: viewTranslation.height).applying(viewToSource)
-        let zero = CGPoint.zero.applying(viewToSource)
-        let moved = frame.offsetBy(dx: origin.x - zero.x, dy: origin.y - zero.y)
+        let delta = DocumentModel.sourceDelta(of: viewTranslation, sourceToView: sourceToView)
+        let moved = frame.offsetBy(dx: delta.x, dy: delta.y)
         let clamped = DocumentModel.clamped(moved, within: page.sourceSize)
         Task { try? await model.moveObject(mark, to: clamped, undoManager: undoManager) }
     }

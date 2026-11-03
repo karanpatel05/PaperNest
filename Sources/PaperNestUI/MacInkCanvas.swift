@@ -28,7 +28,17 @@ struct MacInkCanvas: View {
     let width: Double
     let undoManager: UndoManager?
 
+    /// The drag in progress, in view points.
     @State private var points: [CGPoint] = []
+    /// What the lasso has hold of, by **id**: the strokes themselves are read
+    /// back from the model when they are needed, so an undo between selecting
+    /// and dragging cannot leave this holding points that are no longer there.
+    @State private var selection: [PageObjectID] = []
+    /// Set on the first event of a drag and not revisited, so a drag that
+    /// started on the selection goes on moving it even once the pointer
+    /// leaves.
+    @State private var isMovingSelection = false
+    @State private var moveTranslation: CGSize = .zero
 
     private var scale: CGFloat {
         let determinant = sourceToView.a * sourceToView.d - sourceToView.b * sourceToView.c
@@ -36,7 +46,7 @@ struct MacInkCanvas: View {
     }
 
     private var previewColor: Color {
-        guard tool != .eraser else { return Color.secondary.opacity(0.5) }
+        guard tool.ink != nil else { return Color.secondary.opacity(0.5) }
         let opacity = tool == .highlighter ? InkStroke.highlighterOpacity : 1
         return Color(.sRGB, red: color.red, green: color.green, blue: color.blue,
                      opacity: color.alpha * opacity)
@@ -47,47 +57,212 @@ struct MacInkCanvas: View {
     /// finger, and an eraser that misses feels broken.
     static let eraserRadius: Double = 8
 
+    /// How far outside its own box a selection can be grabbed, in view points.
+    /// A dashed line is thin to aim at, and the strokes inside it are thinner.
+    static let selectionGrip: CGFloat = 6
+
+    /// This page's objects. Right after a page switch the previous page's are
+    /// still loaded, so the filter is not decoration.
+    private var pageObjects: [PageObject] {
+        model.selectedPageObjects.filter { $0.pageID == page.id }
+    }
+
+    /// The lassoed strokes as they are **now**, not as they were when lassoed.
+    private var selectedObjects: [PageObject] {
+        let wanted = Set(selection)
+        return pageObjects.filter { wanted.contains($0.id) }
+    }
+
     var body: some View {
         Canvas { context, _ in
-            guard let first = points.first else { return }
-            var path = Path()
-            path.move(to: first)
-            for point in points.dropFirst() { path.addLine(to: point) }
-            // A click with no movement is a dot, as it is when drawn.
-            if points.count == 1 { path.addLine(to: first) }
-            context.stroke(path, with: .color(previewColor),
-                           style: StrokeStyle(lineWidth: width * scale, lineCap: .round, lineJoin: .round))
+            paintSelection(&context)
+            paintDrag(&context)
         }
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 0)
-                .onChanged { points.append($0.location) }
+                .onChanged { value in
+                    if points.isEmpty, !isMovingSelection {
+                        isMovingSelection = tool == .lasso && startsOnSelection(value.startLocation)
+                    }
+                    if isMovingSelection {
+                        moveTranslation = value.translation
+                    } else {
+                        points.append(value.location)
+                    }
+                }
                 .onEnded { value in
+                    if isMovingSelection {
+                        isMovingSelection = false
+                        moveTranslation = .zero
+                        commitMove(value.translation)
+                        return
+                    }
                     if points.isEmpty { points = [value.location] }
                     commit()
                 }
         )
+        // A selection belongs to one tool on one page. Leaving it up after a
+        // switch would show a dashed box round strokes the next drag cannot
+        // move.
+        .onChange(of: tool) { _, _ in clearSelection() }
+        .onChange(of: page.id) { _, _ in clearSelection() }
         .accessibilityIdentifier("mac-ink-canvas")
         .accessibilityLabel(L10n.markup)
+        .accessibilityValue(selection.isEmpty ? "" : L10n.inkSelectionCount(selection.count))
+    }
+
+    private func clearSelection() {
+        selection = []
+        isMovingSelection = false
+        moveTranslation = .zero
+    }
+
+    /// The dashed box round the lassoed strokes, and while they are being
+    /// dragged, where they are going.
+    private func paintSelection(_ context: inout GraphicsContext) {
+        let objects = selectedObjects
+        guard let bounds = Self.selectionBounds(of: objects) else { return }
+        let box = bounds.applying(sourceToView)
+            .offsetBy(dx: moveTranslation.width, dy: moveTranslation.height)
+        context.stroke(Path(roundedRect: box, cornerRadius: 2), with: .color(Theme.accent),
+                       style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+        // The page underneath goes on drawing the ink where it still is until
+        // the move is committed, so during the drag both are on screen: the
+        // original and this outline of where it will land.
+        guard isMovingSelection else { return }
+        for object in objects {
+            guard case .ink(let stroke) = object.payload, let first = stroke.points.first else { continue }
+            var path = Path()
+            path.move(to: CGPoint(x: first.x, y: first.y).applying(sourceToView))
+            for point in stroke.points.dropFirst() {
+                path.addLine(to: CGPoint(x: point.x, y: point.y).applying(sourceToView))
+            }
+            if stroke.points.count == 1 { path.addLine(to: path.currentPoint ?? .zero) }
+            context.stroke(
+                path.offsetBy(dx: moveTranslation.width, dy: moveTranslation.height),
+                with: .color(Theme.accent.opacity(0.7)),
+                style: StrokeStyle(lineWidth: max(stroke.width * scale, 1), lineCap: .round, lineJoin: .round))
+        }
+    }
+
+    /// The drag in progress: the stroke being drawn, or the loop being closed.
+    private func paintDrag(_ context: inout GraphicsContext) {
+        guard let first = points.first else { return }
+        var path = Path()
+        path.move(to: first)
+        for point in points.dropFirst() { path.addLine(to: point) }
+        if tool == .lasso {
+            // Shown closed, because that is how it is measured.
+            path.closeSubpath()
+            context.stroke(path, with: .color(Theme.accent),
+                           style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+            return
+        }
+        // A click with no movement is a dot, as it is when drawn.
+        if points.count == 1 { path.addLine(to: first) }
+        context.stroke(path, with: .color(previewColor),
+                       style: StrokeStyle(lineWidth: width * scale, lineCap: .round, lineJoin: .round))
+    }
+
+    private func startsOnSelection(_ location: CGPoint) -> Bool {
+        guard let bounds = Self.selectionBounds(of: selectedObjects) else { return false }
+        return bounds.applying(sourceToView)
+            .insetBy(dx: -Self.selectionGrip, dy: -Self.selectionGrip)
+            .contains(location)
     }
 
     private func commit() {
         let captured = points
         points = []
         guard !captured.isEmpty else { return }
-        if tool == .eraser {
-            let viewToSource = sourceToView.inverted()
+        let viewToSource = sourceToView.inverted()
+        switch tool {
+        case .eraser:
             let path = captured.map { $0.applying(viewToSource) }
-            let hit = Self.strokesHit(by: path, in: model.selectedPageObjects.filter { $0.pageID == page.id },
-                                      radius: Self.eraserRadius)
+            let hit = Self.strokesHit(by: path, in: pageObjects, radius: Self.eraserRadius)
             guard !hit.isEmpty else { return }
             Task { try? await model.eraseInk(hit, on: page, undoManager: undoManager) }
-            return
+        case .lasso:
+            let loop = captured.map { $0.applying(viewToSource) }
+            // A loop that caught nothing clears the selection, which is how a
+            // click on empty page lets go of what was held.
+            selection = Self.strokesEnclosed(by: loop, in: pageObjects).map(\.id)
+        case .pen, .highlighter:
+            guard let inkTool = tool.ink,
+                  let stroke = Self.stroke(from: captured, sourceToView: sourceToView,
+                                           tool: inkTool, color: color, width: width) else { return }
+            Task { try? await model.addInkStroke(stroke, to: page, undoManager: undoManager) }
         }
-        guard let inkTool = tool.ink,
-              let stroke = Self.stroke(from: captured, sourceToView: sourceToView,
-                                       tool: inkTool, color: color, width: width) else { return }
-        Task { try? await model.addInkStroke(stroke, to: page, undoManager: undoManager) }
+    }
+
+    private func commitMove(_ viewTranslation: CGSize) {
+        // A click on the selection holds on to it without moving it.
+        guard abs(viewTranslation.width) > 1 || abs(viewTranslation.height) > 1,
+              let bounds = Self.selectionBounds(of: selectedObjects) else { return }
+        let delta = DocumentModel.clampedTranslation(
+            of: bounds,
+            by: DocumentModel.sourceDelta(of: viewTranslation, sourceToView: sourceToView),
+            within: page.sourceSize)
+        let ids = selection
+        Task { try? await model.moveInk(ids, on: page, by: delta, undoManager: undoManager) }
+    }
+
+    /// The ink objects a lasso loop encloses **wholly**.
+    ///
+    /// Every point of a stroke has to be inside, which is what drawing a
+    /// circle round handwriting means, and it is what keeps a loop from
+    /// dragging off the neighbouring word by its tail. The loop is closed from
+    /// its last point back to its first, because a drag ends where the pointer
+    /// stopped rather than where it started.
+    ///
+    /// Ink only: a text box or a placed image inside the loop stays put, and
+    /// is moved its own way with the markup canvas down.
+    nonisolated static func strokesEnclosed(by loop: [CGPoint], in objects: [PageObject]) -> [PageObject] {
+        guard loop.count >= 3 else { return [] }
+        return objects.filter { object in
+            guard case .ink(let stroke) = object.payload, !stroke.points.isEmpty else { return false }
+            return stroke.points.allSatisfy { contains(CGPoint(x: $0.x, y: $0.y), in: loop) }
+        }
+    }
+
+    /// Whether a point is inside a closed polygon, by the even-odd rule: a ray
+    /// cast from the point crosses the outline an odd number of times.
+    ///
+    /// Each side is taken from the previous vertex to this one, starting with
+    /// the side from the **last** vertex, so the loop is closed here rather
+    /// than by whoever drew it.
+    private nonisolated static func contains(_ point: CGPoint, in polygon: [CGPoint]) -> Bool {
+        var inside = false
+        var previous = polygon.count - 1
+        for current in polygon.indices {
+            let a = polygon[current], b = polygon[previous]
+            if (a.y > point.y) != (b.y > point.y),
+               point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x {
+                inside.toggle()
+            }
+            previous = current
+        }
+        return inside
+    }
+
+    /// The box a selection of strokes occupies, in source points, covering the
+    /// **width** of the ink rather than the line through its middle — a thick
+    /// stroke sticking out of its own box looks like a bug.
+    ///
+    /// Nil when nothing is selected, or when nothing selected is ink.
+    nonisolated static func selectionBounds(of objects: [PageObject]) -> CGRect? {
+        var box: CGRect?
+        for object in objects {
+            guard case .ink(let stroke) = object.payload, !stroke.points.isEmpty else { continue }
+            let xs = stroke.points.map(\.x), ys = stroke.points.map(\.y)
+            let reach = stroke.width / 2
+            let strokeBox = CGRect(x: xs.min()! - reach, y: ys.min()! - reach,
+                                   width: xs.max()! - xs.min()! + stroke.width,
+                                   height: ys.max()! - ys.min()! + stroke.width)
+            box = box.map { $0.union(strokeBox) } ?? strokeBox
+        }
+        return box
     }
 
     /// The ink objects an eraser drag touched.

@@ -423,6 +423,75 @@ final class DocumentModel {
         return moved
     }
 
+    /// Moves handwriting, as one undoable step.
+    ///
+    /// Takes the objects' **ids** and reads their current state here rather
+    /// than trusting what the canvas was holding: between selecting a stroke
+    /// and dragging it the page may have been undone underneath, and
+    /// `applyInkChanges` refuses a write whose `replacing` no longer matches.
+    func moveInk(_ ids: [PageObjectID], on page: Page, by delta: CGPoint,
+                 undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        let wanted = Set(ids)
+        let current = selectedPageObjects.filter { wanted.contains($0.id) && $0.pageID == page.id }
+        let moved = current.compactMap { Self.translated($0, by: delta) }
+        guard moved.count == current.count, !moved.isEmpty else { return }
+        replace(try await store.applyInkChanges(on: page.id, saving: moved,
+                                                replacing: current, deleting: []))
+        let change = InkChange(pageID: page.id, saved: moved, replaced: current, deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.moveInk)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    /// A stroke shifted across the page, or nil for a kind with no points.
+    ///
+    /// Every point moves and nothing else changes — the same id, so undo sees
+    /// one mark moved rather than one deleted and another added, and the same
+    /// `widthScale` and `time` per point, so pressure and timing recorded by
+    /// an Apple Pencil survive being moved on a Mac.
+    nonisolated static func translated(_ object: PageObject, by delta: CGPoint) -> PageObject? {
+        guard case .ink(var stroke) = object.payload else { return nil }
+        stroke.points = stroke.points.map {
+            InkPoint(x: $0.x + delta.x, y: $0.y + delta.y, widthScale: $0.widthScale, time: $0.time)
+        }
+        var moved = object
+        moved.payload = .ink(stroke)
+        moved.modifiedAt = Date()
+        return moved
+    }
+
+    /// A drag measured in view points, as a distance in source points.
+    ///
+    /// Through the page's own transform rather than past it: two points
+    /// converted and subtracted, so a rotated or flipped page moves a mark the
+    /// way it looks rather than the way a bare division by the scale would.
+    nonisolated static func sourceDelta(of viewTranslation: CGSize,
+                                        sourceToView: CGAffineTransform) -> CGPoint {
+        let viewToSource = sourceToView.inverted()
+        let moved = CGPoint(x: viewTranslation.width, y: viewTranslation.height).applying(viewToSource)
+        let origin = CGPoint.zero.applying(viewToSource)
+        return CGPoint(x: moved.x - origin.x, y: moved.y - origin.y)
+    }
+
+    /// A drag of a lassoed selection, cut back so the selection stays on the
+    /// page.
+    ///
+    /// Stricter than `clamped`, which lets a frame hang over an edge: the
+    /// lasso only takes a stroke it can enclose **wholly**, so handwriting
+    /// with a tail off the page could never be selected again, and would be
+    /// stuck there. A selection already larger than the page cannot satisfy
+    /// both edges, and then it is left alone rather than pinned.
+    nonisolated static func clampedTranslation(of bounds: CGRect, by delta: CGPoint,
+                                               within source: CGSize) -> CGPoint {
+        func clamp(_ value: Double, _ lowest: Double, _ highest: Double) -> Double {
+            highest >= lowest ? min(max(value, lowest), highest) : value
+        }
+        return CGPoint(x: clamp(delta.x, -bounds.minX, source.width - bounds.maxX),
+                       y: clamp(delta.y, -bounds.minY, source.height - bounds.maxY))
+    }
+
     /// Keeps a dragged frame from being lost off the edge of the page.
     ///
     /// Not clamped to sit fully on the page — hanging over an edge is a

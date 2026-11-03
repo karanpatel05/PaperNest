@@ -56,5 +56,23 @@
 			<string>%lld trazos</string>
 		</dict>
 	</dict>
+	<key>ink.selectionCount</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@selected@</string>
+		<key>selected</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld trazo seleccionado</string>
+			<key>many</key>
+			<string>%lld trazos seleccionados</string>
+			<key>other</key>
+			<string>%lld trazos seleccionados</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

@@ -10,14 +10,14 @@ import PaperNestCore
 /// mode, not a kind of mark, and putting it in the stored enum would invite a
 /// stroke that claims to be one.
 enum MacMarkupTool: String, Hashable, CaseIterable {
-    case pen, highlighter, eraser
+    case pen, highlighter, eraser, lasso
 
     /// The stroke this tool draws, or nil when it draws nothing.
     var ink: InkStroke.Tool? {
         switch self {
         case .pen: .pen
         case .highlighter: .highlighter
-        case .eraser: nil
+        case .eraser, .lasso: nil
         }
     }
 }

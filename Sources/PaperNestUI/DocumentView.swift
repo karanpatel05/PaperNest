@@ -351,12 +351,13 @@ struct DocumentView: View {
                 Text(L10n.inkPen).tag(MacMarkupTool.pen)
                 Text(L10n.inkHighlighter).tag(MacMarkupTool.highlighter)
                 Text(L10n.inkEraser).tag(MacMarkupTool.eraser)
+                Text(L10n.inkLasso).tag(MacMarkupTool.lasso)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 300)
+            .frame(width: 420)
             .accessibilityIdentifier("ink-tool")
-            if inkTool != .eraser {
+            if inkTool.ink != nil {
                 Picker(L10n.shapeWidth, selection: $inkWidth) {
                     Text(L10n.shapeThin).tag(1.0)
                     Text(L10n.shapeMedium).tag(2.0)

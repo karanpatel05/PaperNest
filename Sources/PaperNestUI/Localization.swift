@@ -512,3 +512,10 @@ extension L10n {
 extension L10n {
     static var inkEraser: String { tr("ink.eraser") }
 }
+
+// The Mac lasso — ledger row 21.
+extension L10n {
+    static var inkLasso: String { tr("ink.lasso") }
+    static var moveInk: String { tr("ink.move") }
+    static func inkSelectionCount(_ count: Int) -> String { plural("ink.selectionCount", count) }
+}

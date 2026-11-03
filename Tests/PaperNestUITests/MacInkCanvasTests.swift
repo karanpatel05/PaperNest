@@ -142,5 +142,172 @@ import PaperNestCore
 
         #expect(MacInkCanvas.strokesHit(by: flick, in: [dot], radius: 8).count == 1)
     }
+
+    // MARK: - The lasso
+
+    /// A loop drawn around a stroke takes it and leaves the one outside.
+    @Test func theLassoTakesTheStrokeItEncloses() {
+        let inside = inkObject([(100, 100), (200, 100)], id: "inside")
+        let outside = inkObject([(100, 500), (200, 500)], id: "outside")
+        let loop = [CGPoint(x: 80, y: 80), CGPoint(x: 220, y: 80),
+                    CGPoint(x: 220, y: 140), CGPoint(x: 80, y: 140)]
+
+        let taken = MacInkCanvas.strokesEnclosed(by: loop, in: [inside, outside])
+
+        #expect(taken.map(\.id.rawValue) == ["inside"])
+    }
+
+    /// Nicking the end of a long stroke must not take the whole thing. The
+    /// rule is that the loop goes **around** a mark, which is what drawing a
+    /// circle round handwriting means, and a looser rule would make a lasso
+    /// that grabs the neighbouring word.
+    @Test func aStrokeOnlyPartlyInsideTheLoopIsNotTaken() {
+        let long = inkObject([(100, 100), (900, 100)])
+        let loop = [CGPoint(x: 80, y: 80), CGPoint(x: 220, y: 80),
+                    CGPoint(x: 220, y: 140), CGPoint(x: 80, y: 140)]
+
+        #expect(MacInkCanvas.strokesEnclosed(by: loop, in: [long]).isEmpty)
+    }
+
+    /// The loop is closed from its last point back to its first, because a
+    /// drag ends where the pointer stopped rather than where it started.
+    /// Walking only consecutive pairs would lose that side, and with it every
+    /// lasso nobody closed by hand — which is all of them.
+    @Test func anOpenLoopIsClosedFromItsLastPointToItsFirst() {
+        let stroke = inkObject([(200, 200)])
+        // Three sides of a box, drawn anticlockwise from the top right and
+        // stopped at the bottom right: the right-hand side, from (300, 300)
+        // back to (300, 100), exists only because the loop is closed here.
+        // Without it the stroke is outside, which is the regression this pins.
+        let open = [CGPoint(x: 300, y: 100), CGPoint(x: 100, y: 100),
+                    CGPoint(x: 100, y: 300), CGPoint(x: 300, y: 300)]
+
+        #expect(MacInkCanvas.strokesEnclosed(by: open, in: [stroke]).count == 1)
+    }
+
+    /// A click, or a straight drag, encloses nothing at all.
+    @Test func aLoopWithNoAreaTakesNothing() {
+        let stroke = inkObject([(150, 110)])
+
+        #expect(MacInkCanvas.strokesEnclosed(by: [CGPoint(x: 150, y: 110)], in: [stroke]).isEmpty)
+        #expect(MacInkCanvas.strokesEnclosed(
+            by: [CGPoint(x: 100, y: 110), CGPoint(x: 200, y: 110)], in: [stroke]).isEmpty)
+    }
+
+    /// The lasso is for handwriting. A text box or a placed image inside the
+    /// loop is not picked up with it — those are moved their own way, with the
+    /// markup canvas down.
+    @Test func theLassoNeverTakesATextBoxOrAnImage() {
+        let loop = [CGPoint(x: 0, y: 0), CGPoint(x: 400, y: 0),
+                    CGPoint(x: 400, y: 400), CGPoint(x: 0, y: 400)]
+
+        #expect(MacInkCanvas.strokesEnclosed(by: loop, in: [Self.textBox, Self.placedImage]).isEmpty)
+    }
+
+    /// The dashed box round a selection has to cover the ink's width, not just
+    /// the line through its middle, or a thick stroke sticks out of its own box.
+    @Test func theSelectionBoxCoversTheWidthOfTheInk() throws {
+        let stroke = inkObject([(100, 100), (200, 100)], width: 20)
+
+        let bounds = try #require(MacInkCanvas.selectionBounds(of: [stroke]))
+
+        #expect(bounds == CGRect(x: 90, y: 90, width: 120, height: 20))
+    }
+
+    @Test func nothingSelectedHasNoBox() {
+        #expect(MacInkCanvas.selectionBounds(of: []) == nil)
+        #expect(MacInkCanvas.selectionBounds(of: [Self.textBox]) == nil)
+    }
+
+    /// Moving handwriting changes where it is and nothing else about it:
+    /// pressure, timing, tool, colour and width all survive, and it keeps its
+    /// identity so undo treats it as the same mark moved rather than one
+    /// deleted and another added.
+    @Test func movingHandwritingChangesOnlyItsPlace() throws {
+        let original = PageObject(pageID: PageID(rawValue: "page"), zKey: "m",
+                                  payload: .ink(InkStroke(tool: .highlighter, color: black, width: 7,
+                                                          points: [InkPoint(x: 10, y: 20, widthScale: 2, time: 0.5)])),
+                                  modifiedAt: Date(timeIntervalSince1970: 0))
+
+        let moved = try #require(DocumentModel.translated(original, by: CGPoint(x: 5, y: -3)))
+
+        guard case .ink(let stroke) = moved.payload else { Issue.record("not ink any more"); return }
+        #expect(moved.id == original.id)
+        #expect(stroke.points.map(\.x) == [15])
+        #expect(stroke.points.map(\.y) == [17])
+        #expect(stroke.points.first?.widthScale == 2)
+        #expect(stroke.points.first?.time == 0.5)
+        #expect(stroke.tool == .highlighter)
+        #expect(stroke.width == 7)
+        #expect(stroke.color == black)
+        #expect(moved.modifiedAt > original.modifiedAt)
+    }
+
+    /// A text box has a frame, not points; it moves through `moved(_:to:)`.
+    @Test func translatingIsForInkOnly() {
+        #expect(DocumentModel.translated(Self.textBox, by: CGPoint(x: 5, y: 5)) == nil)
+        #expect(DocumentModel.translated(Self.placedImage, by: CGPoint(x: 5, y: 5)) == nil)
+    }
+
+    /// The same drag moves the ink the same distance **on the page** whatever
+    /// the zoom, because the drag is in view points and the ink is in source
+    /// ones.
+    @Test func theSameDragMovesTheSameDistanceAtAnyZoom() {
+        let drag = CGSize(width: 100, height: 50)
+
+        #expect(DocumentModel.sourceDelta(of: drag, sourceToView: CGAffineTransform(scaleX: 2, y: 2))
+                == CGPoint(x: 50, y: 25))
+        #expect(DocumentModel.sourceDelta(of: drag, sourceToView: CGAffineTransform(scaleX: 0.5, y: 0.5))
+                == CGPoint(x: 200, y: 100))
+    }
+
+    /// A rotated page is where a hand-rolled "divide by the scale" breaks: the
+    /// drag has to go through the page's own transform rather than past it.
+    /// Dragging right across a page turned a quarter turn moves the ink *up*
+    /// the page in its own coordinates.
+    @Test func aDragOnARotatedPageMovesTheInkTheWayItLooks() {
+        let quarterTurn = CGAffineTransform(rotationAngle: .pi / 2)
+
+        let delta = DocumentModel.sourceDelta(of: CGSize(width: 100, height: 0), sourceToView: quarterTurn)
+
+        #expect(abs(delta.x) < 0.0001)
+        #expect(abs(delta.y + 100) < 0.0001)
+    }
+
+    /// Handwriting dragged off the page could never be lassoed back, because
+    /// the canvas only covers the page.
+    @Test func aSelectionCannotBeDraggedOffThePage() {
+        let bounds = CGRect(x: 10, y: 10, width: 100, height: 50)
+        let page = CGSize(width: 600, height: 800)
+
+        #expect(DocumentModel.clampedTranslation(of: bounds, by: CGPoint(x: 20, y: 30), within: page)
+                == CGPoint(x: 20, y: 30))
+        #expect(DocumentModel.clampedTranslation(of: bounds, by: CGPoint(x: -500, y: -500), within: page)
+                == CGPoint(x: -10, y: -10))
+        #expect(DocumentModel.clampedTranslation(of: bounds, by: CGPoint(x: 900, y: 0), within: page)
+                == CGPoint(x: 490, y: 0))
+    }
+
+    /// A selection wider than the page cannot satisfy both edges, and the
+    /// answer is to let it move rather than to pin it.
+    @Test func aSelectionBiggerThanThePageCanStillBeMoved() {
+        let bounds = CGRect(x: -50, y: 0, width: 900, height: 50)
+
+        #expect(DocumentModel.clampedTranslation(of: bounds, by: CGPoint(x: 30, y: 10),
+                                                 within: CGSize(width: 600, height: 800))
+                == CGPoint(x: 30, y: 10))
+    }
+
+    private static let textBox = PageObject(
+        pageID: PageID(rawValue: "page"), zKey: "m",
+        payload: .text(TextBox(frame: CGRect(x: 90, y: 90, width: 100, height: 40),
+                               text: "Keep me", fontSize: 12)),
+        modifiedAt: Date(timeIntervalSince1970: 0))
+
+    private static let placedImage = PageObject(
+        pageID: PageID(rawValue: "page"), zKey: "n",
+        payload: .image(PlacedImage(assetID: AssetID(sha256: String(repeating: "b", count: 64)),
+                                    frame: CGRect(x: 90, y: 90, width: 100, height: 40))),
+        modifiedAt: Date(timeIntervalSince1970: 0))
 }
 #endif
