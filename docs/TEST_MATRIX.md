@@ -3506,3 +3506,79 @@ updated. Checked rather than redone, and the note is removed.
 - **No XCUITest.** The rows carry `recognition-language-<code>` identifiers
   for one, and the unavailable line carries its own.
 
+## Three working export formats nobody could pick — 2026-11-03 (Claude)
+
+From "Engine work waiting for a screen". `ExportFormat` has six cases and the
+export sheet offered **three**: PDF, JPEG and PNG, written out as three tiles
+by hand. TXT, HEIC and DOCX all worked in the engine, were unit-tested, and
+could not be chosen by anyone.
+
+- Full `./scripts/test.sh`: **604 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### What it does
+
+The tile list is **data** now — `ExportSheet.offeredFormats` — and
+`ExportFormatOfferTests` fails if it does not cover `ExportFormat.allCases`.
+That is the part worth keeping: the next format added to the engine cannot
+quietly reach no screen. Six tiles lay out three to a row so they do not
+squeeze each other into slivers on a phone.
+
+**A format that holds only the words shows no image options.** `keepsOnlyWords`
+lives on `ExportFormat`, so the sheet and the engine cannot disagree about
+which is which, and for TXT and DOCX the resolution, quality and packaging
+controls are gone — a control that does nothing is worse than no control. In
+their place, under the tiles, is what the format costs: *"This format keeps
+the words, not the layout: no pictures, no ink, no marks and no page design. A
+page with no text of its own is left out, and a document with none cannot be
+exported this way."*
+
+**A document with no text gets told so.** `ExportError.noTextToExport` used to
+surface as the generic "export failed"; it now reads *"None of these pages
+carry any text, so there is nothing to write. Recognize Text first, or export
+as PDF or an image instead."* That is the likely case for scanned pages nobody
+has recognised yet, and "failed" would send someone looking for a bug.
+
+### Verified by driving the Mac app
+
+On a throwaway library (`/tmp/pn-exp`, since deleted):
+
+- All six tiles appear: PDF, JPEG, PNG / HEIC, TXT, Word.
+- **TXT** on a three-page letter: *Ready: 275 bytes*, which matches the three
+  short lines the pages actually carry.
+- **Word**: *Ready: 2 KB* — a `.docx` is a zip, so that is the right order.
+- **HEIC**: *Ready: 76 KB* for three pages, packaged as a ZIP.
+- Choosing TXT hides the image options and shows the caveat; choosing PDF puts
+  its own options back.
+- A **blank notebook** exported as TXT shows the new message in red rather
+  than "export failed".
+- **English, French and Spanish** all launched and looked at; both new strings
+  wrap cleanly in each.
+
+### Fixed while checking: the caveat did not render at first
+
+It was written as a `Section { EmptyView() } footer: { … }`, and **SwiftUI
+drops a Form section whose content is empty — footer and all**. The first run
+in the app showed nothing between the tiles and Pages. It sits in the Format
+section's own footer now, which is the better place regardless. Worth knowing:
+a section that is only a footer does not exist.
+
+### What this does **not** do
+
+- **No password field.** `Exporter.export` takes one and `ExportError` has
+  three careful cases for it — including that non-ASCII passwords cannot be
+  written, which is a real problem for French and Spanish readers. **Still no
+  way to set one**, so that engine remains unreachable.
+- **The saved file's contents were not read back.** The sheet reported a
+  plausible size for each format and the engines have their own unit tests,
+  but the bytes that reached disk were not opened: the save panel is modal and
+  background control cannot drive it, and saving into the real Downloads
+  folder was not something to do on a check.
+- **DOCX keeps one paragraph per line and no formatting**, as its engine
+  always has; the caveat says so for both text formats.
+- **iOS is untested**, as throughout while the simulator is down. The tile row
+  uses `ViewThatFits` on iOS and a plain `HStack` on macOS, so the phone
+  layout of six tiles in two rows is unseen.
+- **No XCUITest.** Each tile carries `export-format-<format>` and the caveat
+  carries `export-words-only-note`.
+

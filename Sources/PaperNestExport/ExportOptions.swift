@@ -20,6 +20,21 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     /// quality do not apply to it either.
     case docx
 
+    /// Whether this format carries the words alone, with no picture of the
+    /// page.
+    ///
+    /// The sheet reads this to decide which options to show: resolution,
+    /// image quality and how to package several pages all mean nothing for a
+    /// text file, and a control that does nothing is worse than no control.
+    /// Kept on the format rather than in the screen so the two cannot
+    /// disagree about which is which.
+    public var keepsOnlyWords: Bool {
+        switch self {
+        case .txt, .docx: true
+        case .pdf, .jpeg, .png, .heic: false
+        }
+    }
+
     public var fileExtension: String {
         switch self {
         case .pdf: "pdf"

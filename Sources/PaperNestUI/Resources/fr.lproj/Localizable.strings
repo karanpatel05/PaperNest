@@ -448,3 +448,7 @@
 "settings.recognitionLanguages" = "Reconnaissance de texte";
 "settings.recognitionLanguagesFooter" = "La reconnaissance lit dans ces langues. Si vous n’en choisissez aucune, l’anglais, le français et l’espagnol sont utilisés. Chaque langue supplémentaire rend les autres un peu moins précises : ne choisissez que le nécessaire.";
 "settings.recognitionUnavailable" = "Ce Mac ne peut pas lire %@.";
+
+/* Exporting as plain text or Word */
+"export.wordsOnlyNote" = "Ce format conserve les mots, pas la mise en page : ni images, ni tracés, ni annotations, ni mise en forme. Une page sans texte propre est ignorée, et un document qui n’en contient aucun ne peut pas être exporté ainsi.";
+"export.noTextToExport" = "Aucune de ces pages ne contient de texte, il n’y a donc rien à écrire. Lancez d’abord Reconnaître le texte, ou exportez en PDF ou en image.";

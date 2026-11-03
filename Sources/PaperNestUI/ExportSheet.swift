@@ -121,14 +121,33 @@ struct ExportSheet: View {
             Section {
                 documentRow
             }
-            Section(L10n.exportFormat) {
-                tileRow {
-                    ChoiceTile(title: "PDF", systemImage: "doc.richtext", iconColor: .red,
-                               isSelected: options.format == .pdf, identifier: "export-format-pdf") { options.format = .pdf }
-                    ChoiceTile(title: "JPEG", systemImage: "photo",
-                               isSelected: options.format == .jpeg, identifier: "export-format-jpeg") { options.format = .jpeg }
-                    ChoiceTile(title: "PNG", systemImage: "photo.artframe",
-                               isSelected: options.format == .png, identifier: "export-format-png") { options.format = .png }
+            Section {
+                // Three tiles at a time, so six formats do not squeeze each
+                // other into unreadable slivers on a phone.
+                ForEach(Array(Self.offeredFormats.chunked(into: 3).enumerated()), id: \.offset) { _, row in
+                    tileRow {
+                        ForEach(row, id: \.format) { tile in
+                            ChoiceTile(title: tile.title, systemImage: tile.systemImage,
+                                       iconColor: tile.iconColor ?? .secondary,
+                                       isSelected: options.format == tile.format,
+                                       identifier: "export-format-\(tile.format.rawValue)") {
+                                options.format = tile.format
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text(L10n.exportFormat)
+            } footer: {
+                // Under the tiles rather than in `formatOptions`: a Form
+                // Section whose content is empty is dropped whole, footer
+                // and all, so a caveat with no controls beside it has to
+                // live on a section that has some.
+                if options.format.keepsOnlyWords {
+                    Text(L10n.exportWordsOnlyNote)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("export-words-only-note")
                 }
             }
             Section(L10n.exportPages) {
@@ -218,9 +237,32 @@ struct ExportSheet: View {
         #endif
     }
 
+    /// Every format the engine can write, with how it is offered.
+    ///
+    /// Data rather than hand-written tiles because three working formats —
+    /// TXT, HEIC and DOCX — shipped unreachable behind a list of three that
+    /// was never updated. `ExportFormatOfferTests` fails if a format is
+    /// missing from here.
+    ///
+    /// The titles are the formats' own names, so they are not translated and
+    /// go through `Text(verbatim:)` inside the tile.
+    static let offeredFormats: [(format: ExportFormat, title: String, systemImage: String, iconColor: Color?)] = [
+        (.pdf, "PDF", "doc.richtext", .red),
+        (.jpeg, "JPEG", "photo", nil),
+        (.png, "PNG", "photo.artframe", nil),
+        (.heic, "HEIC", "photo.badge.checkmark", nil),
+        (.txt, "TXT", "doc.plaintext", nil),
+        (.docx, "Word", "doc.text", .blue),
+    ]
+
     @ViewBuilder
     private var formatOptions: some View {
-        if options.format == .pdf {
+        // Nothing at all for a format that holds only the words: no
+        // resolution, no quality, no packaging, because none of them touch
+        // it. What is lost is said under the format tiles instead.
+        if options.format.keepsOnlyWords {
+            EmptyView()
+        } else if options.format == .pdf {
             Section {
                 Picker(L10n.paperSize, selection: $options.paperSize) {
                     Text(L10n.paperOriginal).tag(PaperSize.original)
@@ -421,10 +463,23 @@ struct ExportSheet: View {
                 }
             } catch is CancellationError {
                 phase = .configuring
+            } catch ExportError.noTextToExport {
+                // Not a failure to write: there was nothing to write. Saying
+                // so, and what to do instead, beats "export failed" on a
+                // document of scanned pages nobody has recognised yet.
+                phase = .failed(L10n.exportNoTextToExport)
             } catch {
                 phase = .failed(L10n.exportFailed)
             }
         }
+    }
+}
+
+private extension Array {
+    /// Fixed-size groups, for laying tiles out a row at a time.
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map { Array(self[$0..<Swift.min($0 + size, count)]) }
     }
 }
 

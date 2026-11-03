@@ -513,6 +513,12 @@ extension L10n {
     static var inkEraser: String { tr("ink.eraser") }
 }
 
+// Exporting as plain text or Word — row 35 follow-up.
+extension L10n {
+    static var exportWordsOnlyNote: String { tr("export.wordsOnlyNote") }
+    static var exportNoTextToExport: String { tr("export.noTextToExport") }
+}
+
 // Choosing which languages text recognition reads in — F4.
 extension L10n {
     static var settingsRecognitionLanguages: String { tr("settings.recognitionLanguages") }
