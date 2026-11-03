@@ -14,16 +14,61 @@ public struct TextRecognizer: Sendable {
     /// results that were produced by an older one.
     public static let engineVersion = "vision.accurate.1"
 
-    /// Checked against Vision rather than assumed: the supported set differs
-    /// by OS version, and claiming a language we cannot read would be a lie.
-    public static func supportedLanguages(from wanted: [String]) -> [String] {
+    /// Every language this device's Vision can read at `.accurate`.
+    ///
+    /// Asked rather than assumed: the set differs by OS version, so a choice
+    /// made on one machine may be half impossible on another.
+    public static func availableLanguages() -> [String] {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
-        let available = (try? request.supportedRecognitionLanguages()) ?? []
+        return (try? request.supportedRecognitionLanguages()) ?? []
+    }
+
+    /// Checked against Vision rather than assumed: claiming a language we
+    /// cannot read would be a lie.
+    public static func supportedLanguages(from wanted: [String]) -> [String] {
+        let available = Set(availableLanguages())
         return wanted.filter(available.contains)
     }
 
     public static let preferredLanguages = ["en-US", "fr-FR", "es-ES"]
+
+    /// What recognition will read in, and what it was asked for and cannot.
+    public struct LanguageChoice: Equatable, Sendable {
+        /// The list handed to Vision, in the order it will weight them.
+        public let using: [String]
+        /// Languages the reader asked for that this device cannot read. Kept
+        /// so a screen can say so, instead of quietly reading in something
+        /// else.
+        public let unavailable: [String]
+    }
+
+    /// Works out which languages to recognise in.
+    ///
+    /// A reader's choice **replaces** the defaults rather than adding to
+    /// them: someone who says German does not want English guesses mixed in,
+    /// and every extra language costs accuracy on the others, because Vision
+    /// weights the list it is given.
+    ///
+    /// A choice this device cannot honour at all falls back to the defaults
+    /// rather than leaving recognition with an empty list, which would read
+    /// nothing — but `unavailable` still carries the whole choice, so what
+    /// happened can be said out loud. Nothing readable at all comes back
+    /// empty rather than as a guess: reading a page with a language nobody
+    /// asked for produces confident nonsense, and `recognize` refuses an
+    /// empty list outright.
+    public static func resolve(override: [String], fallback: [String] = preferredLanguages,
+                               available: [String]) -> LanguageChoice {
+        let readable = Set(available)
+        func keep(_ wanted: [String]) -> [String] {
+            var seen = Set<String>()
+            return wanted.filter { readable.contains($0) && seen.insert($0).inserted }
+        }
+        guard !override.isEmpty else { return LanguageChoice(using: keep(fallback), unavailable: []) }
+        let chosen = keep(override)
+        let impossible = override.filter { !readable.contains($0) }
+        return LanguageChoice(using: chosen.isEmpty ? keep(fallback) : chosen, unavailable: impossible)
+    }
 
     public let languages: [String]
     public let minimumConfidence: Float

@@ -116,7 +116,11 @@ public final class LibrarySession {
         }
         backgroundTextWork = Task(priority: .utility) { [weak self] in
             _ = try? await EmbeddedTextIndexer(store: env.store).indexMissing()
-            _ = try? await AutomaticTextRecognizer(store: env.store, renderer: env.renderer).recognizeMissing()
+            // The sweep reads in the same languages the reader chose; it
+            // used to be built with the recognizer's own hard-coded default.
+            let recognizer = TextRecognizer(languages: RecognitionLanguagePreference.choice().using)
+            _ = try? await AutomaticTextRecognizer(store: env.store, renderer: env.renderer,
+                                                   recognizer: recognizer).recognizeMissing()
             guard let self else { return }
             backgroundTextWork = nil
             if backgroundTextWorkNeedsAnotherPass {

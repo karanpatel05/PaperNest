@@ -513,6 +513,15 @@ extension L10n {
     static var inkEraser: String { tr("ink.eraser") }
 }
 
+// Choosing which languages text recognition reads in — F4.
+extension L10n {
+    static var settingsRecognitionLanguages: String { tr("settings.recognitionLanguages") }
+    static var settingsRecognitionLanguagesFooter: String { tr("settings.recognitionLanguagesFooter") }
+    static func settingsRecognitionUnavailable(_ names: String) -> String {
+        tr("settings.recognitionUnavailable", names)
+    }
+}
+
 // Resizing a mark by a corner — ledger row 21.
 extension L10n {
     static var resizeObject: String { tr("object.resize") }

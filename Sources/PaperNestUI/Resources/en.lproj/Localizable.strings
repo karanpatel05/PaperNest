@@ -443,3 +443,8 @@
 
 /* Resizing a text box or an image by a corner */
 "object.resize" = "Resize";
+
+/* Choosing which languages text recognition reads in */
+"settings.recognitionLanguages" = "Text Recognition";
+"settings.recognitionLanguagesFooter" = "Recognition reads in these languages. Choosing none uses English, French and Spanish. Each extra language makes the others a little less accurate, so choose only what you need.";
+"settings.recognitionUnavailable" = "This Mac cannot read %@.";

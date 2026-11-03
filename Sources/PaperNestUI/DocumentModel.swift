@@ -41,8 +41,11 @@ final class DocumentModel {
     func recognizeText(on pageID: PageID? = nil) async {
         await finishPendingHistory()
         guard let store, let renderer = session.environment?.renderer, recognitionProgress == nil else { return }
-        let recognizer = TextRecognizer()
-        let languages = TextRecognizer.supportedLanguages(from: TextRecognizer.preferredLanguages)
+        // One resolution for both: the list Vision is given and the list
+        // recorded with the result used to be worked out separately and
+        // agreed only because they started from the same constant.
+        let languages = RecognitionLanguagePreference.choice().using
+        let recognizer = TextRecognizer(languages: languages)
         let pages = self.pages.filter { pageID == nil || $0.id == pageID }
         recognitionProgress = (0, pages.count)
         defer { recognitionProgress = nil }

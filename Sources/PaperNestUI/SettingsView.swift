@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import PaperNestCore
 import PaperNestExport
+import PaperNestRender
 import PaperNestStore
 import SwiftUI
 #if os(iOS)
@@ -91,6 +92,7 @@ final class SettingsModel {
 public struct SettingsView: View {
     @State private var model: SettingsModel
     @State private var isShowingSaver = false
+    @AppStorage(RecognitionLanguagePreference.key) private var recognitionLanguageCodes = ""
     @Environment(\.dismiss) private var dismiss
     #if os(iOS)
     @Environment(\.openURL) private var openURL
@@ -117,6 +119,57 @@ public struct SettingsView: View {
             .frame(width: 480)
             .fixedSize(horizontal: false, vertical: true)
         #endif
+    }
+
+    /// Which languages text recognition reads in.
+    ///
+    /// Only what this device's Vision actually supports is offered — the set
+    /// differs by OS version, and a row that cannot work is a promise that
+    /// cannot be kept. A choice already stored that this device cannot read
+    /// is still called out, because it may have been made on another Mac.
+    @ViewBuilder private var recognitionLanguages: some View {
+        let available = TextRecognizer.availableLanguages()
+        let chosen = RecognitionLanguagePreference.codes(from: recognitionLanguageCodes)
+        Section {
+            // Vision reads close to thirty languages, and on macOS this Form
+            // sizes itself to its content — a row each made the Settings
+            // window 1834 points tall, well past any screen. The list gets a
+            // height of its own and scrolls inside it.
+            let rows = ForEach(available, id: \.self) { code in
+                Toggle(isOn: Binding(
+                    get: { chosen.contains(code) },
+                    set: { wanted in
+                        var next = chosen.filter { $0 != code }
+                        if wanted { next.append(code) }
+                        recognitionLanguageCodes = RecognitionLanguagePreference.stored(from: next)
+                    })) {
+                        Text(RecognitionLanguagePreference.name(of: code))
+                    }
+                    .accessibilityIdentifier("recognition-language-\(code)")
+            }
+            #if os(macOS)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) { rows }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, 4)
+            }
+            .frame(height: 190)
+            #else
+            rows
+            #endif
+            let unavailable = chosen.filter { !available.contains($0) }
+            if !unavailable.isEmpty {
+                Text(L10n.settingsRecognitionUnavailable(
+                    unavailable.map(RecognitionLanguagePreference.name(of:))
+                        .formatted(.list(type: .and))))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("recognition-language-unavailable")
+            }
+        } header: {
+            Text(L10n.settingsRecognitionLanguages).foregroundStyle(Color.primary)
+        } footer: {
+            Text(L10n.settingsRecognitionLanguagesFooter).foregroundStyle(Color.primary)
+        }
     }
 
     private var form: some View {
@@ -150,6 +203,8 @@ public struct SettingsView: View {
                 Text(L10n.settingsLanguageMac)
                 #endif
             }
+
+            recognitionLanguages
 
             Section(L10n.settingsAbout) {
                 LabeledContent(L10n.settingsVersion, value: Self.version)

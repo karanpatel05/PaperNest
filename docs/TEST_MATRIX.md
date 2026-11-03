@@ -3411,3 +3411,98 @@ On a throwaway library (`/tmp/pn-resize`, since deleted):
   menu rather than on screen, so the French and Spanish were not looked at
   this time — nothing in the sheet or the page changed.
 
+## Recognition reads in the languages you choose — F4 — 2026-11-03 (Claude)
+
+Taken from "Next for Claude" in the handoff. Recognition always asked Vision
+for English, French and Spanish — whatever the document was and whoever was
+reading it. Someone scanning German could not say so, and since Vision
+**weights the list it is given**, the wrong list does not merely fail to help:
+it makes the reading worse.
+
+- Full `./scripts/test.sh`: **598 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### What it does
+
+Settings now has a **Text Recognition** section listing every language this
+device's Vision can read, named in the reader's own language. Nothing else is
+offered: the supported set differs by OS version, and a row that cannot work
+is a promise that cannot be kept.
+
+`TextRecognizer.resolve(override:fallback:available:)` decides what to use. A
+choice **replaces** the defaults rather than adding to them, for the weighting
+reason above. The order chosen is kept, because that is the order Vision
+weights. A choice this device cannot honour **at all** falls back to the
+defaults rather than leaving recognition with an empty list that reads
+nothing — and `unavailable` still carries the whole choice, so the screen says
+*"This Mac cannot read Swahili (Kenya)"* instead of quietly reading something
+else. Where nothing is readable the list comes back **empty rather than as a
+guess**: reading a page in a language nobody asked for produces confident
+nonsense, and `recognize` refuses an empty list outright.
+
+Eight tests cover the resolution, with `available` passed in so they do not
+depend on what this particular machine supports; two were proven red by
+removing the fallback and the de-duplication. Five more cover the stored form,
+which is a hand-rolled comma-separated string — a stray space or an empty
+entry would reach Vision as an unreadable language and be reported back as the
+reader's mistake.
+
+**It also removes a duplication that was waiting to go wrong.**
+`DocumentModel.recognizeText` built its recognizer from one constant and
+recorded the languages from another, agreeing only because both started from
+the same list. Both now come from one resolution. The automatic sweep was
+built with the recognizer's own hard-coded default and now takes the same
+choice.
+
+### Verified by driving the Mac app
+
+On a throwaway library (`/tmp/pn-lang`, since deleted):
+
+- The section lists the 28 languages this Mac's Vision reads, each named in
+  the reader's language, none ticked to begin with.
+- Ticking **German** stores `de-DE`; adding Italian and unticking German
+  leaves `it-IT`, so order and removal both work.
+- **End to end:** with Italian chosen, the existing recognitions were deleted
+  and the app relaunched; the automatic sweep redid all three pages and
+  recorded `["it-IT"]` in `page_recognition`. The choice reaches Vision, not
+  just the defaults file.
+- Storing a language this Mac cannot read shows **"This Mac cannot read
+  Swahili (Kenya)."** with Italian still ticked and still used.
+- **English, French and Spanish** all launched and looked at; the long footer
+  wraps cleanly in each and the language names are localized. The French
+  typography test caught a plain space before a colon in the footer, which is
+  a narrow no-break space now.
+
+### Fixed on the way: Settings grew to 1834 points tall
+
+A row per language made the macOS Settings window **1834 points tall**, well
+past any screen, because that Form sizes itself to its content. The list has a
+height of its own and scrolls inside it; the window is 935 now. Seen only
+because the window was opened and looked at — the tests would never have
+caught it.
+
+### A stale note corrected rather than acted on
+
+The handoff said `DocumentModel.recognizeText(on:)` still called the blocking
+`TextRecognizer.recognize(_:)` on the MainActor and should move to
+`recognizeOnADedicatedThread(_:)`. **It does not** — both it and the automatic
+sweep already use the dedicated thread; the fix landed and the note was never
+updated. Checked rather than redone, and the note is removed.
+
+### What this does **not** do
+
+- **No per-document choice.** It is one setting for the whole app; a library
+  with French and German documents in it gets both languages on every page or
+  switches between them by hand.
+- **Nothing is re-recognised when the choice changes.** Pages already read
+  keep what they have until something else invalidates them — there is no
+  "read these again" anywhere.
+- **The accuracy claim in the footer is not measured here.** That more
+  languages costs accuracy is Vision's documented behaviour, not something
+  this slice benchmarked.
+- **iOS is untested**, as throughout while the simulator is down. The section
+  is cross-platform and the macOS-only scroll box is `#if os(macOS)`, so the
+  iOS Form shows the rows inline — unseen.
+- **No XCUITest.** The rows carry `recognition-language-<code>` identifiers
+  for one, and the unavailable line carries its own.
+
