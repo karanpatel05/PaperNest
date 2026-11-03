@@ -3057,20 +3057,10 @@ fresh edit.** Reproduced with the pen alone — draw, Undo, draw, and Redo is
 still blue — so it is not the lasso's doing. Pressing it changed nothing on the
 page, and it then disabled itself.
 
-**Why is unestablished, and an earlier draft of this entry got it wrong.** That
-draft said the row lacked the `NSUndoManager…` notification refresh. It does
-not: the document toolbar **is** `NotebookHistoryActions`
-(`DocumentView.swift:392`), which already observes those notifications. So a
-blue Redo may mean `canRedo` was genuinely true — that the redo stack survived
-a fresh edit — and that the press was refused further down rather than being a
-no-op, because `applyInkChanges` refuses a stale write and `try?` swallows it,
-which looks identical from outside.
-
-**The check that tells the two apart has not been run:** draw A, Undo, draw B,
-press Redo, and see whether A comes back. If it does, this is a real fault in
-the document's undo stack and the registration to look at is
-`DocumentModel.registerInkUndo`. Until someone runs it, this is an open
-question, not a cosmetic label, and it should not be written off as one.
+**Run down and fixed** — see *The Undo button went dead on the stroke you had
+just drawn*, below. It was the row's enabled state, not the history, and the
+symptom was worse than a lit Redo: the **Undo** button was greyed out on the
+mark someone had just drawn.
 
 ### What this does **not** do
 
@@ -3097,3 +3087,81 @@ question, not a cosmetic label, and it should not be written off as one.
   reading one more than the dashed box shows. One line, in `MacInkCanvas`.
 - **No XCUITest**, as throughout while the simulator is down — driven by hand
   on Mac, once each in English, French and Spanish, in light mode.
+
+## The Undo button went dead on the stroke you had just drawn — 2026-11-03 (Claude)
+
+Found while checking the lasso, then run down on its own. Two earlier drafts of
+that entry each got this wrong, which is why the sequence is written out here.
+
+- Full `./scripts/test.sh`: **559 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### What was wrong
+
+After drawing a stroke, the editor's **Undo** button stayed greyed and
+**Redo** stayed lit — the state from *before* the stroke. You could not undo
+the mark you had just made, from the button.
+
+`NotebookHistoryActions` reads `UndoManager.canUndo` and `canRedo`, which are
+not observable SwiftUI state, so it re-reads them only when one of its own
+inputs changes. It bumps a `revision` on `NSUndoManagerDidCloseUndoGroup`,
+`…DidUndoChange` and `…DidRedoChange`. The last two fire; **the first does
+not** for these registrations, because every ink edit registers its undo from
+inside a `Task` rather than while handling an event, so there is no
+event-grouped close for the undo manager to announce. Nothing told the row the
+stroke had happened.
+
+`DocumentModel.historyRevision` is the input it was missing: the model advances
+it whenever it registers an undo, re-registers one during an undo, or clears
+the stack after a failed write, and the row folds it into its `.id`. The model
+is the only thing that knows it has touched the stack.
+
+### How it was established, step by step
+
+Everything below is one action per round trip — **a click and a screenshot in
+the same batch is useless here**, because the undo runs on a `Task` and the
+screenshot is taken before it lands. Two earlier passes were misread exactly
+that way, and the first of them is the reason an earlier draft of the lasso
+entry called this "a stale label" without evidence.
+
+1. Draw A → Undo → page empty, Undo greyed, Redo lit. **Correct**, and it
+   proves the notification path works for an undo.
+2. Draw B → B is on the page, and the row **still** reads Undo greyed, Redo
+   lit. That is the bug: the display never moved.
+3. Press Redo → **A does not come back.** Only B is there, and the row corrects
+   itself to Undo lit, Redo greyed. So the redo stack really had been cleared
+   by the fresh edit, as `UndoManager` does; the lit Redo was stale, and the
+   press changed nothing but the display.
+4. **⌘Z undoes the stroke the greyed button refuses.** The keyboard goes
+   through the responder chain and never consults the row. So the history was
+   sound throughout and nothing was ever lost or misapplied — the fault was
+   entirely in which buttons you were allowed to press.
+
+### What was verified after the fix
+
+- Three tests in `HistoryRevisionTests`, each watched failing first (the
+  property did not exist): drawing advances the revision, **erasing and moving
+  advance it too**, and undoing advances it further rather than going
+  backwards. The first asserts `undo.canUndo` alongside, so it cannot pass by
+  registering nothing.
+- In the running Mac app, on a fresh notebook: drawing a stroke now leaves
+  **Undo lit and Redo greyed**, and undo-then-draw-again — the original
+  symptom — leaves Undo lit and Redo greyed as well.
+
+### What this does **not** cover
+
+- **The same `Task` registration is used for page transforms**, which bump the
+  revision too, but rotate/crop/filter were not re-driven by hand. The tests
+  cover ink only.
+- **iOS was not driven**, as throughout while the simulator is down; it
+  compiles, and the row is shared, so the phone and iPad toolbars should
+  benefit identically — *should*, untested.
+- **No XCUITest.** `notebook-undo` and `notebook-redo` have accessibility
+  identifiers but no `accessibilityValue` saying whether they are enabled, so
+  a test would have to assert on `isEnabled`.
+- **The root cause is worked around rather than removed.** Registering inside
+  an explicit `beginUndoGrouping`/`endUndoGrouping` would make the native
+  notification fire by itself, and would be the smaller fix — but it changes
+  undo grouping for every edit in the app, including the re-registration that
+  runs *during* an undo, and that was not something to change late in a
+  session on a hunch. Worth revisiting deliberately.

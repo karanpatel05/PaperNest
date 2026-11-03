@@ -86,9 +86,18 @@ struct NotebookPageSheet: View {
 
 /// Observe the native manager: its canUndo/canRedo properties are not observable
 /// SwiftUI state. These actions also make notebook history accessible on phones.
+///
+/// The notifications cover an undo and a redo, but **not a registration made
+/// from inside a `Task`**, which is how every ink edit registers. Without
+/// `historyRevision` the row kept showing the state from before the stroke —
+/// Undo greyed out on the mark just drawn, Redo lit with nothing to redo —
+/// until something else happened to refresh it. The model supplies that
+/// revision because only it knows when it has touched the stack.
 struct NotebookHistoryActions: View {
     let undoManager: UndoManager?
     let busy: Bool
+    /// `DocumentModel.historyRevision`, or 0 where there is no document.
+    var historyRevision = 0
     @State private var revision = 0
 
     var body: some View {
@@ -104,7 +113,7 @@ struct NotebookHistoryActions: View {
             .disabled(busy || undoManager?.canRedo != true)
             .accessibilityIdentifier("notebook-redo")
         }
-        .id(revision)
+        .id(revision &+ historyRevision)
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidCloseUndoGroup, object: undoManager)) { _ in revision &+= 1 }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange, object: undoManager)) { _ in revision &+= 1 }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange, object: undoManager)) { _ in revision &+= 1 }

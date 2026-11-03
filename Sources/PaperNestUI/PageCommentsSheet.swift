@@ -63,7 +63,8 @@ struct PageCommentsSheet: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
+                        NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage,
+                                               historyRevision: model.historyRevision)
                     } label: { Label(L10n.more, systemImage: "ellipsis.circle") }
                     .accessibilityIdentifier("comments-history")
                 }

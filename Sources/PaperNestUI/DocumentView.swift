@@ -389,7 +389,8 @@ struct DocumentView: View {
                 commentsButton
                 annotateTextButton
                 manageMarkupButton
-                NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
+                NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage,
+                                       historyRevision: model.historyRevision)
                 editingTools
                 recognizeTextButton
                 addPagesItems
@@ -419,7 +420,8 @@ struct DocumentView: View {
         exportButton
             .labelStyle(.titleAndIcon)
         Menu {
-            NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
+            NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage,
+                                   historyRevision: model.historyRevision)
             Divider()
             addPagesItems
             Divider()
@@ -581,7 +583,8 @@ struct DocumentView: View {
             Label(L10n.pages, systemImage: "square.grid.2x2")
         }
         Menu {
-            NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage)
+            NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage,
+                                   historyRevision: model.historyRevision)
             Divider()
             recognizeTextButton
             annotateTextButton

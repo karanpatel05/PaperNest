@@ -156,6 +156,19 @@ final class DocumentModel {
     // while the undo manager is undoing (or redoing), so the inverse lands
     // on the correct stack; only then does it start the async store write.
 
+    /// Advances every time this model touches the undo stack.
+    ///
+    /// `UndoManager.canUndo` and `canRedo` are not observable, so a view
+    /// holding Undo and Redo buttons re-reads them only when one of its own
+    /// inputs changes. The notifications cover an undo and a redo but **not a
+    /// registration made from inside a `Task`**, which is every ink edit, so
+    /// the row went on showing the state from before the stroke: Undo greyed
+    /// out on the mark just drawn. This is the input it was missing — the
+    /// model is the only thing that knows it has registered.
+    private(set) var historyRevision = 0
+
+    private func historyDidChange() { historyRevision &+= 1 }
+
     /// A fresh edit must not write into an intermediate undo/redo state.
     /// Recheck after each suspension because native shortcuts may enqueue more.
     private func finishPendingHistory() async {
@@ -180,6 +193,7 @@ final class DocumentModel {
             if !(await operation()) {
                 historyGeneration += 1
                 undoManager?.removeAllActions(withTarget: self)
+                historyDidChange()
             }
         }
     }
@@ -196,6 +210,7 @@ final class DocumentModel {
             }
         }
         undoManager?.setActionName(actionName)
+        historyDidChange()
     }
 
     @discardableResult
@@ -541,6 +556,7 @@ final class DocumentModel {
             }
         }
         undoManager?.setActionName(actionName)
+        historyDidChange()
     }
 
     @discardableResult
