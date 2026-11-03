@@ -3019,17 +3019,21 @@ transform — two points through the inverse and subtracted, shared now with
 moves ink the way it looks. A hand-rolled divide-by-the-scale passes the zoom
 test and fails that one, which is why both are pinned.
 
-**A selection is clamped to stay wholly on the page**, which is stricter than
-`clamped` is for a text box, and for a reason: the lasso only takes a stroke it
-can enclose wholly, so handwriting with a tail off the page could never be
-selected again. A selection already bigger than the page is left alone rather
-than pinned. Thirteen tests. They failed to **build** before the API existed,
-which is an error rather than a failure, and **three** were then proven red by
-deliberately breaking the guard they cover: the closure, the whole-stroke rule
-and the rotated transform. The other ten were not shown failing against wrong
-code, and three of those — `nothingSelectedHasNoBox`, `translatingIsForInkOnly`
-and `aSelectionBiggerThanThePageCanStillBeMoved` — would pass against a good
-deal of it.
+**A selection is clamped to stay wholly inside the part of the page that is
+shown**, which is stricter than `clamped` is for a text box, and for a reason:
+the lasso only takes a stroke it can enclose wholly, so handwriting with a tail
+outside could never be selected again. The rectangle is `PageGeometry.cropRect`
+rather than the whole source, because on a cropped page the canvas covers only
+what the crop leaves, and ink dragged under the crop is as unreachable as ink
+dragged off the page. Ignoring the crop's origin makes
+`aSelectionCannotBeDraggedUnderTheCrop` fail, which is how that was checked. A selection already bigger than the page is left alone rather
+than pinned. Fourteen tests. They failed to **build** before the API existed,
+which is an error rather than a failure, and **four** were then proven red by
+deliberately breaking the guard they cover: the closure, the whole-stroke rule,
+the rotated transform and the crop's origin. The other ten were not shown
+failing against wrong code, and three of those — `nothingSelectedHasNoBox`,
+`translatingIsForInkOnly` and `aSelectionBiggerThanThePageCanStillBeMoved` —
+would pass against a good deal of it.
 
 ### Verified by driving the Mac app
 
@@ -3077,14 +3081,6 @@ mark someone had just drawn.
   rectangle to drag.
 - **Partly-enclosed strokes are simply not selected**, with no hint on screen
   saying why. A loop that catches nothing clears the selection.
-- **Clamped to the uncropped page, not the visible one.** The clamp uses
-  `page.sourceSize`, so on a **cropped** page a selection can still be dragged
-  under the crop, where the canvas cannot reach it and the lasso cannot enclose
-  it — which is the very trap the clamp exists to prevent. The rectangle it
-  should use is `PageGeometry.cropRect`. Known and not fixed.
-- **The accessibility value counts selected ids, not strokes still on the
-  page**, so undoing a stroke's creation while it is lassoed leaves the value
-  reading one more than the dashed box shows. One line, in `MacInkCanvas`.
 - **No XCUITest**, as throughout while the simulator is down — driven by hand
   on Mac, once each in English, French and Spanish, in light mode.
 

@@ -490,21 +490,24 @@ final class DocumentModel {
         return CGPoint(x: moved.x - origin.x, y: moved.y - origin.y)
     }
 
-    /// A drag of a lassoed selection, cut back so the selection stays on the
-    /// page.
+    /// A drag of a lassoed selection, cut back so the selection stays inside
+    /// the part of the page that is actually shown.
     ///
     /// Stricter than `clamped`, which lets a frame hang over an edge: the
     /// lasso only takes a stroke it can enclose **wholly**, so handwriting
-    /// with a tail off the page could never be selected again, and would be
-    /// stuck there. A selection already larger than the page cannot satisfy
-    /// both edges, and then it is left alone rather than pinned.
+    /// with a tail outside could never be selected again, and would be stuck
+    /// there. `region` is the crop rather than the whole source for the same
+    /// reason — the canvas covers only what the crop leaves, so ink dragged
+    /// under it is as unreachable as ink dragged off the page. A selection
+    /// already larger than the region cannot satisfy both edges, and then it
+    /// is left alone rather than pinned.
     nonisolated static func clampedTranslation(of bounds: CGRect, by delta: CGPoint,
-                                               within source: CGSize) -> CGPoint {
+                                               within region: CGRect) -> CGPoint {
         func clamp(_ value: Double, _ lowest: Double, _ highest: Double) -> Double {
             highest >= lowest ? min(max(value, lowest), highest) : value
         }
-        return CGPoint(x: clamp(delta.x, -bounds.minX, source.width - bounds.maxX),
-                       y: clamp(delta.y, -bounds.minY, source.height - bounds.maxY))
+        return CGPoint(x: clamp(delta.x, region.minX - bounds.minX, region.maxX - bounds.maxX),
+                       y: clamp(delta.y, region.minY - bounds.minY, region.maxY - bounds.maxY))
     }
 
     /// Keeps a dragged frame from being lost off the edge of the page.

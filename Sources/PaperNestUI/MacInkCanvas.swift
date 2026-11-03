@@ -109,7 +109,10 @@ struct MacInkCanvas: View {
         .onChange(of: page.id) { _, _ in clearSelection() }
         .accessibilityIdentifier("mac-ink-canvas")
         .accessibilityLabel(L10n.markup)
-        .accessibilityValue(selection.isEmpty ? "" : L10n.inkSelectionCount(selection.count))
+        // Counted from the objects still on the page, not from the ids held:
+        // undoing a stroke's creation while it is lassoed takes the box away,
+        // and the value has to go with it.
+        .accessibilityValue(selectedObjects.isEmpty ? "" : L10n.inkSelectionCount(selectedObjects.count))
     }
 
     private func clearSelection() {
@@ -203,7 +206,7 @@ struct MacInkCanvas: View {
         let delta = DocumentModel.clampedTranslation(
             of: bounds,
             by: DocumentModel.sourceDelta(of: viewTranslation, sourceToView: sourceToView),
-            within: page.sourceSize)
+            within: page.geometry.cropRect)
         let ids = selection
         Task { try? await model.moveInk(ids, on: page, by: delta, undoManager: undoManager) }
     }

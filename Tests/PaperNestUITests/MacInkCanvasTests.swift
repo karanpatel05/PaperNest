@@ -278,7 +278,7 @@ import PaperNestCore
     /// the canvas only covers the page.
     @Test func aSelectionCannotBeDraggedOffThePage() {
         let bounds = CGRect(x: 10, y: 10, width: 100, height: 50)
-        let page = CGSize(width: 600, height: 800)
+        let page = CGRect(x: 0, y: 0, width: 600, height: 800)
 
         #expect(DocumentModel.clampedTranslation(of: bounds, by: CGPoint(x: 20, y: 30), within: page)
                 == CGPoint(x: 20, y: 30))
@@ -288,13 +288,27 @@ import PaperNestCore
                 == CGPoint(x: 490, y: 0))
     }
 
+    /// On a **cropped** page the canvas covers only the crop, so handwriting
+    /// dragged outside it lands where no lasso can ever enclose it again —
+    /// the same trap as dragging it off the page, one rectangle in.
+    @Test func aSelectionCannotBeDraggedUnderTheCrop() {
+        let bounds = CGRect(x: 110, y: 110, width: 50, height: 20)
+        // What the crop leaves visible, in source points.
+        let visible = CGRect(x: 100, y: 100, width: 300, height: 400)
+
+        #expect(DocumentModel.clampedTranslation(of: bounds, by: CGPoint(x: -500, y: -500), within: visible)
+                == CGPoint(x: -10, y: -10))
+        #expect(DocumentModel.clampedTranslation(of: bounds, by: CGPoint(x: 900, y: 900), within: visible)
+                == CGPoint(x: 240, y: 370))
+    }
+
     /// A selection wider than the page cannot satisfy both edges, and the
     /// answer is to let it move rather than to pin it.
     @Test func aSelectionBiggerThanThePageCanStillBeMoved() {
         let bounds = CGRect(x: -50, y: 0, width: 900, height: 50)
 
         #expect(DocumentModel.clampedTranslation(of: bounds, by: CGPoint(x: 30, y: 10),
-                                                 within: CGSize(width: 600, height: 800))
+                                                 within: CGRect(x: 0, y: 0, width: 600, height: 800))
                 == CGPoint(x: 30, y: 10))
     }
 
