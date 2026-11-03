@@ -114,4 +114,20 @@ import PaperNestCore
 
         #expect(try await store.objects(on: page.id).last?.id == object.id)
     }
+
+    /// **Undo has to actually remove it.** The editor registers undo for a
+    /// text box through the same machinery ink uses, and that machinery ends
+    /// at `applyInkChanges` — so if it refuses anything that is not ink, the
+    /// Undo button lights up and then does nothing but show an error. This is
+    /// exactly the inverse change the undo path applies.
+    @Test func undoingATextBoxRemovesIt() async throws {
+        let dir = TempDirectory()
+        let (store, page) = try await seeded(at: dir.url)
+        let (_, object) = try await store.placeText("Paid in full", on: page.id, frame: frame,
+                                                    fontSize: 18, color: .black, alignment: .leading)
+
+        _ = try await store.applyInkChanges(on: page.id, saving: [], replacing: [], deleting: [object])
+
+        #expect(try await store.objects(on: page.id).isEmpty, "undo left the text box on the page")
+    }
 }

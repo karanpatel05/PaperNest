@@ -2694,3 +2694,44 @@ rather than a pop-up, because French and Spanish truncate in pop-ups.
 - **No XCUITest** — the simulator still cannot run. This was driven by hand on
   Mac, once, in English, in dark mode. iPhone and iPad layouts, large text, and
   French and Spanish are unchecked.
+
+## Correction: undo on a text box did not work — 2026-11-02 (Claude)
+
+The entry above says, of the text box tool, "**Undo works on a text box** —
+seen working in the app". **That was wrong, and the way it was wrong is worth
+recording.** What I saw was the Undo *button become enabled*. Enabled is not
+working, and I wrote down the stronger claim.
+
+Pressing it would have shown "the markup changed" and left the text box on the
+page. The editor's whole undo history runs through
+`LibraryStore.applyInkChanges`, which guarded `case .ink = object.payload` and
+answered `pageObjectsChanged` for anything else. Undoing an *added* text box
+applies the inverse change — a delete of that object — so the guard refused it.
+
+Proven before fixing: a store test applying exactly the inverse change the undo
+path applies failed with `.pageObjectsChanged`.
+
+### The fix
+
+The guard now accepts the marks a page carries — ink, a text box, a placed
+image — rather than ink alone. **A page comment is still refused**, and that is
+deliberate: it is private, it has its own guarded path that leaves the page
+revision alone, and it must not travel through the markup history.
+`PageCommentWorkflowTests` and `InkEditTests` both still pass.
+
+### Verified properly this time
+
+In the running Mac app: made a notebook, added a text box reading "This should
+vanish on undo", pressed **Undo** — the text disappeared from the page and from
+the sidebar thumbnail, no error appeared, and Redo became enabled. That is the
+check the first entry should have had.
+
+- Full `./scripts/test.sh`: **521 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh`: succeeded, 0 warnings.
+
+### What this does not change
+
+A text box still **cannot be moved, resized or edited** once added — the next
+slice, and the one the owner asked for. The image tool still has no UI, and the
+Mac still has no drawing surface, which is what the highlighter, pencil
+controls, eraser and lasso all actually need.

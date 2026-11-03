@@ -2,8 +2,13 @@ import Foundation
 import PaperNestCore
 
 extension LibraryStore {
-    /// Applies an ink gesture or its inverse only while every affected object
-    /// still matches. Unrelated edits may coexist; a restored ID must be absent
+    /// Applies a markup gesture or its inverse only while every affected
+    /// object still matches.
+    ///
+    /// Named for ink because that is what it carried first; it takes any mark
+    /// a page shows — ink, a text box, a placed image — because the editor's
+    /// undo history goes through it for all of them. A page comment does not:
+    /// it is private and has its own path. Unrelated edits may coexist; a restored ID must be absent
     /// throughout the library so INSERT OR REPLACE cannot move another object.
     public func applyInkChanges(on pageID: PageID, saving: [PageObject], replacing: [PageObject], deleting: [PageObject]) throws -> Page {
         try db.transaction {
@@ -16,9 +21,20 @@ extension LibraryStore {
                   replacedIDs.isSubset(of: savedIDs), savedIDs.isDisjoint(with: deleting.map(\.id)) else {
                 throw StoreError.invalidOrder
             }
+            // Marks a page carries, not ink alone. The editor's undo history
+            // runs everything through here, so a kind missing from this list
+            // gets an Undo button that lights up and then only shows an error
+            // — which is what a text box did until this was widened.
+            //
+            // A page comment is deliberately **not** one: it is private, it has
+            // its own guarded path that leaves the page revision alone, and it
+            // must not travel through the markup history.
             guard (saving + expected).allSatisfy({ object in
-                guard object.pageID == pageID, case .ink = object.payload else { return false }
-                return true
+                guard object.pageID == pageID else { return false }
+                switch object.payload {
+                case .ink, .text, .image: return true
+                case .comment: return false
+                }
             }) else { throw StoreError.pageObjectsChanged }
             let current = Dictionary(uniqueKeysWithValues: try objects(on: pageID).map { ($0.id, $0) })
             guard expected.allSatisfy({ current[$0.id] == $0 }) else { throw StoreError.pageObjectsChanged }
