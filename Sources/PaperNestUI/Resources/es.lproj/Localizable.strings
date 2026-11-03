@@ -295,7 +295,7 @@
 "markup.customColor" = "Color personalizado";
 "markup.saved" = "Trazos guardados";
 "markup.empty" = "No hay trazos en esta página.";
-"markup.help" = "Selecciona resaltados o trazos para cambiar su color o eliminarlos. Cada acción se puede deshacer en el documento.";
+"markup.help" = "Selecciona cualquier elemento de esta página para eliminarlo. El color solo se aplica a resaltados y trazos. Cada acción se puede deshacer en el documento.";
 "markup.recolor" = "Aplicar color";
 "markup.remove" = "Eliminar selección";
 "markup.changed" = "Esta página o sus trazos han cambiado. Revisa la página actualizada y vuelve a seleccionar los trazos.";
@@ -433,3 +433,6 @@
 /* The Mac lasso */
 "ink.lasso" = "Lazo";
 "ink.move" = "Mover la escritura";
+
+/* Removing a text box or an image from the markup manager */
+"markup.image" = "Imagen";

@@ -36,21 +36,20 @@ struct MarkupManagerSheet: View {
                         Text(L10n.markupEmpty).foregroundStyle(Color.primary).accessibilityIdentifier("markup-empty")
                     } else {
                         ForEach(Array(objects.enumerated()), id: \.element.id) { index, object in
-                            if case .ink(let stroke) = object.payload {
-                                Button { toggle(object) } label: {
-                                    HStack(spacing: 12) {
-                                        InkSwatch(stroke: stroke).frame(width: 60, height: 32).accessibilityHidden(true)
-                                        Text(L10n.markupMark(index + 1))
-                                        Spacer()
-                                        Image(systemName: selected.contains(object.id) ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(Theme.accent)
-                                    }.contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("markup-row-\(object.id.rawValue)")
-                                .accessibilityLabel(L10n.markupMark(index + 1))
-                                .accessibilityValue("\(selected.contains(object.id) ? L10n.selectionOn : L10n.selectionOff), \(stroke.color.hexLabel)")
+                            Button { toggle(object) } label: {
+                                HStack(spacing: 12) {
+                                    MarkSwatch(object: object).frame(width: 60, height: 32).accessibilityHidden(true)
+                                    Text(Self.describe(object, number: index + 1))
+                                        .lineLimit(1).truncationMode(.tail)
+                                    Spacer()
+                                    Image(systemName: selected.contains(object.id) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(Theme.accent)
+                                }.contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("markup-row-\(object.id.rawValue)")
+                            .accessibilityLabel(Self.describe(object, number: index + 1))
+                            .accessibilityValue(Self.state(of: object, selected: selected.contains(object.id)))
                         }
                     }
                 } header: {
@@ -61,8 +60,11 @@ struct MarkupManagerSheet: View {
                 if !objects.isEmpty {
                     Section(L10n.markupColor) {
                         MarkupColorPicker(color: $color)
+                        // Only ink has an ink colour. The store refuses the
+                        // rest outright, so offering the button for a text
+                        // box or an image would only promise a refusal.
                         Button(L10n.markupRecolor) { Task { await apply(.recolor(color)) } }
-                            .disabled(selected.isEmpty)
+                            .disabled(selected.isEmpty || !selectionIsAllInk)
                             .accessibilityIdentifier("markup-recolor")
                     }
                     Section {
@@ -100,6 +102,29 @@ struct MarkupManagerSheet: View {
         if wasEmpty, case .ink(let stroke) = object.payload { color = stroke.color }
     }
 
+    private var selectionIsAllInk: Bool {
+        objects.filter { selected.contains($0.id) }.allSatisfy { object in
+            if case .ink = object.payload { return true }
+            return false
+        }
+    }
+
+    /// A text box says what it says; everything else is numbered, because a
+    /// stroke has no name and two of them look alike in a list.
+    private static func describe(_ object: PageObject, number: Int) -> String {
+        switch object.payload {
+        case .text(let box) where !box.text.isEmpty: box.text
+        case .image: L10n.markupImage
+        case .text, .ink, .comment: L10n.markupMark(number)
+        }
+    }
+
+    private static func state(of object: PageObject, selected: Bool) -> String {
+        let selection = selected ? L10n.selectionOn : L10n.selectionOff
+        guard case .ink(let stroke) = object.payload else { return selection }
+        return "\(selection), \(stroke.color.hexLabel)"
+    }
+
     private func load() async {
         let requestID = UUID()
         loadID = requestID
@@ -107,7 +132,14 @@ struct MarkupManagerSheet: View {
         defer { if loadID == requestID { isLoading = false } }
         do {
             guard let store = model.session.environment?.store, let latest = try await store.page(pageID) else { throw StoreError.pageNotFound }
-            let latestObjects = try await store.objects(on: pageID).filter { if case .ink = $0.payload { return true }; return false }
+            // Everything painted on the page, which is what this manager is
+            // for. A comment is not painted on it and is not removable here.
+            let latestObjects = try await store.objects(on: pageID).filter { object in
+                switch object.payload {
+                case .ink, .text, .image: true
+                case .comment: false
+                }
+            }
             guard !Task.isCancelled, loadID == requestID else { return }
             if latest != page || latestObjects != objects {
                 selected = []
@@ -141,6 +173,16 @@ private struct MarkupSelectionPreview: View {
     let page: Page
     let objects: [PageObject]
 
+    /// Where a mark sits in source points, whatever kind it is.
+    static func bounds(of object: PageObject) -> CGRect? {
+        switch object.payload {
+        case .ink(let stroke): stroke.sourceBounds
+        case .text(let box): box.frame
+        case .image(let image): image.frame
+        case .comment: nil
+        }
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let pageSize = page.geometry.pageSize
@@ -149,7 +191,7 @@ private struct MarkupSelectionPreview: View {
                 .overlay {
                     Canvas { context, _ in
                         for object in objects {
-                            guard case .ink(let stroke) = object.payload, let bounds = stroke.sourceBounds else { continue }
+                            guard let bounds = Self.bounds(of: object) else { continue }
                             let rect = bounds.applying(page.geometry.sourceToPage)
                                 .intersection(CGRect(origin: .zero, size: pageSize))
                             guard !rect.isNull else { continue }
@@ -161,6 +203,20 @@ private struct MarkupSelectionPreview: View {
                 }
                 .frame(width: pageSize.width * scale, height: pageSize.height * scale)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+/// The little picture at the start of a row.
+private struct MarkSwatch: View {
+    let object: PageObject
+
+    var body: some View {
+        switch object.payload {
+        case .ink(let stroke): InkSwatch(stroke: stroke)
+        case .text: Image(systemName: "character.textbox").foregroundStyle(Color.secondary)
+        case .image: Image(systemName: "photo").foregroundStyle(Color.secondary)
+        case .comment: EmptyView()
         }
     }
 }

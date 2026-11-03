@@ -513,6 +513,11 @@ extension L10n {
     static var inkEraser: String { tr("ink.eraser") }
 }
 
+// Removing a text box or an image — ledger row 21.
+extension L10n {
+    static var markupImage: String { tr("markup.image") }
+}
+
 // The Mac lasso — ledger row 21.
 extension L10n {
     static var inkLasso: String { tr("ink.lasso") }

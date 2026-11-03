@@ -72,10 +72,9 @@ import PaperNestCore
         let (page, objects) = try await seed(store)
         let blue = RGBAColor(red: 0, green: 0.2, blue: 1)
         var changed = objects[1]; changed.zKey = "Z"
-        for selection in [[objects[0], changed], [objects[0], objects[2]]] {
-            await #expect(throws: StoreError.pageObjectsChanged) {
-                try await store.editInk(on: page.id, expectedRevision: page.revision, objects: selection, edit: .remove)
-            }
+        await #expect(throws: StoreError.pageObjectsChanged) {
+            try await store.editInk(on: page.id, expectedRevision: page.revision,
+                                    objects: [objects[0], changed], edit: .remove)
         }
         for selection in [[], [objects[0], objects[0]]] {
             await #expect(throws: StoreError.invalidOrder) {
@@ -93,6 +92,65 @@ import PaperNestCore
         }
         #expect(try await store.page(page.id)?.revision == rotated.revision)
         #expect(try await store.objects(on: page.id) == objects)
+    }
+
+    /// The markup manager is the only place a mark can be taken off a page
+    /// once undo has moved on. Until it accepted these, **a text box or a
+    /// placed image could never be removed at all** — the manager listed ink
+    /// only, and nothing else offered a delete.
+    @Test func aTextBoxAndAPlacedImageCanBeRemovedToo() async throws {
+        let dir = TempDirectory(), store = try LibraryStore(directory: dir.url)
+        let (page, objects) = try await seed(store)
+        let box = objects[2]
+        let (withImage, image) = try await store.placeImage(
+            try store.assets.store(Data("stamp bytes".utf8), kind: .png, originalFilename: "stamp.png"),
+            on: page.id, frame: CGRect(x: 10, y: 10, width: 40, height: 40))
+
+        let removed = try await store.editInk(on: page.id, expectedRevision: withImage.revision,
+                                              objects: [box, image], edit: .remove)
+
+        #expect(removed.previous == [box, image])
+        #expect(removed.saved.isEmpty)
+        // The ink is untouched, and so is everything the page knows.
+        let reopened = try LibraryStore(directory: dir.url)
+        #expect(try await reopened.objects(on: page.id) == Array(objects.prefix(2)))
+        #expect(try await reopened.search("Searchable") == [page.itemID])
+    }
+
+    /// A comment is not a mark on the page and has its own place to live.
+    /// Letting the markup manager sweep one away would delete something the
+    /// user cannot even see from there.
+    @Test func aCommentIsNeverRemovedThisWay() async throws {
+        let dir = TempDirectory(), store = try LibraryStore(directory: dir.url)
+        let (page, _) = try await seed(store)
+        let comment = PageObject(pageID: page.id, zKey: "D",
+                                 payload: .comment("Ask about this"),
+                                 modifiedAt: Date())
+        let withComment = try await store.applyObjectChanges(on: page.id, saving: [comment], deleting: [])
+        let saved = try #require(try await store.objects(on: page.id).first { $0.id == comment.id })
+
+        await #expect(throws: StoreError.pageObjectsChanged) {
+            try await store.editInk(on: page.id, expectedRevision: withComment.revision,
+                                    objects: [saved], edit: .remove)
+        }
+        #expect(try await store.objects(on: page.id).contains(saved))
+    }
+
+    /// Recoloring stays ink-only: a placed image has no colour at all, and a
+    /// text box's colour is not what this picker means. Refused rather than
+    /// quietly skipped, so a caller cannot believe it recoloured something.
+    @Test func recoloringAnythingButInkIsRefused() async throws {
+        let dir = TempDirectory(), store = try LibraryStore(directory: dir.url)
+        let (page, objects) = try await seed(store)
+        let blue = RGBAColor(red: 0, green: 0.2, blue: 1)
+
+        await #expect(throws: StoreError.cannotRecolor) {
+            try await store.editInk(on: page.id, expectedRevision: page.revision,
+                                    objects: [objects[0], objects[2]], edit: .recolor(blue))
+        }
+        // Not even the ink in the same selection was touched.
+        #expect(try await store.objects(on: page.id) == objects)
+        #expect(try await store.page(page.id)?.revision == page.revision)
     }
 
     @Test func foreignPageAndDeletedDocumentCannotBeEdited() async throws {

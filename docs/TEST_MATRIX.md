@@ -3161,3 +3161,96 @@ entry called this "a stale label" without evidence.
   undo grouping for every edit in the app, including the re-registration that
   runs *during* an undo, and that was not something to change late in a
   session on a hunch. Worth revisiting deliberately.
+
+## The six tools, used together for the first time — 2026-11-03 (Claude)
+
+The six the owner asked for were built one at a time over three days and had
+never been exercised side by side. This is that pass, in one notebook on a
+Mac, and the two faults it turned up — both fixed here.
+
+- Full `./scripts/test.sh`: **567 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### 1. A text box or an image could never be taken off the page
+
+**Manage Markup said "No marks on this page" with a text box plainly on it** —
+and plainly in the sheet's own preview, two inches above those words. Its list
+filtered to `.ink`, so the two tools that do not draw ink produced marks the
+manager could not see. Nothing else offers a delete: the eraser is ink-only by
+design, the lasso selects ink only, and the drag overlay moves without
+removing. So once undo had moved on, **a text box or a placed image was on
+that page permanently.** That is a worse fault than any of the polish items in
+the entries above, and the pass found it in the first two minutes.
+
+The gate was in the store: `editInk` refused anything but `.ink` outright.
+Now:
+
+- **Removing** accepts `.ink`, `.text` and `.image` — anything painted on the
+  page.
+- **A comment is still refused.** It is not painted on the page and has its
+  own place to live; sweeping one away from a markup sheet would delete
+  something the user cannot see from there.
+- **Recolouring stays ink-only** and is **refused**, not skipped, for anything
+  else, through a new `StoreError.cannotRecolor`: an image has no colour and a
+  text box's colour is not what that picker means. The sheet disables **Apply
+  Color** whenever the selection holds anything but ink, so the button never
+  promises a refusal.
+
+The sheet lists every painted mark, a text box under its own words rather than
+as "Mark 3", and the selection preview outlines text and image frames as it
+already did stroke bounds.
+
+### 2. The highlighter drew a hairline
+
+Pen and highlighter shared one row of widths — 1, 2 and 4 points. That is
+right for a pen on an A4 page and useless for a highlighter: at **Thick** it
+laid a 4-point yellow line *across* the words instead of a band behind them,
+which a zoom of the page makes plain. It was not a highlighter in any sense a
+user would recognise.
+
+The width row now means different things to different tools: `width(for:)` on
+`MacMarkupTool`, with the picker carrying a `MarkupWeight` (thin/medium/thick)
+rather than a number. The pen keeps 1/2/4; the highlighter gets 12/20/30, so
+its *thinnest* is wider than the pen's thickest and its middle step covers the
+18-point line a text box defaults to. Choosing by weight rather than by number
+also means switching back to the pen cannot leave a 30-point pen armed.
+
+### What was verified, and how
+
+Thirteen new tests in all, each watched failing first. Three were then proven
+red by breaking the guard they cover: the highlighter widths (set back to the
+pen's, and two tests fail), removing a text box, and recolouring one.
+
+In the running Mac app, on a throwaway library (`/tmp/pn-six`, since deleted):
+
+- A **new** highlighter stroke lays a proper yellow band behind a line of
+  text, in the same frame as the old 4-point stroke still showing as a
+  hairline on the line above. Old strokes keep the width they were saved with,
+  which is correct and worth knowing.
+- Manage Markup lists the text box **under its own words**, with Apply Color
+  greyed and Remove Selected lit while it is the selection.
+- **Remove Selected takes it off the page**, out of the list, out of the
+  preview and out of the sidebar thumbnail — and **Undo puts it back**.
+
+### Also found, and **not** fixed
+
+- **The sheet outgrows the window.** With four marks on a 729-point-tall
+  window, Apply Color and Remove Selected fall below the bottom edge; the
+  scroll view is there, but synthetic scroll events would not move it, so
+  **whether a real trackpad reaches them is unconfirmed**. Verified instead on
+  a page with one mark. The sheet asks for `idealHeight: 680` and the Done
+  button sits at the very bottom edge. Codex owns that layout.
+- **A text box still cannot be edited.** Clicking and double-clicking a placed
+  box does nothing but select it: its words, size, colour and alignment are
+  fixed at the moment it is added. Now that it can at least be *removed*, this
+  is a smaller hole than it was, but a typo still means delete and retype.
+- **A text box's frame is taller than its text**, so the dashed selection box
+  hangs below the words. The text does wrap rather than clip, which the
+  earlier entry for text boxes did not establish.
+- **The image picker is still undriven.** A macOS open panel is modal and
+  background control cannot bring it forward.
+- **Six tools, two homes.** Pen, highlighter, eraser and lasso live behind the
+  Markup toggle; Text Box and Image sit in the toolbar and are unavailable
+  while Markup is on. That is a coherence question for whoever owns the
+  design, not a bug.
+

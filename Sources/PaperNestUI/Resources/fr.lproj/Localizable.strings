@@ -295,7 +295,7 @@
 "markup.customColor" = "Couleur personnalisée";
 "markup.saved" = "Tracés enregistrés";
 "markup.empty" = "Aucun tracé sur cette page.";
-"markup.help" = "Sélectionnez des surlignages ou des tracés pour changer leur couleur ou les supprimer. Chaque action peut être annulée dans le document.";
+"markup.help" = "Sélectionnez n’importe quel élément de cette page pour le supprimer. La couleur ne s’applique qu’aux surlignages et aux tracés. Chaque action peut être annulée dans le document.";
 "markup.recolor" = "Appliquer la couleur";
 "markup.remove" = "Supprimer la sélection";
 "markup.changed" = "Cette page ou ses tracés ont changé. Vérifiez la page mise à jour et sélectionnez à nouveau les tracés.";
@@ -433,3 +433,6 @@
 /* The Mac lasso */
 "ink.lasso" = "Lasso";
 "ink.move" = "Déplacer l’écriture";
+
+/* Removing a text box or an image from the markup manager */
+"markup.image" = "Image";

@@ -33,7 +33,7 @@ struct DocumentView: View {
     @State private var textBoxPage: Page?
     @State private var inkTool: MacMarkupTool = .pen
     @State private var inkColor = RGBAColor(red: 0, green: 0, blue: 0, alpha: 1)
-    @State private var inkWidth: Double = 2
+    @State private var inkWeight: MarkupWeight = .medium
     @State private var isShowingImagePicker = false
     @State private var isShowingCrop = false
     @State private var annotationPage: Page?
@@ -103,7 +103,8 @@ struct DocumentView: View {
                         #endif
                         PageViewer(model: model, zoom: $zoom, showsZoomButtons: true, isMarkingUp: isMarkingUp,
                                    fingerDrawing: isFingerDrawing, undoManager: undoManager,
-                                   inkTool: inkTool, inkColor: inkColor, inkWidth: inkWidth)
+                                   inkTool: inkTool, inkColor: inkColor,
+                                   inkWidth: inkTool.width(for: inkWeight))
                     }
                 }
             }
@@ -358,10 +359,12 @@ struct DocumentView: View {
             .frame(width: 420)
             .accessibilityIdentifier("ink-tool")
             if inkTool.ink != nil {
-                Picker(L10n.shapeWidth, selection: $inkWidth) {
-                    Text(L10n.shapeThin).tag(1.0)
-                    Text(L10n.shapeMedium).tag(2.0)
-                    Text(L10n.shapeThick).tag(4.0)
+                // Thin, Medium and Thick rather than numbers, because what
+                // they are worth depends on the tool: see `width(for:)`.
+                Picker(L10n.shapeWidth, selection: $inkWeight) {
+                    Text(L10n.shapeThin).tag(MarkupWeight.thin)
+                    Text(L10n.shapeMedium).tag(MarkupWeight.medium)
+                    Text(L10n.shapeThick).tag(MarkupWeight.thick)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()

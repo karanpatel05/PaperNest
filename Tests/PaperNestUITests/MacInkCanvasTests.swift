@@ -143,6 +143,48 @@ import PaperNestCore
         #expect(MacInkCanvas.strokesHit(by: flick, in: [dot], radius: 8).count == 1)
     }
 
+    // MARK: - How wide each tool draws
+
+    /// A highlighter is not a thick pen. It has to cover a line of text, and
+    /// the pen's widths — 1, 2 and 4 points on an A4 page — draw a hairline
+    /// that sits *on* the words instead of behind them. That is what the tool
+    /// did on a Mac until these widths existed: picking **Thick** gave a
+    /// 4-point yellow line across the middle of the text, which is not a
+    /// highlighter by any reading.
+    ///
+    /// The relationship is the point, not the numbers: **the thinnest
+    /// highlighter is wider than the thickest pen.**
+    @Test func theThinnestHighlighterIsWiderThanTheThickestPen() {
+        let thinnestHighlighter = MacMarkupTool.highlighter.width(for: .thin)
+        let thickestPen = MacMarkupTool.pen.width(for: .thick)
+
+        #expect(thinnestHighlighter > thickestPen)
+    }
+
+    /// Every tool that draws gets heavier from thin to thick; a row of three
+    /// widths that do not increase is a row of three lies.
+    @Test func everyDrawingToolGetsHeavierWithEachStep() {
+        for tool in MacMarkupTool.allCases where tool.ink != nil {
+            #expect(tool.width(for: .thin) < tool.width(for: .medium), "\(tool) thin to medium")
+            #expect(tool.width(for: .medium) < tool.width(for: .thick), "\(tool) medium to thick")
+            #expect(tool.width(for: .thin) > 0, "\(tool) draws nothing at its thinnest")
+        }
+    }
+
+    /// The eraser and the lasso draw no mark, so they have no width — which
+    /// is also why the width row is hidden for them.
+    @Test func aToolThatDrawsNothingHasNoWidth() {
+        for tool in MacMarkupTool.allCases where tool.ink == nil {
+            #expect(MarkupWeight.allCases.allSatisfy { tool.width(for: $0) == 0 }, "\(tool)")
+        }
+    }
+
+    /// A highlighter wide enough to cover 18-point text, which is the size a
+    /// text box defaults to, is the whole purpose of the tool.
+    @Test func theDefaultHighlighterCoversALineOfText() {
+        #expect(MacMarkupTool.highlighter.width(for: .medium) >= 18)
+    }
+
     // MARK: - The lasso
 
     /// A loop drawn around a stroke takes it and leaves the one outside.

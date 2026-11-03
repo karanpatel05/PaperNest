@@ -22,6 +22,11 @@ public enum StoreError: Error, Equatable, Sendable {
     case recognitionChanged
     /// Saved marks or page geometry changed while the markup manager was open.
     case pageObjectsChanged
+    /// A recolor was asked for on something that has no ink colour — a placed
+    /// image, or a text box, whose colour is not what that picker means.
+    /// Refused rather than quietly skipped, so no caller can believe a mark
+    /// was recoloured when it was left alone.
+    case cannotRecolor
     case io(String)
     /// A migration left dangling references behind; the library is rolled
     /// back to its previous, consistent version.

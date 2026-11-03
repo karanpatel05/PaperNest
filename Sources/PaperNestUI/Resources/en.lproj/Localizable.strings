@@ -295,7 +295,7 @@
 "markup.customColor" = "Custom Color";
 "markup.saved" = "Saved Marks";
 "markup.empty" = "No marks on this page.";
-"markup.help" = "Select highlights or drawn strokes to change their color or remove them. Each action can be undone in the document.";
+"markup.help" = "Select anything on this page to remove it. Color applies to highlights and drawn strokes only. Each action can be undone in the document.";
 "markup.recolor" = "Apply Color";
 "markup.remove" = "Remove Selected";
 "markup.changed" = "This page or its marks changed. Review the updated page and select the marks again.";
@@ -433,3 +433,6 @@
 /* The Mac lasso */
 "ink.lasso" = "Lasso";
 "ink.move" = "Move Handwriting";
+
+/* Removing a text box or an image from the markup manager */
+"markup.image" = "Image";

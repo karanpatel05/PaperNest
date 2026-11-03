@@ -59,8 +59,24 @@ extension LibraryStore {
             guard page.revision == expectedRevision else { throw StoreError.pageObjectsChanged }
             let current = Dictionary(uniqueKeysWithValues: try objects(on: pageID).map { ($0.id, $0) })
             for object in expected {
-                guard object.pageID == pageID, current[object.id] == object,
-                      case .ink = object.payload else { throw StoreError.pageObjectsChanged }
+                guard object.pageID == pageID, current[object.id] == object else {
+                    throw StoreError.pageObjectsChanged
+                }
+                switch (edit, object.payload) {
+                // Removing is for anything painted on the page. The markup
+                // manager is the only place a mark can be taken off once undo
+                // has moved on, and while this accepted ink alone **a text
+                // box or a placed image could never be removed at all**.
+                case (.remove, .ink), (.remove, .text), (.remove, .image): break
+                // A comment is not painted on the page and has its own place
+                // to live; sweeping one away from here would delete something
+                // the user cannot see from there.
+                case (.remove, .comment): throw StoreError.pageObjectsChanged
+                case (.recolor, .ink): break
+                // An image has no colour, and a text box's colour is not what
+                // that picker means. Refused, not skipped.
+                case (.recolor, _): throw StoreError.cannotRecolor
+                }
             }
             let saved: [PageObject]
             let deleted: [PageObjectID]
