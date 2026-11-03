@@ -300,6 +300,21 @@ final class DocumentModel {
         session.didChange()
     }
 
+    /// Removes the strokes an eraser drag touched, as one undoable step.
+    ///
+    /// Whole strokes, not parts of them: see `MacInkCanvas.strokesHit`.
+    func eraseInk(_ objects: [PageObject], on page: Page, undoManager: UndoManager?) async throws {
+        guard !objects.isEmpty else { return }
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        replace(try await store.applyInkChanges(on: page.id, saving: [], replacing: [],
+                                                deleting: objects))
+        let change = InkChange(pageID: page.id, saved: [], replaced: [], deleted: objects)
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.inkEraser)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
     /// Puts an image on a page.
     ///
     /// The bytes are staged durably first and the row that references them is

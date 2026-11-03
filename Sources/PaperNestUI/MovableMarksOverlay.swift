@@ -88,7 +88,7 @@ struct MovableMarksOverlay: View {
         Task { try? await model.moveObject(mark, to: clamped, undoManager: undoManager) }
     }
 
-    static func frame(of object: PageObject) -> CGRect? {
+    nonisolated static func frame(of object: PageObject) -> CGRect? {
         switch object.payload {
         case .text(let box): box.frame
         case .image(let image): image.frame

@@ -507,3 +507,8 @@ extension L10n {
 extension L10n {
     static var insertImage: String { tr("image.insert") }
 }
+
+// The Mac eraser — ledger row 21.
+extension L10n {
+    static var inkEraser: String { tr("ink.eraser") }
+}

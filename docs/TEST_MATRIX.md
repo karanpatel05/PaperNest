@@ -2909,3 +2909,76 @@ misbehaves.
   in.
 - **One image per pick.** Multiple selection is off.
 - **No XCUITest**, as throughout while the simulator is down.
+
+## An eraser on the Mac — row 21 — 2026-11-03 (Claude)
+
+Drawing arrived on the Mac yesterday with no way to take a mark back except
+Undo. **Markup** now reads **Pen | Highlighter | Eraser**, and dragging the
+eraser over a stroke removes it.
+
+- Full `./scripts/test.sh`: **543 tests passed**, **0 warnings**, all five
+  targets green.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### What it does
+
+The eraser is a **mode, not a mark**. `MacMarkupTool` is its own enum rather
+than a case added to `InkStroke.Tool`, which is persisted — an eraser case in
+the stored enum would invite a saved stroke that claims to be one. The drag
+paints nothing: it collects points, converts them to source space, and asks
+which ink objects it touched.
+
+**Hit-testing is point-to-segment, in both directions.** A stroke is taken when
+any of its points comes within `eraserRadius + width / 2` of a *segment* of the
+eraser's path, or any eraser point comes that close to a segment of the stroke.
+Measuring only between recorded points was the first implementation and it
+was wrong: it missed the middle of a long straight stroke, whose two recorded
+points are hundreds apart, and `theEraserTakesTheStrokeItCrosses` caught it. The
+reverse direction covers a dot that falls between two samples of a fast flick
+(`aFastFlickStillTakesADotBetweenItsSamples`). The reach is 8 source points
+plus half the stroke's width, so a thick stroke is caught from further away
+(`aThickStrokeIsReachedFromFurtherAway`) and the reach is the same on the page
+at any zoom.
+
+Removal goes through `applyInkChanges(on:saving:replacing:deleting:)`, the same
+guarded write every other mark uses, as one undoable step named by `L10n`.
+Eleven tests cover the geometry and the hit-testing, including
+`theEraserNeverTakesATextBoxOrAnImage` — the filter matches `.ink` payloads
+only, so a text box or an image sitting under the drag is not collateral.
+
+While the eraser is selected the **width and colour controls are hidden**,
+because neither means anything for it, and the preview stroke is a faint grey
+instead of the pen's colour.
+
+### Verified by driving the Mac app
+
+Against a throwaway library (`/tmp/pn-erase`, since deleted), in a notebook with
+two separate pen strokes one above the other:
+
+- Switching to **Eraser** hid the width and colour rows, leaving the three
+  tools.
+- One drag down across the **upper** stroke only: **the upper stroke
+  disappeared from the page and from the sidebar thumbnail, and the lower one
+  stayed.** Both halves of that matter — an eraser that takes everything would
+  also pass "the stroke is gone".
+- **Undo brought it back**, both lines on the page and in the thumbnail, with
+  Redo then enabled. The write is durable, not a view-state trick.
+
+### What this does **not** do
+
+- **Whole strokes only.** A stroke the eraser crosses goes *entirely*, rather
+  than being split where it was crossed. Splitting means rewriting a stroke's
+  points and deciding what becomes of the halves; a whole-stroke eraser is a
+  behaviour people already know, but it is not what PencilKit does on iOS, so
+  **the two platforms now erase differently** and nobody should read one as
+  evidence about the other.
+- **No eraser size.** 8 source points, chosen because aiming a mouse at a thin
+  line is harder than aiming a finger. Unmeasured against anyone's hand.
+- **No cursor change.** The pointer stays an arrow over the page, so the only
+  sign of which tool is armed is the segmented control.
+- **Nothing is erased on iOS by this.** PencilKit's own eraser is what iOS has,
+  and it is untouched.
+- **Still no lasso on Mac**, which is the last of the six tools the owner asked
+  for: handwriting cannot be selected and moved there.
+- **No XCUITest**, as throughout while the simulator is down — driven by hand
+  on Mac, once, in English, in light mode.

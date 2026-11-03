@@ -426,3 +426,6 @@
 
 /* Placing an image */
 "image.insert" = "Image";
+
+/* The Mac eraser */
+"ink.eraser" = "Eraser";

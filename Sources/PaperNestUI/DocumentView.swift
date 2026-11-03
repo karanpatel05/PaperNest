@@ -31,7 +31,7 @@ struct DocumentView: View {
     @State private var isShowingPageOrganizer = false
     @State private var isShowingOutline = false
     @State private var textBoxPage: Page?
-    @State private var inkTool: InkStroke.Tool = .pen
+    @State private var inkTool: MacMarkupTool = .pen
     @State private var inkColor = RGBAColor(red: 0, green: 0, blue: 0, alpha: 1)
     @State private var inkWidth: Double = 2
     @State private var isShowingImagePicker = false
@@ -348,23 +348,26 @@ struct DocumentView: View {
     private var macInkTools: some View {
         HStack(spacing: 16) {
             Picker(L10n.markup, selection: $inkTool) {
-                Text(L10n.inkPen).tag(InkStroke.Tool.pen)
-                Text(L10n.inkHighlighter).tag(InkStroke.Tool.highlighter)
+                Text(L10n.inkPen).tag(MacMarkupTool.pen)
+                Text(L10n.inkHighlighter).tag(MacMarkupTool.highlighter)
+                Text(L10n.inkEraser).tag(MacMarkupTool.eraser)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 220)
+            .frame(width: 300)
             .accessibilityIdentifier("ink-tool")
-            Picker(L10n.shapeWidth, selection: $inkWidth) {
-                Text(L10n.shapeThin).tag(1.0)
-                Text(L10n.shapeMedium).tag(2.0)
-                Text(L10n.shapeThick).tag(4.0)
+            if inkTool != .eraser {
+                Picker(L10n.shapeWidth, selection: $inkWidth) {
+                    Text(L10n.shapeThin).tag(1.0)
+                    Text(L10n.shapeMedium).tag(2.0)
+                    Text(L10n.shapeThick).tag(4.0)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 220)
+                .accessibilityIdentifier("ink-width")
+                MarkupColorPicker(color: $inkColor)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 220)
-            .accessibilityIdentifier("ink-width")
-            MarkupColorPicker(color: $inkColor)
             Spacer()
         }
         .padding(.horizontal, 14)
@@ -951,7 +954,7 @@ private struct PageViewer: View {
     var isMarkingUp = false
     var fingerDrawing = false
     var undoManager: UndoManager?
-    var inkTool: InkStroke.Tool = .pen
+    var inkTool: MacMarkupTool = .pen
     var inkColor = RGBAColor(red: 0, green: 0, blue: 0, alpha: 1)
     var inkWidth: Double = 2
 
