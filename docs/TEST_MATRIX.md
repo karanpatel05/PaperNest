@@ -3254,3 +3254,77 @@ In the running Mac app, on a throwaway library (`/tmp/pn-six`, since deleted):
   while Markup is on. That is a coherence question for whoever owns the
   design, not a bug.
 
+## A text box can be changed after it is placed — row 21 — 2026-11-03 (Claude)
+
+The hole the previous entry's pass left open. A text box was **write-once**:
+its words, size, colour and alignment were fixed the moment it was added, and
+clicking or double-clicking it did nothing but select it. A typo meant
+deleting the box and typing it again — and until the previous commit it could
+not even be deleted.
+
+- Full `./scripts/test.sh`: **573 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### What it does
+
+**Double-click a box and it opens**, pre-filled with what is on the page, with
+the sheet titled *Edit Text Box* and its button reading *Save*. The same sheet
+adds and edits; `editing` tells it which.
+
+`LibraryStore.updateText` is the way in, with **the same refusals as placing
+one** — empty text, a zero or non-finite size, a frame with no area — because
+an empty box is just as unusable the second time. It also refuses a payload
+that is not a text box, so a stroke handed in here cannot be quietly turned
+into text. The write is the **guarded** one, so a box someone else changed
+first is refused rather than written over.
+
+The box keeps its **id** and its place in the paint order, so undo sees one
+box changed rather than one deleted and another added, and a mark does not
+jump above its neighbours when it is edited. The same write rebuilds the
+page's `text` index row, so the old words stop being findable as the new ones
+start — pinned by a test, since search answering with text the page no longer
+carries is the kind of thing nobody notices for months.
+
+**Where it is stays where it is.** The origin and width it was dragged to are
+kept, and only the height follows the type size, through
+`DocumentModel.textBoxHeight(forFontSize:pageHeight:)` — shared with placing,
+so a box does not change shape the first time someone touches it.
+
+The sheet re-reads the box **by id** when Save is pressed rather than trusting
+the copy it opened with: an undo in between would otherwise make the guarded
+write refuse, and `try?` would hide it. If the box is gone entirely — undone,
+or removed from the markup manager — it says so instead of resurrecting it.
+
+### Verified by driving the Mac app
+
+On a throwaway library (`/tmp/pn-edit`, since deleted), with a box reading
+"Pian in full":
+
+- A **double click opens it**, pre-filled: the text, Size 18, Left, black.
+- Changing the text, the size (18 → 30), the alignment (Left → Center) and the
+  colour (black → red) and pressing **Save** shows all four on the page at
+  once, with the frame grown taller and the sidebar thumbnail redrawn.
+- **Undo restores every one of them**, frame height included.
+- **Editing again straight after that undo works** — the stale-copy trap.
+- **Dragging still works.** The double-click is a `highPriorityGesture` in
+  front of the drag, which is the thing most likely to have broken moving, so
+  it was checked rather than assumed.
+- **English, French and Spanish**, all three launched and looked at:
+  *Edit Text Box / Save*, *Modifier la zone de texte / Enregistrer*, *Editar el
+  cuadro de texto / Guardar*. No truncation in the 460-point sheet.
+
+### What this does **not** do
+
+- **No editing in place.** The words are changed in a sheet, not typed on the
+  page, and there is no caret or text selection on the page itself.
+- **Still no resize or reflow by hand.** The width is whatever it was placed
+  or dragged with; only the height follows the type size, and text longer than
+  the box still runs past its bottom edge.
+- **No font choice.** One typeface, as before.
+- **A placed image cannot be edited**, because there is nothing to edit but
+  its frame, and resizing is not built. Double-clicking one does nothing.
+- **iOS is untested.** The overlay is shared, so a double *tap* should open
+  the same sheet on a phone or iPad, and `accessibilityAction` offers it to
+  VoiceOver — *should*: the simulator is still down and neither was driven.
+- **No XCUITest**, as throughout.
+

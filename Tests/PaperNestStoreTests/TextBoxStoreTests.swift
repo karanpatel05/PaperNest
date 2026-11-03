@@ -130,4 +130,129 @@ import PaperNestCore
 
         #expect(try await store.objects(on: page.id).isEmpty, "undo left the text box on the page")
     }
+
+    // MARK: - Changing one that is already on the page
+
+    /// A text box was write-once: its words, size, colour and alignment were
+    /// fixed the moment it was added, and a typo meant deleting it and typing
+    /// it again. This is the way back in, with the same guards as placing one.
+    @Test func changingATextBoxKeepsItsIdentityAndItsPlace() async throws {
+        let dir = TempDirectory()
+        let (store, page) = try await seeded(at: dir.url)
+        let (placed, original) = try await store.placeText(
+            "Pian in full", on: page.id, frame: frame, fontSize: 24,
+            color: .black, alignment: .leading)
+        let red = RGBAColor(red: 0.8, green: 0, blue: 0, alpha: 1)
+
+        let (updated, edited) = try await store.updateText(
+            original, text: "Paid in full", frame: frame, fontSize: 30,
+            color: red, alignment: .center)
+
+        // The same object, changed: undo treats it as one box edited rather
+        // than one deleted and another added.
+        #expect(edited.id == original.id)
+        #expect(edited.zKey == original.zKey)
+        #expect(try await store.objects(on: page.id).map(\.id) == [original.id])
+        guard case .text(let box) = edited.payload else { Issue.record("not text any more"); return }
+        #expect(box.text == "Paid in full")
+        #expect(box.fontSize == 30)
+        #expect(box.color == red)
+        #expect(box.alignment == .center)
+        #expect(box.frame == frame)
+        #expect(updated.revision > placed.revision)
+    }
+
+    /// The words are indexed on the way in; changing them has to replace what
+    /// is findable, or search answers with text the page no longer carries.
+    @Test func theOldWordsStopBeingFindable() async throws {
+        let dir = TempDirectory()
+        let (store, page) = try await seeded(at: dir.url)
+        let (_, original) = try await store.placeText(
+            "Aubergine", on: page.id, frame: frame, fontSize: 24, color: .black, alignment: .leading)
+        #expect(try await store.search("Aubergine").contains(page.itemID))
+
+        _ = try await store.updateText(original, text: "Courgette", frame: frame,
+                                       fontSize: 24, color: .black, alignment: .leading)
+
+        #expect(try await store.search("Courgette").contains(page.itemID))
+        #expect(try await store.search("Aubergine").isEmpty, "the old words are still findable")
+    }
+
+    /// The box can be given more room as its text or its type grows, which is
+    /// what the editor does when the font size changes.
+    @Test func theFrameCanGrowWithTheText() async throws {
+        let dir = TempDirectory()
+        let (store, page) = try await seeded(at: dir.url)
+        let (_, original) = try await store.placeText(
+            "Short", on: page.id, frame: frame, fontSize: 12, color: .black, alignment: .leading)
+        let taller = frame.insetBy(dx: 0, dy: -40)
+
+        let (_, edited) = try await store.updateText(original, text: "Short", frame: taller,
+                                                     fontSize: 40, color: .black, alignment: .leading)
+
+        guard case .text(let box) = edited.payload else { Issue.record("not text"); return }
+        #expect(box.frame == taller)
+    }
+
+    /// The same refusals as placing one. An empty box would be a mark nobody
+    /// can see and nobody can select.
+    @Test func theSameThingsAreRefusedAsWhenPlacingOne() async throws {
+        let dir = TempDirectory()
+        let (store, page) = try await seeded(at: dir.url)
+        let (_, original) = try await store.placeText(
+            "Keep me", on: page.id, frame: frame, fontSize: 24, color: .black, alignment: .leading)
+
+        for bad in ["", "   \n  "] {
+            await #expect(throws: StoreError.invalidPlacement) {
+                try await store.updateText(original, text: bad, frame: frame, fontSize: 24,
+                                           color: .black, alignment: .leading)
+            }
+        }
+        for size in [0.0, -4.0, Double.nan] {
+            await #expect(throws: StoreError.invalidPlacement) {
+                try await store.updateText(original, text: "Fine", frame: frame, fontSize: size,
+                                           color: .black, alignment: .leading)
+            }
+        }
+        await #expect(throws: StoreError.invalidPlacement) {
+            try await store.updateText(original, text: "Fine", frame: .zero, fontSize: 24,
+                                       color: .black, alignment: .leading)
+        }
+        // Nothing was half written by any of those.
+        let objects = try await store.objects(on: page.id)
+        #expect(objects == [original])
+    }
+
+    /// Only a text box can be edited this way; a stroke under the same call
+    /// would be silently turned into text.
+    @Test func onlyATextBoxCanBeChangedThisWay() async throws {
+        let dir = TempDirectory()
+        let (store, page) = try await seeded(at: dir.url)
+        let ink = PageObject(pageID: page.id, zKey: "A",
+                             payload: .ink(InkStroke(tool: .pen, color: .black, width: 2,
+                                                     points: [InkPoint(x: 10, y: 10)])),
+                             modifiedAt: Date())
+        _ = try await store.applyObjectChanges(on: page.id, saving: [ink], deleting: [])
+        let saved = try #require(try await store.objects(on: page.id).first)
+
+        await #expect(throws: StoreError.invalidPlacement) {
+            try await store.updateText(saved, text: "Nope", frame: frame, fontSize: 24,
+                                       color: .black, alignment: .leading)
+        }
+    }
+
+    /// A box someone else changed first must not be written over.
+    @Test func aBoxThatChangedUnderneathIsRefused() async throws {
+        let dir = TempDirectory()
+        let (store, page) = try await seeded(at: dir.url)
+        let (_, original) = try await store.placeText(
+            "First", on: page.id, frame: frame, fontSize: 24, color: .black, alignment: .leading)
+        _ = try await store.updateText(original, text: "Second", frame: frame, fontSize: 24,
+                                       color: .black, alignment: .leading)
+
+        await #expect(throws: StoreError.pageObjectsChanged) {
+            try await store.updateText(original, text: "Third", frame: frame, fontSize: 24,
+                                       color: .black, alignment: .leading)
+        }
+    }
 }

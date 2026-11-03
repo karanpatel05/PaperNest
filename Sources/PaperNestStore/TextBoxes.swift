@@ -52,4 +52,44 @@ extension LibraryStore {
             return (try applyObjectChanges(on: pageID, saving: [object], deleting: []), object)
         }
     }
+
+    /// Changes a text box already on a page.
+    ///
+    /// A box used to be **write-once**: its words, size, colour and alignment
+    /// were fixed the moment it was added, so a typo meant deleting it and
+    /// typing it again. The same refusals apply as when placing one, because
+    /// an empty box or one with no area is just as unusable the second time.
+    ///
+    /// It keeps its **id** and its place in the paint order, so undo sees one
+    /// box changed rather than one deleted and another added, and so a mark
+    /// does not jump above its neighbours when it is edited.
+    ///
+    /// The write is the guarded one: a box someone else changed first is
+    /// refused rather than written over. `frame` comes from the caller, as it
+    /// does for `placeText`, because how much room a box needs is a layout
+    /// decision and this is not where layout lives.
+    ///
+    /// The same write rebuilds the page's `text` index row, so the old words
+    /// stop being findable as the new ones start.
+    @discardableResult
+    public func updateText(_ object: PageObject, text: String, frame: CGRect, fontSize: Double,
+                           color: RGBAColor, alignment: TextBox.Alignment) throws -> (page: Page, object: PageObject) {
+        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !words.isEmpty else { throw StoreError.invalidPlacement }
+        guard fontSize > 0, fontSize.isFinite else { throw StoreError.invalidPlacement }
+        guard frame.width > 0, frame.height > 0,
+              frame.minX.isFinite, frame.minY.isFinite,
+              frame.width.isFinite, frame.height.isFinite
+        else { throw StoreError.invalidPlacement }
+        // Only a text box: anything else handed in here would be quietly
+        // turned into one, losing whatever it was.
+        guard case .text = object.payload else { throw StoreError.invalidPlacement }
+
+        var updated = object
+        updated.payload = .text(TextBox(frame: frame, text: words, fontSize: fontSize,
+                                        color: color, alignment: alignment))
+        updated.modifiedAt = Date()
+        return (try applyInkChanges(on: object.pageID, saving: [updated],
+                                    replacing: [object], deleting: []), updated)
+    }
 }

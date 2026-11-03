@@ -304,7 +304,7 @@ final class DocumentModel {
         let size = page.sourceSize
         let frame = CGRect(x: size.width * 0.1, y: size.height * 0.12,
                            width: size.width * 0.8,
-                           height: max(fontSize * 3, size.height * 0.12))
+                           height: Self.textBoxHeight(forFontSize: fontSize, pageHeight: size.height))
         let result = try await store.placeText(text, on: page.id, frame: frame,
                                                fontSize: fontSize, color: color,
                                                alignment: alignment)
@@ -313,6 +313,39 @@ final class DocumentModel {
         registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.textBox)
         await loadSelectedPageObjects()
         session.didChange()
+    }
+
+    /// Changes a text box that is already on a page.
+    ///
+    /// Keeps where it is — the origin and the width it was dragged to — and
+    /// only grows its **height** with the type size, because a box that moved
+    /// itself when its words changed would be worse than one that clips.
+    func editTextBox(_ object: PageObject, on page: Page, text: String, fontSize: Double,
+                     color: RGBAColor, alignment: TextBox.Alignment,
+                     undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID, object.pageID == page.id,
+              case .text(let box) = object.payload else { throw StoreError.pageNotFound }
+        let frame = CGRect(x: box.frame.minX, y: box.frame.minY, width: box.frame.width,
+                           height: Self.textBoxHeight(forFontSize: fontSize,
+                                                      pageHeight: page.sourceSize.height))
+        let result = try await store.updateText(object, text: text, frame: frame,
+                                                fontSize: fontSize, color: color,
+                                                alignment: alignment)
+        replace(result.page)
+        let change = InkChange(pageID: page.id, saved: [result.object], replaced: [object], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.textBoxEdit)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    /// How tall a box has to be for type of this size, in source points.
+    ///
+    /// Three lines' worth, or a page-relative minimum, whichever is more.
+    /// Shared by placing and editing so a box does not change shape the first
+    /// time someone touches it.
+    nonisolated static func textBoxHeight(forFontSize fontSize: Double, pageHeight: Double) -> Double {
+        max(fontSize * 3, pageHeight * 0.12)
     }
 
     /// Removes the strokes an eraser drag touched, as one undoable step.

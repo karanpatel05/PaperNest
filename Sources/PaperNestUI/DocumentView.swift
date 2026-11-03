@@ -982,6 +982,8 @@ private struct PageViewer: View {
     @Environment(\.displayScale) private var displayScale
     @State private var pinchBase: CGFloat?
     @State private var selectedMark: PageObjectID?
+    /// The text box a double click opened, if any.
+    @State private var editingMark: PaperNestCore.PageObject?
 
     static let zoomSteps: [CGFloat] = [0.5, 0.75, 1, 1.5, 2, 3, 4]
 
@@ -1013,7 +1015,10 @@ private struct PageViewer: View {
                                         CGAffineTransform(scaleX: size.width / pageSize.width,
                                                           y: size.height / pageSize.height)),
                                     undoManager: undoManager,
-                                    selected: $selectedMark)
+                                    selected: $selectedMark,
+                                    onOpen: { mark in
+                                        if case .text = mark.payload { editingMark = mark }
+                                    })
                             }
                         }
                         #if os(macOS)
@@ -1081,6 +1086,11 @@ private struct PageViewer: View {
             }
         }
         .onChange(of: model.selectedPageID) { zoom = 1 }
+        // A double click on a text box opens it. Presented here rather than
+        // in `DocumentView` because the selection lives here.
+        .sheet(item: $editingMark) { mark in
+            TextBoxSheet(model: model, pageID: mark.pageID, undoManager: undoManager, editing: mark)
+        }
     }
 
     private func fittedSize(_ page: CGSize, in container: CGSize) -> CGSize {

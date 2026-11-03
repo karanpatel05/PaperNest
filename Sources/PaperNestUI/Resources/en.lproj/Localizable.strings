@@ -436,3 +436,7 @@
 
 /* Removing a text box or an image from the markup manager */
 "markup.image" = "Image";
+
+/* Changing a text box that is already on a page */
+"textBox.save" = "Save";
+"textBox.edit" = "Edit Text Box";

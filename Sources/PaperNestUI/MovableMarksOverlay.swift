@@ -2,7 +2,8 @@ import CoreGraphics
 import PaperNestCore
 import SwiftUI
 
-/// Lets a text box or a placed image be picked up and moved on the page.
+/// Lets a text box or a placed image be picked up and moved on the page, and
+/// opened with a double click.
 ///
 /// It sits over the rendered page and claims **only** the rectangles those
 /// marks occupy, so everywhere else — scrolling, zooming, the ink canvas on
@@ -20,6 +21,9 @@ struct MovableMarksOverlay: View {
     let undoManager: UndoManager?
 
     @Binding var selected: PageObjectID?
+    /// Called when a mark is opened — a double click or double tap, the
+    /// idiom on both platforms for "let me change this one".
+    var onOpen: (PageObject) -> Void = { _ in }
     @State private var dragging: PageObjectID?
     @State private var dragTranslation: CGSize = .zero
 
@@ -49,10 +53,18 @@ struct MovableMarksOverlay: View {
                         }
                         .frame(width: max(frame.width, 1), height: max(frame.height, 1))
                         .offset(x: frame.minX + offset.width, y: frame.minY + offset.height)
+                        // Before the drag, and at high priority, because a
+                        // drag with no minimum distance claims the first
+                        // click otherwise and the second never arrives.
+                        .highPriorityGesture(TapGesture(count: 2).onEnded {
+                            selected = mark.id
+                            onOpen(mark)
+                        })
                         .gesture(gesture(for: mark))
                         .accessibilityIdentifier("movable-mark")
                         .accessibilityValue(Self.describe(mark))
                         .accessibilityHint(L10n.moveObjectHint)
+                        .accessibilityAction(named: L10n.textBoxEdit) { onOpen(mark) }
                 }
             }
         }

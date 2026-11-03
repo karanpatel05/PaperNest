@@ -3,16 +3,19 @@ import PaperNestCore
 import PaperNestStore
 import SwiftUI
 
-/// Puts typed text on a page.
+/// Puts typed text on a page, or changes a box already on one.
 ///
-/// Where it lands is decided by `DocumentModel.addTextBox` rather than here,
-/// because nothing can place a box by hand yet: this collects what to write,
-/// not where. Saying so plainly is better than a preview that implies a
-/// position the caller cannot choose.
+/// Where a **new** box lands is decided by `DocumentModel.addTextBox` rather
+/// than here, because nothing can place a box by hand yet: this collects what
+/// to write, not where. Saying so plainly is better than a preview that
+/// implies a position the caller cannot choose. An **existing** box keeps
+/// where it is; only its height follows the type size.
 struct TextBoxSheet: View {
     let model: DocumentModel
     let pageID: PageID
     let undoManager: UndoManager?
+    /// The box being changed, or nil when a new one is being written.
+    var editing: PageObject?
 
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
@@ -25,6 +28,14 @@ struct TextBoxSheet: View {
     private var page: Page? { model.pages.first { $0.id == pageID } }
     private var canAdd: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSaving && page != nil
+    }
+
+    /// The box as it stands now, by id, rather than the copy this sheet was
+    /// opened with: between opening and saving an undo may have put a
+    /// different version of it back, and the guarded write compares values.
+    private var current: PageObject? {
+        guard let editing else { return nil }
+        return model.selectedPageObjects.first { $0.id == editing.id }
     }
 
     var body: some View {
@@ -54,7 +65,7 @@ struct TextBoxSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(L10n.textBox)
+            .navigationTitle(editing == nil ? L10n.textBox : L10n.textBoxEdit)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -64,11 +75,12 @@ struct TextBoxSheet: View {
                         .accessibilityIdentifier("text-box-cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.textBoxAdd) { Task { await add() } }
+                    Button(editing == nil ? L10n.textBoxAdd : L10n.textBoxSave) { Task { await save() } }
                         .disabled(!canAdd)
                         .accessibilityIdentifier("text-box-add")
                 }
             }
+            .onAppear { load() }
             .alert(L10n.genericErrorTitle, isPresented: $failed) {
                 Button(L10n.ok) {}
             } message: {
@@ -80,14 +92,36 @@ struct TextBoxSheet: View {
         #endif
     }
 
-    private func add() async {
+    /// Fills the form from the box being changed, so the sheet opens showing
+    /// what is on the page rather than the defaults.
+    private func load() {
+        guard case .text(let box)? = editing?.payload else { return }
+        text = box.text
+        fontSize = box.fontSize
+        alignment = box.alignment
+        color = box.color
+    }
+
+    private func save() async {
         guard let page else { return }
         isSaving = true
         defer { isSaving = false }
         do {
-            try await model.addTextBox(to: page, text: text, fontSize: fontSize,
-                                       color: color, alignment: alignment,
-                                       undoManager: undoManager)
+            if let object = current {
+                try await model.editTextBox(object, on: page, text: text, fontSize: fontSize,
+                                            color: color, alignment: alignment,
+                                            undoManager: undoManager)
+            } else if editing == nil {
+                try await model.addTextBox(to: page, text: text, fontSize: fontSize,
+                                           color: color, alignment: alignment,
+                                           undoManager: undoManager)
+            } else {
+                // The box went away while this was open — undone, or removed
+                // from the markup manager. Writing it back would resurrect
+                // something the user took off the page.
+                failed = true
+                return
+            }
             dismiss()
         } catch { failed = true }
     }

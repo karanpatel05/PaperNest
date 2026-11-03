@@ -513,6 +513,12 @@ extension L10n {
     static var inkEraser: String { tr("ink.eraser") }
 }
 
+// Changing a text box already on a page — ledger row 21.
+extension L10n {
+    static var textBoxSave: String { tr("textBox.save") }
+    static var textBoxEdit: String { tr("textBox.edit") }
+}
+
 // Removing a text box or an image — ledger row 21.
 extension L10n {
     static var markupImage: String { tr("markup.image") }
