@@ -440,3 +440,6 @@
 /* Changing a text box that is already on a page */
 "textBox.save" = "Guardar";
 "textBox.edit" = "Editar el cuadro de texto";
+
+/* Resizing a text box or an image by a corner */
+"object.resize" = "Cambiar tamaño";

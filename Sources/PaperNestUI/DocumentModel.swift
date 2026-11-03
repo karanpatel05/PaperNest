@@ -441,6 +441,17 @@ final class DocumentModel {
     /// `applyInkChanges` so the write is refused if the object changed under
     /// it, and so undo works the same way it does for everything else.
     func moveObject(_ object: PageObject, to frame: CGRect, undoManager: UndoManager?) async throws {
+        try await setFrame(of: object, to: frame, actionName: L10n.moveObject, undoManager: undoManager)
+    }
+
+    /// Same write as a move — only the frame changes either way — with its own
+    /// name, so the Edit menu says which of the two is being undone.
+    func resizeObject(_ object: PageObject, to frame: CGRect, undoManager: UndoManager?) async throws {
+        try await setFrame(of: object, to: frame, actionName: L10n.resizeObject, undoManager: undoManager)
+    }
+
+    private func setFrame(of object: PageObject, to frame: CGRect, actionName: String,
+                          undoManager: UndoManager?) async throws {
         await finishPendingHistory()
         guard let store, let page = selectedPage, object.pageID == page.id else {
             throw StoreError.pageNotFound
@@ -449,7 +460,7 @@ final class DocumentModel {
         replace(try await store.applyInkChanges(on: page.id, saving: [moved],
                                                 replacing: [object], deleting: []))
         let change = InkChange(pageID: page.id, saved: [moved], replaced: [object], deleted: [])
-        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.moveObject)
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: actionName)
         await loadSelectedPageObjects()
         session.didChange()
     }

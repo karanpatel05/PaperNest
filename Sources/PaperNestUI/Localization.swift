@@ -513,6 +513,11 @@ extension L10n {
     static var inkEraser: String { tr("ink.eraser") }
 }
 
+// Resizing a mark by a corner — ledger row 21.
+extension L10n {
+    static var resizeObject: String { tr("object.resize") }
+}
+
 // Changing a text box already on a page — ledger row 21.
 extension L10n {
     static var textBoxSave: String { tr("textBox.save") }

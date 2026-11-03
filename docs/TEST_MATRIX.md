@@ -3328,3 +3328,86 @@ On a throwaway library (`/tmp/pn-edit`, since deleted), with a box reading
   VoiceOver — *should*: the simulator is still down and neither was driven.
 - **No XCUITest**, as throughout.
 
+## A mark can be resized by a corner — row 21 — 2026-11-03 (Claude)
+
+A text box or a placed image kept whatever size it was given: it could be
+moved, and since the last two commits removed and edited, but never made
+bigger or smaller. Selecting one now puts a handle on each corner.
+
+- Full `./scripts/test.sh`: **585 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### What it does
+
+**The corner opposite the one dragged stays exactly where it is.** That is the
+whole contract of a corner handle, and getting it wrong makes a box look like
+it is running away from the pointer; all four corners are pinned by a test
+that checks the anchor survives.
+
+**An image keeps its proportions; a text box does not have any to keep.**
+Squashing a photo is what the placing code went to trouble to avoid, so a
+resize must not undo it. Which axis drives a locked resize is decided by
+**whichever was dragged further**, so the gesture follows the pointer rather
+than ignoring one direction, and at the edge of the page a locked image
+**shrinks to fit rather than distorting** — the easy mistake there is to clamp
+one side and leave the other, which is exactly the squashing the lock exists
+to prevent.
+
+Nothing shrinks below 16 source points in either direction — a negative width
+draws nothing and leaves something on the page nobody can grab — and nothing
+grows past the page, for the same reason a move is clamped. The write is the
+same one a move uses, with its own undo name, so the Edit menu says which of
+the two it is undoing.
+
+### A regression this turn's checking found in **last** turn's commit
+
+Dragging a corner needs the mark selected first, and **clicking a mark had
+stopped selecting it**. `2cd5c8e` added opening-on-double-click as a
+`TapGesture(count: 2)` beside the move gesture. A tap-count gesture waits to
+see whether a second click is coming and **swallows the single click that
+never becomes one** — as `highPriorityGesture` and, tested here, as
+`simultaneousGesture` too. It was found by taking the tap gesture out and
+watching selection come back, after guessing wrong once.
+
+It is counted by hand now, inside the drag that already handles the first
+click: a second click on the same mark within the system's own
+`NSEvent.doubleClickInterval` opens it. Three tests cover the pairing. **That
+commit's claim that double-clicking worked was true; what it did not say is
+that single-clicking had stopped, because that run only checked the double
+click and the drag.** A reminder that checking the thing you added is not the
+same as checking what it sits next to.
+
+### Verified by driving the Mac app
+
+On a throwaway library (`/tmp/pn-resize`, since deleted):
+
+- **One click selects** and draws four corner handles.
+- **Dragging the bottom-right handle inwards shrinks the box**, with the
+  top-left corner staying exactly where it was.
+- **Undo restores the old size.**
+- **A double click still opens the editor**, and **dragging the middle still
+  moves the mark** — the two things the gesture change could have broken.
+
+### What this does **not** do
+
+- **Corners only.** No edge handles, so a box cannot be made wider without
+  also being made taller unless the drag happens to be horizontal.
+- **No proportional resize for a text box**, and no modifier to lock or
+  unlock: SwiftUI's drag gesture does not report modifier keys, so shift-drag
+  would have to be read some other way. Images are locked, text is free, and
+  that is the whole rule.
+- **Text does not reflow to a resized box.** It still runs past the bottom
+  edge if there is more of it than the box holds.
+- **Pointer only.** The handles are `accessibilityHidden`, because four
+  identically labelled stops would be worse for VoiceOver than none — but
+  that leaves **no way to resize a mark without a mouse or a finger**, which
+  is a gap, not a decision to be proud of.
+- **The handles' targets overlap on a small mark.** Each is 22 view points
+  across, so on a mark near the 16-point minimum they sit on top of one
+  another and whichever is topmost wins.
+- **iOS is untested**, as throughout while the simulator is down; the overlay
+  is shared, so handles should appear there too.
+- **Only the undo name is new text** (`Resize`), and it shows in the Edit
+  menu rather than on screen, so the French and Spanish were not looked at
+  this time — nothing in the sheet or the page changed.
+
