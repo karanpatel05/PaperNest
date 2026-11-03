@@ -35,6 +35,14 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
         }
     }
 
+    /// Whether this format can be protected with a password.
+    ///
+    /// Only a PDF can. Writing an unprotected JPEG, TXT or DOCX when the
+    /// caller asked for protection would be a silent false promise, which is
+    /// why `export` refuses it — this is the same rule, where a screen can
+    /// read it and not offer the field at all.
+    public var canCarryPassword: Bool { self == .pdf }
+
     public var fileExtension: String {
         switch self {
         case .pdf: "pdf"

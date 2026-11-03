@@ -58,6 +58,8 @@ struct ExportSheet: View {
     @State private var phase: Phase = .configuring
     @State private var exportTask: Task<Void, Never>?
     @State private var isShowingSaver = false
+    /// Empty means no password, which is not the same as an empty one.
+    @State private var password = ""
 
     enum PageChoice: Hashable { case all, current, range }
 
@@ -150,6 +152,7 @@ struct ExportSheet: View {
                         .accessibilityIdentifier("export-words-only-note")
                 }
             }
+            passwordSection
             Section(L10n.exportPages) {
                 tileRow {
                     ChoiceTile(title: L10n.exportAllPages, subtitle: L10n.pageCount(pages.count),
@@ -237,6 +240,38 @@ struct ExportSheet: View {
         #endif
     }
 
+    /// The password to hand the exporter: **nil when the field is empty**,
+    /// which means no password rather than an empty one. The engine refuses
+    /// `""`, because written as both the user and the owner password it
+    /// produces a file that opens with nothing while the caller believes it
+    /// is protected — and an untouched field is the likeliest source of it.
+    nonisolated static func passwordToUse(_ typed: String) -> String? {
+        typed.isEmpty ? nil : typed
+    }
+
+    /// What is wrong with a typed password, or nil when it can be used.
+    ///
+    /// Checked where it is typed rather than after the export fails: the
+    /// writer cannot store anything outside ASCII — measured, not inferred,
+    /// since `"été-Ñandú-2026"` was refused as well as `"contraseña-密码-1"` —
+    /// and that is a real limitation for French and Spanish readers which
+    /// deserves to be named rather than returned as "export failed".
+    nonisolated static func passwordProblem(in typed: String, format: ExportFormat) -> ExportError? {
+        guard let password = passwordToUse(typed) else { return nil }
+        guard format.canCarryPassword else { return .passwordNotSupported }
+        guard password.allSatisfy(\.isASCII) else { return .passwordNotRepresentable }
+        return nil
+    }
+
+    /// Whether only part of this password will actually be honoured.
+    ///
+    /// Revision 4 reads the first 32 **bytes**. The whole password still
+    /// opens the file, so this is not a refusal — but someone typing a long
+    /// passphrase believes all of it is protecting them, and it is not.
+    nonisolated static func passwordIsTruncated(_ typed: String) -> Bool {
+        typed.utf8.count > 32
+    }
+
     /// Every format the engine can write, with how it is offered.
     ///
     /// Data rather than hand-written tiles because three working formats —
@@ -254,6 +289,54 @@ struct ExportSheet: View {
         (.txt, "TXT", "doc.plaintext", nil),
         (.docx, "Word", "doc.text", .blue),
     ]
+
+    /// A password for the exported PDF, and what it cannot be.
+    ///
+    /// Offered only where it can be kept. The problem is shown as it is
+    /// typed rather than after the export fails: the writer stores nothing
+    /// outside ASCII, which is a real limitation for anyone whose password
+    /// has an accent in it, and finding that out from "export failed" would
+    /// send them looking for the wrong thing.
+    @ViewBuilder private var passwordSection: some View {
+        if options.format.canCarryPassword {
+            Section {
+                SecureField(L10n.exportPasswordField, text: $password)
+                    .accessibilityIdentifier("export-password")
+                if let problem = passwordProblem {
+                    Text(Self.message(for: problem))
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("export-password-problem")
+                } else if Self.passwordIsTruncated(password) {
+                    Text(L10n.exportPasswordTruncated)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .accessibilityIdentifier("export-password-truncated")
+                }
+            } header: {
+                Text(L10n.exportPasswordTitle)
+            } footer: {
+                Text(L10n.exportPasswordFooter)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var passwordProblem: ExportError? {
+        Self.passwordProblem(in: password, format: options.format)
+    }
+
+    /// What each refusal means to someone reading it, rather than its name.
+    nonisolated static func message(for error: ExportError) -> String {
+        switch error {
+        case .noTextToExport: L10n.exportNoTextToExport
+        case .passwordNotRepresentable: L10n.exportPasswordNotRepresentable
+        case .passwordNotSupported: L10n.exportPasswordNotSupported
+        case .emptyPassword: L10n.exportPasswordEmpty
+        case .noPages, .writeFailed, .archiveTooLarge: L10n.exportFailed
+        }
+    }
 
     @ViewBuilder
     private var formatOptions: some View {
@@ -321,7 +404,7 @@ struct ExportSheet: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(!rangeIsValid)
+                .disabled(!canExport)
                 .accessibilityIdentifier("export-start")
                 #else
                 HStack {
@@ -330,7 +413,7 @@ struct ExportSheet: View {
                         .keyboardShortcut(.cancelAction)
                     Button(L10n.exportButton) { startExport() }
                         .keyboardShortcut(.defaultAction)
-                        .disabled(!rangeIsValid)
+                        .disabled(!canExport)
                         .accessibilityIdentifier("export-start")
                 }
                 #endif
@@ -405,6 +488,9 @@ struct ExportSheet: View {
         currentPageID.flatMap { id in pages.firstIndex { $0.id == id } }
     }
 
+    /// Nothing is exported while the sheet is showing a reason it cannot be.
+    private var canExport: Bool { rangeIsValid && passwordProblem == nil }
+
     private var rangeIsValid: Bool {
         pageChoice != .range || (1...pages.count).contains(rangeStart) && (rangeStart...pages.count).contains(rangeEnd)
     }
@@ -438,10 +524,12 @@ struct ExportSheet: View {
         let options = options
         let name = itemName
         let target = effectiveDestination
+        let password = Self.passwordToUse(password)
         phase = .exporting(ExportProgress(completedPages: 0, totalPages: selection.count))
         exportTask = Task {
             do {
-                let output = try await exporter.export(itemName: name, pages: selection, options: options) { progress in
+                let output = try await exporter.export(itemName: name, pages: selection, options: options,
+                                                       password: password) { progress in
                     Task { @MainActor in
                         if case .exporting = phase { phase = .exporting(progress) }
                     }
@@ -463,11 +551,12 @@ struct ExportSheet: View {
                 }
             } catch is CancellationError {
                 phase = .configuring
-            } catch ExportError.noTextToExport {
-                // Not a failure to write: there was nothing to write. Saying
-                // so, and what to do instead, beats "export failed" on a
-                // document of scanned pages nobody has recognised yet.
-                phase = .failed(L10n.exportNoTextToExport)
+            } catch let error as ExportError {
+                // Each refusal says what it is. "Export failed" on a
+                // document of scanned pages nobody has recognised yet, or on
+                // a password with an accent in it, sends someone looking for
+                // a bug that is not there.
+                phase = .failed(Self.message(for: error))
             } catch {
                 phase = .failed(L10n.exportFailed)
             }

@@ -452,3 +452,12 @@
 /* Exporting as plain text or Word */
 "export.wordsOnlyNote" = "Ce format conserve les mots, pas la mise en page : ni images, ni tracés, ni annotations, ni mise en forme. Une page sans texte propre est ignorée, et un document qui n’en contient aucun ne peut pas être exporté ainsi.";
 "export.noTextToExport" = "Aucune de ces pages ne contient de texte, il n’y a donc rien à écrire. Lancez d’abord Reconnaître le texte, ou exportez en PDF ou en image.";
+
+/* A password on an exported PDF */
+"export.password.title" = "Mot de passe";
+"export.password.field" = "Mot de passe (facultatif)";
+"export.password.footer" = "Un PDF protégé ne peut pas être ouvert sans son mot de passe. Laissez ce champ vide pour exporter sans protection. Le mot de passe n’est enregistré nulle part : s’il est perdu, le fichier ne peut plus être ouvert.";
+"export.password.notRepresentable" = "Ce mot de passe ne peut pas être inscrit dans un PDF. Seuls les lettres sans accent, les chiffres et la ponctuation courante peuvent être enregistrés.";
+"export.password.notSupported" = "Seul un PDF peut porter un mot de passe. Choisissez PDF ou effacez le mot de passe.";
+"export.password.empty" = "Le mot de passe est vide, ce qui ne protégerait rien.";
+"export.password.truncated" = "Seuls les 32 premiers caractères seront nécessaires pour ouvrir le fichier.";

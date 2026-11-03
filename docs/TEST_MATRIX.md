@@ -3582,3 +3582,94 @@ a section that is only a footer does not exist.
 - **No XCUITest.** Each tile carries `export-format-<format>` and the caveat
   carries `export-words-only-note`.
 
+## A password on an exported PDF — row 27 — 2026-11-03 (Claude)
+
+The engine has taken a password since 2026-10-27, with three carefully
+written refusals and eleven tests including *an exported PDF with a password
+needs it to open* and *the encryption is AES and not RC4*. **Nothing could
+set one.** The last entry named this as the clearest remaining gap; this
+closes it.
+
+- Full `./scripts/test.sh`: **611 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### What it does
+
+A **Password** section appears in the export sheet for PDF and for nothing
+else — `ExportFormat.canCarryPassword`, on the format so the sheet and the
+engine cannot disagree. Switching to TXT takes the section away.
+
+**An empty field means no password**, not an empty one. The engine refuses
+`""` outright, because written as both the user and the owner password it
+produces a file that opens with nothing while the caller believes it is
+protected — and an untouched field is the likeliest source of exactly that.
+
+**A password the writer cannot store is caught where it is typed.** PDFKit
+stores nothing outside ASCII — measured, not inferred: `"été-Ñandú-2026"` was
+refused as well as `"contraseña-密码-1"`. The engine's own comment asks
+whoever builds the screen to say so rather than reject the password with a
+generic error, so the reason appears under the field as it is typed and
+Export is disabled until it is fixed. That is a real limitation for French
+and Spanish readers and it is now named in their own languages.
+
+**A password longer than 32 bytes is flagged, not refused.** Revision 4 reads
+the first 32; the whole password still opens the file, so refusing it would
+be wrong — but someone typing a long passphrase believes all of it is
+protecting them. The note says only the first 32 characters will be needed.
+
+Every `ExportError` now maps to its own sentence rather than "export failed",
+which also improves the no-text case from the previous entry.
+
+### Verified by driving the Mac app
+
+On a throwaway library (`/tmp/pn-pw`, since deleted):
+
+- The **Password** section and its footer appear for PDF and **disappear for
+  TXT**, replaced by that format's own caveat.
+- **English, French and Spanish** all launched and looked at: *Password /
+  Password (optional)*, *Mot de passe / Mot de passe (facultatif)*,
+  *Contraseña / Contraseña (opcional)*, each with its footer wrapping cleanly.
+
+### What was **not** driven, and why it matters
+
+**Nothing was typed into the field.** Background control blocks typing into a
+secure text field, which is the right restriction; the alternative was taking
+over the user's screen while they were working remotely, which was not worth
+it for this. So in the running app:
+
+- the accented-password message, the empty-password message and the
+  32-character note were **never seen on screen** — only their strings were
+  checked by `LocalizationTests`;
+- and **the one link nobody has exercised end to end is the sheet handing the
+  typed password to the exporter.** Everything either side is covered — seven
+  new tests on which passwords are allowed and what an empty field means,
+  eleven existing engine tests that a password really locks the file — but
+  that single expression has not been run by anyone.
+
+That is the place to look first if a password ever appears to do nothing, and
+**until someone types one and reopens the file, "exporting with a password
+works" should not be claimed**. An XCUITest is the natural way: the field
+carries `export-password`, the problem line `export-password-problem` and the
+length note `export-password-truncated`.
+
+### Also: a red suite that was my own mess
+
+The full run failed once on `cancellingKeepsTheLibraryIdleAndLeavesNoArchiveBehind`,
+which asserts no `PaperNestExport-*` directory is left in the temporary root.
+The leftover was a **HEIC export from the previous entry's checks**, left at
+"Ready" when the app was killed. Not a regression — but worth knowing that
+this test reads the shared temporary directory, so driving the real app on
+the same machine can turn it red.
+
+### What this does **not** do
+
+- **No password on anything but a PDF**, by design, and no owner/user
+  distinction: one password both opens the file and owns it. No permission
+  flags — printing, copying and annotating are not restricted separately.
+- **The password is not kept anywhere**, which the footer says. There is no
+  "remember this" and no keychain.
+- **No strength meter and no confirmation field.** A typo in a password that
+  is never shown again means a file nobody can open, and nothing warns about
+  that.
+- **iOS is untested**, as throughout while the simulator is down.
+

@@ -513,6 +513,17 @@ extension L10n {
     static var inkEraser: String { tr("ink.eraser") }
 }
 
+// A password on an exported PDF — row 27.
+extension L10n {
+    static var exportPasswordTitle: String { tr("export.password.title") }
+    static var exportPasswordField: String { tr("export.password.field") }
+    static var exportPasswordFooter: String { tr("export.password.footer") }
+    static var exportPasswordNotRepresentable: String { tr("export.password.notRepresentable") }
+    static var exportPasswordNotSupported: String { tr("export.password.notSupported") }
+    static var exportPasswordEmpty: String { tr("export.password.empty") }
+    static var exportPasswordTruncated: String { tr("export.password.truncated") }
+}
+
 // Exporting as plain text or Word — row 35 follow-up.
 extension L10n {
     static var exportWordsOnlyNote: String { tr("export.wordsOnlyNote") }

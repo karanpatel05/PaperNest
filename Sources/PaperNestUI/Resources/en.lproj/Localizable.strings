@@ -452,3 +452,12 @@
 /* Exporting as plain text or Word */
 "export.wordsOnlyNote" = "This format keeps the words, not the layout: no pictures, no ink, no marks and no page design. A page with no text of its own is left out, and a document with none cannot be exported this way.";
 "export.noTextToExport" = "None of these pages carry any text, so there is nothing to write. Recognize Text first, or export as PDF or an image instead.";
+
+/* A password on an exported PDF */
+"export.password.title" = "Password";
+"export.password.field" = "Password (optional)";
+"export.password.footer" = "A PDF with a password cannot be opened without it. Leave this empty to export without one. The password is not stored anywhere: lose it and the file cannot be opened.";
+"export.password.notRepresentable" = "This password cannot be written into a PDF. Only unaccented letters, digits and ordinary punctuation can be stored.";
+"export.password.notSupported" = "Only a PDF can carry a password. Choose PDF, or clear the password.";
+"export.password.empty" = "The password is empty, which would protect nothing.";
+"export.password.truncated" = "Only the first 32 characters will be needed to open the file.";
