@@ -299,6 +299,24 @@ final class DocumentModel {
         session.didChange()
     }
 
+    /// Saves one drawn stroke on top of what the page already holds.
+    ///
+    /// The Mac canvas's way in. iOS does not use it: PencilKit hands over a
+    /// whole drawing to reconcile, which `InkCanvas` does.
+    func addInkStroke(_ stroke: InkStroke, to page: Page, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        let top = selectedPageObjects.filter { $0.pageID == page.id }.map(\.zKey).max()
+        let object = PageObject(pageID: page.id, zKey: try SortKey.between(top, nil),
+                                payload: .ink(stroke), modifiedAt: Date())
+        replace(try await store.applyInkChanges(on: page.id, saving: [object],
+                                                replacing: [], deleting: []))
+        let change = InkChange(pageID: page.id, saved: [object], replaced: [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.undoInk)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
     /// Moves a placed mark to a new frame in source space.
     ///
     /// Only a text box or a placed image: ink is moved by the drawing canvas's

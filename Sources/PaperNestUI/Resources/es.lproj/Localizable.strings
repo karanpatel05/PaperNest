@@ -419,3 +419,7 @@
 /* Moving a placed mark */
 "object.move" = "Mover";
 "object.move.hint" = "Arrastra para mover. Toca fuera para deseleccionar.";
+
+/* Drawing on a Mac */
+"ink.pen" = "Lápiz";
+"ink.highlighter" = "Marcador";

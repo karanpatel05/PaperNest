@@ -31,6 +31,9 @@ struct DocumentView: View {
     @State private var isShowingPageOrganizer = false
     @State private var isShowingOutline = false
     @State private var textBoxPage: Page?
+    @State private var inkTool: InkStroke.Tool = .pen
+    @State private var inkColor = RGBAColor(red: 0, green: 0, blue: 0, alpha: 1)
+    @State private var inkWidth: Double = 2
     @State private var isShowingCrop = false
     @State private var annotationPage: Page?
     @State private var managedMarkupPage: Page?
@@ -93,8 +96,14 @@ struct DocumentView: View {
                         }
                         .frame(width: 168)
                     Divider()
-                    PageViewer(model: model, zoom: $zoom, showsZoomButtons: true, isMarkingUp: isMarkingUp,
-                               fingerDrawing: isFingerDrawing, undoManager: undoManager)
+                    VStack(spacing: 0) {
+                        #if os(macOS)
+                        if isMarkingUp { macInkTools; Divider() }
+                        #endif
+                        PageViewer(model: model, zoom: $zoom, showsZoomButtons: true, isMarkingUp: isMarkingUp,
+                                   fingerDrawing: isFingerDrawing, undoManager: undoManager,
+                                   inkTool: inkTool, inkColor: inkColor, inkWidth: inkWidth)
+                    }
                 }
             }
         }
@@ -313,10 +322,52 @@ struct DocumentView: View {
             .accessibilityIdentifier("editor-finger-drawing")
         }
         #endif
+        #if os(macOS)
+        // The Mac has no PencilKit, so drawing is this app's own canvas; the
+        // toggle is the same idea as the iPad's.
+        Toggle(isOn: $isMarkingUp) {
+            Label(L10n.markup, systemImage: "pencil.tip.crop.circle")
+        }
+        .toggleStyle(.button)
+        .disabled(model.selectedPage == nil)
+        .accessibilityIdentifier("editor-markup")
+        #endif
         rotateMenu
         cropButton
         filterMenu
     }
+
+    #if os(macOS)
+    /// Pen or highlighter, how thick, and what colour. Shown only while the
+    /// Mac canvas is up, in the content area rather than the toolbar, where a
+    /// colour picker has no room.
+    private var macInkTools: some View {
+        HStack(spacing: 16) {
+            Picker(L10n.markup, selection: $inkTool) {
+                Text(L10n.inkPen).tag(InkStroke.Tool.pen)
+                Text(L10n.inkHighlighter).tag(InkStroke.Tool.highlighter)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 220)
+            .accessibilityIdentifier("ink-tool")
+            Picker(L10n.shapeWidth, selection: $inkWidth) {
+                Text(L10n.shapeThin).tag(1.0)
+                Text(L10n.shapeMedium).tag(2.0)
+                Text(L10n.shapeThick).tag(4.0)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 220)
+            .accessibilityIdentifier("ink-width")
+            MarkupColorPicker(color: $inkColor)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Theme.surface)
+    }
+    #endif
 
     /// Keep notebook actions in the content area so native toolbars never
     /// collapse them into an overflow menu. The row scrolls at narrow widths.
@@ -868,6 +919,24 @@ private struct PageViewer: View {
     var isMarkingUp = false
     var fingerDrawing = false
     var undoManager: UndoManager?
+    var inkTool: InkStroke.Tool = .pen
+    var inkColor = RGBAColor(red: 0, green: 0, blue: 0, alpha: 1)
+    var inkWidth: Double = 2
+
+    /// Whether the rendered page includes the ink already saved on it.
+    ///
+    /// On iOS the canvas is PencilKit, which draws every stroke itself, so the
+    /// page underneath leaves ink out to avoid drawing it twice. The Mac
+    /// canvas previews **only the stroke being drawn** — so the page has to
+    /// keep drawing the saved ones, or a finished stroke vanishes the instant
+    /// the pointer comes up. It did exactly that until this was separated.
+    private var pageShowsInk: Bool {
+        #if os(macOS)
+        true
+        #else
+        !isMarkingUp
+        #endif
+    }
     @Environment(\.displayScale) private var displayScale
     @State private var pinchBase: CGFloat?
     @State private var selectedMark: PageObjectID?
@@ -882,7 +951,7 @@ private struct PageViewer: View {
                 ScrollView([.horizontal, .vertical]) {
                     PageImageView(page: page, pixelSize: max(size.width, size.height) * displayScale,
                                   accessibilityLabel: L10n.pageLabel(index + 1, of: model.pages.count),
-                                  includesInk: !isMarkingUp)
+                                  includesInk: pageShowsInk)
                         .accessibilityIdentifier("document-page-image")
                         .accessibilityValue(L10n.strokeCount(model.selectedPageObjects.filter {
                             guard $0.pageID == page.id else { return false }
@@ -905,6 +974,20 @@ private struct PageViewer: View {
                                     selected: $selectedMark)
                             }
                         }
+                        #if os(macOS)
+                        .overlay {
+                            if isMarkingUp {
+                                let pageSize = page.geometry.pageSize
+                                MacInkCanvas(
+                                    model: model, page: page,
+                                    sourceToView: page.geometry.sourceToPage.concatenating(
+                                        CGAffineTransform(scaleX: size.width / pageSize.width,
+                                                          y: size.height / pageSize.height)),
+                                    tool: inkTool, color: inkColor, width: inkWidth,
+                                    undoManager: undoManager)
+                            }
+                        }
+                        #endif
                         #if os(iOS)
                         .overlay {
                             if isMarkingUp {

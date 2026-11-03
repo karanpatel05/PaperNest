@@ -2786,3 +2786,71 @@ it; being dragged entirely off and lost is not.
   to behave differently, and it is untested.
 - **No multiple selection**, no keyboard nudging, and the selection is not
   cleared by tapping the page.
+
+## Drawing on a Mac — row 21 — 2026-11-02 (Claude)
+
+macOS has no PencilKit, so the Mac had **no drawing, no eraser and no lasso at
+all** — the single gap behind four of the six tools the owner asked for. This
+is the first half of closing it: a canvas of our own, with a pen and a
+highlighter, colour and width, saved as ordinary ink with undo.
+
+- Full `./scripts/test.sh`: **531 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### Verified by drawing
+
+In the running Mac app: made a notebook, turned on **Markup** (the toggle now
+exists on Mac), drew a wavy pen stroke, then switched to **Highlighter**,
+**Thick** and **yellow** and drew across it. Both appeared, the highlighter
+translucent over the pen so the stroke beneath shows through. The pen stroke
+survived quitting and relaunching the app, so it is stored as ink like any
+other.
+
+### The bug drawing it found
+
+The first stroke **saved but vanished from the page** the moment the pointer
+came up — it was in the sidebar thumbnail and nowhere else. The page is
+rendered with `includesInk: !isMarkingUp`, which is right for iOS, where
+PencilKit draws every stroke itself and the page underneath must not draw them
+twice. The Mac canvas previews **only the stroke being drawn**, so the page has
+to keep drawing the saved ones. Separated into `pageShowsInk`, with the reason
+written down, because the two canvases genuinely need opposite things.
+
+Nothing but driving it would have caught this: the stroke was saved correctly,
+so every test passed.
+
+### How it works
+
+One drag, one stroke. Points are captured in view space and converted with the
+**inverse of the transform the page was drawn with**, so a stroke lands where
+the pointer was at any zoom and is stored in the same upright source space as
+everything else. Five tests cover that geometry, including that **the same
+place on screen at two different zooms is the same place on the page**, and
+that a click without movement is kept as a dot rather than dropped.
+
+Saving goes through `applyInkChanges`, so undo is the same machinery as
+everything else.
+
+### What this does **not** do
+
+- **No eraser and no lasso.** Half the gap is still open: nothing on Mac
+  selects, moves or rubs out ink. Moving a *text box or image* works (that is
+  `MovableMarksOverlay`), but ink is untouched.
+- **No pressure, so one width per stroke.** A drag gives position only. On iOS
+  Apple Pencil varies the width within a stroke; on Mac it cannot, and that
+  difference is real rather than hidden.
+- **The widths are the shape tool's** — 1, 2 and 4 source points. "Thick" is
+  thin for a highlighter; the sizes have not been tuned for drawing.
+- **No smoothing.** Points are joined as straight segments, so a fast stroke
+  looks angular where PencilKit would curve it.
+- **No XCUITest**, as ever while the simulator is down. Driven by hand on Mac,
+  once, with a mouse — not with a trackpad, and not at any zoom but the default.
+
+### A trap worth knowing
+
+`MacInkCanvas.stroke(…)` is a static on a SwiftUI `View`, which makes it
+main-actor isolated. Calling it from a test **compiled** and then trapped at
+runtime with signal 5. The same thing on `DocumentOutlineSheet.pageToSelect`
+was caught at compile time instead. Mark such helpers `nonisolated` — the
+failure mode is a crash in the test runner with no assertion message, which
+reads like a broken test rather than an isolation problem.

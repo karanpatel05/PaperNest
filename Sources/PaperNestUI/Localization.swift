@@ -496,3 +496,9 @@ extension L10n {
     static var moveObject: String { tr("object.move") }
     static var moveObjectHint: String { tr("object.move.hint") }
 }
+
+// Drawing on a Mac — ledger row 21.
+extension L10n {
+    static var inkPen: String { tr("ink.pen") }
+    static var inkHighlighter: String { tr("ink.highlighter") }
+}
