@@ -358,6 +358,7 @@ struct DocumentCommandContext {
     let showCrop: () -> Void
     let showOutline: () -> Void
     let showTextBox: () -> Void
+    let showInsertImage: () -> Void
 }
 
 extension FocusedValues {

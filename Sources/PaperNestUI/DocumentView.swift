@@ -34,6 +34,7 @@ struct DocumentView: View {
     @State private var inkTool: InkStroke.Tool = .pen
     @State private var inkColor = RGBAColor(red: 0, green: 0, blue: 0, alpha: 1)
     @State private var inkWidth: Double = 2
+    @State private var isShowingImagePicker = false
     @State private var isShowingCrop = false
     @State private var annotationPage: Page?
     @State private var managedMarkupPage: Page?
@@ -155,6 +156,8 @@ struct DocumentView: View {
         .sheet(isPresented: $isShowingExport) {
             ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID)
         }
+        .fileImporter(isPresented: $isShowingImagePicker,
+                      allowedContentTypes: [.image], onCompletion: insertPickedImage)
         .sheet(item: $textBoxPage) { page in
             TextBoxSheet(model: model, pageID: page.id, undoManager: undoManager)
         }
@@ -249,7 +252,8 @@ struct DocumentView: View {
             showReplacePage: { openFilePicker(.replace) },
             showCrop: { isShowingCrop = true },
             showOutline: { isShowingOutline = true },
-            showTextBox: { textBoxPage = model.selectedPage }
+            showTextBox: { textBoxPage = model.selectedPage },
+            showInsertImage: { isShowingImagePicker = true }
         ))
     }
 
@@ -377,6 +381,7 @@ struct DocumentView: View {
                 shapeButton
                 stampButton
                 textBoxButton
+                imageButton
                 commentsButton
                 annotateTextButton
                 manageMarkupButton
@@ -420,6 +425,7 @@ struct DocumentView: View {
             shapeButton
             stampButton
             textBoxButton
+            imageButton
             commentsButton
             Divider()
             outlineButton
@@ -467,6 +473,31 @@ struct DocumentView: View {
         }
         .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
         .accessibilityIdentifier("editor-shapes")
+    }
+
+    /// Reads a picked image and places it on the selected page.
+    ///
+    /// A method rather than a closure in the body: the type-checker gave up on
+    /// that expression once this was inlined in the modifier chain.
+    private func insertPickedImage(_ result: Result<URL, Error>) {
+        guard case .success(let url) = result, let page = model.selectedPage else { return }
+        Task {
+            guard let importer = importModel.environment?.importer,
+                  let data = try? importer.loadData(.file(url)) else {
+                importModel.reportPickerFailure()
+                return
+            }
+            try? await model.addImage(data, named: url.lastPathComponent, to: page,
+                                      undoManager: undoManager)
+        }
+    }
+
+    private var imageButton: some View {
+        Button { isShowingImagePicker = true } label: {
+            Label(L10n.insertImage, systemImage: "photo.badge.plus")
+        }
+        .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
+        .accessibilityIdentifier("editor-insert-image")
     }
 
     private var textBoxButton: some View {
@@ -554,6 +585,7 @@ struct DocumentView: View {
             shapeButton
             stampButton
             textBoxButton
+            imageButton
             commentsButton
             Divider()
             outlineButton

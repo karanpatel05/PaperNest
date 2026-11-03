@@ -35,6 +35,8 @@ public struct PaperNestCommands: Commands {
                 .disabled(document?.model.pages.isEmpty ?? true)
             Button(L10n.textBox) { document?.showTextBox() }
                 .disabled(document?.model.selectedPage == nil)
+            Button(L10n.insertImage) { document?.showInsertImage() }
+                .disabled(document?.model.selectedPage == nil)
             Divider()
             Button(L10n.rotateLeft) { run { await $0.model.rotate(clockwise: false, undoManager: $0.undoManager) } }
                 .keyboardShortcut("l", modifiers: .command)

@@ -423,3 +423,6 @@
 /* Drawing on a Mac */
 "ink.pen" = "Stylo";
 "ink.highlighter" = "Surligneur";
+
+/* Placing an image */
+"image.insert" = "Image";

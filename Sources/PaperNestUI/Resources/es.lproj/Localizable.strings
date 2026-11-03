@@ -423,3 +423,6 @@
 /* Drawing on a Mac */
 "ink.pen" = "Lápiz";
 "ink.highlighter" = "Marcador";
+
+/* Placing an image */
+"image.insert" = "Imagen";

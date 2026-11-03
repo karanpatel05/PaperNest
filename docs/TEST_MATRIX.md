@@ -2854,3 +2854,58 @@ runtime with signal 5. The same thing on `DocumentOutlineSheet.pageToSelect`
 was caught at compile time instead. Mark such helpers `nonisolated` — the
 failure mode is a crash in the test runner with no assertion message, which
 reads like a broken test rather than an isolation problem.
+
+## An Image tool — row 21 — 2026-11-03 (Claude)
+
+The last of the six tools the owner asked for that had no UI at all.
+`placeImage` has been ready since 2026-10-28 and nothing called it; **Image**
+now sits beside Text Box in the editor and in the Page menu, picks an image
+file, and puts it on the page.
+
+- Full `./scripts/test.sh`: **537 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### What it does
+
+The bytes are sniffed with the project's own `FileTypeSniffer.kind(of:)`, so
+what gets stored is what the bytes **are** rather than what a filename claimed,
+and a kind the renderer cannot draw is refused before anything is written. They
+are staged durably and the row referencing them is written by `placeImage` in
+the same transaction, so the housekeeping sweep cannot take the file in
+between.
+
+The frame **keeps the image's own proportions**, so a photo is not squashed into
+a box: a 2:1 image comes out 2:1, measured. A sideways photo reports the size it
+is *shown* at rather than the size it is stored at, because that is the shape the
+frame has to match — the renderer decodes it upright, and
+`aSidewaysPhotoReportsTheSizeItIsShownAt` pins the quarter turn. An image whose
+size cannot be read still gets a usable frame rather than a zero-sized one the
+renderer would skip. Seven tests.
+
+Once placed it can be **dragged**, because `MovableMarksOverlay` already covers
+placed images, and undo is registered like every other mark.
+
+### What was verified, and what was not
+
+- **Verified in the running Mac app:** the **Image** button exists in the
+  notebook tool row and the editor menus, is disabled with no page selected,
+  and is reachable.
+- **Not verified:** the picker itself. A macOS open panel is modal and needs
+  the app frontmost; background control cannot bring it forward, and no panel
+  appeared or could be confirmed. **So the hand-off from "a file was picked" to
+  "an image is on the page" has not been driven by anyone.** Everything either
+  side of it is covered — the sniffing, the frame, the staging-and-row write,
+  the drawing, the dragging and the undo — but that join is code nobody has
+  run.
+
+That is the honest state of it, and it is the place to look first if it
+misbehaves.
+
+### What this does **not** do
+
+- **No resize.** A placed image keeps the size it was given, as a text box
+  does; it can only be dragged.
+- **No drag-and-drop onto the page**, and no paste — the picker is the only way
+  in.
+- **One image per pick.** Multiple selection is off.
+- **No XCUITest**, as throughout while the simulator is down.

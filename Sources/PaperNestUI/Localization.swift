@@ -502,3 +502,8 @@ extension L10n {
     static var inkPen: String { tr("ink.pen") }
     static var inkHighlighter: String { tr("ink.highlighter") }
 }
+
+// Placing an image — ledger row 21.
+extension L10n {
+    static var insertImage: String { tr("image.insert") }
+}

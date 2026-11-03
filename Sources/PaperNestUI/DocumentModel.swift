@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import Observation
 import PaperNestCore
 import PaperNestImport
@@ -297,6 +298,59 @@ final class DocumentModel {
         registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.textBox)
         await loadSelectedPageObjects()
         session.didChange()
+    }
+
+    /// Puts an image on a page.
+    ///
+    /// The bytes are staged durably first and the row that references them is
+    /// written in the same transaction by `placeImage`, so the housekeeping
+    /// sweep cannot take the file in between.
+    func addImage(_ data: Data, named filename: String?, to page: Page,
+                  undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        // The project's own sniffer, so what is stored is what the bytes
+        // are rather than what a filename claimed.
+        guard let kind = FileTypeSniffer.kind(of: data), kind.isDrawableImage else {
+            throw StoreError.invalidPlacement
+        }
+        let staged = try store.assets.store(data, kind: kind, originalFilename: filename)
+        let frame = Self.imageFrame(pixels: Self.pixelSize(of: data), on: page)
+        let result = try await store.placeImage(staged, on: page.id, frame: frame)
+        replace(result.page)
+        let change = InkChange(pageID: page.id, saved: [result.object], replaced: [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.insertImage)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    /// The image's own pixel dimensions, or nil when they cannot be read.
+    ///
+    /// Orientation is taken into account: a photo stored sideways reports the
+    /// size it is *shown* at, which is the shape the frame has to match.
+    nonisolated static func pixelSize(of data: Data) -> CGSize? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Double,
+              let height = properties[kCGImagePropertyPixelHeight] as? Double
+        else { return nil }
+        let orientation = properties[kCGImagePropertyOrientation] as? Int ?? 1
+        // 5...8 are the quarter turns, which swap the shown dimensions.
+        return orientation >= 5 ? CGSize(width: height, height: width)
+                                : CGSize(width: width, height: height)
+    }
+
+    /// Where a newly placed image goes: across the upper middle of the page,
+    /// **keeping its own proportions** so a photo is not squashed. Nothing can
+    /// place one by hand yet, and it can be dragged afterwards.
+    nonisolated static func imageFrame(pixels: CGSize?, on page: Page) -> CGRect {
+        let source = page.sourceSize
+        let box = CGSize(width: source.width * 0.5, height: source.height * 0.4)
+        let pixels = pixels ?? box
+        let scale = min(box.width / max(pixels.width, 1), box.height / max(pixels.height, 1))
+        let size = CGSize(width: max(pixels.width * scale, 1), height: max(pixels.height * scale, 1))
+        return CGRect(x: (source.width - size.width) / 2, y: source.height * 0.15,
+                      width: size.width, height: size.height)
     }
 
     /// Saves one drawn stroke on top of what the page already holds.
