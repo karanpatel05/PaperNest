@@ -405,3 +405,13 @@
 /* Contenido del documento */
 "outline.title" = "Contenido";
 "outline.empty" = "Este documento no incluye un contenido propio.";
+
+/* Text box tool */
+"textBox.title" = "Cuadro de texto";
+"textBox.text" = "Texto";
+"textBox.size" = "Tamaño";
+"textBox.alignment" = "Alineación";
+"textBox.align.left" = "Izquierda";
+"textBox.align.center" = "Centro";
+"textBox.align.right" = "Derecha";
+"textBox.add" = "Añadir";

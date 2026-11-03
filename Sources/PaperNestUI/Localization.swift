@@ -478,3 +478,15 @@ extension L10n {
     static var outline: String { tr("outline.title") }
     static var outlineEmpty: String { tr("outline.empty") }
 }
+
+// Text box tool — ledger row 21.
+extension L10n {
+    static var textBox: String { tr("textBox.title") }
+    static var textBoxText: String { tr("textBox.text") }
+    static var textBoxSize: String { tr("textBox.size") }
+    static var textBoxAlignment: String { tr("textBox.alignment") }
+    static var textBoxAlignLeft: String { tr("textBox.align.left") }
+    static var textBoxAlignCenter: String { tr("textBox.align.center") }
+    static var textBoxAlignRight: String { tr("textBox.align.right") }
+    static var textBoxAdd: String { tr("textBox.add") }
+}

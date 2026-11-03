@@ -275,6 +275,30 @@ final class DocumentModel {
         session.didChange()
     }
 
+    /// Puts typed text on a page.
+    ///
+    /// Nothing can place a box by hand yet, so the frame is chosen here: a
+    /// band across the upper part of the page with room for a few lines.
+    /// Text longer than that is clipped when drawn, which is why the height
+    /// grows with the font size rather than being a fixed fraction.
+    func addTextBox(to page: Page, text: String, fontSize: Double, color: RGBAColor,
+                    alignment: TextBox.Alignment, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        let size = page.sourceSize
+        let frame = CGRect(x: size.width * 0.1, y: size.height * 0.12,
+                           width: size.width * 0.8,
+                           height: max(fontSize * 3, size.height * 0.12))
+        let result = try await store.placeText(text, on: page.id, frame: frame,
+                                               fontSize: fontSize, color: color,
+                                               alignment: alignment)
+        replace(result.page)
+        let change = InkChange(pageID: page.id, saved: [result.object], replaced: [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.textBox)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
     func addTextMarkup(_ snapshot: PageRecognition, lineIndices: Set<Int>, style: TextMarkupStyle, color: RGBAColor? = nil,
                        undoManager: UndoManager?) async throws {
         await finishPendingHistory()

@@ -33,6 +33,8 @@ public struct PaperNestCommands: Commands {
             // that logs them cannot run here today.
             Button(L10n.outline) { document?.showOutline() }
                 .disabled(document?.model.pages.isEmpty ?? true)
+            Button(L10n.textBox) { document?.showTextBox() }
+                .disabled(document?.model.selectedPage == nil)
             Divider()
             Button(L10n.rotateLeft) { run { await $0.model.rotate(clockwise: false, undoManager: $0.undoManager) } }
                 .keyboardShortcut("l", modifiers: .command)

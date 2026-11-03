@@ -357,6 +357,7 @@ struct DocumentCommandContext {
     let showReplacePage: () -> Void
     let showCrop: () -> Void
     let showOutline: () -> Void
+    let showTextBox: () -> Void
 }
 
 extension FocusedValues {

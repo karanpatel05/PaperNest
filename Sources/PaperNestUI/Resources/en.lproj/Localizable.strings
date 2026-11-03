@@ -405,3 +405,13 @@
 /* Document outline */
 "outline.title" = "Contents";
 "outline.empty" = "This document doesn’t carry contents of its own.";
+
+/* Text box tool */
+"textBox.title" = "Text Box";
+"textBox.text" = "Text";
+"textBox.size" = "Size";
+"textBox.alignment" = "Alignment";
+"textBox.align.left" = "Left";
+"textBox.align.center" = "Center";
+"textBox.align.right" = "Right";
+"textBox.add" = "Add";

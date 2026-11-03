@@ -2632,3 +2632,65 @@ engine and the one pure helper, neither of which knows when a sheet is built.
 - **One document, one outline shape.** Flat, three entries, one asset. Nested
   outlines, multi-source documents and deleted pages are covered by unit tests
   only.
+
+## A Text Box tool, and where the other five asked-for tools stand — row 21 — 2026-11-02 (Claude)
+
+The owner asked for six things: a text box, selecting handwriting and moving
+it, an image tool, a highlighter, pencil controls and an eraser. **The survey
+first, because most of the answer is not "build it" but "it exists, elsewhere".**
+
+| asked for | where it actually stands |
+| --- | --- |
+| **Text box** | Engine was done; **the tool is built now**, below. |
+| **Select handwriting, move it** | **Works on iOS** — PencilKit's lasso, and `InkConversion` applies `stroke.transform` on save, so a moved stroke persists moved. **Nothing on Mac.** |
+| **Image tool** | Engine done (`placeImage`, drawing, export). **No UI on either platform.** |
+| **Highlighter** | In the model (`InkStroke.Tool.highlighter`), drawn and exported; reachable on iOS through the PencilKit tool picker. **Not on Mac.** |
+| **Pencil controls** | iOS only, PencilKit's own picker (width, colour, pen/pencil/marker). **Not on Mac.** |
+| **Eraser** | iOS only, PencilKit's. **Not on Mac.** |
+
+**The finding worth acting on: `InkCanvas` is `#if os(iOS)`, and so is the
+Markup toggle. The Mac app has no drawing, no eraser and no lasso at all** —
+four of the six requests are a single missing piece, a Mac drawing surface, and
+PencilKit does not exist on macOS to supply it.
+
+- Full `./scripts/test.sh`: **520 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### The text box tool
+
+`LibraryStore.placeText` is the guarded way in, as `placeImage` is for
+pictures — `saveObject` would take anything, and a box the renderer skips
+leaves the page quietly missing what someone typed. Refused rather than
+stored: empty or whitespace-only text, a frame with no area or a non-finite
+one, a font size of zero, and a missing or deleted page. Each refusal writes
+nothing. Seven store tests.
+
+`DocumentModel.addTextBox` wraps it with the refresh and the undo
+registration the other mark tools use, so **Undo works on a text box** — seen
+working in the app. The same write rebuilds the page's search row, so the
+words are findable the moment they are added.
+
+**Verified by driving the Mac app**, not by inference: created a notebook,
+opened *Text Box* from the notes tool bar, typed "Agreed at the meeting on
+Tuesday", chose Center and red, pressed Add — the text appeared on the page in
+red and centred, the sidebar thumbnail updated, and Undo became enabled.
+
+It is in both More menus, the notebook tool row and the Page menu, with eight
+new keys in English, French and Spanish. Alignment is a **segmented** control
+rather than a pop-up, because French and Spanish truncate in pop-ups.
+
+### What this does **not** do
+
+- **A text box cannot be moved, resized or edited once added.** The frame is
+  chosen by `addTextBox` — a band across the upper part of the page, its height
+  growing with the font size. This is the biggest gap in the tool and the
+  obvious next slice; the owner asked for "move it anywhere" about handwriting,
+  and it applies here too.
+- **Text longer than the frame is clipped**, silently, as it has been since
+  the engine landed.
+- **No image tool yet**, though its engine has been ready since 2026-10-28.
+- **Nothing was added for the Mac's missing drawing surface**, which is what
+  four of the six requests actually need.
+- **No XCUITest** — the simulator still cannot run. This was driven by hand on
+  Mac, once, in English, in dark mode. iPhone and iPad layouts, large text, and
+  French and Spanish are unchecked.

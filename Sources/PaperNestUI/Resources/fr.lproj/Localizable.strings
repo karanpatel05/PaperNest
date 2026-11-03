@@ -405,3 +405,13 @@
 /* Sommaire du document */
 "outline.title" = "Sommaire";
 "outline.empty" = "Ce document ne contient pas de sommaire.";
+
+/* Text box tool */
+"textBox.title" = "Zone de texte";
+"textBox.text" = "Texte";
+"textBox.size" = "Taille";
+"textBox.alignment" = "Alignement";
+"textBox.align.left" = "Gauche";
+"textBox.align.center" = "Centré";
+"textBox.align.right" = "Droite";
+"textBox.add" = "Ajouter";

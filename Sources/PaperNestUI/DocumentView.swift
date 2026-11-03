@@ -30,6 +30,7 @@ struct DocumentView: View {
     @State private var isShowingAdjustments = false
     @State private var isShowingPageOrganizer = false
     @State private var isShowingOutline = false
+    @State private var textBoxPage: Page?
     @State private var isShowingCrop = false
     @State private var annotationPage: Page?
     @State private var managedMarkupPage: Page?
@@ -145,6 +146,9 @@ struct DocumentView: View {
         .sheet(isPresented: $isShowingExport) {
             ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID)
         }
+        .sheet(item: $textBoxPage) { page in
+            TextBoxSheet(model: model, pageID: page.id, undoManager: undoManager)
+        }
         .sheet(isPresented: $isShowingOutline) {
             DocumentOutlineSheet(model: model) { model.selectedPageID = $0 }
         }
@@ -235,7 +239,8 @@ struct DocumentView: View {
             showAddPages: { openFilePicker(.add) },
             showReplacePage: { openFilePicker(.replace) },
             showCrop: { isShowingCrop = true },
-            showOutline: { isShowingOutline = true }
+            showOutline: { isShowingOutline = true },
+            showTextBox: { textBoxPage = model.selectedPage }
         ))
     }
 
@@ -320,6 +325,7 @@ struct DocumentView: View {
             HStack(spacing: 18) {
                 shapeButton
                 stampButton
+                textBoxButton
                 commentsButton
                 annotateTextButton
                 manageMarkupButton
@@ -362,6 +368,7 @@ struct DocumentView: View {
             manageMarkupButton
             shapeButton
             stampButton
+            textBoxButton
             commentsButton
             Divider()
             outlineButton
@@ -409,6 +416,14 @@ struct DocumentView: View {
         }
         .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
         .accessibilityIdentifier("editor-shapes")
+    }
+
+    private var textBoxButton: some View {
+        Button { textBoxPage = model.selectedPage } label: {
+            Label(L10n.textBox, systemImage: "character.textbox")
+        }
+        .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
+        .accessibilityIdentifier("editor-text-box")
     }
 
     private var outlineButton: some View {
@@ -487,6 +502,7 @@ struct DocumentView: View {
             manageMarkupButton
             shapeButton
             stampButton
+            textBoxButton
             commentsButton
             Divider()
             outlineButton
