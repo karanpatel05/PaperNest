@@ -415,3 +415,7 @@
 "textBox.align.center" = "Centro";
 "textBox.align.right" = "Derecha";
 "textBox.add" = "Añadir";
+
+/* Moving a placed mark */
+"object.move" = "Mover";
+"object.move.hint" = "Arrastra para mover. Toca fuera para deseleccionar.";

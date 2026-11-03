@@ -299,6 +299,54 @@ final class DocumentModel {
         session.didChange()
     }
 
+    /// Moves a placed mark to a new frame in source space.
+    ///
+    /// Only a text box or a placed image: ink is moved by the drawing canvas's
+    /// own lasso, and a page comment has no frame to move. Goes through
+    /// `applyInkChanges` so the write is refused if the object changed under
+    /// it, and so undo works the same way it does for everything else.
+    func moveObject(_ object: PageObject, to frame: CGRect, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, let page = selectedPage, object.pageID == page.id else {
+            throw StoreError.pageNotFound
+        }
+        guard let moved = Self.moved(object, to: frame) else { return }
+        replace(try await store.applyInkChanges(on: page.id, saving: [moved],
+                                                replacing: [object], deleting: []))
+        let change = InkChange(pageID: page.id, saved: [moved], replaced: [object], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.moveObject)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    /// The object with a new frame, or nil for a kind this does not move.
+    nonisolated static func moved(_ object: PageObject, to frame: CGRect) -> PageObject? {
+        var moved = object
+        switch object.payload {
+        case .text(var box):
+            box.frame = frame
+            moved.payload = .text(box)
+        case .image(var image):
+            image.frame = frame
+            moved.payload = .image(image)
+        case .ink, .comment:
+            return nil
+        }
+        moved.modifiedAt = Date()
+        return moved
+    }
+
+    /// Keeps a dragged frame from being lost off the edge of the page.
+    ///
+    /// Not clamped to sit fully on the page — hanging over an edge is a
+    /// legitimate thing to want, and drawing clips it — but the origin stays
+    /// inside, so a mark can always be found and dragged back.
+    nonisolated static func clamped(_ frame: CGRect, within source: CGSize) -> CGRect {
+        CGRect(x: min(max(frame.minX, 0), max(source.width - 1, 0)),
+               y: min(max(frame.minY, 0), max(source.height - 1, 0)),
+               width: frame.width, height: frame.height)
+    }
+
     func addTextMarkup(_ snapshot: PageRecognition, lineIndices: Set<Int>, style: TextMarkupStyle, color: RGBAColor? = nil,
                        undoManager: UndoManager?) async throws {
         await finishPendingHistory()

@@ -2735,3 +2735,54 @@ A text box still **cannot be moved, resized or edited** once added — the next
 slice, and the one the owner asked for. The image tool still has no UI, and the
 Mac still has no drawing surface, which is what the highlighter, pencil
 controls, eraser and lasso all actually need.
+
+## A placed mark can be picked up and moved — row 21 — 2026-11-02 (Claude)
+
+The gap the text box shipped with: a box could be added and never moved. A
+text box or a placed image can now be dragged on the page, with undo.
+
+- Full `./scripts/test.sh`: **526 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### Verified by dragging one
+
+In the running Mac app: added a text box reading "DRAG ME" at the top of a
+notebook page, dragged it to the bottom — it moved, the selection outline
+followed it and the sidebar thumbnail updated — then pressed **Undo** and it
+returned to the top with Redo enabled. Both halves seen, not inferred.
+
+### How it is put together
+
+`MovableMarksOverlay` sits over the rendered page and claims **only** the
+rectangles those marks occupy, so scrolling, zooming and the iOS ink canvas
+behave exactly as before, and it stands down entirely while the ink canvas is
+up. It positions handles with the **same `sourceToView` transform the page was
+drawn with** — the one the ink canvas already uses — rather than a second
+guess at where a mark is.
+
+The write goes through `applyInkChanges` with `saving: [moved]` and
+`replacing: [original]`, so a drag is refused if the object changed underneath
+it, and undo comes from the machinery everything else uses. That path only
+accepts text and images here because **ink is moved by the drawing canvas's own
+lasso** and a page comment has no frame — `moved(_:to:)` returns nil for both
+rather than mangling them, and a test says so.
+
+A dragged frame is clamped so its **origin** stays on the page. Hanging over an
+edge is allowed, because that is a reasonable thing to want and drawing clips
+it; being dragged entirely off and lost is not.
+
+### What this does **not** do
+
+- **No resizing.** There are no handles: a mark keeps the size it was created
+  with. For a text box that matters, because text longer than its frame is
+  still clipped silently.
+- **No editing.** The words in a text box cannot be changed after it is added,
+  and there is no delete from the page — only undo.
+- **Ink is untouched.** Selecting and moving handwriting remains PencilKit's
+  lasso on iOS, and still does not exist on Mac.
+- **Mac only, by hand, once.** No XCUITest — the simulator still cannot run —
+  so the drag is unexercised on iPhone and iPad, where a drag competes with
+  scrolling in a way a mouse does not. That is the most likely place for this
+  to behave differently, and it is untested.
+- **No multiple selection**, no keyboard nudging, and the selection is not
+  cleared by tapping the page.

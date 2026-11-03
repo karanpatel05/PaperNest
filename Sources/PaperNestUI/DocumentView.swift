@@ -870,6 +870,7 @@ private struct PageViewer: View {
     var undoManager: UndoManager?
     @Environment(\.displayScale) private var displayScale
     @State private var pinchBase: CGFloat?
+    @State private var selectedMark: PageObjectID?
 
     static let zoomSteps: [CGFloat] = [0.5, 0.75, 1, 1.5, 2, 3, 4]
 
@@ -889,6 +890,21 @@ private struct PageViewer: View {
                             return false
                         }.count))
                         .frame(width: size.width, height: size.height)
+                        // Text boxes and placed images can be picked up and
+                        // moved. Stood down while the ink canvas is up, which
+                        // owns the whole page then.
+                        .overlay {
+                            if !isMarkingUp {
+                                let pageSize = page.geometry.pageSize
+                                MovableMarksOverlay(
+                                    model: model, page: page,
+                                    sourceToView: page.geometry.sourceToPage.concatenating(
+                                        CGAffineTransform(scaleX: size.width / pageSize.width,
+                                                          y: size.height / pageSize.height)),
+                                    undoManager: undoManager,
+                                    selected: $selectedMark)
+                            }
+                        }
                         #if os(iOS)
                         .overlay {
                             if isMarkingUp {

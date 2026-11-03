@@ -490,3 +490,9 @@ extension L10n {
     static var textBoxAlignRight: String { tr("textBox.align.right") }
     static var textBoxAdd: String { tr("textBox.add") }
 }
+
+// Moving a placed mark — ledger row 21.
+extension L10n {
+    static var moveObject: String { tr("object.move") }
+    static var moveObjectHint: String { tr("object.move.hint") }
+}
