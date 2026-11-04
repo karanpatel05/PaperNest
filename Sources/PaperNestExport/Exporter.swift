@@ -150,6 +150,9 @@ public struct Exporter: Sendable {
         // been written: a copied page is read lazily from the document it came
         // from.
         var sourceDocuments: [AssetID: PDFDocument] = [:]
+        // The same bytes, kept for the whole-file copy below so the source is
+        // read once rather than again at the end.
+        var sourceData: [AssetID: Data] = [:]
         for (index, page) in pages.enumerated() {
             try Task.checkCancellation()
             let pageSize = page.geometry.pageSize
@@ -178,6 +181,7 @@ public struct Exporter: Sendable {
                untouchedCandidate || rasterQuality != nil {
                 if sourceDocuments[assetID] == nil, let data = try await renderer.sourcePDFData(for: page) {
                     sourceDocuments[assetID] = PDFDocument(data: data)
+                    sourceData[assetID] = data
                 }
                 if let document = sourceDocuments[assetID] {
                     sourceCopy = document.page(at: sourceIndex)?.copy() as? PDFPage
@@ -249,12 +253,72 @@ public struct Exporter: Sendable {
         }
         ctx.closePDF()
         closed = true
-        if !untouched.isEmpty { try Self.replaceWithSourcePages(untouched, in: url, password: password) }
+        // Every page copied untouched, in the source's own order, all of
+        // them, and nothing else asked for: this export *is* the file that
+        // was imported. Hand that back rather than the rebuild, which would
+        // keep the widget boxes and lose the form they belong to.
+        if untouched.count == pages.count,
+           let asset = Self.wholeSourceAsset(of: pages, options: options,
+                                             rasterQuality: rasterQuality, password: password),
+           let document = sourceDocuments[asset], document.pageCount == pages.count,
+           let data = sourceData[asset] {
+            try data.write(to: url, options: .atomic)
+        } else if !untouched.isEmpty {
+            try Self.replaceWithSourcePages(untouched, in: url, password: password)
+        }
         // The copies are read lazily from the documents they came from, which
         // must therefore outlive the write. Scope alone is not a guarantee
         // once the optimizer is involved, and every run here is Debug.
         withExtendedLifetime(sourceDocuments) {}
         return url
+    }
+
+    /// The one source file an export is simply a copy of, or nil.
+    ///
+    /// Rebuilding a document is what loses a form. An `AcroForm` lives in the
+    /// document **catalog**, not on a page, and PDFKit offers no way to carry
+    /// one across when pages are copied into a new document — so an exported
+    /// page keeps its widget boxes and none of them is a field any more.
+    /// Links and bookmarks go the same way. The answer is not to rebuild the
+    /// document when there is nothing to rebuild: hand back the file that was
+    /// imported, byte for byte.
+    ///
+    /// Strict on purpose. Each of these is a way a copy would hand back
+    /// something other than what was asked for:
+    ///
+    /// - **Another format**, or **different paper** — a copy is the original's
+    ///   format and the original's paper.
+    /// - **A password** — the file on disk is unprotected, and returning it
+    ///   would be the silent false promise refused everywhere else here.
+    /// - **Pages from more than one file**, or **out of the source's order**,
+    ///   or **a subset**: handing back the whole file would restore pages
+    ///   somebody deleted, which is the worst thing this could do. The caller
+    ///   checks the count against the source as well, because this cannot see
+    ///   how many pages the file has.
+    /// - **An edited page** — a crop, a rotation or a filter.
+    ///
+    /// Whether anything is *painted* on the pages is not checked here: the
+    /// caller already knows, because it is exactly the pages it copied
+    /// untouched.
+    static func wholeSourceAsset(of pages: [Page], options: ExportOptions,
+                                 rasterQuality: RasterQuality?, password: String?) -> AssetID? {
+        guard options.format == .pdf, options.paperSize == .original else { return nil }
+        guard password == nil else { return nil }
+        // A compression preset is **not** a reason to rebuild. The caller
+        // only reaches here when no page was re-encoded, which under a preset
+        // means nothing could be made smaller — and the rebuild was measured
+        // coming out *larger* than the source it was built from, which broke
+        // the invariant that compressing is never worse than not compressing.
+        // Handing the source back is both smaller and honest: the compression
+        // result reports no saving, which is what happened.
+        _ = rasterQuality
+        guard let first = pages.first else { return nil }
+        guard case .pdfPage(let asset, index: 0) = first.content else { return nil }
+        for (offset, page) in pages.enumerated() {
+            guard page.transform == .identity,
+                  case .pdfPage(asset, index: offset) = page.content else { return nil }
+        }
+        return asset
     }
 
     /// Vector PDF pages pass through untouched; raster content is limited to

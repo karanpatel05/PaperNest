@@ -57,18 +57,42 @@ import PaperNestTestSupport
         #expect(field.fieldName == "customer")
     }
 
-    /// The finished document is assembled fresh, so its title and creator have
-    /// to be carried over deliberately; a fresh `PDFDocument` has neither.
-    @Test func theDocumentKeepsItsTitleAndCreator() async throws {
+    /// A document this app **assembled** carries its title and creator; a
+    /// fresh `PDFDocument` has neither, so they are set deliberately.
+    @Test func anAssembledDocumentKeepsItsTitleAndCreator() async throws {
+        let fixture = try ExportFixture()
+        let (item, pages) = try await importAnnotated(fixture)
+
+        // Different paper, so the document really is assembled rather than
+        // handed back whole.
+        let (document, output) = try await exportPDF(fixture, item.name, pages,
+                                                     options: ExportOptions(format: .pdf, paperSize: .a4))
+        defer { output.removeTemporaryFiles() }
+
+        let attributes = try #require(document.documentAttributes)
+        #expect(attributes[PDFDocumentAttribute.titleAttribute] as? String == "Agreement")
+        #expect(attributes[PDFDocumentAttribute.creatorAttribute] as? String == Brand.pdfCreator)
+    }
+
+    /// A document handed back **whole** keeps the source's own metadata,
+    /// because it *is* the source: the same bytes, not a rebuild of them.
+    ///
+    /// That is a deliberate trade and the price of keeping the form. Setting
+    /// our title and creator means writing the document through PDFKit, and
+    /// PDFKit will not write this fixture back at all — `write(to:)` returns
+    /// false for it — so there is no version of this that keeps both. Nor is
+    /// stamping this app as the creator of somebody else's unmodified file
+    /// obviously right.
+    @Test func aDocumentHandedBackWholeKeepsTheSourcesMetadata() async throws {
         let fixture = try ExportFixture()
         let (item, pages) = try await importAnnotated(fixture)
 
         let (document, output) = try await exportPDF(fixture, item.name, pages)
         defer { output.removeTemporaryFiles() }
 
-        let attributes = try #require(document.documentAttributes)
-        #expect(attributes[PDFDocumentAttribute.titleAttribute] as? String == "Agreement")
-        #expect(attributes[PDFDocumentAttribute.creatorAttribute] as? String == Brand.pdfCreator)
+        let attributes = document.documentAttributes ?? [:]
+        #expect(attributes[PDFDocumentAttribute.creatorAttribute] as? String != Brand.pdfCreator,
+                "the file was rebuilt after all, or the source grew our creator")
     }
 
     @Test func theTextAndPageCountAreUnchanged() async throws {
@@ -265,30 +289,23 @@ import PaperNestTestSupport
 
     // MARK: - A real interactive form, row 24
 
-    /// **Ledger row 24 was Planned on an inference, and the inference is
-    /// wrong.** It read: an unedited page is copied rather than redrawn, "so
-    /// a field would survive". Nobody had exported a document that really has
-    /// a form — the test above compares two *empty* ones and says so.
+    /// **Row 24, measured on 2026-11-03 and fixed on 2026-11-04.**
     ///
-    /// Measured here with `SyntheticDocuments.acroFormPDF`, which builds a
-    /// real catalog `AcroForm`: the widget annotations come through on the
-    /// page, **and the form dictionary does not**. So an exported copy shows
-    /// the field boxes where they were and none of them is a field any more:
-    /// the worst shape of failure, because it looks right.
+    /// The ledger used to infer that because an unedited page is copied
+    /// rather than redrawn, "a field would survive". It did not: the widget
+    /// annotations came through and the catalog `AcroForm` did not, so an
+    /// exported page showed the field boxes and not one of them was a field
+    /// — and a value already filled in went with them.
     ///
-    /// The cause is structural rather than a slip. An `AcroForm` lives in the
-    /// document **catalog**, not on a page; pass-through copies `PDFPage`s
-    /// into a document PDFKit then writes, and PDFKit exposes no way to carry
-    /// a catalog dictionary across. Keeping it would mean copying the source
-    /// **file** wholesale when every page of it is untouched and in its
-    /// original order — a worthwhile slice, and a different one.
+    /// The cause was structural. An `AcroForm` lives in the document
+    /// **catalog**, not on a page, and PDFKit offers no way to carry one
+    /// across when pages are copied into a new document. So the fix is not to
+    /// build a new document when the export *is* the file that was imported:
+    /// see `Exporter.wholeSourceAsset`.
     ///
     /// Read back through Core Graphics, never PDFKit, which reports a
     /// `fieldName` for a widget whether or not the file has a form at all.
-    ///
-    /// **If this test fails, the loss has been fixed — rewrite it rather than
-    /// patching the numbers.**
-    @Test func anExportedFormKeepsItsBoxesAndLosesItsFields() async throws {
+    @Test func aRealFormSurvivesBeingExportedUntouched() async throws {
         let fixture = try ExportFixture()
         let source = SyntheticDocuments.acroFormPDF(fields: [
             .init(name: "customer", value: "Jane Appleseed"),
@@ -300,51 +317,108 @@ import PaperNestTestSupport
         let (_, output) = try await exportPDF(fixture, item.name, pages)
         defer { output.removeTemporaryFiles() }
 
-        // The fixture really does have a form, or this measures nothing.
-        let sourceURL = fixture.url.appendingPathComponent("real-acroform.pdf")
-        try source.write(to: sourceURL)
-        #expect(Self.acroFormFieldNames(in: sourceURL) == ["customer", "agreed"])
-
-        // What survives: the boxes. What does not: the form they belonged to.
-        let exported = try #require(PDFDocument(url: output.files[0]))
-        #expect(exported.page(at: 0)?.annotations.count == 2, "even the widgets were lost")
-        #expect(Self.acroFormFieldNames(in: output.files[0]).isEmpty,
-                "the form survived — good news, and this test now needs rewriting")
+        #expect(Self.acroFormFieldNames(in: output.files[0]) == ["customer", "agreed"])
+        #expect(try PDFForm.fields(in: Data(contentsOf: output.files[0])).first?.value == "Jane Appleseed",
+                "the fields came back but the answers did not")
     }
 
-    /// And so a value someone had already filled in goes with it. This is
-    /// what row 24 costs in practice: export a filled form and the answers
-    /// are gone, while the page still looks like a form.
-    @Test func aFilledInValueGoesWithTheForm() async throws {
+    /// The export of an unedited file is that file, byte for byte. Stated as
+    /// a hash rather than "it works": anything less than identical means
+    /// something was rebuilt, and whatever was rebuilt can lose things this
+    /// test does not know to look for.
+    @Test func anUneditedDocumentIsHandedBackByteForByte() async throws {
         let fixture = try ExportFixture()
-        let source = SyntheticDocuments.acroFormPDF(fields: [.init(name: "customer", value: "Jane Appleseed")])
+        let source = SyntheticDocuments.acroFormPDF(fields: [.init(name: "customer")])
         let item = try await fixture.importer.importItem(.data(source, name: "Agreement"))
         let pages = try await fixture.store.pages(of: item.id)
-        // The value is really there before the export.
-        #expect(try PDFForm.fields(in: source).first?.value == "Jane Appleseed")
 
         let (_, output) = try await exportPDF(fixture, item.name, pages)
         defer { output.removeTemporaryFiles() }
 
-        #expect(try PDFForm.fields(in: Data(contentsOf: output.files[0])).isEmpty,
-                "the filled value came through — rewrite this test")
+        #expect(try Data(contentsOf: output.files[0]) == source)
     }
 
-    /// The other half of the boundary: a page that had to be **redrawn**
-    /// could never keep a form, because the form lives in the file and a
-    /// drawing knows nothing about it. Pinned so the limit is a measured
-    /// fact rather than something a user discovers on a signature page.
+    /// The boundary, and the reason the predicate is strict: a page that had
+    /// to be **redrawn** cannot keep a form, because the form lives in the
+    /// file and a drawing knows nothing about it. A redrawn export is also
+    /// not the source file, so it must not be handed back as one.
     @Test func aPageThatHadToBeRedrawnLosesItsFormToo() async throws {
         let fixture = try ExportFixture()
         let source = SyntheticDocuments.acroFormPDF(fields: [.init(name: "customer")])
         let item = try await fixture.importer.importItem(.data(source, name: "Agreement"))
         let pages = try await fixture.store.pages(of: item.id)
 
-        // A different paper size forces the page to be redrawn.
         let (_, output) = try await exportPDF(fixture, item.name, pages,
                                               options: ExportOptions(format: .pdf, paperSize: .a4))
         defer { output.removeTemporaryFiles() }
 
         #expect(Self.acroFormFieldNames(in: output.files[0]).isEmpty)
+        #expect(try Data(contentsOf: output.files[0]) != source)
+    }
+
+    /// A password still costs the form, because a protected file has to be
+    /// written and writing it is the rebuild. Pinned so the cost is known
+    /// rather than discovered: **you cannot have both today.**
+    @Test func askingForAPasswordStillCostsTheForm() async throws {
+        let fixture = try ExportFixture()
+        let source = SyntheticDocuments.acroFormPDF(fields: [.init(name: "customer")])
+        let item = try await fixture.importer.importItem(.data(source, name: "Agreement"))
+        let pages = try await fixture.store.pages(of: item.id)
+
+        let output = try await fixture.exporter.export(
+            itemName: item.name, pages: pages,
+            options: ExportOptions(format: .pdf, paperSize: .original), password: "correct-horse")
+        defer { output.removeTemporaryFiles() }
+
+        #expect(try Data(contentsOf: output.files[0]) != source, "the password was not applied")
+        #expect(Self.acroFormFieldNames(in: output.files[0]).isEmpty)
+    }
+
+    /// **The worst thing a whole-file copy could do**: hand back a file that
+    /// still contains a page somebody deleted. Driven as a real export
+    /// rather than left to the predicate's unit test, because this is the
+    /// one failure that would be silent, permanent and impossible to spot
+    /// from the page count alone if the guard were off by one.
+    @Test func aDeletedPageDoesNotComeBackInTheExport() async throws {
+        let fixture = try ExportFixture()
+        let (item, pages) = try await fixture.importPDF(["Keep me alpha", "DELETE ME beta", "Keep me gamma"])
+        let kept = [pages[0], pages[2]]
+
+        let (document, output) = try await exportPDF(fixture, item.name, kept)
+        defer { output.removeTemporaryFiles() }
+
+        #expect(document.pageCount == 2)
+        let text = (0..<document.pageCount).compactMap { document.page(at: $0)?.string }.joined()
+        #expect(!text.contains("DELETE ME"), "a deleted page came back in the export")
+    }
+
+    /// A shuffle that keeps the first page and the page count is the one
+    /// reordering nothing else catches: the first-page guard sees index 0 and
+    /// the page-count guard sees three of three. Without the per-page index
+    /// check the source would come back in the source's order and the
+    /// reordering would be silently undone.
+    @Test func aShuffleKeepingTheFirstPageIsStillExportedAsAsked() async throws {
+        let fixture = try ExportFixture()
+        let (item, pages) = try await fixture.importPDF(["Page alpha", "Page beta", "Page gamma"])
+
+        let (document, output) = try await exportPDF(fixture, item.name, [pages[0], pages[2], pages[1]])
+        defer { output.removeTemporaryFiles() }
+
+        #expect(document.page(at: 1)?.string?.contains("Page gamma") == true,
+                "the shuffle was undone and the source came back in its own order")
+        #expect(document.page(at: 2)?.string?.contains("Page beta") == true)
+    }
+
+    /// The same for reordering: the export must be the order that was asked
+    /// for, not the source's.
+    @Test func reorderedPagesAreNotHandedBackInSourceOrder() async throws {
+        let fixture = try ExportFixture()
+        let (item, pages) = try await fixture.importPDF(["Page alpha", "Page beta"])
+
+        let (document, output) = try await exportPDF(fixture, item.name, [pages[1], pages[0]])
+        defer { output.removeTemporaryFiles() }
+
+        #expect(document.page(at: 0)?.string?.contains("Page beta") == true,
+                "the pages came back in the source's order")
     }
 }

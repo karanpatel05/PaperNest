@@ -61,7 +61,12 @@ func unzip(_ arguments: [String]) throws -> (status: Int32, output: String) {
         #expect(pdf.page(at: 0)?.string?.contains("First page alpha") == true)
         #expect(pdf.page(at: 1)?.string?.contains("Deuxième page — été") == true)
         #expect(pdf.page(at: 2)?.string?.contains("Tercera página año") == true)
-        #expect(pdf.documentAttributes?[PDFDocumentAttribute.creatorAttribute] as? String == Brand.pdfCreator)
+        // The creator is *not* checked here any more. Nothing in this
+        // document was edited, so the export is the imported file handed back
+        // byte for byte — see `Exporter.wholeSourceAsset` — and it keeps the
+        // source's own metadata. `PDFPassThroughTests` covers both halves of
+        // that rule: an assembled document carries this app's creator, one
+        // handed back whole carries the source's.
     }
 
     @Test func rotatedAndReorderedPagesExportUprightInTheNewOrder() async throws {

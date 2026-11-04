@@ -3748,3 +3748,76 @@ misled this project once already.
   Graphics finds no `AcroForm`; Acrobat's view of the same file was not
   sought.
 
+## An unedited export is the file that was imported — row 24 fixed — 2026-11-04 (Claude)
+
+Yesterday's entry measured the loss: exporting a page with a real `AcroForm`
+kept the widget boxes and lost the form, so the page looked like a form and
+was not one. The cause was structural — a form lives in the document
+**catalog**, not on a page, and PDFKit cannot carry a catalog across when
+pages are copied into a new document. This stops building a new document when
+there is nothing to build.
+
+- Full `./scripts/test.sh`: **634 tests passed**, **0 warnings**.
+- `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
+
+### The rule
+
+`Exporter.wholeSourceAsset` answers one question: is this export simply the
+file that was imported? It says yes only when **every** page is an untouched
+page of **one** source file, in that file's **own order**, starting at its
+first page — and the caller adds that the source has no more pages than the
+export does, and that every page really was copied untouched. Then the source
+bytes are written out as they are.
+
+Each refusal is a way the copy would hand back something other than what was
+asked for: another format, different paper, a password, a crop or rotation,
+pages from two files, a subset, a reordering.
+
+### What it buys
+
+- **A form survives**, fields and filled-in values both. So do links,
+  bookmarks and embedded fonts, which the same rebuild was losing silently.
+- **The export is byte-identical to the import**, asserted as such rather
+  than as "it works": anything less means something was rebuilt, and whatever
+  was rebuilt can lose things no test thought to check.
+- **Compression got honest.** Three compression tests failed the moment this
+  landed, on `compressed <= plain` — because `plain` had become the pristine
+  source and **the rebuild had been inflating files**. A preset is now allowed
+  to hand the source back when no page could be re-encoded, which is both
+  smaller and what the compression result already reported: no saving.
+
+### What it costs, deliberately
+
+- **A document handed back whole keeps the source's title and creator**, not
+  this app's. Two tests asserted our creator on unedited exports and are
+  rewritten: an *assembled* document carries it, one handed back whole does
+  not. There is no version that keeps both — setting the metadata means
+  writing through PDFKit, and **PDFKit refuses to write the AcroForm fixture
+  back at all** (`write(to:)` returns false), which was measured, not assumed.
+  Stamping this app as the creator of someone else's unmodified file is not
+  obviously right anyway.
+- **A password still costs the form**, because a protected file has to be
+  written and writing it is the rebuild. Pinned by a test so the trade is
+  known rather than discovered: you cannot have both today.
+
+### The guard that nearly shipped untested
+
+Breaking the per-page index check did **not** fail any test at first. The
+subset case was caught by the first-page guard, and the deleted-page case by
+the page-count guard — so the index check looked load-bearing and was not
+proven to be. The case it alone catches is **a shuffle that keeps the first
+page and the page count**: three pages exported as 1, 3, 2. Without it the
+source comes back in the source's order and the reordering is silently
+undone. Two tests now cover it, one on the predicate and one driving a real
+export, and both fail when the check is removed.
+
+### What this does **not** do
+
+- **Nothing was driven in the app.** This is engine work with no surface of
+  its own; the export sheet is unchanged.
+- **One fixture family.** Radio groups, `/Kids` hierarchies, signature fields
+  and XFA are still untested, and XFA probably fares worse.
+- **No other reader's opinion.** "The form survives" means Core Graphics finds
+  it and `PDFForm` reads its value back; Acrobat was not asked.
+- **Encrypted sources are untouched by this.** A source that needs a password
+  to open was already handled elsewhere and is not part of the copy path.
