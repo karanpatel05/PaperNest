@@ -40,11 +40,15 @@ struct MarkupManagerSheet: View {
                                 HStack(spacing: 12) {
                                     MarkSwatch(object: object).frame(width: 60, height: 32).accessibilityHidden(true)
                                     Text(Self.describe(object, number: index + 1))
-                                        .lineLimit(1).truncationMode(.tail)
+                                        .lineLimit(3)
+                                        .multilineTextAlignment(.leading)
+                                        .fixedSize(horizontal: false, vertical: true)
                                     Spacer()
                                     Image(systemName: selected.contains(object.id) ? "checkmark.circle.fill" : "circle")
                                         .foregroundStyle(Theme.accent)
-                                }.contentShape(Rectangle())
+                                }
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("markup-row-\(object.id.rawValue)")
@@ -92,7 +96,7 @@ struct MarkupManagerSheet: View {
             } message: { Text(errorMessage ?? "") }
         }
         #if os(macOS)
-        .frame(minWidth: 440, idealWidth: 520, minHeight: 520, idealHeight: 680)
+        .frame(minWidth: 440, idealWidth: 520, minHeight: 360, idealHeight: 620, maxHeight: 680)
         #endif
     }
 

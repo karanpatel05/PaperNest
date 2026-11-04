@@ -11,6 +11,7 @@ import SwiftUI
 struct ToolsSheet: View {
     @Bindable var model: LibraryModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var creatingNotebook = false
     @State private var picking: ToolPick?
     @State private var composing: DocumentToolsRequest?
@@ -72,26 +73,35 @@ struct ToolsSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section(L10n.toolsCreate) {
-                    tiles(createTiles)
-                    // A picker brings its own presentation, so it sits beside
-                    // the tiles rather than inside the grid.
-                    PhotosPicker(selection: $photoSelection, maxSelectionCount: 20, matching: .images) {
-                        Label(L10n.importPhotos, systemImage: "photo.on.rectangle")
-                    }
-                    .accessibilityIdentifier("tool-photos")
-                }
-                Section(L10n.toolsDocuments) {
-                    tiles(Tool.allCases.map { tool in
-                        ChoiceTile(title: tool.title, systemImage: tool.systemImage, iconColor: Theme.accent,
-                                   isSelected: false, identifier: "tool-\(tool.rawValue)") {
-                            picking = ToolPick(tool: tool)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    Text(L10n.toolsCreate).font(.title2.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        createActions
+                        PhotosPicker(selection: $photoSelection, maxSelectionCount: 20, matching: .images) {
+                            ToolCardLabel(title: L10n.importPhotos, systemImage: "photo.on.rectangle")
                         }
-                    })
+                        .buttonStyle(PremiumButtonStyle())
+                        .accessibilityIdentifier("tool-photos")
+                    }
+                    Text(L10n.toolsDocuments).font(.title2.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        ForEach(Tool.allCases) { tool in
+                            Button { picking = ToolPick(tool: tool) } label: {
+                                ToolCardLabel(title: tool.title, systemImage: tool.systemImage, detail: tool.prompt)
+                            }
+                            .buttonStyle(PremiumButtonStyle())
+                            .accessibilityIdentifier("tool-\(tool.rawValue)")
+                        }
+                    }
                 }
+                .padding(20)
+                .frame(maxWidth: 840)
+                .frame(maxWidth: .infinity)
             }
-            .formStyle(.grouped)
+            .background(Theme.libraryBackground)
             .navigationTitle(L10n.toolsTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -138,37 +148,41 @@ struct ToolsSheet: View {
             BulkExportSheet(request: request)
         }
         #if os(macOS)
-        .frame(minWidth: 460, idealWidth: 520, minHeight: 420, idealHeight: 540)
+        .frame(minWidth: 460, idealWidth: 640, minHeight: 360, idealHeight: 620, maxHeight: 720)
         #endif
     }
 
-    private var createTiles: [ChoiceTile] {
-        var tiles: [ChoiceTile] = []
+    private var columns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible())]
+            : [GridItem(.adaptive(minimum: 200), spacing: 14, alignment: .top)]
+    }
+
+    @ViewBuilder private var createActions: some View {
         #if os(iOS)
-        tiles.append(ChoiceTile(title: L10n.scan, systemImage: "doc.viewfinder", iconColor: Theme.accent, isSelected: false,
-                                isEnabled: DocumentCameraView.isSupported, identifier: "tool-scan") {
+        Button {
             dismiss()
             model.isShowingScanner = true
-        })
+        } label: {
+            ToolCardLabel(title: L10n.scan, systemImage: "doc.viewfinder")
+        }
+        .buttonStyle(PremiumButtonStyle())
+        .disabled(!DocumentCameraView.isSupported)
+        .accessibilityIdentifier("tool-scan")
         #endif
-        tiles.append(ChoiceTile(title: L10n.importFiles, systemImage: "square.and.arrow.down", iconColor: Theme.accent,
-                                isSelected: false, identifier: "tool-import") {
+        Button {
             dismiss()
             model.isShowingFileImporter = true
-        })
-        tiles.append(ChoiceTile(title: L10n.newNotebook, systemImage: "book.closed", iconColor: Theme.accent,
-                                isSelected: false, identifier: "tool-notebook") {
-            creatingNotebook = true
-        })
-        return tiles
-    }
-
-    /// Two per row, so a long translated title wraps instead of truncating.
-    private func tiles(_ tiles: [ChoiceTile]) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-            ForEach(Array(tiles.enumerated()), id: \.offset) { _, tile in tile }
+        } label: {
+            ToolCardLabel(title: L10n.importFiles, systemImage: "square.and.arrow.down")
         }
-        .listRowInsets(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
+        .buttonStyle(PremiumButtonStyle())
+        .accessibilityIdentifier("tool-import")
+        Button { creatingNotebook = true } label: {
+            ToolCardLabel(title: L10n.newNotebook, systemImage: "book.closed")
+        }
+        .buttonStyle(PremiumButtonStyle())
+        .accessibilityIdentifier("tool-notebook")
     }
 
     /// Photos are loaded one at a time: the picker hands back whole images,
@@ -294,5 +308,45 @@ private struct DocumentPicker: View {
     /// the order a merge starts from.
     private func pickOrder(_ a: LibraryStore.ItemSummary, _ b: LibraryStore.ItemSummary) -> Bool {
         (selection.firstIndex(of: a.id) ?? 0) < (selection.firstIndex(of: b.id) ?? 0)
+    }
+}
+
+/// A shared label keeps system pickers and ordinary actions visually consistent.
+private struct ToolCardLabel: View {
+    let title: String
+    let systemImage: String
+    var detail: String? = nil
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.title2.weight(.medium))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 44, height: 44)
+                .background(Theme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(Color.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let detail {
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .multilineTextAlignment(.leading)
+        .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
+        .padding(18)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.radius)
+                .strokeBorder(Theme.separator, lineWidth: 1)
+        }
+        .opacity(isEnabled ? 1 : 0.45)
+        .contentShape(RoundedRectangle(cornerRadius: Theme.radius))
+        .accessibilityElement(children: .combine)
     }
 }

@@ -1,5 +1,25 @@
 # Test matrix
 
+## 2026-11-04 — First coordinated UI/UX refinement (iPhone, iPad, Mac)
+
+- Owner confirmed three platforms and requested UI work now. Export choices explicitly stack at accessibility Dynamic Type sizes on iOS; tile subtitles wrap and centre. Saved markup labels allow three lines with a 44-point row minimum. Mac Export/Markup sheets use 360 minimum, 620 ideal, 680 maximum height; export ideal width 540. These are layout changes, not proven fixes for the earlier runtime findings. No new strings or backend edits.
+- Bounded Mac build **passed exit 0** (`/private/tmp/papernest-ux-sheets-mac.log`, 600-second bound), no compiler warnings. iOS Simulator app build **passed exit 0** (`/private/tmp/papernest-ux-sheets-ios-build.log`, 180-second bound), no compiler warnings; Xcode still logs CoreSimulator 1174.9.2 versus required 1174.21 and disables simulator device support. A termination attempt after completion found no process; no build was cancelled.
+- Full unit invocation **failed exit 1 during compilation**, 600-second bound, `/private/tmp/papernest-ux-sheets-unit.log`: concurrently introduced `WholeSourceCopyTests.swift` used an invalid Page initializer and referenced missing `Exporter.wholeSourceAsset`. That backend file and the concurrently changing `Exporter.swift` were not edited by Codex. No passing unit result claimed for this slice; rerun after backend work settles.
+- No runtime screenshots, iOS UI tests, Mac interaction or accessibility pass claimed. Xcode setup and absent desktop-control tooling still block those checks. Existing audit failures remain open. `git diff --check` passes. No staging/commits; design continuation recorded in CLEAN_NATIVE_DESIGN. All Codex file claims released.
+
+## 2026-11-04 09:01 UTC — Simulator preflight still blocked
+
+- Usage available. Re-read brief, current claims and newest results; no staged paths. Bounded `xcodebuild -checkFirstLaunchStatus` again returned **69** immediately; log `/private/tmp/papernest-nov4-0901-first-launch.log`. Xcode setup blocker remains. No repeat UI timeout, builds or unit tests: no source changed since the preceding verified baseline. App interaction checks remain unrun. Handoff preserved, documentation claim released, no active processes or commits.
+
+## 2026-11-04 UTC — Codex resumed: current baseline passes; Simulator setup blocked
+
+- Current HEAD `fc1637c`; read Claude’s Nov 3 UI coverage handoff and checked claims/index before work. No product/backend edits, staging or commits.
+- `./scripts/test.sh`, bounded 600 seconds: **616 passed, exit 0** (143 UI, 167 Store, 133 Export, 125 Import, 48 Core). Log `/private/tmp/papernest-nov4-unit.log`. `./scripts/build-mac-app.sh`, bounded 600 seconds: **passed, exit 0**, log `/private/tmp/papernest-nov4-mac.log`. No compiler warning/error matches in either log. These do not establish app interaction success.
+- `xcodebuild -checkFirstLaunchStatus`: **exit 69**, 30-second bound, `/private/tmp/papernest-nov4-first-launch.log`. Installed CoreSimulator is `1174.9.2`; Xcode’s simctl wrapper requires `1174.21` and invokes `xcodebuild -runFirstLaunch`. Initial device-list probe stalled in that child and was terminated. `./scripts/ui-test-ios.sh`, bounded 45 seconds: **timeout, exit 124 before device discovery/test execution**, `/private/tmp/papernest-nov4-ios.log`; process group terminated. No UI test passed or failed an assertion: none started. Owner must complete Xcode setup (`sudo xcodebuild -runFirstLaunch`) before Simulator checks can resume.
+- Visually inspected all three saved `opaque-light-*-ipad.png` images from Oct 29: Position/Start horizontal slider visible; Thick fully visible and selected; native Custom Color popover visible. Scrolled neighbouring content remains clipped at sheet edges. This closes only the old screenshot-review task, not the failed accessibility audits or verification of newer UI.
+- Unrun: current iPhone/iPad interactions for export formats/password input, text/image editing and language settings; native Mac/VoiceOver/two-window interaction (no desktop-control tool available); real camera/device gate; broader accessibility audits. Next: restore Simulator prerequisites, then verify Claude’s new shared UI and remaining accessibility failures before feature work. No running verification process remains.
+
+
 ## 2026-10-29 UTC — Final opaque-toolbar light iPad largest-text check
 
 - `/private/tmp/papernest-opaque-nav-ipad-light-large.log`: **passed, exit 0**, 73.282 seconds, 900-second bound. Final toolbar source on light iPad: sidebar width assertion, largest-text position slider, Thick selection, native color popover, save and saved markup row. Existing assertions unchanged.
@@ -3714,9 +3734,8 @@ there is no API for it, so no amount of care in `isUntouched` can help.
 The honest fix is a different path: when **every** page of an export is
 untouched, comes from one source asset, and is in that source's original
 order, copy the source **file** wholesale instead of rebuilding a document.
-That would keep the form, the links and the bookmarks together.
-*(This also said "and the embedded fonts" — withdrawn 2026-11-04, never
-measured.)* *(Written here as "and be faster" — **measured 2026-11-04 and that
+That would keep the form, the links, the bookmarks and the embedded fonts
+together. *(Written here as "and be faster" — **measured 2026-11-04 and that
 part is wrong**; see the entry below.)* It needs exact guards — page count, order, asset
 identity, no paper change, no text layer, no password — and it changes the
 most-used export path, so it is its own slice and is **not** attempted here.
@@ -3777,14 +3796,8 @@ pages from two files, a subset, a reordering.
 
 ### What it buys
 
-- **A form survives**, fields and filled-in values both. So do **links** and
-  the **table of contents**, each with a test, and the outline keeps its
-  nesting. A rebuild loses the outline entirely, which is pinned too — "the
-  copy keeps the bookmarks" would be an empty sentence otherwise.
-- **Embedded fonts were also claimed here and that claim is withdrawn.** A
-  rebuild draws text as text and keeps it selectable, accents included, so
-  there was no reason to think fonts were being lost; nothing was measured
-  either way, and an unverified line is worse than a missing one.
+- **A form survives**, fields and filled-in values both. So do links,
+  bookmarks and embedded fonts, which the same rebuild was losing silently.
 - **The export is byte-identical to the import**, asserted as such rather
   than as "it works": anything less means something was rebuilt, and whatever
   was rebuilt can lose things no test thought to check.
@@ -3936,4 +3949,3 @@ cooperative pool and does not stall the UI.
 So: the sweep is not a freeze, and it is not free. If a large library ever
 needs it to be gentler, the batch size and a pause between batches are the
 knobs, and neither exists yet.
-

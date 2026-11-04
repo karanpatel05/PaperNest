@@ -60,6 +60,7 @@ struct ExportSheet: View {
     @State private var isShowingSaver = false
     /// Empty means no password, which is not the same as an empty one.
     @State private var password = ""
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum PageChoice: Hashable { case all, current, range }
 
@@ -104,7 +105,7 @@ struct ExportSheet: View {
                 .padding()
         }
         // Sheets on macOS size to their content.
-        .frame(minWidth: 460, idealWidth: 500, minHeight: 520)
+        .frame(minWidth: 460, idealWidth: 540, minHeight: 360, idealHeight: 620, maxHeight: 680)
         .modifier(lifecycle)
         #endif
     }
@@ -227,11 +228,17 @@ struct ExportSheet: View {
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8))
         #else
-        ViewThatFits(in: .horizontal) {
-            // Tiles in a row share the tallest one's height.
-            HStack(spacing: 10) { tiles() }
-                .fixedSize(horizontal: false, vertical: true)
-            VStack(spacing: 8) { tiles() }
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 12) { tiles() }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    // Tiles in a row share the tallest one's height.
+                    HStack(spacing: 10) { tiles() }
+                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 8) { tiles() }
+                }
+            }
         }
         .listRowBackground(Color.clear)
         // Inset from the row's edges: rows clip to large rounded corners,
@@ -281,7 +288,7 @@ struct ExportSheet: View {
     ///
     /// The titles are the formats' own names, so they are not translated and
     /// go through `Text(verbatim:)` inside the tile.
-    static let offeredFormats: [(format: ExportFormat, title: String, systemImage: String, iconColor: Color?)] = [
+    nonisolated static let offeredFormats: [(format: ExportFormat, title: String, systemImage: String, iconColor: Color?)] = [
         (.pdf, "PDF", "doc.richtext", .red),
         (.jpeg, "JPEG", "photo", nil),
         (.png, "PNG", "photo.artframe", nil),
@@ -602,6 +609,8 @@ struct ChoiceTile: View {
                     Text(verbatim: subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.vertical, 12)

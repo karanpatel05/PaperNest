@@ -1,3 +1,13 @@
+## Tools hub refinement — 2026-11-04
+
+The Tools screen now uses a scrolling card collection on the existing ice/navy canvas. Create and Documents remain separate labelled sections. Photos uses the same label treatment as ordinary buttons while retaining the system PhotosPicker. Document cards show their existing localized selection instructions before opening the picker. Cards use SF headline/subheadline, accent icon wells, quiet surface borders and wrapping labels. An adaptive 200-point minimum yields one column on narrow phones and more on wider windows; accessibility text sizes force one column. Mac sheet size is bounded, with Done remaining in its existing footer. All original identifiers and actions remain. No new converter, media, Vault or VPN tiles.
+
+## Coordinated iPhone, iPad and Mac refinement — 2026-11-04
+
+Owner confirmed all three platforms. Continue the existing premium SF/indigo/lavender direction, using real library content and working actions. First slice makes export choices explicitly stack at accessibility text sizes on iPhone/iPad, permits their detail text to wrap, and bounds Mac export/markup sheets to 680 points with a smaller minimum so grouped forms can scroll. Saved marks get three lines for distinguishing similar text boxes, a 44-point minimum row, and their full existing accessibility label. Export formats, password validation and store operations stay intact.
+
+Next slices: consistent library hierarchy and empty states, Tools grouping, then editor control density and keyboard/VoiceOver access. Keep Notes tools side by side with reachable overflow by scrolling. Verify each slice across compact/regular layouts and en/fr/es when Simulator setup is repaired; compilation alone is not visual or interaction validation. Vault/VPN remain deferred.
+
 # Premium reference redesign — 2026-10-27
 
 The owner’s new primary specification is `DesignReferences/paper-nest-reference.png`, superseding the older clean/native mockups below. Reproduce the interfaces inside the devices using the existing working app. SF typography, indigo #5264FF and lavender #9667FF, ice #F8F9FF canvas, #F0F2FF sidebar, translucent rounded surfaces, restrained borders and shadows. Dark mode uses dark navy surfaces and lighter accent contrast. Respect Reduce Motion and Reduce Transparency.
