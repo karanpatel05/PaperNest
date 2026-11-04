@@ -197,9 +197,22 @@ extension Exporter {
     /// Reduces a PDF held as loose bytes, page by page.
     ///
     /// The output is assembled fresh in PDFKit and the untouched pages are
-    /// `copy()`d, so whatever they carry — links, annotations, a form field's
-    /// name — comes with them. Everything that can fail happens before the
-    /// temporary directory exists, so a refusal still writes nothing.
+    /// `copy()`d, so links and annotations come with them. **Not an
+    /// interactive form**: that lives in the document catalog, not on a page,
+    /// and PDFKit cannot carry a catalog into a new document — a copied page
+    /// keeps its widget boxes and none of them is a field any more. PDFKit
+    /// reports a `fieldName` for a widget either way, which is how an earlier
+    /// version of this comment came to claim otherwise.
+    ///
+    /// So a rebuild is only worth doing when it actually compresses
+    /// something. **When no page could be re-encoded — the common case for a
+    /// document of real text, since a preset only re-encodes scans — the
+    /// original bytes are handed back instead**, which keeps the form and
+    /// cannot come out larger than the file it replaced. The same applies if
+    /// the rebuild turns out no smaller than the original.
+    ///
+    /// Everything that can fail happens before the temporary directory
+    /// exists, so a refusal still writes nothing.
     static func compressPDF(named name: String, document: PDFDocument, data: Data,
                             preset: CompressionPreset, temporaryRoot: URL) throws -> CompressionResult {
         // A protected PDF is refused, measured rather than assumed. A locked
@@ -223,19 +236,24 @@ extension Exporter {
         // serialized. Letting one go out of scope leaves a blank page behind,
         // and the file still looks like a triumph of compression.
         var rebuilt: [PDFDocument] = []
+        var reEncodedAnyPage = false
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index) else { throw ExportError.writeFailed }
             if !Self.carriesText(document, at: index),
                let reduced = Self.reEncodedPage(readable, pageNumber: index + 1, page: page,
                                                 preset: preset, keeping: &rebuilt) {
                 output.insert(reduced, at: output.pageCount)
+                reEncodedAnyPage = true
                 continue
             }
             guard let copy = page.copy() as? PDFPage else { throw ExportError.writeFailed }
             output.insert(copy, at: output.pageCount)
         }
         guard output.pageCount == document.pageCount,
-              let encoded = output.dataRepresentation() else { throw ExportError.writeFailed }
+              let rebuiltData = output.dataRepresentation() else { throw ExportError.writeFailed }
+        // Nothing compressed, or the rebuild came out no smaller: hand back
+        // what arrived. A rebuild that saves nothing has still cost the form.
+        let encoded = (reEncodedAnyPage && rebuiltData.count < data.count) ? rebuiltData : data
         withExtendedLifetime(rebuilt) {}
 
         let directory = temporaryRoot.appendingPathComponent("PaperNestExport-\(UUID().uuidString)", isDirectory: true)

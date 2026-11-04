@@ -3842,3 +3842,64 @@ export, and both fail when the check is removed.
   it and `PDFForm` reads its value back; Acrobat was not asked.
 - **Encrypted sources are untouched by this.** A source that needs a password
   to open was already handled elsewhere and is not part of the copy path.
+
+## Compressing a PDF that cannot shrink no longer costs you the form — 2026-11-04 (Claude)
+
+Found while checking what else the row-24 finding touched. `compressPDF` —
+the path for a **stored PDF file**, separate from compressing a document's
+pages — rebuilt the document in PDFKit whatever happened, even when **no page
+could be re-encoded at all**. That is the common case for a document of real
+text, because a preset only re-encodes scans.
+
+- Full `./scripts/test.sh`: **639 tests passed**, **0 warnings**.
+
+### What was wrong
+
+Measured on a one-page PDF carrying a real `AcroForm`, compressed at
+*Smallest*:
+
+- the output was **larger than the input**, and
+- the **form was gone** — fields and filled-in value both — because a rebuild
+  cannot carry a catalog `AcroForm` across.
+
+So "Reduce File Size" on a form could grow the file and kill the form, and
+the result would honestly report no saving while the damage was already done.
+
+The comment above that function claimed a copied page brings "a form field's
+name" with it. True, and misleading in exactly the way that misled this
+project before: **PDFKit reports a `fieldName` for a widget whether or not
+the document has a form at all.** The comment now says what actually
+survives, and what does not.
+
+### What it does now
+
+If **no page was re-encoded**, the original bytes are handed back. The same
+if the rebuild turns out no smaller than the original. So:
+
+- `compressedByteCount <= originalByteCount` is now an invariant for this
+  path, where before a "compression" could add bytes;
+- a document nothing could shrink keeps its form, its links and everything
+  else, because it is not touched at all;
+- the result still reports `isSmaller == false` and `savedByteCount == 0`,
+  which is what happened.
+
+Both tests were proven red by removing the guard.
+
+### What this does **not** do
+
+- **A page that really was re-encoded still costs the form.** The page content
+  genuinely changed, so there is no copy to hand back. Unavoidable, and the
+  same shape as the password trade on export.
+- **Only the file path changed.** Compressing a *document's pages* goes
+  through `writePDF`, which got its own version of this on 2026-11-04.
+- **No measurement of how often this bites.** The fixtures say it happens for
+  text documents at every preset; how much of a real library is text-only is
+  unknown.
+
+### A stale note corrected on the way
+
+The handoff listed "image format choice for output" as remaining backend for
+compression. **It is done**: `CompressionFormat` offers JPEG and HEIC with
+measured sizes, the image path honours it, and the PDF path documents why it
+cannot. Only **folder/archive compression** is left in that area.
+

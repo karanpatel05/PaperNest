@@ -568,4 +568,44 @@ import PaperNestTestSupport
                                                 preset: .strong, format: .heic)
         }
     }
+
+    // MARK: - A PDF file nothing could shrink
+
+    /// Compressing a stored PDF rebuilt it in PDFKit whatever happened, even
+    /// when **no page could be re-encoded at all** — which is the common case
+    /// for a document of real text, since a preset only re-encodes scans. The
+    /// rebuild then achieved nothing and cost something: it dropped the
+    /// catalog `AcroForm`, so a form came back as dead boxes, and it could
+    /// come out larger than the file it replaced.
+    ///
+    /// The comment in `compressPDF` claimed a copied page brings "a form
+    /// field's name" with it, which is true and misleading in exactly the way
+    /// that misled this project before: PDFKit reports a `fieldName` for a
+    /// widget whether or not the document has a form at all.
+    @Test func aPDFNothingCouldShrinkComesBackAsItself() async throws {
+        let source = SyntheticDocuments.acroFormPDF(fields: [
+            .init(name: "customer", value: "Jane Appleseed"),
+        ])
+
+        let result = try await compress(source, .smallest, named: "agreement.pdf")
+        defer { result.output.removeTemporaryFiles() }
+
+        let written = try Data(contentsOf: result.output.files[0])
+        #expect(written == source, "the file was rebuilt even though nothing was compressed")
+        #expect(try PDFForm.fields(in: written).first?.value == "Jane Appleseed",
+                "the form was lost to a rebuild that saved nothing")
+        #expect(!result.isSmaller)
+        #expect(result.savedByteCount == 0)
+    }
+
+    /// And the output is never *larger* than the input when nothing could be
+    /// shrunk, which a rebuild could not promise.
+    @Test func nothingToShrinkMeansNothingIsAdded() async throws {
+        let source = SyntheticDocuments.textPDF(pages: ["Quarterly statement", "Second page"])
+
+        let result = try await compress(source, .smallest, named: "statement.pdf")
+        defer { result.output.removeTemporaryFiles() }
+
+        #expect(result.compressedByteCount <= Int64(source.count))
+    }
 }
