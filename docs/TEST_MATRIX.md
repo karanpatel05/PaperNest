@@ -3714,8 +3714,9 @@ there is no API for it, so no amount of care in `isUntouched` can help.
 The honest fix is a different path: when **every** page of an export is
 untouched, comes from one source asset, and is in that source's original
 order, copy the source **file** wholesale instead of rebuilding a document.
-That would keep the form, the links, the bookmarks and the embedded fonts
-together. *(Written here as "and be faster" — **measured 2026-11-04 and that
+That would keep the form, the links and the bookmarks together.
+*(This also said "and the embedded fonts" — withdrawn 2026-11-04, never
+measured.)* *(Written here as "and be faster" — **measured 2026-11-04 and that
 part is wrong**; see the entry below.)* It needs exact guards — page count, order, asset
 identity, no paper change, no text layer, no password — and it changes the
 most-used export path, so it is its own slice and is **not** attempted here.
@@ -3776,8 +3777,14 @@ pages from two files, a subset, a reordering.
 
 ### What it buys
 
-- **A form survives**, fields and filled-in values both. So do links,
-  bookmarks and embedded fonts, which the same rebuild was losing silently.
+- **A form survives**, fields and filled-in values both. So do **links** and
+  the **table of contents**, each with a test, and the outline keeps its
+  nesting. A rebuild loses the outline entirely, which is pinned too — "the
+  copy keeps the bookmarks" would be an empty sentence otherwise.
+- **Embedded fonts were also claimed here and that claim is withdrawn.** A
+  rebuild draws text as text and keeps it selectable, accents included, so
+  there was no reason to think fonts were being lost; nothing was measured
+  either way, and an unverified line is worse than a missing one.
 - **The export is byte-identical to the import**, asserted as such rather
   than as "it works": anything less means something was rebuilt, and whatever
   was rebuilt can lose things no test thought to check.

@@ -446,4 +446,49 @@ import PaperNestTestSupport
         #expect(try Data(contentsOf: output.files[0]) != locked)
     }
 
+
+    /// **Claimed in the record before it was checked**, alongside "and be
+    /// faster" which turned out to be wrong: that handing the file back
+    /// keeps its bookmarks, and that a rebuild was losing them.
+    ///
+    /// Both halves are measured here. A table of contents is the kind of
+    /// thing nobody notices is gone until they open a long document and the
+    /// sidebar is empty.
+    @Test func aTableOfContentsSurvivesAnUneditedExport() async throws {
+        let fixture = try ExportFixture()
+        let source = SyntheticDocuments.outlinedPDF(
+            pages: ["Chapter one text", "Chapter two text", "Chapter three text"],
+            entries: [("One", 0, [("One A", 0)]), ("Two", 1, []), ("Three", 2, [])])
+        let item = try await fixture.importer.importItem(.data(source, name: "Book"))
+        let pages = try await fixture.store.pages(of: item.id)
+
+        let (document, output) = try await exportPDF(fixture, item.name, pages)
+        defer { output.removeTemporaryFiles() }
+
+        let root = try #require(document.outlineRoot, "the table of contents is gone")
+        #expect(root.numberOfChildren == 3)
+        #expect(root.child(at: 0)?.label == "One")
+        #expect(root.child(at: 0)?.numberOfChildren == 1, "the nesting was flattened")
+        #expect(root.child(at: 2)?.label == "Three")
+    }
+
+    /// The other half of that claim: a **rebuilt** export really does lose
+    /// it. Pinned so "the copy keeps the bookmarks" means something — if a
+    /// rebuild kept them too, the sentence would be empty.
+    @Test func aRebuiltExportLosesTheTableOfContents() async throws {
+        let fixture = try ExportFixture()
+        let source = SyntheticDocuments.outlinedPDF(
+            pages: ["Chapter one text", "Chapter two text"],
+            entries: [("One", 0, []), ("Two", 1, [])])
+        let item = try await fixture.importer.importItem(.data(source, name: "Book"))
+        let pages = try await fixture.store.pages(of: item.id)
+
+        // Different paper, so the document is assembled rather than copied.
+        let (document, output) = try await exportPDF(fixture, item.name, pages,
+                                                     options: ExportOptions(format: .pdf, paperSize: .a4))
+        defer { output.removeTemporaryFiles() }
+
+        #expect(document.outlineRoot?.numberOfChildren ?? 0 == 0,
+                "a rebuild kept the outline, so the copy is not what saves it")
+    }
 }
