@@ -3678,3 +3678,73 @@ the same machine can turn it red.
   that.
 - **iOS is untested**, as throughout while the simulator is down.
 
+## Row 24 measured: an exported form keeps its boxes and loses its fields — 2026-11-03 (Claude)
+
+Ledger row 24, *interactive PDF form fields preserved*, has read **Planned**
+since 2026-10-26 with the note that an unedited page is now copied rather
+than redrawn, *"so a field would survive"*. **That inference is wrong**, and
+nobody had checked it: the existing pass-through test compares an exported
+form against a source that has no form either, and says so in its own
+comment.
+
+- Full `./scripts/test.sh`: **616 tests passed**, **0 warnings**. No source
+  changed — this slice is a measurement and three tests.
+
+### What actually happens
+
+Exporting a document whose single page carries a real catalog `AcroForm`:
+
+- the **widget annotations survive** — both of them, on the page, where they
+  were;
+- the **`AcroForm` does not**. `PDFForm.fields(in:)` reads nothing from the
+  exported file, and a value that was already filled in is gone with it.
+
+So the export shows the field boxes exactly where they belong and not one of
+them is a field any more. That is the worst shape this failure could take,
+because it looks right: someone exporting a filled agreement gets a page that
+still looks like a form and has lost the answers.
+
+### Why, and what fixing it would take
+
+Structural, not a slip. An `AcroForm` lives in the document **catalog**, not
+on a page. Pass-through copies `PDFPage`s into a document that PDFKit then
+writes, and **PDFKit exposes no way to carry a catalog dictionary across** —
+there is no API for it, so no amount of care in `isUntouched` can help.
+
+The honest fix is a different path: when **every** page of an export is
+untouched, comes from one source asset, and is in that source's original
+order, copy the source **file** wholesale instead of rebuilding a document.
+That would keep the form, the links, the bookmarks and the embedded fonts
+together, and be faster. It needs exact guards — page count, order, asset
+identity, no paper change, no text layer, no password — and it changes the
+most-used export path, so it is its own slice and is **not** attempted here.
+
+### What is pinned
+
+Three tests, all passing, all written so that **fixing the loss makes them
+fail**, with comments saying to rewrite rather than patch them:
+
+- `anExportedFormKeepsItsBoxesAndLosesItsFields` — asserts the fixture really
+  has a form first, then that two widgets survive and the form does not.
+- `aFilledInValueGoesWithTheForm` — the value is read back from the source
+  before the export, so the test cannot pass by the value never existing.
+- `aPageThatHadToBeRedrawnLosesItsFormToo` — the other half of the boundary:
+  a page redrawn for a different paper size could never keep a form, and
+  that is now a measured fact rather than something found on a signature
+  page.
+
+Read back through **Core Graphics** throughout, never PDFKit, which reports a
+`fieldName` for a widget whether or not the file has a form at all and has
+misled this project once already.
+
+### What this does **not** do
+
+- **It does not fix anything.** Row 24 is not closer to working; it is
+  closer to being honestly described.
+- **One fixture, one page, one field of each kind.** Radio groups, `/Kids`
+  hierarchies, signature fields and XFA are untested, and XFA almost
+  certainly fares worse.
+- **Nothing was checked in another reader.** "The form is gone" means Core
+  Graphics finds no `AcroForm`; Acrobat's view of the same file was not
+  sought.
+
