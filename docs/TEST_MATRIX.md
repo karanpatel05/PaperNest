@@ -3715,7 +3715,8 @@ The honest fix is a different path: when **every** page of an export is
 untouched, comes from one source asset, and is in that source's original
 order, copy the source **file** wholesale instead of rebuilding a document.
 That would keep the form, the links, the bookmarks and the embedded fonts
-together, and be faster. It needs exact guards — page count, order, asset
+together. *(Written here as "and be faster" — **measured 2026-11-04 and that
+part is wrong**; see the entry below.)* It needs exact guards — page count, order, asset
 identity, no paper change, no text layer, no password — and it changes the
 most-used export path, so it is its own slice and is **not** attempted here.
 
@@ -3785,6 +3786,19 @@ pages from two files, a subset, a reordering.
   source and **the rebuild had been inflating files**. A preset is now allowed
   to hand the source back when no page could be re-encoded, which is both
   smaller and what the compression result already reported: no saving.
+
+### It is not faster, which I had assumed out loud
+
+The handoff and yesterday's entry both said this would "be faster". **It is
+not.** Twenty vector pages, three runs each: **copy 0.016s, rebuild 0.013s** —
+marginally *slower*, and both negligible.
+
+The reason is plain once measured: the copy path still runs the whole page
+loop and writes a placeholder document before throwing it away, because
+deciding whether a page is untouched needs the same per-page work either way.
+So this does strictly *more* than before for an unedited export. The gain is
+correctness — forms, links, bookmarks and fonts surviving — and nothing else.
+Said here because it was claimed before it was checked.
 
 ### What it costs, deliberately
 

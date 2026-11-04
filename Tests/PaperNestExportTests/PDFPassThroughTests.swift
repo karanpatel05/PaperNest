@@ -421,4 +421,29 @@ import PaperNestTestSupport
         #expect(document.page(at: 0)?.string?.contains("Page beta") == true,
                 "the pages came back in the source's order")
     }
+
+    /// A protected source must not come back out protected.
+    ///
+    /// Worth pinning because the whole-file copy hands back stored bytes
+    /// verbatim, and "the stored bytes" for a password-protected import are
+    /// **the unlocked copy**, not the file the user picked — `PDFInspector`
+    /// unlocks it once, at import, and stores that. If it ever stored the
+    /// original instead, this path would hand someone an export they cannot
+    /// open, with a password they never set for it.
+    @Test func aProtectedSourceIsExportedOpenable() async throws {
+        let fixture = try ExportFixture()
+        let locked = SyntheticDocuments.encryptedPDF(text: "Confidential alpha", password: "correct-horse")
+        let item = try await fixture.importer.importItem(.data(locked, name: "Sealed"), password: "correct-horse")
+        let pages = try await fixture.store.pages(of: item.id)
+
+        let (document, output) = try await exportPDF(fixture, item.name, pages)
+        defer { output.removeTemporaryFiles() }
+
+        #expect(!document.isLocked, "the export needs a password the user never set for it")
+        #expect(!document.isEncrypted)
+        #expect(document.page(at: 0)?.string?.contains("Confidential alpha") == true)
+        // And it is not the bytes the user handed in, which were encrypted.
+        #expect(try Data(contentsOf: output.files[0]) != locked)
+    }
+
 }
