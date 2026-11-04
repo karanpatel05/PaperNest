@@ -230,6 +230,57 @@ func unzip(_ arguments: [String]) throws -> (status: Int32, output: String) {
 }
 
 @Suite struct LibraryBackupTests {
+
+    /// The backup is the path people trust most — "keep a copy somewhere
+    /// safe" — so it is the last place a document should come back quietly
+    /// diminished. It calls the same `export`, so it inherits the rule that
+    /// an unedited document is handed back as the file that was imported;
+    /// this proves it rather than assuming it, because inheriting a fix
+    /// through a default argument is exactly the kind of thing that stops
+    /// being true when someone adds a parameter.
+    @Test func anUneditedDocumentIsBackedUpAsItself() async throws {
+        let f = try ExportFixture()
+        let source = SyntheticDocuments.acroFormPDF(fields: [
+            .init(name: "customer", value: "Jane Appleseed"),
+        ])
+        let item = try await f.importer.importItem(.data(source, name: "Agreement"))
+        let items = [LibraryExportItem(name: "Agreement", pages: try await f.store.pages(of: item.id))]
+
+        let output = try await f.exporter.exportLibrary(items, archiveName: "Backup")
+        defer { output.removeTemporaryFiles() }
+
+        let extracted = f.url.appendingPathComponent("form-backup", isDirectory: true)
+        #expect(try unzip(["-q", output.files[0].path, "-d", extracted.path]).status == 0)
+        let written = try Data(contentsOf: extracted.appendingPathComponent("Agreement.pdf"))
+        #expect(written == source, "the backup rebuilt a document nobody had edited")
+        #expect(try PDFForm.fields(in: written).first?.value == "Jane Appleseed",
+                "the backup lost the form")
+    }
+
+    /// An archive asked for **with a compression preset**, over a document no
+    /// preset can shrink. This is the combination most likely to go wrong: a
+    /// preset used to force a rebuild unconditionally, so the document came
+    /// out larger *and* without its form, having compressed nothing. The
+    /// copy rule deliberately still applies here — a preset is not a reason
+    /// to rebuild when no page could be re-encoded.
+    @Test func anArchiveWithAPresetStillKeepsWhatItCannotShrink() async throws {
+        let f = try ExportFixture()
+        let source = SyntheticDocuments.acroFormPDF(fields: [.init(name: "customer", value: "Jane Appleseed")])
+        let item = try await f.importer.importItem(.data(source, name: "Agreement"))
+        let entries: [LibraryExportEntry] = [
+            .document(LibraryExportItem(name: "Agreement", pages: try await f.store.pages(of: item.id))),
+        ]
+
+        let output = try await f.exporter.exportArchive(entries, archiveName: "Smallest", preset: .smallest)
+        defer { output.removeTemporaryFiles() }
+
+        let extracted = f.url.appendingPathComponent("preset-archive", isDirectory: true)
+        #expect(try unzip(["-q", output.files[0].path, "-d", extracted.path]).status == 0)
+        let written = try Data(contentsOf: extracted.appendingPathComponent("Agreement.pdf"))
+        #expect(written == source, "a preset rebuilt a document it could not compress")
+        #expect(try PDFForm.fields(in: written).first?.value == "Jane Appleseed")
+    }
+
     @Test func everyDocumentBecomesAPDFInOneValidZipWithUniqueNames() async throws {
         let f = try ExportFixture()
         let (one, onePages) = try await f.importPDF(["First", "Second"])

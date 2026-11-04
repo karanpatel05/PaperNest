@@ -3949,3 +3949,40 @@ cooperative pool and does not stall the UI.
 So: the sweep is not a freeze, and it is not free. If a large library ever
 needs it to be gentler, the batch size and a pause between batches are the
 knobs, and neither exists yet.
+
+## Backup and bulk export inherit the copy rule — 2026-11-04 (Claude)
+
+Having changed what an export produces, the question is which other paths
+produce exports. Two do: the **library backup** and the **bulk "export a
+selection as one ZIP"**. Both call the same `export`, so both inherit the
+rule that an unedited document is handed back as the file that was imported.
+Proven rather than assumed, because a fix inherited through a default
+argument is exactly what stops being true when someone adds a parameter.
+
+- Full `./scripts/test.sh`: **641 tests passed**, **0 warnings**.
+- No source changed — two tests.
+
+### What is pinned
+
+- **A backup keeps a form.** A library containing one form PDF is backed up,
+  the archive unzipped, and the file inside is byte-identical to the import
+  with its filled-in value still readable. The backup is the path people
+  trust most — *keep a copy somewhere safe* — so it is the last place a
+  document should come back quietly diminished.
+- **An archive asked for with a compression preset keeps what it cannot
+  shrink.** This is the combination most likely to go wrong, and did: a
+  preset used to force a rebuild unconditionally, so a text document came out
+  larger *and* without its form, having compressed nothing. The copy rule
+  deliberately still applies under a preset when no page could be
+  re-encoded.
+
+### What this does **not** cover
+
+- **A document that really was edited, or a scan a preset really did
+  shrink.** Both are rebuilt, and both still lose a form. That is inherent,
+  not an oversight.
+- **File entries in an archive** were already kept as themselves and are
+  untouched by any of this.
+- **Nothing about archive size or timing.** Only what comes out the other
+  end.
+
