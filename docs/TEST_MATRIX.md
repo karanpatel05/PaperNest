@@ -3903,3 +3903,37 @@ compression. **It is done**: `CompressionFormat` offers JPEG and HEIC with
 measured sizes, the image path honours it, and the PDF path documents why it
 cannot. Only **folder/archive compression** is left in that area.
 
+## The first-launch recognition sweep, measured at last — 2026-11-04 (Claude)
+
+"The cost of a first-launch sweep over a large library is unmeasured" has
+been in this file since 2026-10-26, on every entry that touched recognition.
+Measured now.
+
+**8.4 pages per second**, on this Mac: 24 synthetic scans imported in 1.12s,
+then `AutomaticTextRecognizer.recognizeMissing()` read all 24 in **2.86s**.
+
+Taken at face value that is roughly **two minutes for a thousand pages** and
+**ten for five thousand** — sustained, but batched (ten pages at a time),
+resumable, and run on `recognizeOnADedicatedThread`, so it is off the
+cooperative pool and does not stall the UI.
+
+### Why that number is an upper bound, not a promise
+
+- **The fixtures are two-line synthetic scans**, clean and sparse. A real
+  scanned page of dense text gives Vision far more to do, so the true rate on
+  a real library is **lower than 8.4/s, probably by a lot**. This measures the
+  machinery, not a photocopied contract.
+- **One machine, one OS version**, as every timing in this file.
+- **Default batch size (10)**, through the public entry point.
+- **Nothing about battery or thermals.** A laptop sweeping five thousand
+  pages will be warm and draining; that was not measured and is not claimed
+  either way.
+- **The measurement was a one-off and is not committed.** A timing assertion
+  in the suite would be flaky on a shared machine — and this very suite has
+  already been turned red once by the real app leaving a file in the
+  temporary directory.
+
+So: the sweep is not a freeze, and it is not free. If a large library ever
+needs it to be gentler, the batch size and a pause between batches are the
+knobs, and neither exists yet.
+
