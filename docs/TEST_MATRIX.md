@@ -3590,7 +3590,7 @@ needs it to open* and *the encryption is AES and not RC4*. **Nothing could
 set one.** The last entry named this as the clearest remaining gap; this
 closes it.
 
-- Full `./scripts/test.sh`: **611 tests passed**, **0 warnings**.
+- Full `./scripts/test.sh`: **613 tests passed**, **0 warnings**.
 - `./scripts/build-mac-app.sh` and the iOS Simulator build: clean, 0 warnings.
 
 ### What it does
@@ -3630,27 +3630,32 @@ On a throwaway library (`/tmp/pn-pw`, since deleted):
   Password (optional)*, *Mot de passe / Mot de passe (facultatif)*,
   *Contraseña / Contraseña (opcional)*, each with its footer wrapping cleanly.
 
-### What was **not** driven, and why it matters
+### What was **not** driven, and what was done instead
 
 **Nothing was typed into the field.** Background control blocks typing into a
-secure text field, which is the right restriction; the alternative was taking
-over the user's screen while they were working remotely, which was not worth
-it for this. So in the running app:
+secure text field, which is the right restriction, and taking over the screen
+needs an approval card that went unanswered through four attempts — so that
+route was abandoned rather than retried into the ground.
 
-- the accented-password message, the empty-password message and the
-  32-character note were **never seen on screen** — only their strings were
-  checked by `LocalizationTests`;
-- and **the one link nobody has exercised end to end is the sheet handing the
-  typed password to the exporter.** Everything either side is covered — seven
-  new tests on which passwords are allowed and what an empty field means,
-  eleven existing engine tests that a password really locks the file — but
-  that single expression has not been run by anyone.
+What that left unexercised was the link between the two tested halves: the
+value the sheet decides on reaching the exporter. **`ExportPasswordWorkflowTests`
+closes it** by running the same value through the same call the sheet makes,
+against a real library and a real exporter, and then opening the written file:
 
-That is the place to look first if a password ever appears to do nothing, and
-**until someone types one and reopens the file, "exporting with a password
-works" should not be claimed**. An XCUITest is the natural way: the field
-carries `export-password`, the problem line `export-password-problem` and the
-length note `export-password-truncated`.
+- a typed password leaves a file that is **locked**, refuses a wrong password
+  and opens with the typed one;
+- an untouched field leaves a file that is **neither locked nor encrypted** —
+  the empty-password failure the engine refuses, seen from this side.
+
+Proven red by making `passwordToUse` always return nil, which is exactly the
+"sheet silently drops the password" failure worth fearing.
+
+**What is still not covered:** the SwiftUI binding from a keystroke to
+`@State password`, and the three messages — accented password, empty
+password, 32 characters — which have **never been seen on screen**, only
+checked as strings by `LocalizationTests`. An XCUITest is the natural way to
+finish it: the field carries `export-password`, the problem line
+`export-password-problem` and the length note `export-password-truncated`.
 
 ### Also: a red suite that was my own mess
 
