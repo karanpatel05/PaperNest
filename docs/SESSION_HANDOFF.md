@@ -28,6 +28,11 @@ side. The commit is kept as it is; these rules exist so it does not happen again
 **Set by the owner on 2026-10-26: Claude is responsible for core logic and the backend; Codex is responsible for
 design and for testing the whole app.** The table below is that instruction, made concrete.
 
+> **Suspended 2026-11-02, back in force 2026-11-04.** The owner asked Claude to cover UI while Codex was out of
+> usage; Codex returns on 2026-11-04 and the table below governs again from its first commit. What changed in
+> `PaperNestUI` during the cover is listed under **"Codex, read this first"** in Current claims — read that before
+> editing a UI file.
+
 | | Area | Targets |
 |---|---|---|
 | **Claude** | **Core logic and backend.** Schema and migrations, store APIs, composition, import/export, rendering, recognition, compression, and anything security-sensitive (archives, encryption, redaction). Builds each slice test-first and leaves it verified at the unit level. | `PaperNestCore`, `PaperNestStore`, `PaperNestImport`, `PaperNestExport`, `PaperNestRender`, their test targets |
@@ -50,6 +55,56 @@ says so in Current claims — that is how the ZIP work below has a `LibraryModel
 file-preview work has a `FileKind.prepareTemporaryCopy` in it.
 
 ### Current claims
+
+## ⚑ Codex, read this first — what moved while you were away (Claude, 2026-11-03)
+
+**Nothing of yours was dropped, but your base has moved a long way.** Thirteen commits landed today, `2bc6f6e`..`5620bc4`, and **fourteen of them are in `PaperNestUI`, which is yours.** Start with `git log --oneline 97ec1e4~1..HEAD` and `git diff 97ec1e4~1..HEAD -- Sources/PaperNestUI` before you edit anything; if you have local changes to the files below, rebase them rather than re-applying from memory.
+
+**Why Claude was in your files at all:** the owner said on 2026-11-02, *"Can you start working on UI untill CODEX restores it usage limit."* **That cover ends as you pick this up.** The division in "Who takes what" is back in force from your first commit: `PaperNestUI`, `Apps/iOS/UITests`, the design doc and the app-level rows of TEST_MATRIX are yours again. Claude is back in `PaperNestCore`/`Store`/`Import`/`Export`/`Render` and will claim here before touching a UI file.
+
+### The files that moved, and what is now in them
+
+| File | What changed |
+|---|---|
+| `DocumentView.swift` | Mac markup row is **Pen / Highlighter / Eraser / Lasso** (420pt), width is a `MarkupWeight` not a number, Image and Text Box buttons, text-box editing sheet |
+| `MovableMarksOverlay.swift` | Resize handles on all four corners, double-click to open, move unchanged |
+| `MacInkCanvas.swift` | Eraser and lasso geometry, all `nonisolated static` and unit-tested |
+| `MarkupTool.swift` (new) | `MacMarkupTool`, `MarkupWeight`, per-tool widths |
+| `MarkupManagerSheet.swift` | Lists **text boxes and placed images**, not just ink; Apply Color disabled unless the selection is all ink |
+| `ExportSheet.swift` | All six formats offered (was three), a password field, words-only caveat |
+| `SettingsView.swift` | Text-recognition language section |
+| `TextBoxSheet.swift` | Doubles as the editor for an existing box |
+| `DocumentModel.swift` | `historyRevision`, `moveInk`, `resizeObject`, `editTextBox`, `sourceDelta`, `textBoxHeight` |
+| `NotebookPageSheet.swift`, `PageCommentsSheet.swift` | `NotebookHistoryActions` takes `historyRevision` |
+| `Localization.swift` + 3 `.strings` + 3 `.stringsdict` | ~20 new keys, all three languages, all checked on screen |
+
+### Four traps that cost real time today — do not rediscover them
+
+1. **A `TapGesture(count: 2)` beside a `DragGesture(minimumDistance: 0)` swallows the single click.** As `highPriorityGesture` *and* as `simultaneousGesture`. It shipped in `2cd5c8e` and stopped a click selecting a mark at all. Double clicks are counted by hand now, inside the drag, against `NSEvent.doubleClickInterval`.
+2. **A Form `Section` whose content is empty is dropped whole, footer and all.** A caveat with no controls beside it has to live on a section that has some.
+3. **`.contentShape(Rectangle().size(…))` describes a shape at the origin of the frame that *follows* it.** Four corner handles all got their hit area in the mark's top-left and looked purely decorative.
+4. **A macOS `Form` sizes itself to its content.** A row per recognition language made the Settings window **1834 points tall**. Long lists need a height of their own.
+
+### Three things in your list that are already done
+
+- **Saved-ink selection/recolor/removal** now covers **text boxes and placed images too** — they could never be removed at all before, and `StoreError.cannotRecolor` refuses recolouring anything but ink rather than skipping it.
+- **Notebook text editing** (your item 3): a placed text box can be opened with a double click and its words, size, colour and alignment changed; it can also be resized by a corner. **Planners and richer navigation remain.**
+- **Export as text** from "engine work waiting for a screen": done, and it was worse than recorded — the sheet offered three formats of six, so **TXT, HEIC and DOCX were all unreachable**. **`Compress` is now the only entry left on that list.**
+
+### What is yours to finish, where Claude could not
+
+- **No XCUITest for any of it.** The simulator is still down (`sudo xcodebuild -runFirstLaunch` is the owner's to run), so **none of today's work has been seen on iOS at all** — the overlay, the markup manager, the export sheet and the Settings section are all shared code, unseen on a phone or iPad.
+- **Typing into the export password field.** A secure field refuses synthetic typing from the background and the screen-takeover approval went unanswered four times. The value's whole path is covered by `ExportPasswordWorkflowTests`, but the keystroke-to-state binding and the three messages (accented password, empty password, 32 characters) have **never been seen on screen**. Identifiers: `export-password`, `export-password-problem`, `export-password-truncated`.
+- **The image picker hand-off**, still undriven: a macOS open panel is modal and background control cannot bring it forward.
+- **`MarkupManagerSheet` outgrows the window**: with four marks on a 729-point-tall screen, Apply Color and Remove Selected fall below the bottom edge. Synthetic scrolling would not move it, so whether a real trackpad reaches them is unconfirmed.
+- **Resize has no keyboard or VoiceOver path.** The handles are `accessibilityHidden`, because four identically labelled stops would be worse than none — but that leaves no way to resize without a pointer. A gap, not a decision to be proud of.
+
+### Two practical notes
+
+- **`cancellingKeepsTheLibraryIdleAndLeavesNoArchiveBehind` reads the shared temporary directory.** Driving the real app and leaving an export at "Ready" turns the suite red. Clear `$TMPDIR/PaperNestExport-*` before believing a failure.
+- **Two notes in this file were stale and are corrected**: `DocumentModel.recognizeText` has not blocked the MainActor for some time — it and the automatic sweep both use `recognizeOnADedicatedThread`.
+
+**State as you pick this up:** 613 tests pass, 0 warnings, Mac and iOS Simulator builds clean, branch `document-tools-ocr-and-file-items` at `5620bc4`, no remote, working tree clean.
 
 **Claude — a password on an exported PDF (row 27); done and released 2026-11-03 (claim lifted).** `Sources/PaperNestExport/ExportOptions.swift`, `Sources/PaperNestUI/ExportSheet.swift`, `Sources/PaperNestUI/Localization.swift`, the three `.strings` files, and `Tests/PaperNestUITests/ExportPasswordTests.swift` and `ExportPasswordWorkflowTests.swift` (new). **613 tests pass, 0 warnings, Mac and iOS Simulator builds clean.** The engine has taken a password since 2026-10-27 with eleven tests behind it, and nothing could set one. A Password section now appears for PDF and nothing else (`ExportFormat.canCarryPassword`, on the format so the screen cannot disagree with the engine); an empty field means **no password** rather than an empty one; a password PDFKit cannot store — anything outside ASCII — is explained **under the field as it is typed** with Export disabled, which is what the engine's own comment asked of whoever built this; and a password over 32 bytes is flagged rather than refused, because the whole of it still opens the file. Every `ExportError` maps to its own sentence now instead of "export failed". **Read this before claiming it works.** Background control **blocks typing into a secure field** and the screen-takeover card went unanswered through four attempts, so nothing was typed in the running app. Instead `ExportPasswordWorkflowTests` runs the value the sheet decides on through the same call the sheet makes, against a real library and exporter, and opens the result: a typed password leaves a **locked** file that refuses a wrong password and opens with the right one, and an untouched field leaves one neither locked nor encrypted. Proven red by making `passwordToUse` return nil — the "sheet silently drops it" failure. **Still uncovered:** the SwiftUI binding from keystroke to `@State`, and the accented-password, empty-password and 32-character messages, which have never been seen on screen. Identifiers are there for an XCUITest (`export-password`, `export-password-problem`, `export-password-truncated`). **One more thing worth knowing:** `cancellingKeepsTheLibraryIdleAndLeavesNoArchiveBehind` reads the **shared** temporary directory, so an export left at "Ready" by driving the real app turns the suite red; that is what happened here, and clearing `$TMPDIR/PaperNestExport-*` fixed it. **No longer claimed — anyone may edit these.**
 
@@ -238,8 +293,8 @@ exact API for each, so none of it has to be rediscovered. The list below is unch
 
 
 1. **Finish the remaining Mac audit checks**, including the new annotation sheet, localized fr/es layouts, backup, import/paste, crop/reorder/keyboard and sandboxed save. Representative native Mac library/document/export, Tools extraction, file preview/details/save and Settings checks have now passed; no longer claim the entire Mac app was never viewed.
-2. **Continue F3** — word-level selection, text/custom-image stamps and exported/positioned comment annotations. Private page comments, outlined shapes, symbol stamps, whole-line marks, preset/custom colors and saved-ink selection/recolor/removal are implemented. Preserve the store snapshot guards and existing PencilKit ink workflow. See the current verification section for exact run scope.
-3. **Notebook follow-ups** — creation and additional blank/lined/grid pages are implemented. Planners, text/image editing and richer notebook navigation remain.
+2. **Continue F3** — word-level selection, text/custom-image stamps and exported/positioned comment annotations. Private page comments, outlined shapes, symbol stamps, whole-line marks, preset/custom colors and saved-ink selection/recolor/removal are implemented — **and since 2026-11-03 that last one covers text boxes and placed images too**, which could not be removed at all before. Preserve the store snapshot guards and existing PencilKit ink workflow. See the current verification section for exact run scope.
+3. **Notebook follow-ups** — creation and additional blank/lined/grid pages are implemented, and **text editing is done as of 2026-11-03**: a placed text box opens on a double click and can be re-worded, resized, recoloured and realigned, or removed. **Planners, image editing and richer notebook navigation remain.**
 4. **Visual fill & sign**, then app lock (device authentication).
 
 **Engine work waiting for a screen (added 2026-10-26, now Codex's by the owner's division).** These are finished
@@ -251,6 +306,8 @@ rule none should appear until it really works:
   "before". A `CompressionResult` reports `isSmaller` and `savedByteCount`, and **both are zero or false when a
   source cannot be reduced** — a vector PDF, an already-compact photo. Whatever the screen shows must come from
   those measured numbers; it must not promise a saving before one exists, and it must say when none is possible.
+**Only `Compress` is left on this list as of 2026-11-03.** The other two are done; their entries are kept below for the API notes.
+
 - ~~**Export as text.**~~ **Done 2026-11-03** — and it was worse than recorded: the sheet offered three formats of six, so **TXT, HEIC and DOCX were all unreachable**. The tile list is data now (`ExportSheet.offeredFormats`) and a test fails if it does not cover `ExportFormat.allCases`. The original note follows. `ExportFormat.txt` works through the existing `export` call. The sheet's format tiles are
   written one per format, so TXT needs a tile, and `ExportError.noTextToExport` needs a message: a document with
   no text on any page is refused rather than exported as an empty file.
