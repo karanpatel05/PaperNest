@@ -1,3 +1,72 @@
+## Sidebar toggle placement — owner approval, 2026-11-08
+
+Mac and iPad keep editor panel controls in the native navigation header: page thumbnails beside Back/title on the leading side, PDF tools beside Export on the trailing side. Both remain available when their panels are hidden. The centered writing row contains Pen, Eraser, Highlighter, Lasso, Image and Text only. Preserve the panel defaults, accessibility labels/IDs and existing actions. iPhone retains its current writing-row page toggle and More menu. Approved preview: `docs/design/mockups/sidebar-header-mac-approved-2026-11-08.png`.
+
+## Approved phased redesign — owner approval, 2026-11-07
+
+The owner approved implementation of the reference boards in `docs/design/approved-2026-11-07/`. These supersede the earlier “preview only” notes below. Preserve the real `leaf.circle` brand and existing SF/native typography, semantic lavender colors, product boundaries and durable store.
+
+- Home: compact capture/import, Tools, actual Recent/Favorites and My Space. No Shared or sync claim without a real service. Wide layouts place collections beside recent content. Notes uses real notebook covers; Documents uses document rows and independent layout preference.
+- Editor: session-local document tabs, compact icon-only tools for notebooks and PDFs, hideable page strip and default-visible trailing tools inspector on iPad/Mac. Signature, forms and page controls occupy the inspector; iPhone keeps its compact presentations. Retain per-document inline drafts, zoom and undo state when switching tabs. Confirm before discarding unsaved tool drafts.
+- Scan: dark capture chrome and lavender shutter, actual edge detection and native scanner fallback, thumbnails above review, crop/rotate/filter controls and durable import destination workflow. Do not display unsupported capture modes or imply OCR text is a searchable PDF.
+- Profile/Pro/Export: use existing accountless profile, actual StoreKit offer data and real export choices. Never reproduce illustrative prices, sync states or sample library content.
+
+Verification and remaining hardware limitations are recorded in TEST_MATRIX, not inferred from the design images.
+
+## PDF tools right sidebar — owner request, 2026-11-05
+
+Mac and iPad expose the existing secondary editor actions in a native trailing inspector. The sidebar icon beside Text toggles it; a localized close button stays at its top. It opens by default on Mac and iPad (owner correction, 2026-11-05); either hide control restores page space. The panel uses semantic lavender surfaces, wrapping SF labels, recognizable symbols, 44-point rows and vertical scrolling. In compact iPad windows, the system adapts the inspector presentation. iPhone retains the existing More menu. Both presentations share the same action builder and existing sheets, subscription checks, history and persistence; no new PDF capabilities are implied. The separate compact editor-header/left-page-strip concept remains unimplemented pending owner approval.
+
+## iPad sidebar headings — owner correction, 2026-11-05
+
+Keep the regular-width iPad sidebar navigation bar untitled on Home, Notes, Documents, Favorites, folders and open documents. Preserve the sidebar toggle and all destinations. PaperNest’s logo/name belongs in the Home dashboard, not a repeated heading above sidebar navigation. Destination names stay in the main detail column. Home uses no redundant dashboard navigation title on iPhone, iPad or Mac. Keep the Home destination label in the tab/sidebar, the dashboard brand and Profile entry. Other destination titles remain unchanged.
+
+## Preserve the project in design samples — owner instruction, 2026-11-05
+
+All future samples must retain PaperNest’s actual existing logo and the existing project components, icons, colors, typography and navigation except for the specific changes the owner asks to explore. Reuse the exact current logo asset/symbol (`leaf.circle` in LibraryHome), not a generated substitute. Prefer a screenshot or deterministic composite when exact branding matters; label any unavoidable illustration approximation. Read the current project before creating samples. The compact editor header and hideable page-strip concept is still a preview, not approved implementation.
+
+## Round eraser — 2026-11-05
+
+The owner confirmed partial erasing as the default. Keep the approved toolbar icon, with a circular canvas footprint and an anchored Eraser popover on repeat selection. Offer Small/Medium/Large, a continuous relative size and a round preview; keep pen/highlighter preferences independent. Whole-stroke mode is optional. iOS uses PencilKit’s supported precision width range and hides sizing for its fixed-size whole-stroke mode. Mac maps the view-space circle through PageGeometry and preserves editable stroke fragments with undo. Text and images are never silently erased by the ink eraser.
+
+## Notes toolbar option B — owner-approved November 5, 2026
+
+Use the expressive writing tools from the approved two-option preview: a slanted pen with purple ink detail, pink-ended eraser, yellow highlighter nib, dotted freehand lasso, simple image frame, T and More. Original vector paths share a 24-point optical grid and rounded strokes. Keep icon-only presentation, existing localized accessibility labels/tooltips and 44-point targets. The selection is a quiet lavender rounded square; color accents identify instruments, not subscription state or current ink color. Preserve tool order and place a subtle divider before Image/Text/More. The white/tinted toolbar surface hugs its content and centers on wide screens, scrolling when it cannot fit. Lower active-tool glyph matches the upper row. All existing actions, popover anchors and persistence remain unchanged.
+
+## Icon-only Notes toolbar — 2026-11-05
+
+Owner correction: use the slanted SF Symbol `pencil` for writing and hide visible names in the notebook toolbar on iPhone, iPad and Mac. Keep 44-point targets, localized VoiceOver names, selection values and Mac tooltips. Primary order: Pen, Eraser, Highlighter, Lasso, Image, Text Box, More. Image and Text Box open their existing working insertion/formatting flows; secondary tools remain in More.
+
+Pen settings must anchor to the top Pen tool, including when opened from the lower palette. Each writing tool owns its settings popover; compact iPhone presentation remains a popover near that tool rather than a bottom sheet. Text Box retains its native editor with text, size, alignment and color controls. Preserve the existing NotebookToolbar evaluation boundary and durable insertion paths.
+
+## Compact Notes tools — 2026-11-04
+
+Owner correction: limit the writing toolbar on every platform. Keep Pen, Eraser, Highlighter, Lasso and More, with Eraser immediately after Pen. More retains the working insert, page and document-editing actions. Reuse the existing native menus and sheet flows. Keep horizontal scrolling for long translations and accessibility text sizes.
+
+Selecting Pen activates drawing; tapping it again opens settings. Settings include a live stroke preview, width presets plus a fine width slider, existing custom colors, and opacity. Keep independent Pen and Highlighter widths during the editor session; color changes preserve opacity. Retain whole-stroke erasing and explain it honestly. No unsupported brush names, data-model changes, or new persistence stores. Keep the separate NotebookToolbar View evaluation boundary that prevents the iPad debug stack overflow.
+
+## Notes library — 2026-11-04
+
+Notes is a notebook-only library, using the existing durable library and notebook editor. Its empty state describes notebooks and offers New Notebook; the same creation action remains in the toolbar once notebooks exist. Reuse NotebookCreationSheet, templates and subscription limits. Scan/import actions remain in document destinations and Home. Filter rendered rows immediately by the selected content kind while asynchronous reloads finish, and clear bulk selection when changing kind. Keep notebook creation, opening and reopening consistent on iPad and Mac. Sidebar actions reset the detail path when switching destinations; apply destination tags after badges so native selection still recognizes every row.
+
+## Home Profile icon — 2026-11-04
+
+Owner correction: use an icon-only circular profile symbol in the Home header on iPhone, iPad and Mac, without visible “Profile” text or rectangular button chrome. Retain a localized Profile accessibility label, at least a 44-point hit target, Dynamic Type and the existing Profile sheet. Apple does not expose an Apple Account avatar to downloaded apps or Sign in with Apple credentials; this app has no existing account-photo source. Use the honest person symbol fallback rather than inventing a photo or adding an unrelated account system.
+
+## Native sidebar selection — 2026-11-04
+
+Physical iPad correction: Full Keyboard Access is off; the earlier settings attribution was incorrect. Runtime inspection identified the native List collection cell and its `UIFocusHaloEffect`. The custom `listRowBackground` capsule forced a separate rectangular keyboard-focus outline. Remove the custom row background and foreground overrides; let native List own selection and focus together. Physical Home and Notes screenshots now show one rounded blue highlight without the outer square. Keep keyboard focus enabled and do not change system accessibility settings.
+
+Home and Notes participate in native list selection on Mac and iPad. Explicit row actions preserve navigation, and switching destinations moves the highlight and accessibility selection state. Scope selection and document navigation remain backed by LibraryModel. Keep the compact iPhone Home's lavender styling.
+
+## Home Tools placement — 2026-11-04
+
+The owner's latest Home mockup supersedes the earlier restriction on Home Scan/Import actions: show the existing capture/import actions after search, then a labeled Tools section, then Recent. Home offers Merge Documents, Extract Pages, Split into Pages and Export as ZIP using the existing tool catalog and workflows. See All opens the complete Tools screen, including creation/import tools. Remove global Tools toolbar buttons on iPhone, iPad and Mac; editor-specific tools remain in the editor. Compact layouts retain two wrapping columns (vertical icon/label at accessibility sizes); wider windows use an adaptive grid. Mac offers Import, with no unsupported camera placeholder. Native typography and semantic lavender surfaces are unchanged. No new converters, payment rules or persistence changes.
+
+## Unified studio reference — 2026-11-04
+
+The owner's Biology Cell Notes, Biology Notes UI and Cross-Platform Showcase screenshots supersede the older blue/ice palette for Home, Scan and Notes. Use semantic lavender #B9A5FF / strong purple #7545F8, selected #E4DAFF and background #FAF9FF with dark counterparts. Home is content-first with no central quick-action cards. Keep actual folders and local/cloud state honest. Preserve native VisionKit behavior rather than substituting a camera without its capture guarantees. Custom Notes controls drive the existing canvas and store. Vault is separately planned per the owner's reply. Implementation and remaining capabilities: `UNIFIED_STUDIO_REDESIGN.md`.
+
 ## Tools hub refinement — 2026-11-04
 
 The Tools screen now uses a scrolling card collection on the existing ice/navy canvas. Create and Documents remain separate labelled sections. Photos uses the same label treatment as ordinary buttons while retaining the system PhotosPicker. Document cards show their existing localized selection instructions before opening the picker. Cards use SF headline/subheadline, accent icon wells, quiet surface borders and wrapping labels. An adaptive 200-point minimum yields one column on narrow phones and more on wider windows; accessibility text sizes force one column. Mac sheet size is bounded, with Done remaining in its existing footer. All original identifiers and actions remain. No new converter, media, Vault or VPN tiles.
@@ -239,3 +308,21 @@ Owner requested visible tools side by side instead of a dropdown. Notes now use 
 ## First-launch welcome — 2026-10-27
 
 One introductory screen appears before Home until Get started is pressed. It reuses the approved adaptive indigo/lavender palette and rounded system title, with a stack of ruled paper as the focal illustration and three unboxed explanations. Wide windows pair the introduction with feature copy; phone and accessibility sizes stack and scroll. The primary action stays below the scroll content. At accessibility sizes the decorative illustration is omitted. Mac wording describes importing rather than camera capture. Completion is local app preference state, not library metadata. Debug UI tests can bypass the screen or use an isolated completion key. No sign-in, subscription or permission is required to continue.
+
+
+## Inline text and PDF workspace — 2026-11-05
+
+- Main editor tools are icon-only and centered; More sits immediately beside Text Box, with a scrolling row when needed. Keep accessible names and Mac tooltips. Icon artwork stays within 44-point targets at accessibility sizes; menus and text continue to scale.
+- Text input stays on paper, with a native caret and a contextual floating formatting bar. Only dedicated handles move/resize; formatting preserves selection. Keyboard presentation must not rescale the paper under the caret.
+- Form, signature and page operations use native adaptive sheets with real working actions. Preserve form controls through the success state on Mac to avoid replacing the active accessibility focus hierarchy. Keep Undo and Redo together in one toolbar container.
+- Be explicit about filled copies, unsupported form fields and visual signatures. Never imply certificate signing or interactive form retention after a rendered export.
+
+
+## Notebook continuation — 2026-11-08
+
+The last notebook page ends with a quiet localized continuation hint. Deliberately scrolling to its end creates and selects one blank page with the last page's paper pattern and geometry. A gesture can append only once; opening/resizing alone never creates pages. The hint is also an accessible Add action. Reuse notebook persistence/history; do not copy page objects or append pages automatically to PDF documents. Keep drawing/lasso gestures separate from navigation scrolling.
+
+
+## Continuous notebook pages — 2026-11-08
+
+Notebooks use a single lazy vertical page stack with 20-point gaps. Scroll in either direction through existing pages; the most visible page becomes active without jumping the viewport. Only that page mounts editing canvases; other pages render saved editable content through the existing renderer. Sidebar selections still jump directly to their page. Preserve zoom across notebook pages, keep inline drafts on their original page until finished, and retain automatic matching-paper continuation only at the notebook tail. PDFs retain their selected-page workspace. Inactive pages expose a localized activation button for accessibility; the active editor keeps its existing identifiers.
