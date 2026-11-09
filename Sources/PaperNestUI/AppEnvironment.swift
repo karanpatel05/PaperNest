@@ -25,6 +25,13 @@ public struct AppEnvironment: Sendable {
     /// `-PaperNestLibraryPath <dir>` so UI checks never touch real data.
     public static func defaultLibraryURL() throws -> URL {
         #if DEBUG
+        // Device UI tests cannot use the host's /tmp. Keep their library in
+        // this app's sandbox, isolated from the user's Application Support.
+        if let value = UserDefaults.standard.string(forKey: "PaperNestDebugTemporaryLibrary"),
+           let id = UUID(uuidString: value) {
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("PaperNestUITest-" + id.uuidString, isDirectory: true)
+        }
         if let override = UserDefaults.standard.string(forKey: "PaperNestLibraryPath"), !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
@@ -54,6 +61,7 @@ public final class LibrarySession {
     private(set) var backgroundTextWork: Task<Void, Never>?
     private var backgroundTextWorkNeedsAnotherPass = false
     let thumbnails = ThumbnailCache()
+
     private let libraryURL: URL?
 
     /// `libraryURL` overrides the default location (used by tests).
@@ -108,6 +116,8 @@ public final class LibrarySession {
     /// rather than queueing one each. Most changes — an ink stroke, an undo —
     /// add no pages at all, so the usual cost is two indexed lookups that find
     /// nothing to do.
+    func resumeTextRecognition() { startBackgroundTextWork() }
+
     private func startBackgroundTextWork() {
         guard let env = environment else { return }
         guard backgroundTextWork == nil else {
@@ -118,9 +128,11 @@ public final class LibrarySession {
             _ = try? await EmbeddedTextIndexer(store: env.store).indexMissing()
             // The sweep reads in the same languages the reader chose; it
             // used to be built with the recognizer's own hard-coded default.
-            let recognizer = TextRecognizer(languages: RecognitionLanguagePreference.choice().using)
-            _ = try? await AutomaticTextRecognizer(store: env.store, renderer: env.renderer,
-                                                   recognizer: recognizer).recognizeMissing()
+            if SubscriptionStore.shared.allowsPremiumOperations {
+                let recognizer = TextRecognizer(languages: RecognitionLanguagePreference.choice().using)
+                _ = try? await AutomaticTextRecognizer(store: env.store, renderer: env.renderer,
+                                                       recognizer: recognizer).recognizeMissing()
+            }
             guard let self else { return }
             backgroundTextWork = nil
             if backgroundTextWorkNeedsAnotherPass {

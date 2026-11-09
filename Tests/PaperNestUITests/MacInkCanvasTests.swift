@@ -69,6 +69,12 @@ import PaperNestCore
         #expect(stroke.width == 4)
     }
 
+    @Test func fastEraserCrossingBetweenBothPathsSamplesStillHits() {
+        let stroke = inkObject([(50, 100), (250, 100)], width: 2)
+        let eraser = [CGPoint(x: 150, y: 0), CGPoint(x: 150, y: 200)]
+        #expect(MacInkCanvas.strokesHit(by: eraser, in: [stroke], radius: 8).count == 1)
+    }
+
     // MARK: - Eraser
 
     private func inkObject(_ points: [(Double, Double)], width: Double = 2,
@@ -197,6 +203,43 @@ import PaperNestCore
         let taken = MacInkCanvas.strokesEnclosed(by: loop, in: [inside, outside])
 
         #expect(taken.map(\.id.rawValue) == ["inside"])
+    }
+
+    @Test func lassoIncludesInkOnEveryBoundaryOfTheLoop() {
+        let loop = [CGPoint(x: 80, y: 80), CGPoint(x: 220, y: 80),
+                    CGPoint(x: 220, y: 140), CGPoint(x: 80, y: 140)]
+        let edges = [inkObject([(80, 90), (80, 130)], id: "left"),
+                     inkObject([(220, 90), (220, 130)], id: "right"),
+                     inkObject([(100, 80), (200, 80)], id: "top"),
+                     inkObject([(100, 140), (200, 140)], id: "bottom")]
+        #expect(MacInkCanvas.strokesEnclosed(by: loop, in: edges).count == 4)
+    }
+
+    @Test func lassoToleranceForgivesSmallWobbleWithoutTakingNearbyInk() {
+        let loop = [CGPoint(x: 80, y: 80), CGPoint(x: 220, y: 80),
+                    CGPoint(x: 220, y: 140), CGPoint(x: 80, y: 140)]
+        let close = inkObject([(221, 90), (222, 130)], id: "close")
+        let outside = inkObject([(225, 90), (225, 130)], id: "outside")
+        #expect(MacInkCanvas.strokesEnclosed(by: loop, in: [close, outside], tolerance: 3).map(\.id.rawValue) == ["close"])
+        let line = [CGPoint(x: 80, y: 100), CGPoint(x: 220, y: 100), CGPoint(x: 80, y: 100)]
+        #expect(MacInkCanvas.strokesEnclosed(by: line, in: [inkObject([(120, 100)])], tolerance: 3).isEmpty)
+    }
+
+    @Test func selfCrossingLassoStillSelectsItsEnclosedLobes() {
+        let loop = [CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 100),
+                    CGPoint(x: 0, y: 100), CGPoint(x: 100, y: 0)]
+        #expect(MacInkCanvas.strokesEnclosed(by: loop, in: [inkObject([(50, 20)])]).count == 1)
+    }
+
+    @Test func lassoClickSelectsInkAtDifferentZoomsAndEmptyClickClears() {
+        let ink = inkObject([(100, 100), (200, 100)])
+        for zoom in [CGFloat(0.5), 1, 3] {
+            let mapping = CGAffineTransform(scaleX: zoom, y: zoom)
+            let point = CGPoint(x: 150 * zoom, y: 100 * zoom + 4)
+            #expect(MacInkCanvas.lassoSelection(from: [point], in: [ink], sourceToView: mapping).count == 1)
+            #expect(MacInkCanvas.lassoSelection(from: [CGPoint(x: 0, y: 0)], in: [ink], sourceToView: mapping).isEmpty)
+        }
+        #expect(MacInkCanvas.lassoSelection(from: [CGPoint(x: 100, y: 100)], in: [Self.textBox, Self.placedImage], sourceToView: .identity).isEmpty)
     }
 
     /// Nicking the end of a long stroke must not take the whole thing. The

@@ -19,6 +19,11 @@ struct ToolsSheet: View {
     @State private var createdItemID: ItemID?
     @State private var photoSelection: [PhotosPickerItem] = []
 
+    init(model: LibraryModel, initialTool: Tool? = nil) {
+        self.model = model
+        _picking = State(initialValue: initialTool.map { ToolPick(tool: $0) })
+    }
+
     /// The tools that can start from the library, with the selection each needs.
     enum Tool: String, CaseIterable, Identifiable, Hashable {
         case merge, extract, split, archive
@@ -31,6 +36,14 @@ struct ToolsSheet: View {
             case .extract: L10n.extractPages
             case .split: L10n.splitPages
             case .archive: L10n.exportAsZip
+            }
+        }
+
+        var compactTitle: String {
+            switch self {
+            case .merge: L10n.mergeTitle
+            case .extract: L10n.extractTitle
+            case .split, .archive: title
             }
         }
 
@@ -194,7 +207,7 @@ struct ToolsSheet: View {
             let suggested = item.itemIdentifier.map { String($0.prefix(8)) } ?? "\(index + 1)"
             loaded.append((data, "Photo \(suggested)"))
         }
-        await model.importPhotos(loaded)
+        await model.importPhotos(loaded, chooseLocation: true)
     }
 
     private func run(_ tool: Tool, on chosen: [LibraryStore.ItemSummary]) {

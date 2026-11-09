@@ -6,7 +6,9 @@ import UniformTypeIdentifiers
 
 struct LibraryView: View {
     @Bindable var model: LibraryModel
-    @AppStorage("libraryLayout") private var layout: LibraryLayout = .grid
+    @AppStorage("libraryLayout") private var documentLayout: LibraryLayout = .list
+    @AppStorage("notebookLibraryLayout") private var notebookLayout: LibraryLayout = .grid
+    private var layout: LibraryLayout { model.contentKind == .notes ? notebookLayout : documentLayout }
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var renaming: LibraryStore.ItemSummary?
@@ -22,6 +24,7 @@ struct LibraryView: View {
     @State private var bulkExport: BulkExportRequest?
     @State private var fileDetails: FileDetailsRequest?
     @State private var filePreview: FilePreviewRequest?
+    @State private var creatingNotebook = false
 
     /// Anything can be kept: a type we cannot make pages from becomes a
     /// file item instead. Pages-only flows use `pageTypes`.
@@ -29,17 +32,22 @@ struct LibraryView: View {
     static let pageTypes: [UTType] = [.pdf, .jpeg, .png]
 
     private var reloadKey: String {
-        "\(model.scope)|\(model.searchText)|\(model.session.changeToken)"
+        "\(model.contentKind)|\(model.scope)|\(model.searchText)|\(model.session.changeToken)"
     }
 
-    private var title: String { model.scopeTitle }
+    private var title: String { model.contentKind == .notes ? L10n.premiumNotes : model.scopeTitle }
+
+    /// Keep the previous scope's rows out of Notes while its async reload finishes.
+    private var visibleItems: [LibraryStore.ItemSummary] {
+        model.items.filter { model.contentKind.includes($0.item.kind) }
+    }
 
     var body: some View {
         content
             .background(Theme.libraryBackground)
             .navigationTitle(title)
             #if os(macOS)
-            .navigationSubtitle(model.hasLoaded ? L10n.itemCount(model.items.count) : "")
+            .navigationSubtitle(model.hasLoaded ? L10n.itemCount(visibleItems.count) : "")
             #endif
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
@@ -52,12 +60,13 @@ struct LibraryView: View {
                 if isSelecting { selectionBar }
             }
             .onChange(of: model.scope) { _, _ in endSelection() }
+            .onChange(of: model.contentKind) { _, _ in endSelection() }
             .onChange(of: model.searchText) { _, _ in endSelection() }
-            .onChange(of: model.items.map(\.id)) { _, ids in selection.formIntersection(ids) }
+            .onChange(of: visibleItems.map(\.id)) { _, ids in selection.formIntersection(ids) }
             .dropDestination(for: URL.self) { urls, _ in
                 let files = urls.filter(\.isFileURL)
                 guard !files.isEmpty, model.scope != .recentlyDeleted else { return false }
-                Task { await model.importFiles(files) }
+                Task { await model.importFiles(files, chooseLocation: true) }
                 return true
             } isTargeted: { isDropTargeted = $0 }
             #if os(macOS)
@@ -100,13 +109,10 @@ struct LibraryView: View {
             .sheet(item: $exporting) { summary in
                 ExportLoader(itemID: summary.id, currentPageID: nil)
             }
-            .sheet(item: $toolsRequest, onDismiss: {
-                if let id = createdItemID {
-                    createdItemID = nil
-                    endSelection()
-                    model.open(id)
-                }
-            }) { request in
+            .sheet(isPresented: $creatingNotebook, onDismiss: openCreatedItem) {
+                NotebookCreationSheet(model: model) { createdItemID = $0 }
+            }
+            .sheet(item: $toolsRequest, onDismiss: openCreatedItem) { request in
                 DocumentToolsSheet(request: request) { createdItemID = $0 }
             }
             .sheet(item: $bulkExport) { request in
@@ -118,29 +124,36 @@ struct LibraryView: View {
             .modifier(FilePreviewPresentation(request: $filePreview))
     }
 
+    private func openCreatedItem() {
+        guard let id = createdItemID else { return }
+        createdItemID = nil
+        endSelection()
+        model.open(id)
+    }
+
     @ViewBuilder
     private var content: some View {
         if !model.hasLoaded {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    #if os(iOS)
-                    if model.scope != .recentlyDeleted, model.searchText.isEmpty {
-                        CaptureActions(model: model)
+                VStack(alignment: .leading, spacing: 16) {
+                    if model.scope != .recentlyDeleted, model.contentKind != .notes, model.searchText.isEmpty {
+                        if model.scope == .all || model.scope == .favorites { documentFilters }
+                        folderNavigation
                     }
-                    #endif
-                    if model.items.isEmpty {
+                    if visibleItems.isEmpty {
                         emptyState.frame(maxWidth: .infinity, minHeight: 300)
                     } else {
                         collectionHeader
                         if layout == .grid {
                             LazyVGrid(columns: columns, spacing: 18) {
-                                ForEach(model.items) { summary in cell(for: summary) }
+                                ForEach(visibleItems) { summary in cell(for: summary) }
+                                if model.contentKind == .notes, model.scope != .recentlyDeleted, !isSelecting { newNotebookTile }
                             }
                         } else {
-                            LazyVStack(spacing: 10) {
-                                ForEach(model.items) { summary in cell(for: summary) }
+                            LazyVStack(spacing: 0) {
+                                ForEach(visibleItems) { summary in cell(for: summary) }
                             }
                         }
                     }
@@ -154,13 +167,81 @@ struct LibraryView: View {
         }
     }
 
+    private var documentFilters: some View {
+        HStack(spacing: 6) {
+            scopeButton(L10n.homeRecent, symbol: "clock", scope: .all, identifier: "library-filter-recent")
+            scopeButton(L10n.favorites, symbol: "star", scope: .favorites, identifier: "library-filter-favorites")
+        }.padding(4).modifier(PremiumCard())
+    }
+
+    private func scopeButton(_ title: String, symbol: String, scope: LibraryStore.Scope, identifier: String) -> some View {
+        Button {
+            if scope == .all { model.sortOrder = .dateModified }
+            model.sidebarSelection = scope
+        } label: {
+            Label(title, systemImage: symbol).font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .background(model.scope == scope ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 10))
+        }.buttonStyle(.plain)
+            .accessibilityIdentifier(identifier)
+            .accessibilityValue(model.scope == scope ? L10n.selectionOn : L10n.selectionOff)
+    }
+
+    private var newNotebookTile: some View {
+        Button { creatingNotebook = true } label: {
+            VStack(spacing: 12) {
+                Image(systemName: "plus").font(.title)
+                Text(L10n.newNotebook).font(.subheadline).multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, minHeight: 218)
+            .background(Theme.surface.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+            .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [5, 3])) }
+        }.buttonStyle(.plain)
+            .accessibilityIdentifier("notes-create-tile")
+            .accessibilityValue(L10n.newNotebook)
+    }
+
+    private var folderNavigation: some View {
+        let children = model.folders.filter { $0.parentID == model.currentFolderID }
+        return VStack(alignment: .leading, spacing: 12) {
+            if let currentID = model.currentFolderID,
+               let current = model.folders.first(where: { $0.id == currentID }) {
+                Button {
+                    model.sidebarSelection = current.parentID.map { .folder($0) } ?? .all
+                } label: {
+                    Label(current.name, systemImage: "chevron.left")
+                        .font(.subheadline).frame(minHeight: 44)
+                }.accessibilityIdentifier("library-folder-parent")
+            }
+            if !children.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(children) { folder in
+                            Button { model.sidebarSelection = .folder(folder.id) } label: {
+                                VStack(spacing: 5) {
+                                    Image(systemName: "folder.fill").font(.title2).foregroundStyle(Theme.accent)
+                                    Text(folder.name).font(.subheadline.weight(.semibold)).lineLimit(2)
+                                    Text(L10n.itemCount(model.counts.folders[folder.id, default: 0]))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }.frame(width: dynamicTypeSize.isAccessibilitySize ? 180 : 100).frame(minHeight: 76)
+                                    .padding(10).background(Theme.selection.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+                            }.buttonStyle(.plain)
+                                .accessibilityIdentifier("library-folder-\(folder.id)")
+                                .accessibilityValue(L10n.itemCount(model.counts.folders[folder.id, default: 0]))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var columns: [GridItem] {
         [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 280 : 150, maximum: 280), spacing: 16)]
     }
 
     private var collectionHeader: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text(L10n.itemCount(model.items.count))
+            Text(L10n.itemCount(visibleItems.count))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("library-count")
@@ -168,7 +249,9 @@ struct LibraryView: View {
             if model.scope != .recentlyDeleted {
                 sortMenu
             }
-            Picker(L10n.libraryLayout, selection: $layout) {
+            Picker(L10n.libraryLayout, selection: Binding(get: { layout }, set: { value in
+                if model.contentKind == .notes { notebookLayout = value } else { documentLayout = value }
+            })) {
                 Image(systemName: "square.grid.2x2").tag(LibraryLayout.grid)
                     .accessibilityLabel(L10n.gridView)
                 Image(systemName: "list.bullet").tag(LibraryLayout.list)
@@ -242,7 +325,7 @@ struct LibraryView: View {
             }
         }
         .contextMenu { if !isSelecting { itemActions(for: summary) } }
-        .overlay(alignment: layout == .grid ? .bottomTrailing : .trailing) {
+        .overlay(alignment: layout == .grid ? (summary.item.kind == .notebook ? .topTrailing : .bottomTrailing) : .trailing) {
             if !isSelecting {
             Menu {
                 itemActions(for: summary)
@@ -315,6 +398,16 @@ struct LibraryView: View {
         if !model.searchText.isEmpty, model.scope != .recentlyDeleted {
             ContentUnavailableView(L10n.noResultsTitle, systemImage: "magnifyingglass",
                                    description: Text(L10n.noResultsMessage(model.searchText)))
+        } else if model.contentKind == .notes {
+            ContentUnavailableView {
+                Label(L10n.emptyNotesTitle, systemImage: "book.closed")
+            } description: {
+                Text(L10n.emptyNotesMessage)
+            } actions: {
+                Button(L10n.newNotebook) { creatingNotebook = true }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("notes-create-empty")
+            }
         } else {
             switch model.scope {
             case .favorites:
@@ -351,7 +444,16 @@ struct LibraryView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            if isSelecting || (model.scope != .recentlyDeleted && !model.items.isEmpty) {
+            if model.contentKind == .notes {
+                Button { creatingNotebook = true } label: {
+                    Label(L10n.newNotebook, systemImage: "plus")
+                }
+                .accessibilityIdentifier("notes-create")
+                .disabled(isSelecting || isComposing)
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            if isSelecting || (model.scope != .recentlyDeleted && !visibleItems.isEmpty) {
                 Button(isSelecting ? L10n.done : L10n.selectItems) {
                     if isSelecting { endSelection() } else { isSelecting = true }
                 }
@@ -361,23 +463,24 @@ struct LibraryView: View {
         }
         #if os(macOS)
         ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-                model.isShowingFileImporter = true
-            } label: {
-                Label(L10n.importFiles, systemImage: "square.and.arrow.down")
+            if model.contentKind != .notes {
+                Button {
+                    model.isShowingFileImporter = true
+                } label: {
+                    Label(L10n.importFiles, systemImage: "square.and.arrow.down")
+                }
+                .disabled(model.scope == .recentlyDeleted)
             }
-            .disabled(model.scope == .recentlyDeleted)
         }
         #endif
-        ToolbarItem(placement: .primaryAction) {
-            Button {
-                model.isShowingTools = true
-            } label: {
-                Label(L10n.toolsTitle, systemImage: "wrench.and.screwdriver")
-            }
-            .accessibilityIdentifier("library-tools")
-        }
         #if os(iOS)
+        ToolbarItem(placement: .primaryAction) {
+            if model.contentKind != .notes, model.scope != .recentlyDeleted {
+                Button { model.isShowingFileImporter = true } label: {
+                    Label(L10n.importFiles, systemImage: "square.and.arrow.down")
+                }.accessibilityIdentifier("library-import")
+            }
+        }
         // The Mac uses the standard Settings window (⌘,) instead.
         ToolbarItem(placement: .primaryAction) {
             Button {
@@ -394,15 +497,15 @@ struct LibraryView: View {
         guard model.scope != .recentlyDeleted, let content = Clipboard.read() else { return }
         switch content {
         case .files(let urls):
-            Task { await model.importFiles(urls) }
+            Task { await model.importFiles(urls, chooseLocation: true) }
         case .image(let data):
             let name = L10n.pastedImageName(Date().formatted(date: .abbreviated, time: .shortened))
-            Task { await model.importImages([data], name: name) }
+            Task { await model.importImages([data], name: name, chooseLocation: true) }
         }
     }
 
     private var selectedItems: [LibraryStore.ItemSummary] {
-        model.items.filter { selection.contains($0.id) }
+        visibleItems.filter { selection.contains($0.id) }
     }
 
     private var selectionBar: some View {
@@ -428,8 +531,8 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var selectionControls: some View {
-        Button(selection.count == model.items.count ? L10n.deselectAll : L10n.selectAll) {
-            selection = selection.count == model.items.count ? [] : Set(model.items.map(\.id))
+        Button(selection.count == visibleItems.count ? L10n.deselectAll : L10n.selectAll) {
+            selection = selection.count == visibleItems.count ? [] : Set(visibleItems.map(\.id))
         }
         Menu {
             Button(L10n.duplicate) { duplicate(selectedItems.map(\.id)) }
@@ -524,7 +627,12 @@ struct ItemCell: View {
 
     var body: some View {
         Group {
-            if layout == .grid {
+            if layout == .grid, summary.item.kind == .notebook {
+                NotebookCover(summary: summary)
+                    .overlay {
+                        if isSelected { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent, lineWidth: 2) }
+                    }
+            } else if layout == .grid {
                 VStack(alignment: .leading, spacing: 10) {
                     preview
                         .frame(height: reservesMenuSpace ? 190 : 150)
@@ -540,12 +648,13 @@ struct ItemCell: View {
                 .modifier(PremiumCard())
             } else {
                 HStack(spacing: 14) {
-                    preview.frame(width: 60, height: 76).clipShape(RoundedRectangle(cornerRadius: 6))
+                    preview.frame(width: 40, height: 54).clipShape(RoundedRectangle(cornerRadius: 6))
                     metadata.frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(10)
                 .padding(.trailing, 36)
-                .modifier(PremiumCard())
+                .background(isSelected ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(alignment: .bottom) { Divider().padding(.leading, 64) }
                 .overlay {
                     if isSelected { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent, lineWidth: 2) }
                 }
@@ -683,14 +792,19 @@ struct CaptureActions: View {
 /// a scope's grid): the file importer, the camera, Settings, errors and
 /// password prompts. Attached once, at the root.
 struct LibraryPresentations: ViewModifier {
+    @State private var scannerName: String?
     @Bindable var model: LibraryModel
 
     func body(content: Content) -> some View {
         content
+            .sheet(item: $model.importLocationRequest, onDismiss: { model.finishImportLocation() }) { _ in
+                ImportLocationSheet(model: model)
+            }
+            .modifier(FilePreviewPresentation(request: $model.importedFilePreview))
             .fileImporter(isPresented: $model.isShowingFileImporter, allowedContentTypes: LibraryView.importableTypes,
                           allowsMultipleSelection: true) { result in
                 switch result {
-                case .success(let urls): Task { await model.importFiles(urls) }
+                case .success(let urls): Task { await model.importFiles(urls, chooseLocation: true) }
                 case .failure: model.reportPickerFailure()
                 }
             }
@@ -708,19 +822,19 @@ struct LibraryPresentations: ViewModifier {
                 SettingsView(session: model.session)
             }
             .fullScreenCover(isPresented: $model.isShowingScanner) {
-                DocumentCameraView { outcome in
+                ScannerWorkspaceView(onName: { scannerName = $0 }) { outcome in
                     model.isShowingScanner = false
                     switch outcome {
                     case .scanned(let images):
-                        let name = L10n.scanName(Date().formatted(date: .abbreviated, time: .shortened))
-                        Task { await model.importImages(images, name: name) }
+                        let name = scannerName ?? L10n.scanName(Date().formatted(date: .abbreviated, time: .shortened))
+                        scannerName = nil
+                        Task { await model.importImages(images, name: name, openAfterSaving: true, chooseLocation: true) }
                     case .cancelled:
                         break
                     case .failed:
                         model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.scanFailed)
                     }
                 }
-                .ignoresSafeArea()
             }
             #endif
     }

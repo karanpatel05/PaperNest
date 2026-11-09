@@ -30,7 +30,7 @@
 	<true/>
 	<!-- English base text; translations live in <lang>.lproj/InfoPlist.strings. -->
 	<key>NSCameraUsageDescription</key>
-	<string>PaperNest uses the camera to scan paper documents. Scans are saved in your library on this device.</string>
+	<string>PaperNest uses the camera to scan documents and add photos to notes. Captures are saved in your library on this device.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -26,10 +26,13 @@ struct MacInkCanvas: View {
     let tool: MacMarkupTool
     let color: RGBAColor
     let width: Double
+    var eraserMode: InkEraserMode = .precision
     let undoManager: UndoManager?
 
     /// The drag in progress, in view points.
     @State private var points: [CGPoint] = []
+    @State private var cursorPoint: CGPoint?
+    @State private var isErasing = false
     /// What the lasso has hold of, by **id**: the strokes themselves are read
     /// back from the model when they are needed, so an undo between selecting
     /// and dragging cannot leave this holding points that are no longer there.
@@ -52,11 +55,6 @@ struct MacInkCanvas: View {
                      opacity: color.alpha * opacity)
     }
 
-    /// How wide the eraser reaches, in source points. Generous compared with a
-    /// pen, because aiming a mouse at a thin line is harder than aiming a
-    /// finger, and an eraser that misses feels broken.
-    static let eraserRadius: Double = 8
-
     /// How far outside its own box a selection can be grabbed, in view points.
     /// A dashed line is thin to aim at, and the strokes inside it are thinner.
     static let selectionGrip: CGFloat = 6
@@ -77,13 +75,29 @@ struct MacInkCanvas: View {
         Canvas { context, _ in
             paintSelection(&context)
             paintDrag(&context)
+            if tool == .eraser, let point = cursorPoint {
+                let diameter = width
+                let circle = Path(ellipseIn: CGRect(x: point.x - diameter / 2, y: point.y - diameter / 2,
+                                                    width: diameter, height: diameter))
+                context.fill(circle, with: .color(.white.opacity(0.18)))
+                context.stroke(circle, with: .color(.black.opacity(0.65)), lineWidth: 1.5)
+            }
+        }
+        .onContinuousHover { phase in
+            switch phase {
+            case .active(let point): cursorPoint = point
+            case .ended: if points.isEmpty { cursorPoint = nil }
+            }
         }
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
+                    guard !isErasing else { return }
+                    cursorPoint = value.location
                     if points.isEmpty, !isMovingSelection {
                         isMovingSelection = tool == .lasso && startsOnSelection(value.startLocation)
+                        if !isMovingSelection { points.append(value.startLocation) }
                     }
                     if isMovingSelection {
                         moveTranslation = value.translation
@@ -92,13 +106,14 @@ struct MacInkCanvas: View {
                     }
                 }
                 .onEnded { value in
+                    guard !isErasing else { return }
                     if isMovingSelection {
                         isMovingSelection = false
                         moveTranslation = .zero
                         commitMove(value.translation)
                         return
                     }
-                    if points.isEmpty { points = [value.location] }
+                    if points.last != value.location { points.append(value.location) }
                     commit()
                 }
         )
@@ -116,6 +131,7 @@ struct MacInkCanvas: View {
     }
 
     private func clearSelection() {
+        points = []; cursorPoint = nil
         selection = []
         isMovingSelection = false
         moveTranslation = .zero
@@ -151,7 +167,7 @@ struct MacInkCanvas: View {
 
     /// The drag in progress: the stroke being drawn, or the loop being closed.
     private func paintDrag(_ context: inout GraphicsContext) {
-        guard let first = points.first else { return }
+        guard tool != .eraser, let first = points.first else { return }
         var path = Path()
         path.move(to: first)
         for point in points.dropFirst() { path.addLine(to: point) }
@@ -183,20 +199,39 @@ struct MacInkCanvas: View {
         switch tool {
         case .eraser:
             let path = captured.map { $0.applying(viewToSource) }
-            let hit = Self.strokesHit(by: path, in: pageObjects, radius: Self.eraserRadius)
-            guard !hit.isEmpty else { return }
-            Task { try? await model.eraseInk(hit, on: page, undoManager: undoManager) }
+            let capturedObjects = pageObjects
+            isErasing = true
+            Task {
+                defer { isErasing = false }
+                do {
+                    try await model.eraseInk(capturedObjects, on: page, path: path, diameter: width / scale,
+                                             mode: eraserMode, undoManager: undoManager)
+                } catch { model.presentedError = .saveFailed() }
+            }
         case .lasso:
-            let loop = captured.map { $0.applying(viewToSource) }
             // A loop that caught nothing clears the selection, which is how a
             // click on empty page lets go of what was held.
-            selection = Self.strokesEnclosed(by: loop, in: pageObjects).map(\.id)
+            selection = Self.lassoSelection(from: captured, in: pageObjects, sourceToView: sourceToView).map(\.id)
         case .pen, .highlighter:
             guard let inkTool = tool.ink,
                   let stroke = Self.stroke(from: captured, sourceToView: sourceToView,
                                            tool: inkTool, color: color, width: width) else { return }
             Task { try? await model.addInkStroke(stroke, to: page, undoManager: undoManager) }
         }
+    }
+
+    /// A click picks the uppermost nearby stroke; a drag encloses handwriting.
+    /// Input tolerance is in screen points, independent of zoom and rotation.
+    nonisolated static func lassoSelection(from points: [CGPoint], in objects: [PageObject],
+                                          sourceToView: CGAffineTransform) -> [PageObject] {
+        guard let first = points.first else { return [] }
+        let scale = max(sqrt(abs(sourceToView.a * sourceToView.d - sourceToView.b * sourceToView.c)), 0.0001)
+        let source = points.map { $0.applying(sourceToView.inverted()) }
+        if points.allSatisfy({ hypot($0.x - first.x, $0.y - first.y) <= 3 }) {
+            let hit = strokesHit(by: source, in: objects, radius: 6 / scale).max { $0.zKey < $1.zKey }
+            return hit.map { [$0] } ?? []
+        }
+        return strokesEnclosed(by: source, in: objects, tolerance: 3 / scale)
     }
 
     private func commitMove(_ viewTranslation: CGSize) {
@@ -221,11 +256,19 @@ struct MacInkCanvas: View {
     ///
     /// Ink only: a text box or a placed image inside the loop stays put, and
     /// is moved its own way with the markup canvas down.
-    nonisolated static func strokesEnclosed(by loop: [CGPoint], in objects: [PageObject]) -> [PageObject] {
+    nonisolated static func strokesEnclosed(by loop: [CGPoint], in objects: [PageObject], tolerance: CGFloat = 0) -> [PageObject] {
         guard loop.count >= 3 else { return [] }
+        // A click or a retraced line does not enclose an area, even when its
+        // proximity to a stroke falls within the input tolerance.
+        let first = loop[0]
+        guard let second = loop.dropFirst().first(where: { $0 != first }),
+              loop.contains(where: {
+                  abs((second.x - first.x) * ($0.y - first.y) -
+                      (second.y - first.y) * ($0.x - first.x)) > 0.001
+              }) else { return [] }
         return objects.filter { object in
             guard case .ink(let stroke) = object.payload, !stroke.points.isEmpty else { return false }
-            return stroke.points.allSatisfy { contains(CGPoint(x: $0.x, y: $0.y), in: loop) }
+            return stroke.points.allSatisfy { contains(CGPoint(x: $0.x, y: $0.y), in: loop, tolerance: tolerance) }
         }
     }
 
@@ -235,11 +278,14 @@ struct MacInkCanvas: View {
     /// Each side is taken from the previous vertex to this one, starting with
     /// the side from the **last** vertex, so the loop is closed here rather
     /// than by whoever drew it.
-    private nonisolated static func contains(_ point: CGPoint, in polygon: [CGPoint]) -> Bool {
+    private nonisolated static func contains(_ point: CGPoint, in polygon: [CGPoint], tolerance: CGFloat) -> Bool {
         var inside = false
         var previous = polygon.count - 1
         for current in polygon.indices {
             let a = polygon[current], b = polygon[previous]
+            // Include the boundary symmetrically and forgive three view points
+            // of mouse/trackpad wobble without taking a neighbouring word.
+            if distance(from: point, toSegmentFrom: a, to: b) <= max(tolerance, 0.000001) { return true }
             if (a.y > point.y) != (b.y > point.y),
                point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x {
                 inside.toggle()
@@ -268,42 +314,14 @@ struct MacInkCanvas: View {
         return box
     }
 
-    /// The ink objects an eraser drag touched.
-    ///
-    /// **Whole strokes.** A stroke the eraser crosses goes entirely, rather
-    /// than being split where it was crossed. That is a real limitation and a
-    /// deliberate one: splitting means rewriting a stroke's points and
-    /// deciding what happens to the halves, and a whole-stroke eraser is a
-    /// behaviour people already know. It is said plainly in TEST_MATRIX rather
-    /// than left to be discovered.
-    ///
-    /// All distances are in source points, so the eraser reaches the same
-    /// distance on the page whatever the zoom.
+    /// Whole-stroke hits for selection/optional whole-stroke erasing.
+    /// The default precision eraser uses InkEraser.fragments instead.
     nonisolated static func strokesHit(by eraserPath: [CGPoint], in objects: [PageObject],
                                        radius: Double) -> [PageObject] {
         guard !eraserPath.isEmpty else { return [] }
         return objects.filter { object in
-            guard case .ink(let stroke) = object.payload, !stroke.points.isEmpty else { return false }
-            let reach = radius + stroke.width / 2
-            let strokePoints = stroke.points.map { CGPoint(x: $0.x, y: $0.y) }
-            // Both directions, because either path can be sampled sparsely:
-            // checking only the recorded points misses the middle of a long
-            // straight stroke, and checking only the stroke's points misses a
-            // dot that falls between two samples of a fast eraser drag. The
-            // first of those was a real bug caught by a test.
-            return Self.anyPoint(strokePoints, within: reach, ofSegmentsOf: eraserPath)
-                || Self.anyPoint(eraserPath, within: reach, ofSegmentsOf: strokePoints)
-        }
-    }
-
-    private nonisolated static func anyPoint(_ points: [CGPoint], within reach: Double,
-                                             ofSegmentsOf path: [CGPoint]) -> Bool {
-        guard !path.isEmpty else { return false }
-        return points.contains { point in
-            if path.count == 1 { return hypot(point.x - path[0].x, point.y - path[0].y) <= reach }
-            return zip(path, path.dropFirst()).contains { start, end in
-                distance(from: point, toSegmentFrom: start, to: end) <= reach
-            }
+            guard case .ink(let ink) = object.payload else { return false }
+            return InkEraser.hits(ink, path: eraserPath, radius: radius)
         }
     }
 

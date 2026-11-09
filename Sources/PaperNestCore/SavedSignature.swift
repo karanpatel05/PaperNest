@@ -16,11 +16,11 @@ import Foundation
 public struct SavedSignature: Hashable, Codable, Sendable, Identifiable {
     public var id: String
     public var name: String
-    /// Strokes in unit space: both axes divided by the **same** number, the
+    /// Strokes in unit space: coordinates and widths divided by the **same** number, the
     /// longer side of the ink's own bounds. So the longer side runs 0...1 and
     /// the shorter runs 0...less, which is what keeps the signature's shape.
     /// Scaling each axis to 0...1 separately would square up a wide signature
-    /// before it was ever placed.
+    /// before it was ever placed. For a lone dot, its diameter supplies that divisor.
     public var strokes: [InkStroke]
     public var createdAt: Date
 
@@ -51,14 +51,19 @@ public struct SavedSignature: Hashable, Codable, Sendable, Identifiable {
         // signature. Normalising each axis separately would turn a wide
         // signature into a square one here, before placement ever saw it.
         let longest = max(width, height)
+        // Width lives in the same units as the captured points. A lone dot
+        // has no point extent, so its widest stroke supplies its diameter.
+        let widestStroke = drawn.map(\.width).max() ?? 1
+        let divisor = longest > 0 ? longest : (widestStroke > 0 && widestStroke.isFinite ? widestStroke : 1)
         self.init(
             id: id, name: name,
             strokes: drawn.map { stroke in
                 var normalized = stroke
+                normalized.width = stroke.width / divisor
                 normalized.points = stroke.points.map { point in
                     var moved = point
-                    moved.x = longest > 0 ? (point.x - minX) / longest : 0
-                    moved.y = longest > 0 ? (point.y - minY) / longest : 0
+                    moved.x = (point.x - minX) / divisor
+                    moved.y = (point.y - minY) / divisor
                     return moved
                 }
                 return normalized
@@ -80,9 +85,10 @@ public struct SavedSignature: Hashable, Codable, Sendable, Identifiable {
                          width: target.width * pageSize.width, height: target.height * pageSize.height)
         let extent = self.extent
         // Fit inside, keeping shape. A flat signature uses the one axis it has.
-        let scaleX = extent.width > 0 ? box.width / extent.width : box.width
-        let scaleY = extent.height > 0 ? box.height / extent.height : box.height
-        let scale = min(scaleX, scaleY)
+        let scaleX = extent.width > 0 ? box.width / extent.width : .infinity
+        let scaleY = extent.height > 0 ? box.height / extent.height : .infinity
+        let scale = extent.width > 0 || extent.height > 0
+            ? min(scaleX, scaleY) : min(box.width, box.height)
         let drawnWidth = extent.width * scale, drawnHeight = extent.height * scale
         let originX = box.minX + (box.width - drawnWidth) / 2
         let originY = box.minY + (box.height - drawnHeight) / 2

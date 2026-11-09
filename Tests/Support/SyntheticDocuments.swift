@@ -233,11 +233,16 @@ extension SyntheticDocuments {
         public var type: String
         public var name: String
         public var value: String
+        public var flags: Int
+        public var widgetCount: Int
 
-        public init(type: String = "Tx", name: String, value: String = "") {
+        public init(type: String = "Tx", name: String, value: String = "", flags: Int = 0,
+                    widgetCount: Int = 1) {
             self.type = type
             self.name = name
             self.value = value
+            self.flags = flags
+            self.widgetCount = widgetCount
         }
     }
 
@@ -248,23 +253,49 @@ extension SyntheticDocuments {
     /// this there is no honest way to test form filling at all — a widget
     /// annotation on its own is not a form, and PDFKit reports a `fieldName`
     /// for one either way, which misled this project once.
-    public static func acroFormPDF(fields: [FormFieldSpec] = [FormFieldSpec(name: "customer")]) -> Data {
+    public static func acroFormPDF(fields: [FormFieldSpec] = [FormFieldSpec(name: "customer")],
+                                   cyclicFieldTree: Bool = false) -> Data {
         let content = Data("BT /Helv 14 Tf 72 700 Td (Agreement) Tj ET\n".utf8)
-        // Objects 1...5 are fixed; each field is an object after them.
-        let fieldStart = 6
-        let fieldRefs = fields.indices.map { "\(fieldStart + $0) 0 R" }.joined(separator: " ")
+        // Objects 1...5 are fixed. Multiple widgets share a parent field,
+        // with type, value and flags inherited through /Parent.
+        var nextObject = 6
+        var fieldIDs: [Int] = []
+        var widgetIDs: [[Int]] = []
+        for field in fields {
+            fieldIDs.append(nextObject)
+            nextObject += 1
+            if field.widgetCount > 1 {
+                widgetIDs.append(Array(nextObject..<(nextObject + field.widgetCount)))
+                nextObject += field.widgetCount
+            } else { widgetIDs.append([nextObject - 1]) }
+        }
+        let fieldRefs = fieldIDs.map { "\($0) 0 R" }.joined(separator: " ")
+        let annotationRefs = widgetIDs.flatMap { $0 }.map { "\($0) 0 R" }.joined(separator: " ")
         var objects: [String] = [
             "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [\(fieldRefs)] /DA (/Helv 0 Tf 0 g) >> >>",
             "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /Helv 5 0 R >> >> "
-                + "/Annots [\(fieldRefs)] /Contents 4 0 R >>",
+                + "/Annots [\(annotationRefs)] /Contents 4 0 R >>",
             "<< /Length \(content.count) >>\nstream\n" + String(decoding: content, as: UTF8.self) + "endstream",
             "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
         ]
         for (index, field) in fields.enumerated() {
             let top = 630 - index * 40
-            objects.append("<< /Type /Annot /Subtype /Widget /FT /\(field.type) /T (\(field.name)) "
-                + "/V (\(field.value)) /Rect [72 \(top - 30) 300 \(top)] /P 3 0 R /F 4 /DA (/Helv 12 Tf 0 g) >>")
+            let attributes = "/FT /\(field.type) /T (\(field.name)) /V (\(field.value)) /Ff \(field.flags) /DA (/Helv 12 Tf 0 g)"
+                + (field.type == "Ch" ? " /Opt [(One) (Two)]" : "")
+                + (cyclicFieldTree && index == 0 ? " /Kids [\(fieldIDs[index]) 0 R]" : "")
+            if field.widgetCount > 1 {
+                let children = widgetIDs[index].map { "\($0) 0 R" }.joined(separator: " ")
+                objects.append("<< \(attributes) /Kids [\(children)] >>")
+                for widget in 0..<field.widgetCount {
+                    let left = 72 + widget * 120
+                    objects.append("<< /Type /Annot /Subtype /Widget /Parent \(fieldIDs[index]) 0 R "
+                        + "/Rect [\(left) \(top - 30) \(left + 100) \(top)] /P 3 0 R /F 4 >>")
+                }
+            } else {
+                objects.append("<< /Type /Annot /Subtype /Widget \(attributes) "
+                    + "/Rect [72 \(top - 30) 300 \(top)] /P 3 0 R /F 4 >>")
+            }
         }
 
         var out = Data("%PDF-1.7\n".utf8)

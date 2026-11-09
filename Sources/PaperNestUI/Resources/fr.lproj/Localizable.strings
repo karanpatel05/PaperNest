@@ -461,3 +461,208 @@
 "export.password.notSupported" = "Seul un PDF peut porter un mot de passe. Choisissez PDF ou effacez le mot de passe.";
 "export.password.empty" = "Le mot de passe est vide, ce qui ne protégerait rien.";
 "export.password.truncated" = "Seuls les 32 premiers caractères seront nécessaires pour ouvrir le fichier.";
+
+/* Unified studio redesign */
+"studio.shared" = "Partagés";
+"studio.shared.detail" = "Les collections partagées ne sont pas encore disponibles. Vous pouvez exporter et partager des copies de vos documents.";
+"studio.localStorage" = "Stocké sur cet appareil";
+"studio.sync.detail" = "La synchronisation cloud n’est pas connectée.";
+"studio.mySpace" = "Mon espace";
+"studio.toolSettings" = "Réglages de l’outil";
+"studio.opacity" = "Opacité";
+
+// Import destination
+"import.location.title" = "Enregistrer dans PaperNest";
+"import.location.home" = "Accueil (sans dossier)";
+"import.location.save" = "Enregistrer et ouvrir";
+
+/* Notes camera capture */
+"image.take_photo" = "Prendre une photo";
+"image.camera_permission" = "L’accès à l’appareil photo est indisponible. Autorisez-le dans Réglages pour prendre une photo.";
+"image.capture_failed" = "La photo n’a pas pu être prise. Veuillez réessayer.";
+
+/* Pro and Profile */
+"pro.profile" = "Profil";
+"pro.proTitle" = "PaperNest Pro";
+"pro.proHeadline" = "Plus de place pour vos idées.";
+"pro.proSubtitle" = "Plus de possibilités pour vos documents au quotidien.";
+"pro.proNotebooks" = "Carnets illimités";
+"pro.proOCR" = "Reconnaissance de texte par lots et PDF consultables";
+"pro.proExport" = "Exportation de texte et de documents Word";
+"pro.proPDF" = "Outils PDF avancés";
+"pro.proMonthly" = "Mensuel";
+"pro.proYearly" = "Annuel";
+"pro.proMonthPrice" = "%@ par mois";
+"pro.proYearPrice" = "%@ par an, facturés annuellement";
+"pro.proTrialCTA" = "Commencer l’essai gratuit de 7 jours";
+"pro.proSubscribe" = "S’abonner à Pro";
+"pro.proUpgrade" = "Passer à Pro";
+"pro.proContinueFree" = "Continuer gratuitement";
+"pro.proFreeDetail" = "Continuez à numériser, consulter et partager vos documents gratuitement.";
+"pro.proTrialBilling" = "7 jours gratuits, puis %@.";
+"pro.proRenewalTerms" = "Renouvellement automatique sauf annulation. Annulez dans les réglages d’abonnement Apple au moins 24 heures avant la fin de l’essai ou de la période de facturation. Apple confirme le paiement.";
+"pro.proRestore" = "Restaurer les achats";
+"pro.proManage" = "Gérer l’abonnement";
+"pro.proTerms" = "Conditions d’utilisation";
+"pro.proPrivacy" = "Politique de confidentialité";
+"pro.proSupport" = "Assistance";
+"pro.proUnavailable" = "Les abonnements sont indisponibles pour le moment. Vous pouvez continuer gratuitement.";
+"pro.proLegalUnavailable" = "Les informations d’achat et les liens juridiques doivent être disponibles avant de s’abonner.";
+"pro.proLoadError" = "Impossible d’actualiser les informations d’abonnement. Réessayez une fois connecté.";
+"pro.proVerificationError" = "L’achat Apple n’a pas pu être vérifié. Restaurez les achats ou réessayez.";
+"pro.proPending" = "Votre achat attend une approbation. Pro sera activé après confirmation par Apple.";
+"pro.proPurchaseError" = "L’achat n’a pas pu être effectué. Veuillez réessayer.";
+"pro.proRestored" = "Votre accès Pro a été restauré.";
+"pro.proNothingToRestore" = "Aucun abonnement Pro actif n’a été trouvé pour votre compte Apple.";
+"pro.proRestoreError" = "Les achats n’ont pas pu être restaurés. Veuillez réessayer.";
+"pro.proFree" = "Gratuit";
+"pro.proTrial" = "Essai Pro";
+"pro.proActive" = "Pro actif";
+"pro.proCanceled" = "Annulé · accès maintenu";
+"pro.proExpired" = "Abonnement expiré";
+"pro.proBillingIssue" = "Problème de facturation";
+"pro.proTrialEnds" = "Fin de l’essai : %@ · %@ jours restants";
+"pro.proRenews" = "Renouvellement le %@";
+"pro.proAccessEnds" = "Fin de l’accès le %@";
+"pro.proContentSafe" = "Vos documents restent à vous. Vous pouvez toujours consulter et exporter votre travail existant.";
+"pro.proLoading" = "Vérification de l’abonnement…";
+"pro.proRetry" = "Réessayer";
+"pro.close" = "Fermer";
+"pro.required" = "Cette fonctionnalité nécessite PaperNest Pro. Ouvrez Profil sur l’accueil pour vous abonner.";
+
+/* Notes library */
+"notes.empty.title" = "Aucun carnet pour le moment";
+"notes.empty.message" = "Créez un carnet pour écrire, dessiner ou rassembler vos idées.";
+
+/* Compact notebook writing controls */
+"studio.strokePreview" = "Aperçu du trait";
+"studio.eraserDetail" = "Touchez un trait pour l’effacer entièrement. Annuler restaure les traits effacés.";
+"studio.widthValue" = "%@ points";
+
+/* Inline text editing */
+"inline.inlinePlace" = "Touchez la page pour placer du texte";
+"inline.inlineFont" = "Police";
+"inline.inlineBold" = "Gras";
+"inline.inlineItalic" = "Italique";
+"inline.inlineSans" = "Sans empattement";
+"inline.inlineSerif" = "Avec empattement";
+"inline.inlineMono" = "Chasse fixe";
+"inline.inlineRetry" = "Réessayer";
+"inline.inlineLarger" = "Agrandir le texte";
+"inline.inlineSmaller" = "Réduire le texte";
+"inline.inlineMoveLeft" = "Déplacer à gauche";
+"inline.inlineMoveRight" = "Déplacer à droite";
+"inline.inlineMoveUp" = "Déplacer vers le haut";
+"inline.inlineMoveDown" = "Déplacer vers le bas";
+"inline.inlineWider" = "Élargir la zone";
+"inline.inlineNarrower" = "Rétrécir la zone";
+"inline.inlineTaller" = "Augmenter la hauteur";
+"inline.inlineShorter" = "Réduire la hauteur";
+"inline.inlineGeometryHint" = "Faites glisser cette poignée ou utilisez le menu Plus pour régler la position et la taille.";
+
+"inline.back" = "Retour";
+
+/* Reusable handwritten signatures */
+"signature.title" = "Signature";
+"signature.saved" = "Signatures enregistrées";
+"signature.new" = "Nouvelle signature";
+"signature.draw" = "Dessinez votre signature";
+"signature.drawHint" = "Dessinez votre signature dans cette zone.";
+"signature.name" = "Nom";
+"signature.clear" = "Effacer le dessin";
+"signature.save" = "Enregistrer la signature";
+"signature.place" = "Placer la signature";
+"signature.help" = "Placez votre écriture sous forme de traits modifiables. Les signatures enregistrées peuvent être réutilisées.";
+"signature.position" = "Position et taille";
+"signature.horizontal" = "Position horizontale";
+"signature.vertical" = "Position verticale";
+"signature.width" = "Largeur";
+"signature.height" = "Hauteur";
+"signature.preview" = "Aperçu du placement";
+"signature.drag" = "Touchez la page ou faites glisser pour placer votre signature.";
+"signature.saveFailed" = "Vos modifications n’ont pas pu être enregistrées. Votre dessin est conservé. Réessayez.";
+"signature.refreshPreview" = "Actualiser l’aperçu";
+"signature.noSaved" = "Aucune signature enregistrée";
+"signature.deleteNamed" = "Supprimer la signature enregistrée %@";
+
+/* PDF form workspace */
+"form.formTitle" = "Remplir le formulaire PDF";
+"form.formCopyName" = "%@ — Copie remplie";
+"form.formSaved" = "Enregistré dans Documents";
+"form.formLoadFailed" = "Impossible de lire ce formulaire";
+"form.formNoFields" = "Aucun champ de formulaire interactif";
+"form.formNoFieldsHelp" = "Cette version ne contient aucun champ PDF modifiable. Utilisez Zone de texte pour écrire directement sur la page. La modification ou le réagencement des pages peut supprimer les champs interactifs des PDF exportés.";
+"form.formCopyHelp" = "Enregistrez une copie remplie dans Documents. Votre original reste intact et les champs pris en charge restent modifiables.";
+"form.formExportHelp" = "L’ajout d’encre, de signatures ou d’autres modifications, ou le changement d’ordre des pages, produit un PDF visuel à l’exportation. Les champs interactifs ne sont pas conservés dans ce fichier.";
+"form.formUnsupported" = "Champ en lecture seule ou non pris en charge. Sa valeur actuelle est conservée.";
+"form.formSaveCopy" = "Enregistrer une copie remplie";
+
+/* Inline draft conflict recovery */
+"inline.recover" = "Options de récupération";
+"inline.saveAsNew" = "Enregistrer dans une nouvelle zone de texte";
+"inline.discardDraft" = "Abandonner les modifications non enregistrées";
+"inline.discardHelp" = "Abandonner uniquement ce brouillon non enregistré ? Le texte enregistré, y compris les modifications d’une autre fenêtre, reste inchangé.";
+"inline.copyText" = "Copier le texte du brouillon";
+
+/* Lasso interaction guidance */
+"ink.lasso.help" = "Entourez l’écriture, les zones de texte et les images pour les sélectionner ensemble, puis faites glisser le groupe. Touchez un objet ou cliquez dessus pour le sélectionner. Touchez deux fois le texte pour le modifier.";
+
+/* Mixed page selection */
+"selection.mode" = "Forme de sélection";
+"selection.freehand" = "À main levée";
+"selection.rectangle" = "Rectangle";
+"selection.edit" = "Modifier l’objet sélectionné";
+
+/* Round eraser controls */
+"eraser.size" = "Taille";
+"eraser.small" = "Petite";
+"eraser.medium" = "Moyenne";
+"eraser.large" = "Grande";
+"eraser.mode" = "Effacer";
+"eraser.precision" = "Parties de traits";
+"eraser.stroke" = "Traits entiers";
+"eraser.precision.detail" = "Effacez seulement la partie du trait sous la gomme ronde. Annuler restaure l’encre effacée.";
+
+/* PDF tools sidebar */
+"pdfTools.title" = "Outils PDF";
+"pdfTools.show" = "Afficher les outils PDF";
+"pdfTools.hide" = "Masquer les outils PDF";
+
+/* Signature save validation */
+"signature.nameRequired" = "Saisissez un nom pour enregistrer votre signature.";
+
+// Approved studio redesign
+"studio.showPages" = "Afficher les miniatures des pages";
+"studio.hidePages" = "Masquer les miniatures des pages";
+"studio.closeTab" = "Fermer l’onglet du document";
+"studio.openAnother" = "Ouvrir un autre document";
+"studio.openTabs" = "Documents ouverts (%d)";
+
+// Scanner workspace
+"scanner.flash" = "Flash";
+"scanner.on" = "Activé";
+"scanner.off" = "Désactivé";
+"scanner.native" = "Scanner système";
+"scanner.cameraUnavailable" = "Appareil photo indisponible. Autorisez son accès dans Réglages ou importez des photos.";
+"scanner.retry" = "Réessayer";
+"scanner.review" = "Vérifier le scan";
+
+"scanner.auto" = "Auto";
+"scanner.manual" = "Manuel";
+"scanner.edit" = "Modifier le scan";
+"scanner.moveEarlier" = "Déplacer avant";
+"scanner.moveLater" = "Déplacer après";
+
+"studio.closeDraftTitle" = "Fermer ce document ?";
+"studio.closeDraftMessage" = "Des brouillons de signature ou de formulaire sont inachevés. Gardez les documents ouverts ou abandonnez les brouillons. Le contenu enregistré est conservé.";
+"studio.keepOpen" = "Garder ouvert";
+
+"scanner.enhance" = "Améliorer";
+
+/* Notebook scroll continuation */
+"notebook.scrollAdd" = "Faites défiler vers le bas pour ajouter une page avec le même style de papier";
+
+/* iPad capture decision */
+"scanner.keepScan" = "Garder la numérisation";
+"scanner.reviewCapture" = "Vérifier la numérisation";
+"scanner.reviewCaptureHint" = "Gardez cette numérisation pour l’ajouter à la file, ou supprimez-la pour recommencer.";

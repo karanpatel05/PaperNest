@@ -34,6 +34,41 @@ import Testing
         #expect(SavedSignature(name: "Nothing", capturing: [stroke([])]) == nil)
     }
 
+    @Test func captureAndPlacementPreserveStrokeWidthAtTheOriginalSize() throws {
+        let signature = try #require(SavedSignature(name: "Mine",
+            capturing: [stroke([(10, 20), (210, 70)])]))
+        let original = signature.placed(in: .exact(x: 0, y: 0, width: 1, height: 1),
+                                        on: CGSize(width: 200, height: 50))
+        let doubled = signature.placed(in: .exact(x: 0, y: 0, width: 1, height: 1),
+                                       on: CGSize(width: 400, height: 100))
+        #expect(abs(try #require(original.first).width - 2) < 0.0001)
+        #expect(abs(try #require(doubled.first).width - 4) < 0.0001)
+    }
+
+    @Test func capturedDotFitsItsDiameterInsideTheTarget() throws {
+        let signature = try #require(SavedSignature(name: "Dot", capturing: [stroke([(12, 18)])]))
+        let placed = signature.placed(in: .exact(x: 0, y: 0, width: 1, height: 1),
+                                      on: CGSize(width: 40, height: 20))
+        let dot = try #require(placed.first)
+        #expect(dot.width == 20)
+        #expect(dot.points.first?.x == 20 && dot.points.first?.y == 10)
+    }
+
+    @Test func flatSignatureUsesItsNonzeroAxisToFit() throws {
+        let horizontal = try #require(SavedSignature(name: "Line",
+            capturing: [stroke([(10, 20), (210, 20)])]))
+        let vertical = try #require(SavedSignature(name: "Line",
+            capturing: [stroke([(10, 20), (10, 220)])]))
+        let placedHorizontal = try #require(horizontal.placed(in: .full,
+            on: CGSize(width: 200, height: 50)).first)
+        let placedVertical = try #require(vertical.placed(in: .full,
+            on: CGSize(width: 50, height: 200)).first)
+        #expect(placedHorizontal.points.last?.x == 200)
+        #expect(placedVertical.points.last?.y == 200)
+        #expect(abs(placedHorizontal.width - 2) < 0.0001)
+        #expect(abs(placedVertical.width - 2) < 0.0001)
+    }
+
     @Test func placingPutsEveryPointInsideTheTarget() throws {
         let signature = try #require(SavedSignature(name: "Mine",
                                                     capturing: [stroke([(0, 0), (200, 0), (200, 50)])]))

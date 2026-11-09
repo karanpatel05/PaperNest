@@ -22,6 +22,7 @@ struct MovableMarksOverlay: View {
     /// Source points to points in this view, the mapping the page was drawn with.
     let sourceToView: CGAffineTransform
     let undoManager: UndoManager?
+    var includesText = true
 
     @Binding var selected: PageObjectID?
     /// Called when a mark is opened — a double click or double tap, the
@@ -55,7 +56,8 @@ struct MovableMarksOverlay: View {
         model.selectedPageObjects.filter { object in
             guard object.pageID == page.id else { return false }
             switch object.payload {
-            case .text, .image: return true
+            case .text: return includesText
+            case .image: return true
             case .ink, .comment: return false
             }
         }

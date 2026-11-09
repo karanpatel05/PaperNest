@@ -26,6 +26,154 @@ enum ResourceBundle {
 /// `LocalizationTests` checks that each key used here exists in English,
 /// French and Spanish with matching format arguments.
 enum L10n {
+    static var closeDraftTitle: String { tr("studio.closeDraftTitle") }
+    static var closeDraftMessage: String { tr("studio.closeDraftMessage") }
+    static var keepDocumentOpen: String { tr("studio.keepOpen") }
+
+    // iPad capture decision
+    static var scannerKeepScan: String { tr("scanner.keepScan") }
+    static var scannerReviewCapture: String { tr("scanner.reviewCapture") }
+    static var scannerReviewCaptureHint: String { tr("scanner.reviewCaptureHint") }
+    static var scannerAuto: String { tr("scanner.auto") }
+    static var scannerManual: String { tr("scanner.manual") }
+    static var scannerEnhance: String { tr("scanner.enhance") }
+    static var scannerEdit: String { tr("scanner.edit") }
+    static var scannerMoveEarlier: String { tr("scanner.moveEarlier") }
+    static var scannerMoveLater: String { tr("scanner.moveLater") }
+
+    static var scannerFlash: String { tr("scanner.flash") }
+    static var scannerOn: String { tr("scanner.on") }
+    static var scannerOff: String { tr("scanner.off") }
+    static var scannerNative: String { tr("scanner.native") }
+    static var scannerCameraUnavailable: String { tr("scanner.cameraUnavailable") }
+    static var scannerRetry: String { tr("scanner.retry") }
+    static var scannerReview: String { tr("scanner.review") }
+
+    // Approved studio redesign: workspace navigation.
+    static var showPageThumbnails: String { tr("studio.showPages") }
+    static var hidePageThumbnails: String { tr("studio.hidePages") }
+    static var closeDocumentTab: String { tr("studio.closeTab") }
+    static var openAnotherDocument: String { tr("studio.openAnother") }
+    static func openDocumentTabs(_ count: Int) -> String { tr("studio.openTabs", count) }
+
+    // PDF tools sidebar
+    static var pdfTools: String { tr("pdfTools.title") }
+    static var showPDFTools: String { tr("pdfTools.show") }
+    static var hidePDFTools: String { tr("pdfTools.hide") }
+
+    // PDF form workspace
+    static var formTitle: String { tr("form.formTitle") }
+    static func formCopyName(_ name: String) -> String { tr("form.formCopyName", name) }
+    static var formSaved: String { tr("form.formSaved") }
+    static var formLoadFailed: String { tr("form.formLoadFailed") }
+    static var formNoFields: String { tr("form.formNoFields") }
+    static var formNoFieldsHelp: String { tr("form.formNoFieldsHelp") }
+    static var formCopyHelp: String { tr("form.formCopyHelp") }
+    static var formExportHelp: String { tr("form.formExportHelp") }
+    static var formUnsupported: String { tr("form.formUnsupported") }
+    static var formSaveCopy: String { tr("form.formSaveCopy") }
+
+    // Inline text editing
+    static var inlineBack: String { tr("inline.back") }
+    static var inlinePlace: String { tr("inline.inlinePlace") }
+    static var inlineFont: String { tr("inline.inlineFont") }
+    static var inlineBold: String { tr("inline.inlineBold") }
+    static var inlineItalic: String { tr("inline.inlineItalic") }
+    static var inlineSans: String { tr("inline.inlineSans") }
+    static var inlineSerif: String { tr("inline.inlineSerif") }
+    static var inlineMono: String { tr("inline.inlineMono") }
+    static var inlineRetry: String { tr("inline.inlineRetry") }
+    static var inlineCopyText: String { tr("inline.copyText") }
+    static var inlineRecover: String { tr("inline.recover") }
+    static var inlineSaveAsNew: String { tr("inline.saveAsNew") }
+    static var inlineDiscardDraft: String { tr("inline.discardDraft") }
+    static var inlineDiscardHelp: String { tr("inline.discardHelp") }
+    static var inlineLarger: String { tr("inline.inlineLarger") }
+    static var inlineSmaller: String { tr("inline.inlineSmaller") }
+    static var inlineMoveLeft: String { tr("inline.inlineMoveLeft") }
+    static var inlineMoveRight: String { tr("inline.inlineMoveRight") }
+    static var inlineMoveUp: String { tr("inline.inlineMoveUp") }
+    static var inlineMoveDown: String { tr("inline.inlineMoveDown") }
+    static var inlineWider: String { tr("inline.inlineWider") }
+    static var inlineNarrower: String { tr("inline.inlineNarrower") }
+    static var inlineTaller: String { tr("inline.inlineTaller") }
+    static var inlineShorter: String { tr("inline.inlineShorter") }
+    static var inlineGeometryHint: String { tr("inline.inlineGeometryHint") }
+
+    // Notes library
+    static var emptyNotesTitle: String { tr("notes.empty.title") }
+    static var emptyNotesMessage: String { tr("notes.empty.message") }
+    static var proClose: String { tr("pro.close") }
+    static var proRequired: String { tr("pro.required") }
+    // Pro and Profile
+    static var profile: String { tr("pro.profile") }
+    static var proTitle: String { tr("pro.proTitle") }
+    static var proHeadline: String { tr("pro.proHeadline") }
+    static var proSubtitle: String { tr("pro.proSubtitle") }
+    static var proNotebooks: String { tr("pro.proNotebooks") }
+    static var proOCR: String { tr("pro.proOCR") }
+    static var proExport: String { tr("pro.proExport") }
+    static var proPDF: String { tr("pro.proPDF") }
+    static var proMonthly: String { tr("pro.proMonthly") }
+    static var proYearly: String { tr("pro.proYearly") }
+    static func proMonthPrice(_ value0: String) -> String { tr("pro.proMonthPrice", value0) }
+    static func proYearPrice(_ value0: String) -> String { tr("pro.proYearPrice", value0) }
+    static var proTrialCTA: String { tr("pro.proTrialCTA") }
+    static var proSubscribe: String { tr("pro.proSubscribe") }
+    static var proUpgrade: String { tr("pro.proUpgrade") }
+    static var proContinueFree: String { tr("pro.proContinueFree") }
+    static var proFreeDetail: String { tr("pro.proFreeDetail") }
+    static func proTrialBilling(_ value0: String) -> String { tr("pro.proTrialBilling", value0) }
+    static var proRenewalTerms: String { tr("pro.proRenewalTerms") }
+    static var proRestore: String { tr("pro.proRestore") }
+    static var proManage: String { tr("pro.proManage") }
+    static var proTerms: String { tr("pro.proTerms") }
+    static var proPrivacy: String { tr("pro.proPrivacy") }
+    static var proSupport: String { tr("pro.proSupport") }
+    static var proUnavailable: String { tr("pro.proUnavailable") }
+    static var proLegalUnavailable: String { tr("pro.proLegalUnavailable") }
+    static var proLoadError: String { tr("pro.proLoadError") }
+    static var proVerificationError: String { tr("pro.proVerificationError") }
+    static var proPending: String { tr("pro.proPending") }
+    static var proPurchaseError: String { tr("pro.proPurchaseError") }
+    static var proRestored: String { tr("pro.proRestored") }
+    static var proNothingToRestore: String { tr("pro.proNothingToRestore") }
+    static var proRestoreError: String { tr("pro.proRestoreError") }
+    static var proFree: String { tr("pro.proFree") }
+    static var proTrial: String { tr("pro.proTrial") }
+    static var proActive: String { tr("pro.proActive") }
+    static var proCanceled: String { tr("pro.proCanceled") }
+    static var proExpired: String { tr("pro.proExpired") }
+    static var proBillingIssue: String { tr("pro.proBillingIssue") }
+    static func proTrialEnds(_ value0: String, _ value1: String) -> String { tr("pro.proTrialEnds", value0, value1) }
+    static func proRenews(_ value0: String) -> String { tr("pro.proRenews", value0) }
+    static func proAccessEnds(_ value0: String) -> String { tr("pro.proAccessEnds", value0) }
+    static var proContentSafe: String { tr("pro.proContentSafe") }
+    static var proLoading: String { tr("pro.proLoading") }
+    static var proRetry: String { tr("pro.proRetry") }
+
+    // Unified studio redesign
+    static var studioShared: String { tr("studio.shared") }
+    static var studioSharedDetail: String { tr("studio.shared.detail") }
+    static var studioLocalStorage: String { tr("studio.localStorage") }
+    static var studioSyncDetail: String { tr("studio.sync.detail") }
+    static var studioMySpace: String { tr("studio.mySpace") }
+    static var studioToolSettings: String { tr("studio.toolSettings") }
+    // Compact notebook writing controls
+    static var studioStrokePreview: String { tr("studio.strokePreview") }
+    // Round eraser controls
+    static var eraserSize: String { tr("eraser.size") }
+    static var eraserSmall: String { tr("eraser.small") }
+    static var eraserMedium: String { tr("eraser.medium") }
+    static var eraserLarge: String { tr("eraser.large") }
+    static var eraserMode: String { tr("eraser.mode") }
+    static var eraserPrecision: String { tr("eraser.precision") }
+    static var eraserStroke: String { tr("eraser.stroke") }
+    static var eraserPrecisionDetail: String { tr("eraser.precision.detail") }
+    static var studioEraserDetail: String { tr("studio.eraserDetail") }
+    static func studioWidthValue(_ value: String) -> String { tr("studio.widthValue", value) }
+    static var studioOpacity: String { tr("studio.opacity") }
+
     static var welcomeImportDetail: String { tr("welcome.import.detail") }
 
     static var welcomeMacSubtitle: String { tr("welcome.mac.subtitle") }
@@ -291,6 +439,8 @@ enum L10n {
     static var passwordField: String { tr("password.field") }
     static var passwordOpen: String { tr("password.open") }
     static var genericErrorTitle: String { tr("error.generic.title") }
+    static var notebookScrollAdd: String { tr("notebook.scrollAdd") }
+
     static var saveFailed: String { tr("error.save") }
     static var libraryErrorTitle: String { tr("error.library.title") }
     static var libraryNewer: String { tr("error.library.newer", Brand.displayName) }
@@ -505,6 +655,10 @@ extension L10n {
 
 // Placing an image — ledger row 21.
 extension L10n {
+    // Notes camera capture
+    static var takePhoto: String { tr("image.take_photo") }
+    static var photoCameraPermission: String { tr("image.camera_permission") }
+    static var photoCaptureFailed: String { tr("image.capture_failed") }
     static var insertImage: String { tr("image.insert") }
 }
 
@@ -560,4 +714,46 @@ extension L10n {
     static var inkLasso: String { tr("ink.lasso") }
     static var moveInk: String { tr("ink.move") }
     static func inkSelectionCount(_ count: Int) -> String { plural("ink.selectionCount", count) }
+}
+
+// Import destination prompt, shared by iPhone, iPad and Mac.
+extension L10n {
+    static var importLocationTitle: String { tr("import.location.title") }
+    static var importLocationHome: String { tr("import.location.home") }
+    static var importLocationSave: String { tr("import.location.save") }
+}
+
+// Reusable handwritten signatures — visual ink, no certificate claims.
+extension L10n {
+    static var signatureTitle: String { tr("signature.title") }
+    static var signatureSaved: String { tr("signature.saved") }
+    static var signatureNew: String { tr("signature.new") }
+    static var signatureDraw: String { tr("signature.draw") }
+    static var signatureDrawHint: String { tr("signature.drawHint") }
+    static var signatureNameRequired: String { tr("signature.nameRequired") }
+    static var signatureName: String { tr("signature.name") }
+    static var signatureClear: String { tr("signature.clear") }
+    static var signatureSave: String { tr("signature.save") }
+    static var signaturePlace: String { tr("signature.place") }
+    static var signatureHelp: String { tr("signature.help") }
+    static var signaturePosition: String { tr("signature.position") }
+    static var signatureHorizontal: String { tr("signature.horizontal") }
+    static var signatureVertical: String { tr("signature.vertical") }
+    static var signatureWidth: String { tr("signature.width") }
+    static var signatureHeight: String { tr("signature.height") }
+    static var signaturePreview: String { tr("signature.preview") }
+    static var signatureDrag: String { tr("signature.drag") }
+    static var signatureSaveFailed: String { tr("signature.saveFailed") }
+    static var signatureRefreshPreview: String { tr("signature.refreshPreview") }
+    static var signatureNoSaved: String { tr("signature.noSaved") }
+    static func signatureDeleteNamed(_ name: String) -> String { tr("signature.deleteNamed", name) }
+}
+
+// Lasso interaction guidance.
+extension L10n {
+    static var lassoInkHint: String { tr("ink.lasso.help") }
+    static var selectionMode: String { tr("selection.mode") }
+    static var selectionFreehand: String { tr("selection.freehand") }
+    static var selectionRectangle: String { tr("selection.rectangle") }
+    static var selectionEdit: String { tr("selection.edit") }
 }

@@ -115,18 +115,65 @@ public struct TextBox: Hashable, Codable, Sendable {
         case leading, center, trailing
     }
 
+    public enum FontFamily: String, Codable, CaseIterable, Sendable {
+        case sans, serif, monospaced
+    }
+
     public var frame: CGRect
     public var text: String
     public var fontSize: Double
     public var color: RGBAColor
     public var alignment: Alignment
+    public var fontFamily: FontFamily
+    public var isBold: Bool
+    public var isItalic: Bool
 
-    public init(frame: CGRect, text: String, fontSize: Double = 14, color: RGBAColor = .black, alignment: Alignment = .leading) {
+    public init(frame: CGRect, text: String, fontSize: Double = 14, color: RGBAColor = .black,
+                alignment: Alignment = .leading, fontFamily: FontFamily = .sans,
+                isBold: Bool = false, isItalic: Bool = false) {
         self.frame = frame
         self.text = text
         self.fontSize = fontSize
         self.color = color
         self.alignment = alignment
+        self.fontFamily = fontFamily
+        self.isBold = isBold
+        self.isItalic = isItalic
+    }
+
+    /// Shared by the native editor and CoreText rendering/export.
+    public var postScriptFontName: String {
+        switch (fontFamily, isBold, isItalic) {
+        case (.sans, false, false): "Helvetica"
+        case (.sans, true, false): "Helvetica-Bold"
+        case (.sans, false, true): "Helvetica-Oblique"
+        case (.sans, true, true): "Helvetica-BoldOblique"
+        case (.serif, false, false): "TimesNewRomanPSMT"
+        case (.serif, true, false): "TimesNewRomanPS-BoldMT"
+        case (.serif, false, true): "TimesNewRomanPS-ItalicMT"
+        case (.serif, true, true): "TimesNewRomanPS-BoldItalicMT"
+        case (.monospaced, false, false): "Courier"
+        case (.monospaced, true, false): "Courier-Bold"
+        case (.monospaced, false, true): "Courier-Oblique"
+        case (.monospaced, true, true): "Courier-BoldOblique"
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case frame, text, fontSize, color, alignment, fontFamily, isBold, isItalic
+    }
+
+    /// Old libraries have no font keys; their Helvetica appearance is retained.
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        frame = try values.decode(CGRect.self, forKey: .frame)
+        text = try values.decode(String.self, forKey: .text)
+        fontSize = try values.decode(Double.self, forKey: .fontSize)
+        color = try values.decode(RGBAColor.self, forKey: .color)
+        alignment = try values.decode(Alignment.self, forKey: .alignment)
+        fontFamily = try values.decodeIfPresent(FontFamily.self, forKey: .fontFamily) ?? .sans
+        isBold = try values.decodeIfPresent(Bool.self, forKey: .isBold) ?? false
+        isItalic = try values.decodeIfPresent(Bool.self, forKey: .isItalic) ?? false
     }
 }
 

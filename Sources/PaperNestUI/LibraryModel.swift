@@ -38,6 +38,7 @@ public final class LibraryModel {
     }
     private(set) var hasLoaded = false
     @ObservationIgnored private var reloadGeneration = 0
+    var contentKind: LibraryContentKind = .all
     var searchText = ""
     private(set) var isImporting = false
     var presentedError: PresentedError?
@@ -48,6 +49,7 @@ public final class LibraryModel {
     var isShowingSettings = false
     var isShowingTools = false
     /// The newest documents, for the iPhone home's Recent row.
+    private(set) var dashboardItems: [LibraryStore.ItemSummary] = []
     private(set) var recentItems: [LibraryStore.ItemSummary] = []
 
     struct PendingPassword: Identifiable {
@@ -61,7 +63,7 @@ public final class LibraryModel {
 
     /// Where an import goes once its password is known.
     enum Destination {
-        case newItem(folder: FolderID?)
+        case newItem(folder: FolderID?, openAfterSaving: Bool)
         case pages(into: ItemID, after: PageID?)
         /// Validated pages handed to an action, e.g. replacing a page.
         case prepared(@MainActor (DocumentImporter.Prepared) async -> Void)
@@ -71,6 +73,7 @@ public final class LibraryModel {
     /// than on All Documents.
     public init(session: LibrarySession, startsAtHome: Bool = false) {
         self.session = session
+        usesCompactNavigation = startsAtHome
         if startsAtHome { sidebarSelection = nil }
     }
 
@@ -78,7 +81,8 @@ public final class LibraryModel {
     /// showing (no selection), otherwise over All Documents.
     func open(_ id: ItemID) {
         if sidebarSelection == nil {
-            homeDocument = id
+            if usesCompactNavigation { homeDocument = id }
+            else { path = [id] }
         } else {
             sidebarSelection = .all
             path = [id]
@@ -88,6 +92,7 @@ public final class LibraryModel {
     /// A document pushed directly over the iPhone home (Recent row).
     /// Setting the split view's selection and the library's path together
     /// loses the path on iPhone, so the home pushes the document itself.
+    var usesCompactNavigation = false
     var homeDocument: ItemID?
 
     var environment: AppEnvironment? { session.environment }
@@ -100,6 +105,7 @@ public final class LibraryModel {
         let generation = reloadGeneration
         let requestedScope = scope
         let requestedSearch = searchText
+        let requestedKind = contentKind
         do {
             let query = requestedSearch.trimmingCharacters(in: .whitespacesAndNewlines)
             var summaries = try await env.store.items(in: requestedScope)
@@ -107,12 +113,13 @@ public final class LibraryModel {
                 let matches = Set(try await env.store.search(query))
                 summaries = summaries.filter { matches.contains($0.id) }
             }
+            summaries = summaries.filter { requestedKind.includes($0.item.kind) }
             let loadedFolders = try await env.store.folders()
             let loadedCounts = try await env.store.scopeCounts()
             // A canceled or older read must not publish rows that would
             // prune the user's selection in a newer search or scope.
             guard !Task.isCancelled, generation == reloadGeneration,
-                  requestedScope == scope, requestedSearch == searchText else { return }
+                  requestedScope == scope, requestedSearch == searchText, requestedKind == contentKind else { return }
             items = sorted(summaries)
             folders = loadedFolders
             counts = loadedCounts
@@ -122,19 +129,82 @@ public final class LibraryModel {
             hasLoaded = true
         } catch {
             guard !Task.isCancelled, generation == reloadGeneration,
-                  requestedScope == scope, requestedSearch == searchText else { return }
+                  requestedScope == scope, requestedSearch == searchText, requestedKind == contentKind else { return }
             presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.libraryOpenFailed)
         }
+    }
+
+    struct ImportLocationRequest: Identifiable { let id = UUID() }
+    enum ImportLocationChoice {
+        case home
+        case folder(FolderID)
+        case newFolder(String)
+    }
+    var importLocationRequest: ImportLocationRequest?
+    var importLocationChoice: ImportLocationChoice?
+    var importedFilePreview: FilePreviewRequest?
+    @ObservationIgnored private var locationContinuation: CheckedContinuation<ImportLocationChoice?, Never>?
+
+    /// Resume only after the destination sheet dismisses, before navigation.
+    func finishImportLocation() {
+        let continuation = locationContinuation
+        locationContinuation = nil
+        importLocationRequest = nil
+        let choice = importLocationChoice
+        importLocationChoice = nil
+        continuation?.resume(returning: choice)
+    }
+
+    private func chooseImportLocation() async -> ImportLocationChoice? {
+        await reloadSidebar()
+        return await withCheckedContinuation { continuation in
+            locationContinuation = continuation
+            importLocationChoice = nil
+            importLocationRequest = ImportLocationRequest()
+        }
+    }
+
+    private func folderForImport(_ choice: ImportLocationChoice) async throws -> FolderID? {
+        switch choice {
+        case .home: return nil
+        case .folder(let id): return id
+        case .newFolder(let name):
+            guard let env = environment else { throw CocoaError(.fileWriteUnknown) }
+            let folder = try await env.store.createFolder(named: name)
+            session.didChange()
+            return folder.id
+        }
+    }
+
+    private func openImported(_ id: ItemID) async {
+        guard let env = environment else { return }
+        do {
+            if let summary = try await env.store.items(in: .all).first(where: { $0.id == id }), summary.file != nil {
+                importedFilePreview = FilePreviewRequest(summary: summary)
+            } else {
+                open(id)
+            }
+        } catch { presentedError = .saveFailed() }
     }
 
     // MARK: - Import
 
     /// Imports each file as its own document. Failures are collected and
     /// reported together; password-protected PDFs are queued for a prompt.
-    func importFiles(_ urls: [URL], into target: ItemID? = nil, after pageID: PageID? = nil) async {
-        guard let env = environment, !urls.isEmpty else { return }
+    func importFiles(_ urls: [URL], into target: ItemID? = nil, after pageID: PageID? = nil, chooseLocation: Bool = false) async {
+        guard let env = environment, !urls.isEmpty, !isImporting else { return }
         isImporting = true
         defer { isImporting = false }
+        // Keep security-scoped access alive while the destination sheet is open.
+        let scoped = urls.filter { $0.startAccessingSecurityScopedResource() }
+        defer { scoped.forEach { $0.stopAccessingSecurityScopedResource() } }
+        var folderID = currentFolderID
+        if chooseLocation && target == nil {
+            guard let choice = await chooseImportLocation() else { return }
+            do { folderID = try await folderForImport(choice) }
+            catch { presentedError = .saveFailed(); return }
+        }
+        var firstImported: ItemID?
         var failures: [ImportError] = []
         var insertAfter = pageID
         for url in urls {
@@ -144,16 +214,18 @@ public final class LibraryModel {
                     insertAfter = added.last?.id ?? insertAfter
                 } else {
                     do {
-                        _ = try await env.importer.importItem(.file(url), folderID: currentFolderID)
+                        let item = try await env.importer.importItem(.file(url), folderID: folderID)
+                        if firstImported == nil { firstImported = item.id }
                     } catch ImportError.unsupportedType {
                         // Not something we can make pages from, so keep it as
                         // the file it is rather than refusing it.
-                        _ = try await FileItemImporter(store: env.store).importFile(at: url, into: currentFolderID)
+                        let item = try await FileItemImporter(store: env.store).importFile(at: url, into: folderID)
+                        if firstImported == nil { firstImported = item.id }
                     }
                 }
             } catch ImportError.passwordRequired(let filename) {
                 if let data = try? env.importer.loadData(.file(url)) {
-                    let destination: Destination = target.map { .pages(into: $0, after: insertAfter) } ?? .newItem(folder: currentFolderID)
+                    let destination: Destination = target.map { .pages(into: $0, after: insertAfter) } ?? .newItem(folder: folderID, openAfterSaving: chooseLocation)
                     passwordQueue.append(PendingPassword(data: data, filename: filename, destination: destination))
                 } else {
                     failures.append(.unreadable(filename: filename))
@@ -166,15 +238,23 @@ public final class LibraryModel {
         }
         session.didChange()
         report(failures)
+        if chooseLocation, let firstImported { await openImported(firstImported) }
     }
 
     /// Imports in-memory image data (paste, camera) as one new document.
-    func importImages(_ images: [Data], name: String) async {
-        guard let env = environment, !images.isEmpty else { return }
+    func importImages(_ images: [Data], name: String, openAfterSaving: Bool = false, chooseLocation: Bool = false) async {
+        guard let env = environment, !images.isEmpty, !isImporting else { return }
         isImporting = true
         defer { isImporting = false }
+        var folderID = currentFolderID
+        if chooseLocation {
+            guard let choice = await chooseImportLocation() else { return }
+            do { folderID = try await folderForImport(choice) }
+            catch { presentedError = .saveFailed(); return }
+        }
         do {
-            _ = try await env.importer.importScan(images: images, name: name, folderID: currentFolderID)
+            let imported = try await env.importer.importScan(images: images, name: name, folderID: folderID)
+            if openAfterSaving || chooseLocation { open(imported.id) }
             session.didChange()
         } catch let error as ImportError {
             report([error])
@@ -186,14 +266,22 @@ public final class LibraryModel {
     /// Photos picked from the system library, each becoming its own
     /// document — a photo of a receipt is a document, not a page of some
     /// other one. Failures are reported per photo and the rest still land.
-    func importPhotos(_ photos: [(data: Data, name: String)]) async {
-        guard let env = environment, !photos.isEmpty else { return }
+    func importPhotos(_ photos: [(data: Data, name: String)], chooseLocation: Bool = false) async {
+        guard let env = environment, !photos.isEmpty, !isImporting else { return }
         isImporting = true
         defer { isImporting = false }
+        var folderID = currentFolderID
+        if chooseLocation {
+            guard let choice = await chooseImportLocation() else { return }
+            do { folderID = try await folderForImport(choice) }
+            catch { presentedError = .saveFailed(); return }
+        }
+        var firstImported: ItemID?
         var failures: [ImportError] = []
         for photo in photos {
             do {
-                _ = try await env.importer.importItem(.data(photo.data, name: photo.name), folderID: currentFolderID)
+                let item = try await env.importer.importItem(.data(photo.data, name: photo.name), folderID: folderID)
+                if firstImported == nil { firstImported = item.id }
             } catch let error as ImportError {
                 failures.append(error)
             } catch {
@@ -203,6 +291,7 @@ public final class LibraryModel {
         session.didChange()
         await reload()
         report(failures)
+        if chooseLocation, let firstImported { await openImported(firstImported) }
     }
 
     func submitPassword(_ password: String, for pending: PendingPassword) async {
@@ -211,8 +300,9 @@ public final class LibraryModel {
         let source = DocumentImporter.Source.data(pending.data, name: pending.filename)
         do {
             switch pending.destination {
-            case .newItem(let folder):
-                _ = try await env.importer.importItem(source, password: password, folderID: folder)
+            case .newItem(let folder, let openAfterSaving):
+                let item = try await env.importer.importItem(source, password: password, folderID: folder)
+                if openAfterSaving { await openImported(item.id) }
             case .pages(let target, let after):
                 try await env.importer.insertPages(from: source, password: password, into: target, after: after)
             case .prepared(let use):
@@ -310,10 +400,12 @@ public final class LibraryModel {
     /// Creates the notebook and its first A4 page together before publishing.
     func createNotebook(named name: String, template: PageTemplate) async throws -> ItemID {
         guard let env = environment else { throw CocoaError(.fileReadUnknown) }
-        let item = try await env.store.createItem(kind: .notebook, name: name,
+        let item = try await SubscriptionStore.shared.withNotebookAllowance(in: env.store, additional: 1) {
+            try await env.store.createItem(kind: .notebook, name: name,
             folderID: currentFolderID,
             pages: [.init(sourceSize: CGSize(width: 595.28, height: 841.89), content: .template(template))],
             assets: [])
+        }
         session.didChange()
         await reload()
         return item.id
@@ -333,7 +425,10 @@ public final class LibraryModel {
         guard let env = environment else { return }
         folders = (try? await env.store.folders()) ?? folders
         counts = (try? await env.store.scopeCounts()) ?? counts
-        if let all = try? await env.store.items(in: .all) { recentItems = Array(all.prefix(10)) }
+        if let all = try? await env.store.items(in: .all) {
+            dashboardItems = all.sorted { $0.item.modifiedAt > $1.item.modifiedAt }
+            recentItems = Array(dashboardItems.prefix(10))
+        }
     }
 
     /// Creates a folder and shows it.
@@ -380,10 +475,17 @@ public final class LibraryModel {
     func duplicate(_ ids: [ItemID]) async -> Bool {
         guard let env = environment else { return false }
         do {
-            _ = try await env.store.duplicateItems(ids)
+            let selected = Set(ids)
+            let additional = try await env.store.items(in: .all).filter { selected.contains($0.id) && $0.item.kind == .notebook }.count
+            _ = try await SubscriptionStore.shared.withNotebookAllowance(in: env.store, additional: additional) {
+                try await env.store.duplicateItems(Array(selected))
+            }
             session.didChange()
             await reload()
             return true
+        } catch is ProAccessError {
+            presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
+            return false
         } catch {
             presentedError = .saveFailed()
             return false
@@ -392,6 +494,10 @@ public final class LibraryModel {
 
     /// One document per live page, named after the source. The source is kept.
     func split(_ summary: LibraryStore.ItemSummary) async -> Bool {
+        guard SubscriptionStore.shared.allowsPremiumOperations else {
+            presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
+            return false
+        }
         guard let env = environment else { return false }
         do {
             let name = summary.item.name
@@ -477,4 +583,16 @@ public final class LibraryModel {
 
 enum LibrarySort: String, CaseIterable {
     case dateModified, dateAdded, name
+}
+
+/// A presentation filter; never a second store or persisted collection.
+enum LibraryContentKind: String {
+    case all, notes, documents
+    func includes(_ kind: ItemKind) -> Bool {
+        switch self {
+        case .all: true
+        case .notes: kind == .notebook
+        case .documents: kind != .notebook
+        }
+    }
 }

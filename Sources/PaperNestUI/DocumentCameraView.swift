@@ -1,3 +1,21 @@
+import Foundation
+
+/// Capture conversion policy, independent of the camera so encoding failures
+/// can be tested without requiring a physical device.
+enum ScanCaptureEncoding {
+    static func pages(count: Int, encode: (Int) -> Data?) -> [Data]? {
+        guard count > 0 else { return nil }
+        var pages: [Data] = []
+        pages.reserveCapacity(count)
+        for index in 0..<count {
+            // A partial result would silently lose paper the user captured.
+            guard let page = encode(index) else { return nil }
+            pages.append(page)
+        }
+        return pages
+    }
+}
+
 #if os(iOS)
 import SwiftUI
 import UIKit
@@ -7,8 +25,7 @@ import VisionKit
 /// perspective correction and multi-page capture. iPhone and iPad only:
 /// this controller does not exist on native macOS.
 ///
-/// Status: implemented, not yet compiled or run. The development machine
-/// had no iOS SDK when this was written (see docs/TEST_MATRIX.md).
+/// Compiled for iOS; physical-device capture remains a verification gate.
 struct DocumentCameraView: UIViewControllerRepresentable {
     enum Outcome {
         /// JPEG data for each captured page, in capture order.
@@ -25,6 +42,7 @@ struct DocumentCameraView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
         let controller = VNDocumentCameraViewController()
         controller.delegate = context.coordinator
+        controller.view.tintColor = UIColor(Theme.accent)
         return controller
     }
 
@@ -42,8 +60,13 @@ struct DocumentCameraView: UIViewControllerRepresentable {
         }
 
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
-            let pages = (0..<scan.pageCount).compactMap { scan.imageOfPage(at: $0).jpegData(compressionQuality: 0.9) }
-            onFinish(pages.isEmpty ? .failed : .scanned(pages))
+            guard let pages = ScanCaptureEncoding.pages(count: scan.pageCount, encode: {
+                scan.imageOfPage(at: $0).jpegData(compressionQuality: 0.9)
+            }) else {
+                onFinish(.failed)
+                return
+            }
+            onFinish(.scanned(pages))
         }
 
         func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {

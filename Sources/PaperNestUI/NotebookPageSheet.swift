@@ -98,16 +98,17 @@ struct NotebookHistoryActions: View {
     let busy: Bool
     /// `DocumentModel.historyRevision`, or 0 where there is no document.
     var historyRevision = 0
+    var beforeAction: (() async -> Bool)? = nil
     @State private var revision = 0
 
     var body: some View {
         Group {
-            Button { undoManager?.undo() } label: {
+            Button { Task { if await beforeAction?() ?? true { undoManager?.undo() } } } label: {
                 Label(L10n.notebookUndo, systemImage: "arrow.uturn.backward")
             }
             .disabled(busy || undoManager?.canUndo != true)
             .accessibilityIdentifier("notebook-undo")
-            Button { undoManager?.redo() } label: {
+            Button { Task { if await beforeAction?() ?? true { undoManager?.redo() } } } label: {
                 Label(L10n.notebookRedo, systemImage: "arrow.uturn.forward")
             }
             .disabled(busy || undoManager?.canRedo != true)

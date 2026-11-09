@@ -58,6 +58,7 @@ struct ExportSheet: View {
     @State private var phase: Phase = .configuring
     @State private var exportTask: Task<Void, Never>?
     @State private var isShowingSaver = false
+    @State private var showPro = false
     /// Empty means no password, which is not the same as an empty one.
     @State private var password = ""
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -95,6 +96,7 @@ struct ExportSheet: View {
                 }
         }
         .modifier(lifecycle)
+        .sheet(isPresented: $showPro) { ProPaywallView(store: .shared) }
         #else
         VStack(alignment: .leading, spacing: 0) {
             Text(L10n.exportTitle)
@@ -107,11 +109,15 @@ struct ExportSheet: View {
         // Sheets on macOS size to their content.
         .frame(minWidth: 460, idealWidth: 540, minHeight: 360, idealHeight: 620, maxHeight: 680)
         .modifier(lifecycle)
+        .sheet(isPresented: $showPro) { ProPaywallView(store: .shared) }
         #endif
     }
 
     private var lifecycle: ExportLifecycle {
-        ExportLifecycle(onAppear: { rangeEnd = pages.count }, onDisappear: {
+        ExportLifecycle(onAppear: {
+            rangeEnd = pages.count
+            if !SubscriptionStore.shared.allowsPremiumOperations { options.includesRecognizedText = false }
+        }, onDisappear: {
             exportTask?.cancel()
             if case .ready(let output) = phase { output.removeTemporaryFiles() }
         }, saver: SaveExportedFiles(isPresented: $isShowingSaver, output: readyOutput, format: options.format) {
@@ -199,14 +205,19 @@ struct ExportSheet: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(Theme.libraryBackground)
+        .tint(Theme.accent)
         .disabled(isBusyOrDone)
     }
 
     private var documentRow: some View {
         HStack(spacing: 12) {
             if let cover = pages.first {
-                PageImageView(page: cover, pixelSize: 120)
-                    .frame(width: 34, height: 44)
+                PageImageView(page: cover, pixelSize: 240)
+                    .frame(width: 56, height: 76)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .shadow(color: Theme.paperShadow, radius: 5, y: 3)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(itemName).font(.headline).lineLimit(2)
@@ -526,6 +537,9 @@ struct ExportSheet: View {
     }
 
     private func startExport() {
+        let premium = options.format == .txt || options.format == .docx
+            || (options.format == .pdf && (options.includesRecognizedText || !password.isEmpty))
+        if premium && !SubscriptionStore.shared.allowsPremiumOperations { showPro = true; return }
         guard let exporter = session.environment?.exporter else { return }
         let selection = selectedPages
         let options = options
@@ -661,7 +675,7 @@ private struct ExportLifecycle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear(perform: onAppear)
-            .onDisappear(perform: onDisappear)
+        .onDisappear(perform: onDisappear)
             .modifier(saver)
     }
 }

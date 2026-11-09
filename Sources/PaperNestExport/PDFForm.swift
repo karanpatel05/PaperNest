@@ -8,10 +8,14 @@ public enum FormError: Error, Equatable, Sendable {
     /// A value was offered for a field the form does not have. Refused rather
     /// than ignored, so a caller cannot believe it wrote something it did not.
     case noSuchField(String)
-    /// Text was offered for a checkbox, or a tick for a text field. Refused
+    /// Text was offered for a checkbox, a tick for a text field, or a value
+    /// for an unsupported widget type. Refused
     /// rather than coerced: writing "true" into a name field, or ticking a box
     /// because a string was non-empty, is a guess about what was meant.
     case wrongKind(String)
+    /// A read-only field cannot be changed, including through a writable
+    /// widget with the same name as a read-only sibling.
+    case readOnlyField(String)
     case writeFailed
 }
 
@@ -29,12 +33,14 @@ public struct FormField: Hashable, Sendable {
     public let value: String
     /// Which page it sits on, counting from zero.
     public let pageIndex: Int
-    /// Whether `filled(_:with:)` can set it: text fields and checkboxes can.
+    /// Whether `filled(_:with:)` can set it: writable text fields and checkboxes can.
     ///
     /// A choice field (a dropdown or list) cannot, because picking a value
     /// means picking from the options the form declares, which this does not
     /// read. Such a field is reported with `false` rather than left out, so a
     /// caller can say what it cannot do instead of implying the form is done.
+    /// Repeated names are also unsupported: PDFKit can write only one mirror's
+    /// value or appearance even when every widget is explicitly updated.
     public let isFillable: Bool
     /// True for a checkbox, which takes `.checked` rather than `.text`.
     public let isCheckbox: Bool
@@ -66,8 +72,8 @@ public enum PDFForm {
     public static func fields(in data: Data) throws -> [FormField] {
         pdfKit.lock()
         defer { pdfKit.unlock() }
+        guard let readOnlyNames = try readOnlyFieldNames(in: data) else { return [] }
         guard let document = PDFDocument(data: data) else { throw FormError.writeFailed }
-        guard hasAcroForm(data) else { return [] }
         var fields: [FormField] = []
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index) else { continue }
@@ -81,11 +87,15 @@ public enum PDFForm {
                         ? (annotation.buttonWidgetState == .onState ? "on" : "off")
                         : (annotation.widgetStringValue ?? ""),
                     pageIndex: index,
-                    isFillable: kind == .text || isCheckbox,
+                    isFillable: !readOnlyNames.contains(name) && !annotation.isReadOnly && (kind == .text || isCheckbox),
                     isCheckbox: isCheckbox))
             }
         }
-        return fields
+        let counts = Dictionary(grouping: fields, by: \.name).mapValues(\.count)
+        return fields.map { field in
+            FormField(name: field.name, value: field.value, pageIndex: field.pageIndex,
+                      isFillable: field.isFillable && counts[field.name] == 1, isCheckbox: field.isCheckbox)
+        }
     }
 
     /// The document with `values` written into its fields.
@@ -96,15 +106,15 @@ public enum PDFForm {
     public static func filled(_ data: Data, with values: [String: FormValue]) throws -> Data {
         pdfKit.lock()
         defer { pdfKit.unlock() }
-        guard hasAcroForm(data) else { throw FormError.noForm }
+        guard let readOnlyNames = try readOnlyFieldNames(in: data) else { throw FormError.noForm }
         guard let document = PDFDocument(data: data) else { throw FormError.writeFailed }
 
-        var widgets: [String: PDFAnnotation] = [:]
+        var widgets: [String: [PDFAnnotation]] = [:]
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index) else { continue }
             for annotation in page.annotations {
-                if let name = annotation.fieldName, widgets[name] == nil {
-                    widgets[name] = annotation
+                if let name = annotation.fieldName {
+                    widgets[name, default: []].append(annotation)
                 }
             }
         }
@@ -113,43 +123,80 @@ public enum PDFForm {
         for name in values.keys where widgets[name] == nil {
             throw FormError.noSuchField(name)
         }
-        // Kinds are checked up front too, so a form is never left half filled
-        // because the third value turned out to be the wrong sort.
+        // Every widget sharing a name is checked before any mutation, including
+        // inherited read-only flags. Updating only the first leaves stale values
+        // or appearances elsewhere in the same form.
         for (name, value) in values {
-            guard let widget = widgets[name] else { continue }
-            let isCheckbox = widget.widgetFieldType == .button
-                && widget.widgetControlType == .checkBoxControl
-            switch (value, isCheckbox) {
-            case (.text, true), (.checked, false):
-                throw FormError.wrongKind(name)
-            default: break
+            guard !readOnlyNames.contains(name) else { throw FormError.readOnlyField(name) }
+            guard widgets[name]?.count == 1 else { throw FormError.wrongKind(name) }
+            for widget in widgets[name] ?? [] {
+                guard !widget.isReadOnly else { throw FormError.readOnlyField(name) }
+                let isText = widget.widgetFieldType == .text
+                let isCheckbox = widget.widgetFieldType == .button
+                    && widget.widgetControlType == .checkBoxControl
+                switch value {
+                case .text:
+                    guard isText else { throw FormError.wrongKind(name) }
+                case .checked:
+                    guard isCheckbox else { throw FormError.wrongKind(name) }
+                }
             }
         }
         for (name, value) in values {
-            guard let widget = widgets[name] else { continue }
-            switch value {
-            case .text(let text):
-                widget.widgetStringValue = text
-            case .checked(let on):
-                // PDFKit writes both `/V` and `/AS` from this, using the
-                // widget's own on-state name rather than an assumed one.
-                widget.buttonWidgetState = on ? .onState : .offState
+            for widget in widgets[name] ?? [] {
+                switch value {
+                case .text(let text):
+                    widget.widgetStringValue = text
+                case .checked(let on):
+                    // PDFKit writes both `/V` and `/AS` from this, using the
+                    // widget's own on-state name rather than an assumed one.
+                    widget.buttonWidgetState = on ? .onState : .offState
+                }
             }
         }
         guard let written = document.dataRepresentation() else { throw FormError.writeFailed }
         return written
     }
 
-    /// Whether the catalog really has a form, read through Core Graphics.
-    /// PDFKit cannot answer this: it reports a field name for a loose widget.
-    private static func hasAcroForm(_ data: Data) -> Bool {
+    /// Read flags from the original dictionaries: PDFKit can report a checkbox's
+    /// `/Ff 1` as zero. Follow the form hierarchy to inherit flags and names before
+    /// asking PDFKit to construct widgets. Cycles/deep malformed trees are refused.
+    /// Nil means there is no real document-level form.
+    private static func readOnlyFieldNames(in data: Data) throws -> Set<String>? {
         guard let provider = CGDataProvider(data: data as CFData),
               let document = CGPDFDocument(provider),
-              let catalog = document.catalog else { return false }
+              let catalog = document.catalog else { throw FormError.writeFailed }
         var form: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(catalog, "AcroForm", &form), let form else { return false }
+        guard CGPDFDictionaryGetDictionary(catalog, "AcroForm", &form), let form else { return nil }
         var fields: CGPDFArrayRef?
-        guard CGPDFDictionaryGetArray(form, "Fields", &fields), let fields else { return false }
-        return CGPDFArrayGetCount(fields) > 0
+        guard CGPDFDictionaryGetArray(form, "Fields", &fields), let fields,
+              CGPDFArrayGetCount(fields) > 0 else { return nil }
+        var names = Set<String>()
+        var visitedCount = 0
+        func visit(_ field: CGPDFDictionaryRef, prefix: String, inheritedFlags: CGPDFInteger, depth: Int) throws {
+            guard depth < 64, visitedCount < 4_096 else { throw FormError.writeFailed }
+            visitedCount += 1
+            var flags = inheritedFlags
+            if !CGPDFDictionaryGetInteger(field, "Ff", &flags) { flags = inheritedFlags }
+            var title: CGPDFStringRef?
+            let part = CGPDFDictionaryGetString(field, "T", &title)
+                ? title.flatMap { CGPDFStringCopyTextString($0) } as String? : nil
+            let name = part.map { prefix.isEmpty ? $0 : "\(prefix).\($0)" } ?? prefix
+            if flags & 1 != 0 { names.insert(name) }
+            var children: CGPDFArrayRef?
+            if CGPDFDictionaryGetArray(field, "Kids", &children), let children {
+                for index in 0..<CGPDFArrayGetCount(children) {
+                    var child: CGPDFDictionaryRef?
+                    guard CGPDFArrayGetDictionary(children, index, &child), let child else { throw FormError.writeFailed }
+                    try visit(child, prefix: name, inheritedFlags: flags, depth: depth + 1)
+                }
+            }
+        }
+        for index in 0..<CGPDFArrayGetCount(fields) {
+            var field: CGPDFDictionaryRef?
+            guard CGPDFArrayGetDictionary(fields, index, &field), let field else { throw FormError.writeFailed }
+            try visit(field, prefix: "", inheritedFlags: 0, depth: 0)
+        }
+        return names
     }
 }

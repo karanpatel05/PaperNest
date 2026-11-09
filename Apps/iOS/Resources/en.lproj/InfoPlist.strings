@@ -1,3 +1,3 @@
 /* Localized Info.plist values (iOS/iPadOS). Keep in sync with Apps/iOS/Resources/Info.plist. */
 "CFBundleDisplayName" = "PaperNest";
-"NSCameraUsageDescription" = "PaperNest uses the camera to scan paper documents. Scans are saved in your library on this device.";
+"NSCameraUsageDescription" = "PaperNest uses the camera to scan documents and add photos to notes. Captures are saved in your library on this device.";

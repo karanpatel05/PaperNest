@@ -9,6 +9,7 @@ struct NotebookCreationSheet: View {
     @State private var template: PageTemplate = .blank
     @State private var saving = false
     @State private var failed = false
+    @State private var showPro = false
 
     var body: some View {
         NavigationStack {
@@ -61,6 +62,7 @@ struct NotebookCreationSheet: View {
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 350)
         #endif
+        .sheet(isPresented: $showPro) { ProPaywallView(store: .shared) }
     }
 
     private func save() async {
@@ -71,7 +73,7 @@ struct NotebookCreationSheet: View {
             let id = try await model.createNotebook(named: name, template: template)
             created(id)
             dismiss()
-        } catch { failed = true }
+        } catch is ProAccessError { showPro = true } catch { failed = true }
     }
 }
 

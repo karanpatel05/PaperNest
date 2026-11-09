@@ -27,11 +27,14 @@ extension LibraryStore {
     @discardableResult
     public func placeText(_ text: String, on pageID: PageID, frame: CGRect,
                           fontSize: Double, color: RGBAColor,
-                          alignment: TextBox.Alignment) throws -> (page: Page, object: PageObject) {
-        // Trimmed here rather than at the edges of the app, so what is stored
-        // is what the index and the renderer will both see.
-        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty else { throw StoreError.invalidPlacement }
+                          alignment: TextBox.Alignment, fontFamily: TextBox.FontFamily = .sans,
+                          isBold: Bool = false, isItalic: Bool = false,
+                          preserveWhitespace: Bool = false) throws -> (page: Page, object: PageObject) {
+        // Inline typing retains indentation and trailing newlines; older callers
+        // retain the established trimmed behavior. Invisible boxes are refused.
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw StoreError.invalidPlacement }
+        let words = preserveWhitespace ? text : trimmed
         guard fontSize > 0, fontSize.isFinite else { throw StoreError.invalidPlacement }
         guard frame.width > 0, frame.height > 0,
               frame.minX.isFinite, frame.minY.isFinite,
@@ -47,7 +50,8 @@ extension LibraryStore {
             let object = PageObject(
                 pageID: pageID, zKey: key,
                 payload: .text(TextBox(frame: frame, text: words, fontSize: fontSize,
-                                       color: color, alignment: alignment)),
+                                       color: color, alignment: alignment, fontFamily: fontFamily,
+                                       isBold: isBold, isItalic: isItalic)),
                 modifiedAt: timestamp)
             return (try applyObjectChanges(on: pageID, saving: [object], deleting: []), object)
         }
@@ -73,9 +77,12 @@ extension LibraryStore {
     /// stop being findable as the new ones start.
     @discardableResult
     public func updateText(_ object: PageObject, text: String, frame: CGRect, fontSize: Double,
-                           color: RGBAColor, alignment: TextBox.Alignment) throws -> (page: Page, object: PageObject) {
-        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty else { throw StoreError.invalidPlacement }
+                           color: RGBAColor, alignment: TextBox.Alignment,
+                           fontFamily: TextBox.FontFamily? = nil, isBold: Bool? = nil, isItalic: Bool? = nil,
+                           preserveWhitespace: Bool = false) throws -> (page: Page, object: PageObject) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw StoreError.invalidPlacement }
+        let words = preserveWhitespace ? text : trimmed
         guard fontSize > 0, fontSize.isFinite else { throw StoreError.invalidPlacement }
         guard frame.width > 0, frame.height > 0,
               frame.minX.isFinite, frame.minY.isFinite,
@@ -83,11 +90,13 @@ extension LibraryStore {
         else { throw StoreError.invalidPlacement }
         // Only a text box: anything else handed in here would be quietly
         // turned into one, losing whatever it was.
-        guard case .text = object.payload else { throw StoreError.invalidPlacement }
+        guard case .text(let previous) = object.payload else { throw StoreError.invalidPlacement }
 
         var updated = object
         updated.payload = .text(TextBox(frame: frame, text: words, fontSize: fontSize,
-                                        color: color, alignment: alignment))
+                                        color: color, alignment: alignment,
+                                        fontFamily: fontFamily ?? previous.fontFamily,
+                                        isBold: isBold ?? previous.isBold, isItalic: isItalic ?? previous.isItalic))
         updated.modifiedAt = Date()
         return (try applyInkChanges(on: object.pageID, saving: [updated],
                                     replacing: [object], deleting: []), updated)

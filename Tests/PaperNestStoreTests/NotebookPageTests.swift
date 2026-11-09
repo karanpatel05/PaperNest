@@ -5,6 +5,32 @@ import PaperNestCore
 @testable import PaperNestStore
 
 @Suite struct NotebookPageTests {
+    @Test func continuationKeepsPaperGeometryButDoesNotCopyWritingAndRejectsStaleTail() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let transform = PageTransform(rotation: .clockwise90)
+        let book = try await store.createItem(kind: .notebook, name: "Continue", pages: [
+            .init(sourceSize: CGSize(width: 420, height: 600), content: .template(.grid), transform: transform)
+        ], assets: [])
+        let tail = try #require(try await store.pages(of: book.id).last)
+        let mark = PageObject(pageID: tail.id, zKey: "V", payload: .text(.init(frame: .zero, text: "Keep here")), modifiedAt: Date())
+        try await store.saveObject(mark)
+        let latest = try #require(try await store.pages(of: book.id).last)
+        let change = try await store.appendNotebookPage(matching: latest)
+        #expect(change.page.content == .template(.grid))
+        #expect(change.page.sourceSize == latest.sourceSize)
+        #expect(change.page.transform == latest.transform)
+        #expect(try await store.objects(on: change.page.id).isEmpty)
+        await #expect(throws: StoreError.notebookPageChanged) { try await store.appendNotebookPage(matching: latest) }
+        #expect(try await store.pages(of: book.id).count == 2)
+        let undone = try await store.toggleNotebookPage(change)
+        #expect(try await store.pages(of: book.id).count == 1)
+        _ = try await store.toggleNotebookPage(undone)
+        let reopened = try LibraryStore(directory: dir.url)
+        #expect(try await reopened.pages(of: book.id).last == change.page)
+        #expect(try await reopened.objects(on: latest.id) == [mark])
+    }
+
     @Test(arguments: PageTemplate.allCases)
     func insertsAfterSelectionAndRestoresIdentity(_ template: PageTemplate) async throws {
         let dir = TempDirectory()

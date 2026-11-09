@@ -20,6 +20,11 @@ struct InkCanvas: UIViewRepresentable {
     let fingerDrawing: Bool
     /// The document's undo manager, for the tool palette's Undo and Redo.
     let documentUndoManager: UndoManager?
+    var studioTool: MacMarkupTool? = nil
+    var enablesTwoFingerNavigation = false
+    var studioColor: RGBAColor = .black
+    var studioWidth: Double = 2
+    var eraserMode: InkEraserMode = .precision
     let onChange: (_ saving: [PageObject], _ deleting: [PageObject]) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -30,6 +35,12 @@ struct InkCanvas: UIViewRepresentable {
         canvas.isOpaque = false
         // The page viewer scrolls and zooms; the canvas never does.
         canvas.isScrollEnabled = false
+        canvas.pinchGestureRecognizer?.isEnabled = false
+        do {
+            let navigation = NotebookInkNavigationGuard(target: nil, action: nil)
+            canvas.addGestureRecognizer(navigation)
+            canvas.drawingGestureRecognizer.require(toFail: navigation)
+        }
         // Paper is always white, so ink keeps the colors picked for it.
         canvas.overrideUserInterfaceStyle = .light
         canvas.delegate = context.coordinator
@@ -37,8 +48,10 @@ struct InkCanvas: UIViewRepresentable {
         context.coordinator.canvas = canvas
         let picker = context.coordinator.toolPicker
         picker.colorUserInterfaceStyle = .light
-        picker.addObserver(canvas)
-        picker.setVisible(true, forFirstResponder: canvas)
+        if studioTool == nil {
+            picker.addObserver(canvas)
+            picker.setVisible(true, forFirstResponder: canvas)
+        }
         DispatchQueue.main.async { canvas.becomeFirstResponder() }
         return canvas
     }
@@ -48,9 +61,34 @@ struct InkCanvas: UIViewRepresentable {
         coordinator.onChange = onChange
         canvas.paletteUndoManager.document = documentUndoManager
         canvas.drawingPolicy = fingerDrawing ? .anyInput : .pencilOnly
+        if let studioTool {
+            coordinator.toolPicker.setVisible(false, forFirstResponder: canvas)
+            let width = studioWidth * InkConversion.uniformScale(sourceToView)
+            switch studioTool {
+            case .pen, .highlighter:
+                setTool(PKInkingTool(studioTool == .pen ? .pen : .marker,
+                                    color: InkConversion.color(studioColor), width: width), on: canvas)
+            case .eraser: setTool(Self.eraser(mode: eraserMode, size: studioWidth), on: canvas)
+            case .lasso: setTool(PKLassoTool(), on: canvas)
+            }
+        }
         coordinator.show(pageID: pageID, objects: objects, sourceToView: sourceToView)
         canvas.accessibilityLabel = L10n.markup
         canvas.accessibilityValue = L10n.strokeCount(objects.filter { if case .ink = $0.payload { true } else { false } }.count)
+    }
+
+    /// Size is a relative preference (8...64), mapped into the supported
+    /// native range so all presets remain distinct at every page zoom.
+    static func eraser(mode: InkEraserMode, size: Double) -> PKEraserTool {
+        if mode == .stroke { return PKEraserTool(.vector) }
+        let range = PKEraserTool.EraserType.fixedWidthBitmap.validWidthRange
+        let fraction = min(1, max(0, (size - 8) / 56))
+        return PKEraserTool(.fixedWidthBitmap, width: range.lowerBound + fraction * (range.upperBound - range.lowerBound))
+    }
+
+    /// Reassigning even an equivalent tool can dismiss PencilKit's selection.
+    private func setTool<T: PKTool & Equatable>(_ tool: T, on canvas: PKCanvasView) {
+        if canvas.tool as? T != tool { canvas.tool = tool }
     }
 
     static func dismantleUIView(_ canvas: InkCanvasView, coordinator: Coordinator) {
@@ -68,7 +106,7 @@ struct InkCanvas: UIViewRepresentable {
         private var conversion = InkConversion(sourceToView: .identity)
         /// Each stroke on the canvas, by seed: the objects it is stored as,
         /// and its shape when stored (to notice moves and erasing).
-        private var known: [UInt32: (objects: [PageObject], shape: StrokeShape)] = [:]
+        private var known: [UInt32: (objects: [PageObject], shape: [StrokeShape])] = [:]
         /// The objects the canvas shows, including its own unsaved changes.
         private var shown: [PageObjectID: PageObject.Payload] = [:]
         /// The objects the model last reported, and the states the canvas
@@ -90,6 +128,10 @@ struct InkCanvas: UIViewRepresentable {
                     modelState = incoming
                     return
                 }
+                // SwiftUI also updates for toolbar/focus changes and while an
+                // ink mutation is still committing. Neither should recreate
+                // native strokes or discard PencilKit's transient selection.
+                if incoming == modelState { return }
             }
             // Another page, a new zoom or rotation, or a change from outside.
             self.pageID = pageID
@@ -107,7 +149,7 @@ struct InkCanvas: UIViewRepresentable {
                 nextSeed &+= 1
                 let stroke = conversion.pkStroke(from: ink, seed: seed)
                 strokes.append(stroke)
-                known[seed] = ([object], StrokeShape(stroke))
+                known[seed] = ([object], [StrokeShape(stroke)])
             }
             shown = Dictionary(objects.map { ($0.id, $0.payload) }, uniquingKeysWith: { a, _ in a })
             modelState = shown
@@ -122,24 +164,27 @@ struct InkCanvas: UIViewRepresentable {
             guard !isLoading, let pageID else { return }
             var saving: [PageObject] = []
             var deleting: [PageObject] = []
-            var present = Set<UInt32>()
+            // PencilKit can split a partially erased stroke into several
+            // native strokes sharing the original randomSeed. Reconcile the
+            // whole family once, otherwise fragments reuse the same object ID
+            // and the guarded store correctly rejects the duplicate write.
+            var families: [UInt32: [PKStroke]] = [:]
+            var order: [UInt32] = []
             for stroke in canvasView.drawing.strokes {
-                let seed = stroke.randomSeed
-                present.insert(seed)
-                let shape = StrokeShape(stroke)
-                if let entry = known[seed] {
-                    guard entry.shape != shape else { continue }
-                    // Moved or partly erased. The first part keeps its ID,
-                    // so a plain move is an update of the same object.
-                    let updated = objects(for: conversion.inkStrokes(from: stroke), reusing: entry.objects, pageID: pageID)
-                    deleting += entry.objects.filter { old in !updated.contains { $0.id == old.id } }
-                    saving += updated
-                    known[seed] = (updated, shape)
-                } else {
-                    let created = objects(for: conversion.inkStrokes(from: stroke), reusing: [], pageID: pageID)
-                    saving += created
-                    known[seed] = (created, shape)
-                }
+                if families[stroke.randomSeed] == nil { order.append(stroke.randomSeed) }
+                families[stroke.randomSeed, default: []].append(stroke)
+            }
+            let present = Set(order)
+            for seed in order {
+                let strokes = families[seed] ?? []
+                let shape = strokes.map(StrokeShape.init)
+                if let entry = known[seed], entry.shape == shape { continue }
+                let previous = known[seed]?.objects ?? []
+                let inks = strokes.flatMap { conversion.inkStrokes(from: $0) }
+                let updated = objects(for: inks, reusing: previous, pageID: pageID)
+                deleting += previous.filter { old in !updated.contains { $0.id == old.id } }
+                saving += updated
+                known[seed] = (updated, shape)
             }
             for (seed, entry) in known where !present.contains(seed) {
                 deleting += entry.objects

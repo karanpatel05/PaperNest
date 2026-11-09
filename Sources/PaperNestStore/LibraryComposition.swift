@@ -78,6 +78,84 @@ extension LibraryStore {
         }
     }
 
+    /// One atomic insertion and its guarded, in-session undo token.
+    public struct PageDuplicationChange: Sendable {
+        public let pages: [Page]
+        public let isDeleted: Bool
+        fileprivate let snapshots: [DuplicatedPageSnapshot]
+        fileprivate let order: [PageID]
+    }
+
+    fileprivate struct DuplicatedPageSnapshot: Sendable {
+        let row: [String?]
+        let objects: [PageObject]
+    }
+
+    /// Copies selected pages in source order after `anchor`, keeping their
+    /// editable objects and derived text under fresh identities. The complete
+    /// batch commits or rolls back together, including late asset validation.
+    public func duplicatePages(_ pageIDs: [PageID], in itemID: ItemID, after anchor: PageID?) throws -> PageDuplicationChange {
+        try db.transaction {
+            let item = try compositionSource(itemID)
+            guard item.kind != .file, !pageIDs.isEmpty, Set(pageIDs).count == pageIDs.count else { throw StoreError.invalidOrder }
+            let wanted = Set(pageIDs)
+            let sourcePages = try pages(of: itemID).filter { wanted.contains($0.id) }
+            guard sourcePages.count == wanted.count else { throw StoreError.invalidOrder }
+            var checked = Set<AssetID>()
+            for page in sourcePages {
+                if let asset = page.content.assetID { try validateCompositionAsset(asset, checked: &checked) }
+            }
+            let inserted = try insertPages(sourcePages.map {
+                NewPage(sourceSize: $0.sourceSize, content: $0.content, transform: $0.transform)
+            }, into: itemID, after: anchor, assets: [])
+            var copies: [Page] = []
+            for (source, destination) in zip(sourcePages, inserted) {
+                copies.append(try copyPageContents(from: source, to: destination, checkedAssets: &checked))
+            }
+            return try duplicationChange(copies, deleted: false)
+        }
+    }
+
+    /// Refuses to remove or restore a copy another window changed. Cache
+    /// revisions and timestamps can advance through fully undone edits; page
+    /// semantics, current objects and ordering must still match. Derived OCR
+    /// may finish in the background; soft deletion keeps those rows for redo.
+    public func toggleDuplicatedPages(_ expected: PageDuplicationChange) throws -> PageDuplicationChange {
+        try db.transaction {
+            guard let first = expected.pages.first else { throw StoreError.invalidOrder }
+            _ = try compositionSource(first.itemID)
+            let current = try duplicationChange(expected.pages, deleted: expected.isDeleted)
+            let semanticColumns = [0, 1] + Array(3..<10) + [11, 13]
+            guard current.order == expected.order,
+                  zip(current.snapshots, expected.snapshots).allSatisfy({ actual, old in
+                      semanticColumns.allSatisfy { actual.row[$0] == old.row[$0] }
+                          && actual.objects == old.objects
+                  }) else { throw StoreError.notebookPageChanged }
+            if expected.isDeleted {
+                try restorePages(expected.pages.map { DeletedPage(page: $0) })
+            } else { _ = try deletePages(expected.pages.map(\.id)) }
+            let live = try expected.pages.map { try page($0.id) ?? $0 }
+            return try duplicationChange(live, deleted: !expected.isDeleted)
+        }
+    }
+
+    private func duplicationChange(_ copied: [Page], deleted: Bool) throws -> PageDuplicationChange {
+        guard let first = copied.first else { throw StoreError.invalidOrder }
+        let snapshots = try copied.map { page in
+            let rows = try db.query("""
+                SELECT id, item_id, sort_key, source_width, source_height, content_kind,
+                       asset_id, pdf_page_index, template, transform_json, revision,
+                       created_at, modified_at, deleted_at FROM pages WHERE id = ?
+                """, [.text(page.id.rawValue)]) { statement in
+                    (0..<14).map { statement.optionalText(Int32($0)) }
+                }
+            guard let row = rows.first, (row[13] != nil) == deleted else { throw StoreError.notebookPageChanged }
+            return DuplicatedPageSnapshot(row: row, objects: try objects(on: page.id))
+        }
+        return PageDuplicationChange(pages: copied, isDeleted: deleted, snapshots: snapshots,
+                                     order: try pages(of: first.itemID).map(\.id))
+    }
+
     private func compositionSource(_ id: ItemID) throws -> LibraryItem {
         guard let source = try item(id), !source.isDeleted else { throw StoreError.itemNotFound }
         return source
@@ -108,34 +186,33 @@ extension LibraryStore {
         // are deliberately not cloned. Immutable assets are shared by hash.
         let destinations = try pages(of: created.id)
         for (source, destination) in zip(sourcePages, destinations) {
-            let sourceObjects = try objects(on: source.id)
-            for object in sourceObjects {
-                if case .image(let image) = object.payload {
-                    try validateCompositionAsset(image.assetID, checked: &checkedAssets)
-                }
-            }
-            // Fresh IDs change the tie-breaker for equal z-keys. Respacing in
-            // stored order preserves the exact paint order, even after sync
-            // has left tied keys. Payloads remain fully editable and unchanged.
-            let keys = SortKey.evenlySpaced(count: sourceObjects.count)
-            let copies = zip(sourceObjects, keys).map { object, key in
-                PageObject(pageID: destination.id, zKey: key, payload: object.payload, modifiedAt: destination.modifiedAt)
-            }
-            let current = try applyObjectChanges(on: destination.id, saving: copies, deleting: [])
-            try copyCompositionRecognition(from: source, to: current)
-            try copyEmbeddedText(from: source, to: current)
-
-            // Typed text needs nothing here any more. The objects were
-            // written through `applyObjectChanges` above, which bumps the
-            // page's revision, which rebuilds the `text` row from the copy's
-            // own objects — the same "rebuild rather than carry stale content
-            // or source IDs" this used to do by hand, now in one place that
-            // also covers simply typing on a page.
+            _ = try copyPageContents(from: source, to: destination, checkedAssets: &checkedAssets)
         }
         // Object and label mutations may have advanced modifiedAt; return the
         // committed metadata as it now stands, rather than createItem's snapshot.
         guard let result = try item(created.id) else { throw StoreError.itemNotFound }
         return result
+    }
+
+    private func copyPageContents(from source: Page, to destination: Page, checkedAssets: inout Set<AssetID>) throws -> Page {
+        let sourceObjects = try objects(on: source.id)
+        for object in sourceObjects {
+            if case .image(let image) = object.payload {
+                try validateCompositionAsset(image.assetID, checked: &checkedAssets)
+            }
+        }
+        // Fresh IDs change the tie-breaker for equal z-keys. Respacing in
+        // stored order preserves the exact paint order, even after sync
+        // has left tied keys. Payloads remain fully editable and unchanged.
+        let keys = SortKey.evenlySpaced(count: sourceObjects.count)
+        let copies = zip(sourceObjects, keys).map { object, key in
+            PageObject(pageID: destination.id, zKey: key, payload: object.payload, modifiedAt: destination.modifiedAt)
+        }
+        let current = try applyObjectChanges(on: destination.id, saving: copies, deleting: [])
+        try copyCompositionRecognition(from: source, to: current)
+        try copyEmbeddedText(from: source, to: current)
+
+        return current
     }
 
     private func validateCompositionAsset(_ id: AssetID, checked: inout Set<AssetID>) throws {

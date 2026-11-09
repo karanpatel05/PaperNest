@@ -24,6 +24,22 @@ extension LibraryStore {
         }
     }
 
+    /// Append a fresh sheet, not a duplicate of its writing. Checking the tail
+    /// inside the transaction prevents two windows from appending from stale state.
+    public func appendNotebookPage(matching expected: Page) throws -> NotebookPageChange {
+        try db.transaction {
+            try requireActiveNotebook(expected.itemID)
+            guard try pages(of: expected.itemID).last == expected else { throw StoreError.notebookPageChanged }
+            let template: PageTemplate
+            if case .template(let paper) = expected.content { template = paper }
+            else { template = .blank }
+            let inserted = try insertPages([
+                .init(sourceSize: expected.sourceSize, content: .template(template), transform: expected.transform)
+            ], into: expected.itemID, after: expected.id, assets: [])
+            return try notebookPageChange(inserted[0], deleted: false)
+        }
+    }
+
     /// Toggles only the same content state that produced the token. A failure changes
     /// nothing, including when another window edited, moved or deleted a page.
     public func toggleNotebookPage(_ expected: NotebookPageChange) throws -> NotebookPageChange {

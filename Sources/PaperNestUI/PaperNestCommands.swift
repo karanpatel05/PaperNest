@@ -10,7 +10,10 @@ public struct PaperNestCommands: Commands {
     public var body: some Commands {
         CommandGroup(after: .newItem) {
             Button(L10n.importFiles) {
-                library?.isShowingFileImporter = true
+                Task { @MainActor in
+                    guard await document?.beforeAction?() ?? true else { return }
+                    library?.isShowingFileImporter = true
+                }
             }
             .keyboardShortcut("o", modifiers: .command)
             .disabled(library == nil)
@@ -67,6 +70,9 @@ public struct PaperNestCommands: Commands {
 
     private func run(_ action: @escaping @MainActor (DocumentCommandContext) async -> Void) {
         guard let document else { return }
-        Task { @MainActor in await action(document) }
+        Task { @MainActor in
+            guard await document.beforeAction?() ?? true else { return }
+            await action(document)
+        }
     }
 }

@@ -10,11 +10,15 @@ extension LibraryStore {
     /// undo history goes through it for all of them. A page comment does not:
     /// it is private and has its own path. Unrelated edits may coexist; a restored ID must be absent
     /// throughout the library so INSERT OR REPLACE cannot move another object.
-    public func applyInkChanges(on pageID: PageID, saving: [PageObject], replacing: [PageObject], deleting: [PageObject]) throws -> Page {
+    /// A gesture may additionally require its displayed page snapshot, so a
+    /// concurrent crop or rotation cannot change the meaning of its delta.
+    public func applyInkChanges(on pageID: PageID, saving: [PageObject], replacing: [PageObject],
+                                deleting: [PageObject], expectedPage: Page? = nil) throws -> Page {
         try db.transaction {
             guard let page = try page(pageID), let parent = try item(page.itemID), parent.deletedAt == nil else {
                 throw StoreError.pageNotFound
             }
+            if let expectedPage, page != expectedPage { throw StoreError.pageObjectsChanged }
             let savedIDs = Set(saving.map(\.id)), replacedIDs = Set(replacing.map(\.id))
             let expected = replacing + deleting
             guard savedIDs.count == saving.count, Set(expected.map(\.id)).count == expected.count,

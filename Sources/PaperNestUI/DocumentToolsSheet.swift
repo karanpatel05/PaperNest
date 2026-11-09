@@ -25,6 +25,7 @@ struct DocumentToolsSheet: View {
     @State private var isLoading = true
     @State private var isSaving = false
     @State private var failed = false
+    @State private var showPro = false
 
     init(request: DocumentToolsRequest, created: @escaping (ItemID) -> Void) {
         self.request = request
@@ -149,9 +150,11 @@ struct DocumentToolsSheet: View {
         #if os(macOS)
         .frame(minWidth: 460, idealWidth: 520, minHeight: 420, idealHeight: 560)
         #endif
+        .sheet(isPresented: $showPro) { ProPaywallView(store: .shared) }
     }
 
     private func create() async {
+        guard SubscriptionStore.shared.allowsPremiumOperations else { showPro = true; return }
         guard !isSaving, let store = session.environment?.store else { return }
         isSaving = true
         defer { isSaving = false }

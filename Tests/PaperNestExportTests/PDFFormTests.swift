@@ -5,9 +5,8 @@ import Testing
 import PaperNestTestSupport
 @testable import PaperNestExport
 
-/// Ledger row 24. Every check here reads the written file through **Core
-/// Graphics**, never PDFKit: PDFKit reports a `fieldName` whether or not the
-/// document has a form at all, and that misled this project once already.
+/// Ledger row 24. Form existence and stored values are checked through Core
+/// Graphics, never solely through PDFKit's widget metadata.
 @Suite struct PDFFormTests {
     /// The catalog's AcroForm fields, as another reader would see them.
     private func formFields(in data: Data) -> [(name: String, value: String)] {
@@ -136,6 +135,94 @@ import PaperNestTestSupport
         }
         #expect(throws: FormError.wrongKind("customer")) {
             try PDFForm.filled(data, with: ["customer": .checked(true)])
+        }
+    }
+
+    @Test(arguments: ["Ch", "Sig", "Btn"])
+    func unsupportedWidgetsCannotReceiveText(_ type: String) throws {
+        // A Btn with the pushbutton flag is not a checkbox.
+        let data = SyntheticDocuments.acroFormPDF(fields: [
+            .init(type: type, name: "unsupported", flags: type == "Btn" ? 65_536 : 0),
+        ])
+        #expect(try PDFForm.fields(in: data).first?.isFillable == false)
+        #expect(throws: FormError.wrongKind("unsupported")) {
+            try PDFForm.filled(data, with: ["unsupported": .text("must not write")])
+        }
+    }
+
+    @Test(arguments: ["Tx", "Btn"])
+    func readOnlyFieldsCannotBeFilled(_ type: String) throws {
+        let data = SyntheticDocuments.acroFormPDF(fields: [
+            .init(type: type, name: "locked", value: "Original", flags: 1),
+        ])
+        #expect(try PDFForm.fields(in: data).first?.isFillable == false)
+        #expect(throws: FormError.readOnlyField("locked")) {
+            try PDFForm.filled(data, with: ["locked": type == "Tx" ? .text("Changed") : .checked(true)])
+        }
+        #expect(formFields(in: data).first?.value == "Original")
+    }
+
+    @Test func repeatedTextNamesAreRefusedRatherThanPartlyWritten() throws {
+        let data = SyntheticDocuments.acroFormPDF(fields: [
+            .init(name: "customer", value: "First"),
+            .init(name: "customer", value: "Second"),
+        ])
+        #expect(try PDFForm.fields(in: data).allSatisfy { !$0.isFillable })
+        #expect(throws: FormError.wrongKind("customer")) {
+            try PDFForm.filled(data, with: ["customer": .text("Updated")])
+        }
+        #expect(formFields(in: data).map(\.value) == ["First", "Second"])
+    }
+
+    @Test func repeatedCheckboxNamesAreRefusedRatherThanPartlyWritten() throws {
+        let data = SyntheticDocuments.acroFormPDF(fields: [
+            .init(type: "Btn", name: "agreed"), .init(type: "Btn", name: "agreed"),
+        ])
+        #expect(try PDFForm.fields(in: data).allSatisfy { !$0.isFillable })
+        #expect(throws: FormError.wrongKind("agreed")) {
+            try PDFForm.filled(data, with: ["agreed": .checked(true)])
+        }
+    }
+
+    @Test func repeatedNamesValidateEveryWidgetBeforeFilling() throws {
+        let mixed = SyntheticDocuments.acroFormPDF(fields: [
+            .init(name: "shared"), .init(type: "Ch", name: "shared"),
+        ])
+        #expect(throws: FormError.wrongKind("shared")) {
+            try PDFForm.filled(mixed, with: ["shared": .text("Cannot change a choice")])
+        }
+        let locked = SyntheticDocuments.acroFormPDF(fields: [
+            .init(name: "shared"), .init(name: "shared", flags: 1),
+        ])
+        #expect(throws: FormError.readOnlyField("shared")) {
+            try PDFForm.filled(locked, with: ["shared": .text("Cannot change the locked mirror")])
+        }
+    }
+
+    @Test func childWidgetsAreReportedUnsupportedAndInheritReadOnlyFlag() throws {
+        let data = SyntheticDocuments.acroFormPDF(fields: [
+            .init(name: "customer", value: "Original", widgetCount: 2),
+        ])
+        let fields = try PDFForm.fields(in: data)
+        #expect(fields.count == 2 && fields.allSatisfy { !$0.isFillable && $0.value == "Original" })
+        #expect(throws: FormError.wrongKind("customer")) {
+            try PDFForm.filled(data, with: ["customer": .text("Updated")])
+        }
+
+        let locked = SyntheticDocuments.acroFormPDF(fields: [
+            .init(name: "customer", value: "Original", flags: 1, widgetCount: 2),
+        ])
+        #expect(try PDFForm.fields(in: locked).allSatisfy { !$0.isFillable })
+        #expect(throws: FormError.readOnlyField("customer")) {
+            try PDFForm.filled(locked, with: ["customer": .text("Changed")])
+        }
+    }
+
+    @Test func cyclicFieldTreeIsRejectedBeforePDFKitLoadsWidgets() throws {
+        let data = SyntheticDocuments.acroFormPDF(cyclicFieldTree: true)
+        #expect(throws: FormError.writeFailed) { try PDFForm.fields(in: data) }
+        #expect(throws: FormError.writeFailed) {
+            try PDFForm.filled(data, with: ["customer": .text("No write")])
         }
     }
 

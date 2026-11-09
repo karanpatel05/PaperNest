@@ -461,3 +461,208 @@
 "export.password.notSupported" = "Only a PDF can carry a password. Choose PDF, or clear the password.";
 "export.password.empty" = "The password is empty, which would protect nothing.";
 "export.password.truncated" = "Only the first 32 characters will be needed to open the file.";
+
+/* Unified studio redesign */
+"studio.shared" = "Shared";
+"studio.shared.detail" = "Shared collections are not available yet. You can export and share copies of your documents.";
+"studio.localStorage" = "Stored on this device";
+"studio.sync.detail" = "Cloud synchronization is not connected.";
+"studio.mySpace" = "My Space";
+"studio.toolSettings" = "Tool settings";
+"studio.opacity" = "Opacity";
+
+// Import destination
+"import.location.title" = "Save in PaperNest";
+"import.location.home" = "Home (no folder)";
+"import.location.save" = "Save and Open";
+
+/* Notes camera capture */
+"image.take_photo" = "Take Photo";
+"image.camera_permission" = "Camera access is unavailable. Allow camera access in Settings to take a photo.";
+"image.capture_failed" = "The photo could not be captured. Please try again.";
+
+/* Pro and Profile */
+"pro.profile" = "Profile";
+"pro.proTitle" = "PaperNest Pro";
+"pro.proHeadline" = "More room for your ideas.";
+"pro.proSubtitle" = "A little more power for your everyday paperwork.";
+"pro.proNotebooks" = "Unlimited notebooks";
+"pro.proOCR" = "Batch text recognition and searchable PDFs";
+"pro.proExport" = "Text and Word document export";
+"pro.proPDF" = "Advanced PDF tools";
+"pro.proMonthly" = "Monthly";
+"pro.proYearly" = "Yearly";
+"pro.proMonthPrice" = "%@ per month";
+"pro.proYearPrice" = "%@ per year, billed annually";
+"pro.proTrialCTA" = "Start 7-day free trial";
+"pro.proSubscribe" = "Subscribe to Pro";
+"pro.proUpgrade" = "Upgrade to Pro";
+"pro.proContinueFree" = "Continue with Free";
+"pro.proFreeDetail" = "Keep scanning, viewing and sharing your documents for free.";
+"pro.proTrialBilling" = "7 days free, then %@.";
+"pro.proRenewalTerms" = "Automatically renews unless canceled. Cancel in your Apple subscription settings at least 24 hours before the trial or billing period ends. Payment is confirmed by Apple.";
+"pro.proRestore" = "Restore Purchases";
+"pro.proManage" = "Manage Subscription";
+"pro.proTerms" = "Terms of Use";
+"pro.proPrivacy" = "Privacy Policy";
+"pro.proSupport" = "Support";
+"pro.proUnavailable" = "Subscriptions are unavailable right now. You can continue with Free.";
+"pro.proLegalUnavailable" = "Purchase information and legal links must be available before subscribing.";
+"pro.proLoadError" = "Couldn’t refresh subscription information. Try again when connected.";
+"pro.proVerificationError" = "Apple’s purchase could not be verified. Restore purchases or try again.";
+"pro.proPending" = "Your purchase is awaiting approval. Pro will unlock when Apple confirms it.";
+"pro.proPurchaseError" = "The purchase couldn’t be completed. Please try again.";
+"pro.proRestored" = "Your Pro access has been restored.";
+"pro.proNothingToRestore" = "No active Pro subscription was found for your Apple Account.";
+"pro.proRestoreError" = "Purchases couldn’t be restored. Please try again.";
+"pro.proFree" = "Free";
+"pro.proTrial" = "Pro Trial";
+"pro.proActive" = "Pro active";
+"pro.proCanceled" = "Canceled · access remaining";
+"pro.proExpired" = "Subscription expired";
+"pro.proBillingIssue" = "Billing issue";
+"pro.proTrialEnds" = "Trial ends %@ · %@ days remaining";
+"pro.proRenews" = "Renews on %@";
+"pro.proAccessEnds" = "Access ends on %@";
+"pro.proContentSafe" = "Your documents stay yours. You can always view and export your existing work.";
+"pro.proLoading" = "Checking subscription…";
+"pro.proRetry" = "Try Again";
+"pro.close" = "Close";
+"pro.required" = "This feature requires PaperNest Pro. Open Profile on Home to upgrade.";
+
+/* Notes library */
+"notes.empty.title" = "No Notebooks Yet";
+"notes.empty.message" = "Create a notebook to start writing, drawing, or collecting ideas.";
+
+/* Compact notebook writing controls */
+"studio.strokePreview" = "Stroke Preview";
+"studio.eraserDetail" = "Erase a stroke by touching it. Undo restores erased strokes.";
+"studio.widthValue" = "%@ points";
+
+/* Inline text editing */
+"inline.inlinePlace" = "Tap the page to place text";
+"inline.inlineFont" = "Font";
+"inline.inlineBold" = "Bold";
+"inline.inlineItalic" = "Italic";
+"inline.inlineSans" = "Sans Serif";
+"inline.inlineSerif" = "Serif";
+"inline.inlineMono" = "Monospaced";
+"inline.inlineRetry" = "Retry";
+"inline.inlineLarger" = "Larger text";
+"inline.inlineSmaller" = "Smaller text";
+"inline.inlineMoveLeft" = "Move left";
+"inline.inlineMoveRight" = "Move right";
+"inline.inlineMoveUp" = "Move up";
+"inline.inlineMoveDown" = "Move down";
+"inline.inlineWider" = "Wider box";
+"inline.inlineNarrower" = "Narrower box";
+"inline.inlineTaller" = "Taller box";
+"inline.inlineShorter" = "Shorter box";
+"inline.inlineGeometryHint" = "Drag this handle, or use the More menu for position and size controls.";
+
+"inline.back" = "Back";
+
+/* Reusable handwritten signatures */
+"signature.title" = "Signature";
+"signature.saved" = "Saved Signatures";
+"signature.new" = "New Signature";
+"signature.draw" = "Draw Your Signature";
+"signature.drawHint" = "Draw your signature in this area.";
+"signature.name" = "Name";
+"signature.clear" = "Clear Drawing";
+"signature.save" = "Save Signature";
+"signature.place" = "Place Signature";
+"signature.help" = "Place your handwriting as editable ink. Saved signatures can be reused.";
+"signature.position" = "Position and Size";
+"signature.horizontal" = "Horizontal Position";
+"signature.vertical" = "Vertical Position";
+"signature.width" = "Width";
+"signature.height" = "Height";
+"signature.preview" = "Placement Preview";
+"signature.drag" = "Tap or drag on the page to position your signature.";
+"signature.saveFailed" = "Your changes could not be saved. Your drawing is still here; try again.";
+"signature.refreshPreview" = "Refresh Preview";
+"signature.noSaved" = "No saved signatures yet";
+"signature.deleteNamed" = "Delete saved signature %@";
+
+/* PDF form workspace */
+"form.formTitle" = "Fill PDF Form";
+"form.formCopyName" = "%@ — Filled copy";
+"form.formSaved" = "Saved to Documents";
+"form.formLoadFailed" = "Couldn’t read this form";
+"form.formNoFields" = "No interactive form fields";
+"form.formNoFieldsHelp" = "This version has no editable PDF fields. Use Text Box to write directly on the page. Page edits or rearrangement can remove interactive fields from exported PDFs.";
+"form.formCopyHelp" = "Save a filled copy in Documents. Your original stays unchanged, and supported fields remain editable.";
+"form.formExportHelp" = "Adding ink, signatures or other page edits, or changing page order, produces a visual PDF on export; interactive form fields are not retained in that output.";
+"form.formUnsupported" = "Read-only or unsupported field. Its current value is preserved.";
+"form.formSaveCopy" = "Save Filled Copy";
+
+/* Inline draft conflict recovery */
+"inline.recover" = "Recovery options";
+"inline.saveAsNew" = "Save as New Text Box";
+"inline.discardDraft" = "Discard Unsaved Changes";
+"inline.discardHelp" = "Discard only this unsaved draft? Saved text, including changes from another window, stays unchanged.";
+"inline.copyText" = "Copy Draft Text";
+
+/* Lasso interaction guidance */
+"ink.lasso.help" = "Draw around handwriting, text boxes and images to select them together, then drag the group. Tap or click an object to select it. Double-tap text to edit it.";
+
+/* Mixed page selection */
+"selection.mode" = "Selection Shape";
+"selection.freehand" = "Freehand";
+"selection.rectangle" = "Rectangle";
+"selection.edit" = "Edit Selected Object";
+
+/* Round eraser controls */
+"eraser.size" = "Size";
+"eraser.small" = "Small";
+"eraser.medium" = "Medium";
+"eraser.large" = "Large";
+"eraser.mode" = "Erase";
+"eraser.precision" = "Parts of Strokes";
+"eraser.stroke" = "Whole Strokes";
+"eraser.precision.detail" = "Rub out only the part of a line inside the round eraser. Undo restores erased ink.";
+
+/* PDF tools sidebar */
+"pdfTools.title" = "PDF Tools";
+"pdfTools.show" = "Show PDF tools";
+"pdfTools.hide" = "Hide PDF tools";
+
+/* Signature save validation */
+"signature.nameRequired" = "Enter a name to save your signature.";
+
+// Approved studio redesign
+"studio.showPages" = "Show page thumbnails";
+"studio.hidePages" = "Hide page thumbnails";
+"studio.closeTab" = "Close document tab";
+"studio.openAnother" = "Open another document";
+"studio.openTabs" = "Open documents (%d)";
+
+// Scanner workspace
+"scanner.flash" = "Flash";
+"scanner.on" = "On";
+"scanner.off" = "Off";
+"scanner.native" = "System scanner";
+"scanner.cameraUnavailable" = "Camera unavailable. Allow camera access in Settings, or import photos.";
+"scanner.retry" = "Retry";
+"scanner.review" = "Review scan";
+
+"scanner.auto" = "Auto";
+"scanner.manual" = "Manual";
+"scanner.edit" = "Scan Edit";
+"scanner.moveEarlier" = "Move earlier";
+"scanner.moveLater" = "Move later";
+
+"studio.closeDraftTitle" = "Close this document?";
+"studio.closeDraftMessage" = "There are unfinished signature or form drafts. Keep the documents open to finish, or discard the drafts. Saved document content is kept.";
+"studio.keepOpen" = "Keep open";
+
+"scanner.enhance" = "Enhance";
+
+/* Notebook scroll continuation */
+"notebook.scrollAdd" = "Scroll down to add a page with the same paper style";
+
+/* iPad capture decision */
+"scanner.keepScan" = "Keep Scan";
+"scanner.reviewCapture" = "Review Scan";
+"scanner.reviewCaptureHint" = "Keep this scan to add it to your queue, or delete it and scan again.";

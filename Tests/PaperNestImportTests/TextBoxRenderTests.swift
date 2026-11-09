@@ -13,6 +13,32 @@ import PaperNestTestSupport
 /// because a single sample can land in the gap between two letters and say
 /// "nothing here" about text that is plainly there.
 @Suite struct TextBoxRenderTests {
+    @Test func selectionTracksVisibleAlignedAndWrappedGlyphs() {
+        let frame = CGRect(x: 100, y: 200, width: 240, height: 90)
+        for alignment in [TextBox.Alignment.leading, .center, .trailing] {
+            let box = TextBox(frame: frame, text: "Hi", fontSize: 20, alignment: alignment)
+            let rects = PageRenderer.textSelectionRects(box)
+            #expect(rects.count == 2)
+            let bounds = rects.reduce(CGRect.null) { $0.union($1) }
+            #expect(frame.contains(bounds))
+            #expect(bounds.maxY < frame.minY + 30)
+            switch alignment {
+            case .leading: #expect(bounds.maxX < frame.minX + 30)
+            case .center: #expect(abs(bounds.midX - frame.midX) < 3)
+            case .trailing: #expect(bounds.minX > frame.maxX - 30)
+            }
+        }
+        let wrapped = TextBox(frame: CGRect(x: 100, y: 200, width: 80, height: 90),
+                              text: "First second third fourth fifth sixth", fontSize: 20)
+        let rects = PageRenderer.textSelectionRects(wrapped)
+        #expect(!rects.isEmpty)
+        #expect(rects.allSatisfy { wrapped.frame.contains($0) })
+        #expect(rects.contains { $0.minY > wrapped.frame.minY + 30 })
+        for blank in ["", "   ", "\n\n"] {
+            #expect(PageRenderer.textSelectionRects(TextBox(frame: frame, text: blank)).isEmpty)
+        }
+    }
+
     private struct Library {
         let directory: URL
         let store: LibraryStore
@@ -135,4 +161,29 @@ import PaperNestTestSupport
 
         #expect(!anyDark(rendered, x: 0.16...0.80, y: 0.57...0.88))
     }
+    @Test func excludingEditedTextRemovesOnlyItsBackingRendering() async throws {
+        let library = try await seeded()
+        defer { try? FileManager.default.removeItem(at: library.directory) }
+        let (_, selected) = try await library.store.placeText("EDIT ME", on: library.page.id, frame: box,
+            fontSize: 28, color: .black, alignment: .leading)
+        let (_, retained) = try await library.store.placeText("KEEP ME", on: library.page.id,
+            frame: CGRect(x: 100, y: 600, width: 400, height: 80), fontSize: 28,
+            color: .black, alignment: .leading)
+        let layers = try await library.renderer.layers(for: library.page, pixelsPerPoint: 1,
+            excludingObjectIDs: [selected.id])
+        #expect(layers.count == 1)
+        guard case .text(let retainedBox) = retained.payload,
+              case .text(let layerBox) = layers.first else { Issue.record("missing retained text"); return }
+        #expect(layerBox == retainedBox)
+        let rendered = Pixels(try await library.renderer.renderImage(library.page, pixelsPerPoint: 1,
+            excludingObjectIDs: [selected.id]))
+        #expect(!anyDark(rendered, x: 0.16...0.80, y: 0.57...0.61))
+        #expect(anyDark(rendered, x: 0.16...0.80, y: 0.76...0.80))
+        let thumbnail = Pixels(try await library.renderer.renderThumbnail(library.page, maxPixelSize: 792,
+            excludingObjectIDs: [selected.id]))
+        #expect(!anyDark(thumbnail, x: 0.16...0.80, y: 0.57...0.61))
+        #expect(anyDark(thumbnail, x: 0.16...0.80, y: 0.76...0.80))
+        #expect(try await library.store.objects(on: library.page.id).count == 2)
+    }
+
 }

@@ -39,6 +39,10 @@ final class DocumentModel {
     /// is useful before the last page is done, and a failure on one page does
     /// not discard the others.
     func recognizeText(on pageID: PageID? = nil) async {
+        guard SubscriptionStore.shared.allowsPremiumOperations else {
+            presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
+            return
+        }
         await finishPendingHistory()
         guard let store, let renderer = session.environment?.renderer, recognitionProgress == nil else { return }
         // One resolution for both: the list Vision is given and the list
@@ -284,12 +288,27 @@ final class DocumentModel {
 
     func addShape(to page: Page, kind: ShapeAnnotation, start: CGPoint, end: CGPoint,
                   color: RGBAColor, width: Double, undoManager: UndoManager?) async throws {
+        try SubscriptionStore.shared.requirePremiumOperation()
         await finishPendingHistory()
         guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
         let result = try await store.addShape(to: page, kind: kind, start: start, end: end, color: color, width: width)
         replace(result.page)
         let change = InkChange(pageID: page.id, saved: result.objects, replaced: [], deleted: [])
         registerInkUndo(change.inverse, undoManager: undoManager, actionName: kind.isStamp ? L10n.stampTitle : L10n.shapeTitle)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    /// A placed signature is ordinary editable ink; all its strokes share one undo step.
+    func placeSignature(_ signature: SavedSignature, on page: Page, target: NormalizedRect,
+                        undoManager: UndoManager?) async throws {
+        try SubscriptionStore.shared.requirePremiumOperation()
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        let result = try await store.placeSignature(signature, on: page, target: target)
+        replace(result.page)
+        let change = InkChange(pageID: page.id, saved: result.objects, replaced: [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.signaturePlace)
         await loadSelectedPageObjects()
         session.didChange()
     }
@@ -342,6 +361,53 @@ final class DocumentModel {
         session.didChange()
     }
 
+    /// Saves the native editor's exact source-space draft after a durable,
+    /// guarded mutation. Failed writes propagate so the draft stays editable.
+    @discardableResult
+    func saveInlineText(_ box: TextBox, replacing original: PageObject?, on page: Page,
+                        undoManager: UndoManager?) async throws -> PageObject {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        let result: (page: Page, object: PageObject)
+        if let original {
+            guard original.pageID == page.id, case .text = original.payload else {
+                throw StoreError.pageObjectsChanged
+            }
+            result = try await store.updateText(original, text: box.text, frame: box.frame,
+                fontSize: box.fontSize, color: box.color, alignment: box.alignment,
+                fontFamily: box.fontFamily, isBold: box.isBold, isItalic: box.isItalic,
+                preserveWhitespace: true)
+        } else {
+            result = try await store.placeText(box.text, on: page.id, frame: box.frame,
+                fontSize: box.fontSize, color: box.color, alignment: box.alignment,
+                fontFamily: box.fontFamily, isBold: box.isBold, isItalic: box.isItalic,
+                preserveWhitespace: true)
+        }
+        replace(result.page)
+        let change = InkChange(pageID: page.id, saved: [result.object],
+                               replaced: original.map { [$0] } ?? [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager,
+                        actionName: original == nil ? L10n.textBox : L10n.textBoxEdit)
+        await loadSelectedPageObjects()
+        session.didChange()
+        return result.object
+    }
+
+    /// Explicit deletion also guards the exact saved object, so clearing a
+    /// draft cannot remove text that another window has changed meanwhile.
+    func deleteInlineText(_ object: PageObject, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, case .text = object.payload,
+              let page = try await store.page(object.pageID), page.itemID == itemID else {
+            throw StoreError.pageNotFound
+        }
+        replace(try await store.applyInkChanges(on: object.pageID, saving: [], replacing: [], deleting: [object]))
+        let change = InkChange(pageID: object.pageID, saved: [], replaced: [], deleted: [object])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.textBoxEdit)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
     /// How tall a box has to be for type of this size, in source points.
     ///
     /// Three lines' worth, or a page-relative minimum, whichever is more.
@@ -361,6 +427,44 @@ final class DocumentModel {
         replace(try await store.applyInkChanges(on: page.id, saving: [], replacing: [],
                                                 deleting: objects))
         let change = InkChange(pageID: page.id, saved: [], replaced: [], deleted: objects)
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.inkEraser)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    /// One circular eraser gesture, guarded against concurrent edits and
+    /// recorded as one reversible change. Split pieces remain editable ink.
+    func eraseInk(_ objects: [PageObject], on page: Page, path: [CGPoint], diameter: Double,
+                  mode: InkEraserMode, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        let ordered = objects.sorted { $0.zKey < $1.zKey }
+        var saving: [PageObject] = [], replacing: [PageObject] = [], deleting: [PageObject] = []
+        for (index, object) in ordered.enumerated() {
+            guard case .ink(let ink) = object.payload else { continue }
+            let pieces = mode == .stroke
+                ? (InkEraser.hits(ink, path: path, radius: diameter / 2) ? [] : [ink])
+                : InkEraser.fragments(of: ink, path: path, diameter: diameter)
+            guard pieces != [ink] else { continue }
+            if pieces.isEmpty { deleting.append(object); continue }
+            replacing.append(object)
+            var previous = object.zKey
+            let next = index + 1 < ordered.count ? ordered[index + 1].zKey : nil
+            for (part, piece) in pieces.enumerated() {
+                var updated = object
+                if part > 0 {
+                    previous = try SortKey.between(previous, next)
+                    updated = PageObject(pageID: page.id, zKey: previous, payload: .ink(piece), modifiedAt: Date())
+                } else {
+                    updated.payload = .ink(piece); updated.modifiedAt = Date()
+                }
+                saving.append(updated)
+            }
+        }
+        guard !saving.isEmpty || !deleting.isEmpty else { return }
+        replace(try await store.applyInkChanges(on: page.id, saving: saving, replacing: replacing,
+                                                deleting: deleting, expectedPage: page))
+        let change = InkChange(pageID: page.id, saved: saving, replaced: replacing, deleted: deleting)
         registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.inkEraser)
         await loadSelectedPageObjects()
         session.didChange()
@@ -485,6 +589,61 @@ final class DocumentModel {
         return moved
     }
 
+    /// Moves the exact mixed selection captured when a gesture began.
+    /// `delta` is already clamped by the selection overlay in source space.
+    func moveSelection(_ expected: [PageObject], on page: Page, by delta: CGPoint,
+                       undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        guard delta.x.isFinite, delta.y.isFinite else { throw StoreError.invalidPlacement }
+        guard !expected.isEmpty, delta != .zero else { return }
+        let timestamp = Date()
+        let moved = try expected.map { object -> PageObject in
+            var result: PageObject
+            switch object.payload {
+            case .ink:
+                guard let translated = Self.translated(object, by: delta),
+                      case .ink(let stroke) = translated.payload,
+                      stroke.points.allSatisfy({ $0.x.isFinite && $0.y.isFinite }) else {
+                    throw StoreError.invalidPlacement
+                }
+                result = translated
+            case .text(let box):
+                guard let translated = Self.moved(object, to: box.frame.offsetBy(dx: delta.x, dy: delta.y)) else {
+                    throw StoreError.pageObjectsChanged
+                }
+                result = translated
+            case .image(let image):
+                guard let translated = Self.moved(object, to: image.frame.offsetBy(dx: delta.x, dy: delta.y)) else {
+                    throw StoreError.pageObjectsChanged
+                }
+                result = translated
+            case .comment:
+                throw StoreError.pageObjectsChanged
+            }
+            let frame: CGRect?
+            switch result.payload {
+            case .text(let box): frame = box.frame
+            case .image(let image): frame = image.frame
+            case .ink, .comment: frame = nil
+            }
+            if let frame {
+                guard frame.width > 0, frame.height > 0,
+                      [frame.minX, frame.minY, frame.maxX, frame.maxY, frame.width, frame.height].allSatisfy(\.isFinite) else {
+                    throw StoreError.invalidPlacement
+                }
+            }
+            result.modifiedAt = timestamp
+            return result
+        }
+        replace(try await store.applyInkChanges(on: page.id, saving: moved,
+                                               replacing: expected, deleting: [], expectedPage: page))
+        let change = InkChange(pageID: page.id, saved: moved, replaced: expected, deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.moveObject)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
     /// Moves handwriting, as one undoable step.
     ///
     /// Takes the objects' **ids** and reads their current state here rather
@@ -570,6 +729,7 @@ final class DocumentModel {
 
     func addTextMarkup(_ snapshot: PageRecognition, lineIndices: Set<Int>, style: TextMarkupStyle, color: RGBAColor? = nil,
                        undoManager: UndoManager?) async throws {
+        try SubscriptionStore.shared.requirePremiumOperation()
         await finishPendingHistory()
         guard let store else { throw StoreError.pageNotFound }
         let result = try await store.addTextMarkup(snapshot, lineIndices: lineIndices, style: style, color: color)
@@ -672,6 +832,54 @@ final class DocumentModel {
             presentedError = .saveFailed()
             return false
         }
+    }
+
+    /// Copies a complete editable page in one transaction and one history step.
+    func duplicateSelectedPage(undoManager: UndoManager?) async throws {
+        try SubscriptionStore.shared.requirePremiumOperation()
+        await finishPendingHistory()
+        guard let store, let selectedPageID else { throw StoreError.pageNotFound }
+        isChangingNotebookPage = true
+        defer { isChangingNotebookPage = pendingHistory > 0 }
+        let change = try await store.duplicatePages([selectedPageID], in: itemID, after: selectedPageID)
+        registerDuplicateUndo(DuplicateUndoStep(change), undoManager: undoManager)
+        self.selectedPageID = change.pages.first?.id
+        await load()
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    @MainActor private final class DuplicateUndoStep {
+        var change: LibraryStore.PageDuplicationChange?
+        init(_ change: LibraryStore.PageDuplicationChange? = nil) { self.change = change }
+    }
+
+    private func registerDuplicateUndo(_ step: DuplicateUndoStep, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                let inverse = DuplicateUndoStep()
+                model.registerDuplicateUndo(inverse, undoManager: undoManager)
+                model.enqueueHistory(undoManager: undoManager) {
+                    do {
+                        guard let store = model.store, let change = step.change else { throw StoreError.pageNotFound }
+                        let result = try await store.toggleDuplicatedPages(change)
+                        inverse.change = result
+                        if !result.isDeleted { model.selectedPageID = result.pages.first?.id }
+                        await model.load()
+                        await model.loadSelectedPageObjects()
+                        model.session.didChange()
+                        return true
+                    } catch {
+                        await model.load()
+                        await model.loadSelectedPageObjects()
+                        model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.notebookPageChanged)
+                        return false
+                    }
+                }
+            }
+        }
+        undoManager?.setActionName(L10n.duplicate)
+        historyDidChange()
     }
 
     // MARK: - Deletion
@@ -777,6 +985,20 @@ final class DocumentModel {
     }
 
     // MARK: - Notebook template pages
+
+    func appendNotebookPage(after expectedID: PageID, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard !isChangingNotebookPage, let store, item?.kind == .notebook,
+              selectedPageID == expectedID, let last = pages.last, last.id == expectedID else { return }
+        isChangingNotebookPage = true
+        defer { isChangingNotebookPage = pendingHistory > 0 }
+        let change = try await store.appendNotebookPage(matching: last)
+        registerNotebookPageUndo(NotebookUndoStep(change), undoManager: undoManager)
+        selectedPageID = change.page.id
+        await load()
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
 
     func addNotebookPage(_ template: PageTemplate, after anchor: PageID?, undoManager: UndoManager?) async throws {
         await finishPendingHistory()

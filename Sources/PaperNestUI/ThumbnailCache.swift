@@ -17,13 +17,15 @@ final class ThumbnailCache {
         let pixelSize: Int
         /// The ink editor shows the page without its ink.
         let includesInk: Bool
+        let excludedIDs: Set<PageObjectID>
 
-        init(_ page: Page, pixelSize: CGFloat, includesInk: Bool = true) {
+        init(_ page: Page, pixelSize: CGFloat, includesInk: Bool = true, excludingObjectIDs: Set<PageObjectID> = []) {
             self.page = page.id
             revision = page.revision
             transform = page.transform
             self.pixelSize = ThumbnailCache.bucket(pixelSize)
             self.includesInk = includesInk
+            excludedIDs = excludingObjectIDs
         }
     }
 
@@ -38,15 +40,15 @@ final class ThumbnailCache {
         return steps.first { CGFloat($0) >= pixels } ?? 4096
     }
 
-    func cached(_ page: Page, pixelSize: CGFloat, includesInk: Bool = true) -> CGImage? {
-        let key = Key(page, pixelSize: pixelSize, includesInk: includesInk)
+    func cached(_ page: Page, pixelSize: CGFloat, includesInk: Bool = true, excludingObjectIDs: Set<PageObjectID> = []) -> CGImage? {
+        let key = Key(page, pixelSize: pixelSize, includesInk: includesInk, excludingObjectIDs: excludingObjectIDs)
         guard let image = images[key] else { return nil }
         touch(key)
         return image
     }
 
-    func image(for page: Page, pixelSize: CGFloat, includesInk: Bool = true, renderer: PageRenderer) async throws -> CGImage {
-        let key = Key(page, pixelSize: pixelSize, includesInk: includesInk)
+    func image(for page: Page, pixelSize: CGFloat, includesInk: Bool = true, excludingObjectIDs: Set<PageObjectID> = [], renderer: PageRenderer) async throws -> CGImage {
+        let key = Key(page, pixelSize: pixelSize, includesInk: includesInk, excludingObjectIDs: excludingObjectIDs)
         if let hit = images[key] {
             touch(key)
             return hit
@@ -55,7 +57,7 @@ final class ThumbnailCache {
         let image: CGImage
         do {
             try Task.checkCancellation()
-            image = try await renderer.renderThumbnail(page, maxPixelSize: CGFloat(key.pixelSize), includingInk: includesInk)
+            image = try await renderer.renderThumbnail(page, maxPixelSize: CGFloat(key.pixelSize), includingInk: includesInk, excludingObjectIDs: excludingObjectIDs)
             await gate.leave()
         } catch {
             await gate.leave()

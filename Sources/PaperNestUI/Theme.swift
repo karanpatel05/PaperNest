@@ -7,17 +7,21 @@ import AppKit
 
 /// Reference palette with explicit dark counterparts; document paper stays white.
 enum Theme {
-    static let accent = adaptive(0x5264FF, 0xA5B0FF)
-    static let violet = adaptive(0x9667FF, 0xBF9CFF)
-    static let libraryBackground = adaptive(0xF8F9FF, 0x141623)
-    static let sidebar = adaptive(0xF0F2FF, 0x1B1E30)
-    static let canvas = adaptive(0xEDF0FA, 0x11131D)
+    static let accent = adaptive(0x7545F8, 0xC5AEFF)
+    static let violet = adaptive(0xB9A5FF, 0xB9A5FF)
+    static let libraryBackground = adaptive(0xFAF9FF, 0x171522)
+    static let sidebar = adaptive(0xF4EFFF, 0x211C30)
+    static let canvas = adaptive(0xFAF9FF, 0x11101A)
     static let surface = adaptive(0xFFFFFF, 0x25293C)
     static let preview = adaptive(0xEEF0FA, 0x1C2031)
     static let paperShadow = Color.black.opacity(0.12)
-    static let separator = adaptive(0xDDE1F3, 0x41465E)
+    static let separator = adaptive(0xEAE6F2, 0x494256)
+    static let selection = adaptive(0xE4DAFF, 0x443361)
+    static let primaryText = adaptive(0x17172B, 0xF6F2FF)
+    static let secondaryText = adaptive(0x77768C, 0xBAB6CB)
     static let radius: CGFloat = 18
-    static let gradient = LinearGradient(colors: [Color(red: 0.32, green: 0.39, blue: 1), Color(red: 0.59, green: 0.40, blue: 1)], startPoint: .leading, endPoint: .trailing)
+    // Filled actions retain contrast with their existing white labels in both appearances.
+    static let gradient = LinearGradient(colors: [adaptive(0x7545F8, 0x6839D8), adaptive(0x6737DA, 0x7545F8)], startPoint: .leading, endPoint: .trailing)
     static let headerGradient = LinearGradient(colors: [Color(red: 0.12, green: 0.21, blue: 0.38), Color(red: 0.39, green: 0.30, blue: 0.48)], startPoint: .topLeading, endPoint: .bottomTrailing)
 
     private static func adaptive(_ light: UInt32, _ dark: UInt32) -> Color {

@@ -6,6 +6,34 @@ import PaperNestExport
 @testable import PaperNestUI
 
 @MainActor @Suite(.serialized) struct NotebookPageWorkflowTests {
+    @Test func scrollingAppendSelectsMatchingBlankPageAndCanUndoRedo() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = LibrarySession(libraryURL: root)
+        await session.bootstrap()
+        let id = try await LibraryModel(session: session).createNotebook(named: "Scroll", template: .lined)
+        let model = DocumentModel(itemID: id, session: session)
+        await model.load()
+        let first = try #require(model.selectedPageID)
+        let undo = UndoManager()
+        try await model.appendNotebookPage(after: first, undoManager: undo)
+        let added = try #require(model.selectedPageID)
+        #expect(added != first)
+        #expect(model.pages.count == 2)
+        #expect(model.selectedPage?.content == .template(.lined))
+        try await model.appendNotebookPage(after: first, undoManager: undo)
+        #expect(model.pages.count == 2)
+        undo.undo()
+        try await settled(model)
+        #expect(model.pages.count == 1)
+        undo.redo()
+        try await settled(model)
+        #expect(model.pages.count == 2)
+        let reopened = DocumentModel(itemID: id, session: session)
+        await reopened.load()
+        #expect(reopened.pages == model.pages)
+    }
+
     @Test func insertionUndoRedoAndExportSurviveReopen() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

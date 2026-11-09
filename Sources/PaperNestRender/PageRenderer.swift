@@ -49,13 +49,15 @@ public struct PageRenderer: Sendable {
     /// Renders `page` with `pixelsPerPoint` resolution onto white.
     /// `includingInk: false` is for the ink editor, which draws the strokes
     /// it is editing over the page itself.
-    public func renderImage(_ page: Page, pixelsPerPoint: CGFloat, includingInk: Bool = true) async throws -> CGImage {
+    public func renderImage(_ page: Page, pixelsPerPoint: CGFloat, includingInk: Bool = true,
+                            excludingObjectIDs: Set<PageObjectID> = []) async throws -> CGImage {
         let size = page.geometry.pageSize
         let width = max(1, Int((size.width * pixelsPerPoint).rounded()))
         let height = max(1, Int((size.height * pixelsPerPoint).rounded()))
         guard width * height <= Self.maxPixelCount else { throw RenderError.outputTooLarge }
         let source = try await prepareSource(for: page, pixelsPerPoint: pixelsPerPoint)
-        let layers = try await layers(for: page, pixelsPerPoint: pixelsPerPoint, includingInk: includingInk)
+        let layers = try await layers(for: page, pixelsPerPoint: pixelsPerPoint, includingInk: includingInk,
+                                      excludingObjectIDs: excludingObjectIDs)
         return try Self.bitmap(width: width, height: height) { ctx in
             let pageToContext = CGAffineTransform(a: CGFloat(width) / size.width, b: 0, c: 0, d: -CGFloat(height) / size.height,
                                                   tx: 0, ty: CGFloat(height))
@@ -63,10 +65,42 @@ public struct PageRenderer: Sendable {
         }
     }
 
-    /// Renders with the longer page edge at `maxPixelSize` pixels.
-    public func renderThumbnail(_ page: Page, maxPixelSize: CGFloat, includingInk: Bool = true) async throws -> CGImage {
+    /// A transparent, page-sized preview of the selected editable objects.
+    /// Used only while moving a selection: no original page content is loaded
+    /// or painted, and no metadata or assets are changed.
+    public func renderSelection(_ page: Page, objectIDs: Set<PageObjectID>,
+                                pixelsPerPoint: CGFloat) async throws -> CGImage {
         let size = page.geometry.pageSize
-        return try await renderImage(page, pixelsPerPoint: maxPixelSize / max(size.width, size.height), includingInk: includingInk)
+        guard pixelsPerPoint.isFinite, pixelsPerPoint > 0,
+              size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else {
+            throw RenderError.outputTooLarge
+        }
+        let pixelWidth = max(1, (size.width * pixelsPerPoint).rounded())
+        let pixelHeight = max(1, (size.height * pixelsPerPoint).rounded())
+        // Check before conversion or integer multiplication, including values
+        // too large to represent as Int, so a bad scale cannot trap or allocate.
+        guard pixelWidth.isFinite, pixelHeight.isFinite,
+              pixelWidth <= CGFloat(Self.maxPixelCount), pixelHeight <= CGFloat(Self.maxPixelCount),
+              pixelWidth * pixelHeight <= CGFloat(Self.maxPixelCount) else { throw RenderError.outputTooLarge }
+        let width = Int(pixelWidth), height = Int(pixelHeight)
+        let selected = try await store.objects(on: page.id).filter { objectIDs.contains($0.id) }
+        let layers = try await preparedLayers(selected, pixelsPerPoint: pixelsPerPoint, includingInk: true)
+        return try Self.bitmap(width: width, height: height, transparent: true) { ctx in
+            let pageToContext = CGAffineTransform(a: CGFloat(width) / size.width, b: 0,
+                c: 0, d: -CGFloat(height) / size.height, tx: 0, ty: CGFloat(height))
+            ctx.concatenate(pageToContext)
+            ctx.clip(to: CGRect(origin: .zero, size: size))
+            ctx.concatenate(page.geometry.sourceToPage)
+            Self.drawLayers(layers, in: ctx)
+        }
+    }
+
+    /// Renders with the longer page edge at `maxPixelSize` pixels.
+    public func renderThumbnail(_ page: Page, maxPixelSize: CGFloat, includingInk: Bool = true,
+                            excludingObjectIDs: Set<PageObjectID> = []) async throws -> CGImage {
+        let size = page.geometry.pageSize
+        return try await renderImage(page, pixelsPerPoint: maxPixelSize / max(size.width, size.height), includingInk: includingInk,
+                                     excludingObjectIDs: excludingObjectIDs)
     }
 
     /// The page's recognized text, but only when it still describes the page:
@@ -119,9 +153,18 @@ public struct PageRenderer: Sendable {
     /// being skipped: a page quietly missing part of itself is worse than one
     /// that says it cannot be drawn.
     public func layers(for page: Page, pixelsPerPoint: CGFloat,
-                       includingInk: Bool = true) async throws -> [PageLayer] {
+                       includingInk: Bool = true, excludingObjectIDs: Set<PageObjectID> = []) async throws -> [PageLayer] {
+        let objects = try await store.objects(on: page.id).filter { !excludingObjectIDs.contains($0.id) }
+        return try await preparedLayers(objects, pixelsPerPoint: pixelsPerPoint, includingInk: includingInk)
+    }
+
+    /// Prepare just the requested objects, preserving their store paint order.
+    /// Filtering happens before asset decoding so unrelated unavailable images
+    /// cannot prevent a selection preview from rendering.
+    private func preparedLayers(_ objects: [PageObject], pixelsPerPoint: CGFloat,
+                                includingInk: Bool) async throws -> [PageLayer] {
         var layers: [PageLayer] = []
-        for object in try await store.objects(on: page.id) {
+        for object in objects {
             switch object.payload {
             case .ink(let stroke):
                 if includingInk { layers.append(.ink(stroke)) }
@@ -141,11 +184,13 @@ public struct PageRenderer: Sendable {
         return layers
     }
 
-    static func bitmap(width: Int, height: Int, draw: (CGContext) -> Void) throws -> CGImage {
+    static func bitmap(width: Int, height: Int, transparent: Bool = false,
+                       draw: (CGContext) -> Void) throws -> CGImage {
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+                                  bitmapInfo: (transparent ? CGImageAlphaInfo.premultipliedLast : .noneSkipLast).rawValue)
         else { throw RenderError.contextCreationFailed }
+        if transparent { ctx.clear(CGRect(x: 0, y: 0, width: width, height: height)) }
         ctx.interpolationQuality = .high
         draw(ctx)
         guard let image = ctx.makeImage() else { throw RenderError.contextCreationFailed }
@@ -302,6 +347,11 @@ public struct PageRenderer: Sendable {
         case .template(let template):
             drawTemplate(template, size: page.sourceSize, in: ctx)
         }
+        drawLayers(layers, in: ctx)
+    }
+
+    /// Both page export and transient previews paint the same source-space layers.
+    private static func drawLayers(_ layers: [PageLayer], in ctx: CGContext) {
         for layer in layers {
             switch layer {
             case .ink(let stroke): drawInk(stroke, in: ctx)
@@ -327,9 +377,45 @@ public struct PageRenderer: Sendable {
     /// Text longer than its box is **clipped** by the frame path, with nothing
     /// to say so.
     static func drawTextBox(_ textBox: TextBox, in ctx: CGContext) {
+        guard let frame = textFrame(textBox) else { return }
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
+        ctx.translateBy(x: textBox.frame.minX, y: textBox.frame.maxY)
+        ctx.scaleBy(x: 1, y: -1)
+        CTFrameDraw(frame, ctx)
+    }
+
+    /// Visible glyph bounds in the same upright source space as the text box.
+    /// Selection must not require enclosing its unused width/height. Shared
+    /// CoreText layout preserves wrapping, alignment, styles and font fallback.
+    public static func textSelectionRects(_ textBox: TextBox) -> [CGRect] {
+        guard textBox.color.alpha > 0, let frame = textFrame(textBox),
+              let context = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8,
+                                      bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return [] }
+        let lines = CTFrameGetLines(frame) as! [CTLine]
+        var origins = [CGPoint](repeating: .zero, count: lines.count)
+        CTFrameGetLineOrigins(frame, CFRange(location: 0, length: 0), &origins)
+        let mapping = PageGeometry.yUpToYDown(in: CGRect(origin: .zero, size: textBox.frame.size))
+            .concatenating(CGAffineTransform(translationX: textBox.frame.minX, y: textBox.frame.minY))
+        var result: [CGRect] = []
+        for (line, origin) in zip(lines, origins) {
+            for run in CTLineGetGlyphRuns(line) as! [CTRun] {
+                for index in 0..<CTRunGetGlyphCount(run) {
+                    let bounds = CTRunGetImageBounds(run, context, CFRange(location: index, length: 1))
+                    guard !bounds.isNull, !bounds.isEmpty else { continue }
+                    let rect = bounds.offsetBy(dx: origin.x, dy: origin.y).applying(mapping).intersection(textBox.frame)
+                    if !rect.isNull, !rect.isEmpty { result.append(rect) }
+                }
+            }
+        }
+        return result
+    }
+
+    private static func textFrame(_ textBox: TextBox) -> CTFrame? {
         guard !textBox.text.isEmpty, textBox.fontSize > 0,
-              textBox.frame.width > 0, textBox.frame.height > 0 else { return }
-        let font = CTFontCreateWithName("Helvetica" as CFString, CGFloat(textBox.fontSize), nil)
+              textBox.frame.width > 0, textBox.frame.height > 0 else { return nil }
+        let font = CTFontCreateWithName(textBox.postScriptFontName as CFString, CGFloat(textBox.fontSize), nil)
         var alignment: CTTextAlignment = switch textBox.alignment {
         case .leading: .left
         case .center: .center
@@ -348,14 +434,9 @@ public struct PageRenderer: Sendable {
                 CGColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: color.alpha),
             NSAttributedString.Key(kCTParagraphStyleAttributeName as String): style,
         ])
-        ctx.saveGState()
-        defer { ctx.restoreGState() }
-        ctx.translateBy(x: textBox.frame.minX, y: textBox.frame.maxY)
-        ctx.scaleBy(x: 1, y: -1)
         let path = CGPath(rect: CGRect(origin: .zero, size: textBox.frame.size), transform: nil)
-        let frame = CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(attributed),
-                                             CFRange(location: 0, length: 0), path, nil)
-        CTFrameDraw(frame, ctx)
+        return CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(attributed),
+                                        CFRange(location: 0, length: 0), path, nil)
     }
 
     /// Draws a placed image into its frame in source space.
