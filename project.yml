@@ -49,8 +49,13 @@ targets:
     platform: iOS
     sources:
       - path: Apps/iOS/UITests
+      - path: Tests/Support/SyntheticDocuments.swift
     dependencies:
       - target: PaperNest-iOS
+      - package: PaperNestKit
+        product: PaperNestStore
+      - package: PaperNestKit
+        product: PaperNestCore
     settings:
       base:
         PRODUCT_NAME: PaperNestUITests
@@ -58,6 +63,41 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: PaperNest-iOS
         TARGETED_DEVICE_FAMILY: "1,2"
+  PaperNest-SubscriptionTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Apps/iOS/SubscriptionTests
+      - path: Tests/Fixtures/PaperNest.storekit
+        buildPhase: resources
+    dependencies:
+      - target: PaperNest-iOS
+      - package: PaperNestKit
+        product: PaperNestUI
+    settings:
+      base:
+        PRODUCT_NAME: PaperNestSubscriptionTests
+        PRODUCT_BUNDLE_IDENTIFIER: $(PAPERNEST_BUNDLE_ID).subscriptiontests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/PaperNest.app/PaperNest
+        BUNDLE_LOADER: $(TEST_HOST)
+  PaperNest-CanvasTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/PaperNestUITests/InkCanvasCoordinatorTests.swift
+      - path: Tests/PaperNestUITests/ScannerPageTests.swift
+    dependencies:
+      - target: PaperNest-iOS
+      - package: PaperNestKit
+        product: PaperNestUI
+    settings:
+      base:
+        PRODUCT_NAME: PaperNestCanvasTests
+        PRODUCT_BUNDLE_IDENTIFIER: $(PAPERNEST_BUNDLE_ID).canvastests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/PaperNest.app/PaperNest
+        BUNDLE_LOADER: $(TEST_HOST)
   PaperNest-macOS:
     type: application
     platform: macOS
@@ -96,3 +136,31 @@ schemes:
       config: Debug
     archive:
       config: Release
+
+  PaperNest-Subscriptions:
+    build:
+      targets:
+        PaperNest-iOS: all
+    run:
+      config: Debug
+      storeKitConfiguration: Tests/Fixtures/PaperNest.storekit
+      commandLineArguments:
+        "-PaperNestLibraryPath /tmp/papernest-subscriptions-host": true
+        "-PaperNestDebugSkipWelcome YES": true
+    test:
+      config: Debug
+      debugEnabled: true
+      targets:
+        - PaperNest-SubscriptionTests
+
+  PaperNest-Canvas:
+    build:
+      targets:
+        PaperNest-iOS: all
+    test:
+      config: Debug
+      commandLineArguments:
+        "-PaperNestLibraryPath /tmp/papernest-canvas-host": true
+        "-PaperNestDebugSkipWelcome YES": true
+      targets:
+        - PaperNest-CanvasTests
