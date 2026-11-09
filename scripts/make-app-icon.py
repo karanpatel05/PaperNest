@@ -54,6 +54,16 @@ BRAND = (117, 69, 248)
 TOP = (135, 92, 250)
 BOTTOM = (104, 56, 232)
 
+# The dark appearance. Apple's guidance (HIG "App icons", Appearances) is to
+# use the light icon as the basis, pick complementary colours that reflect it,
+# avoid excessively bright images, and keep a *colour* background, which
+# "generally offer[s] the greatest contrast in dark icons" — so this is the
+# same hue carried down, not a transparent tile.
+TOP_DARK = (74, 42, 160)
+BOTTOM_DARK = (44, 22, 104)
+# Not pure white: at full brightness the mark glares against the darker field.
+MARK_DARK = (232, 226, 252)
+
 # Share of the canvas the mark covers. The source art floats in a lot of
 # white; an icon wants the mark to carry the tile.
 MARK_SCALE_IOS = 0.62
@@ -102,19 +112,21 @@ def mark_alpha(source: Image.Image) -> Image.Image:
     return alpha.crop(box)
 
 
-def gradient(size: int) -> Image.Image:
-    canvas = Image.new("RGB", (size, size), BRAND)
+def gradient(size: int, top: tuple[int, int, int] = TOP,
+             bottom: tuple[int, int, int] = BOTTOM) -> Image.Image:
+    canvas = Image.new("RGB", (size, size), top)
     draw = ImageDraw.Draw(canvas)
     for y in range(size):
         t = y / max(size - 1, 1)
         draw.line(
             [(0, y), (size, y)],
-            fill=tuple(round(TOP[i] + (BOTTOM[i] - TOP[i]) * t) for i in range(3)),
+            fill=tuple(round(top[i] + (bottom[i] - top[i]) * t) for i in range(3)),
         )
     return canvas
 
 
-def place_mark(canvas: Image.Image, mark: Image.Image, scale: float) -> None:
+def place_mark(canvas: Image.Image, mark: Image.Image, scale: float,
+               color: tuple[int, int, int] = (255, 255, 255)) -> None:
     size = canvas.size[0]
     target = round(size * scale)
     ratio = target / max(mark.size)
@@ -122,9 +134,9 @@ def place_mark(canvas: Image.Image, mark: Image.Image, scale: float) -> None:
         (max(1, round(mark.size[0] * ratio)), max(1, round(mark.size[1] * ratio))),
         Image.LANCZOS,
     )
-    white = Image.new("RGBA", resized.size, (255, 255, 255, 255))
+    ink = Image.new("RGBA", resized.size, (*color, 255))
     canvas.paste(
-        white,
+        ink,
         ((size - resized.size[0]) // 2, (size - resized.size[1]) // 2),
         resized,
     )
@@ -135,6 +147,27 @@ def ios_icon(mark: Image.Image, size: int = 1024) -> Image.Image:
     canvas = gradient(size).convert("RGBA")
     place_mark(canvas, mark, MARK_SCALE_IOS)
     return canvas.convert("RGB")
+
+
+def ios_dark_icon(mark: Image.Image, size: int = 1024) -> Image.Image:
+    """The dark appearance: same mark and framing, deeper field."""
+    canvas = gradient(size, TOP_DARK, BOTTOM_DARK).convert("RGBA")
+    place_mark(canvas, mark, MARK_SCALE_IOS, MARK_DARK)
+    return canvas.convert("RGB")
+
+
+def ios_tinted_icon(mark: Image.Image, size: int = 1024) -> Image.Image:
+    """The tinted appearance: greyscale, which the system maps to the tint.
+
+    Derived from the dark icon rather than drawn separately, so the mark sits
+    in the same place at the same size across all three — the HIG asks for
+    features to stay consistent between appearances.
+
+    Converted back to RGB on purpose. A single-channel greyscale PNG is a
+    different colour space from its light and dark siblings, and that
+    mismatch is a reported cause of the tinted variant rendering wrongly.
+    """
+    return ios_dark_icon(mark, size).convert("L").convert("RGB")
 
 
 def mac_icon(mark: Image.Image, size: int) -> Image.Image:
@@ -187,12 +220,22 @@ def main() -> int:
     mark = mark_alpha(Image.open(SOURCE))
     ICON_SET.mkdir(parents=True, exist_ok=True)
 
-    images: list[dict[str, str]] = []
+    images: list[dict[str, object]] = []
 
-    ios = ios_icon(mark)
-    ios.save(ICON_SET / "icon-ios-1024.png")
-    images.append({"filename": "icon-ios-1024.png", "idiom": "universal",
-                   "platform": "ios", "size": "1024x1024"})
+    # iOS carries three appearances. The system generates any it is not given,
+    # by segmenting the bitmap into foreground and background; supplying them
+    # is how the colours stay ours rather than inferred.
+    for name, image, appearance in (
+        ("icon-ios-1024.png", ios_icon(mark), None),
+        ("icon-ios-1024-dark.png", ios_dark_icon(mark), "dark"),
+        ("icon-ios-1024-tinted.png", ios_tinted_icon(mark), "tinted"),
+    ):
+        image.save(ICON_SET / name)
+        entry: dict[str, object] = {"filename": name, "idiom": "universal",
+                                    "platform": "ios", "size": "1024x1024"}
+        if appearance is not None:
+            entry["appearances"] = [{"appearance": "luminosity", "value": appearance}]
+        images.append(entry)
 
     # macOS wants every size drawn, not scaled by the system.
     tiles: dict[tuple[int, int], Image.Image] = {}

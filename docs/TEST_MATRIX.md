@@ -1,3 +1,32 @@
+## 2026-11-09 12:38 CST — iOS dark and tinted icon appearances (Claude)
+
+- Checked Apple's current HIG ("App icons", updated 2026-10-28) before designing, and it corrected two assumptions.
+  **Dark icons want a colour background, not transparency** — "Color backgrounds generally offer the greatest contrast
+  in dark icons", built from the light icon with complementary colours and "avoid excessively bright images". And the
+  appearance list is now **six** (default, dark, clear light, clear dark, tinted light, tinted dark), with the system
+  generating any variant not supplied by segmenting the bitmap into foreground and background.
+- Dark is the same mark and framing on a deeper field (`TOP_DARK (74,42,160)` → `BOTTOM_DARK (44,22,104)`), mark
+  softened to `(232,226,252)` rather than pure white. Tinted is derived from the dark icon's greyscale, so the mark
+  cannot drift between appearances, and is written back as **RGB, not single-channel grey** — a colour-space mismatch
+  between the three files is a reported cause of the tinted variant misrendering.
+- `actool` compiles **clean with no diagnostics on both iphoneos and macosx**. `assetutil` confirms all three
+  appearances reach the compiled catalogue: `(default)` 4 renditions, `UIAppearanceDark` 2, `ISAppearanceTintable` 2.
+- Verified on iPhone 17 Pro / iOS 27.1, all three appearances. **The appearance is a Home Screen setting
+  (Customize → Default/Dark/Clear/Tinted), not system dark mode** — switching the device to dark mode alone left the
+  tile pixel-identical at (133.3,89.7,249.2), which is the light asset. Under Customize → Dark the rendered tile
+  measured **(69.6,39.2,151.8) against the dark asset's (70,39,152)** at the same relative point, so iOS draws our
+  asset rather than a generated one.
+- **Tinted was proved by deliberate falsification, not by appearance.** A tinted variant looks plausible whether the
+  system uses our file or derives one, so the asset was temporarily inverted and reinstalled: the PaperNest tile
+  inverted to a light field with a dark mark while every other icon was unchanged. The diagnostic was then discarded
+  by regenerating from source, confirmed **byte-identical** to the pre-diagnostic file.
+- Full suite after the change: **750 tests across 5 targets, all passed** (225/175/139/158/53), exit0.
+- **Not done / not verified.** No `clear light` or `clear dark` variant — the catalogue's `luminosity` appearance has
+  no value for them, so those two are still system-generated; supplying them means moving to a layered Icon Composer
+  `.icon`, which Apple now prefers over bitmaps and which would also let us control which elements take Liquid Glass.
+  macOS appearance variants are untouched. Nothing checked on physical hardware or through App Store validation.
+- Simulator left as found: Home Screen appearance returned to Default and the device to light mode.
+
 ## 2026-11-09 11:36 CST — App icon: generator, catalogue, both build paths (Claude)
 
 - The project had **no icon catalogue at all** — a hard App Store blocker found during the 2026-11-08 deployability
