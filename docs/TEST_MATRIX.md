@@ -22,6 +22,11 @@
   SpringBoard's icon cache, not a build fault — the installed bundle's own `AppIcon60x60@2x.png` was already the right
   art, and the mark appeared after `launchctl stop com.apple.SpringBoard`. Five stale PaperNest installs from earlier
   sessions were removed first so the tile under test was unambiguous.
+- Checked for a third, unwired build path after a stale `com.example.papernest.dev` iOS install turned up on the
+  simulator. There is none: `scripts/build-ios-sim-app.sh` and `scripts/ui-test-ios.sh` both run `xcodegen` and
+  build the `PaperNest-iOS` scheme, so they inherit the catalogue. Confirmed by running the Simulator script and
+  finding `Assets.car`, `AppIcon60x60@2x.png` and `CFBundleIconName` in its output bundle. The `.dev` install is a
+  leftover from when that script hand-assembled its bundle, which its own header comment describes.
 - Full suite after the change: **750 tests across 5 targets, all passed** (225/175/139/158/53), exit0.
 - **Not done / not verified.** No dark-mode or tinted iOS variant, and no layered iOS 26+ `.icon` (Icon Composer)
   asset — iOS uses the single light tile for every appearance. Not checked on a physical device, not checked on iPad
