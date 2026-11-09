@@ -36,9 +36,12 @@ targets:
         buildPhase: resources
       - path: Apps/Shared/PrivacyInfo.xcprivacy
         buildPhase: resources
+      - path: Apps/Shared/Assets.xcassets
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: Apps/iOS/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
     dependencies:
@@ -107,9 +110,12 @@ targets:
         buildPhase: resources
       - path: Apps/Shared/PrivacyInfo.xcprivacy
         buildPhase: resources
+      - path: Apps/Shared/Assets.xcassets
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: Apps/Mac/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Apps/Mac/PaperNest.entitlements
         ENABLE_HARDENED_RUNTIME: YES
     dependencies:

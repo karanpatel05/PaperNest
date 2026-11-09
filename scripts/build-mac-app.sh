@@ -32,6 +32,10 @@ cp "$BIN_DIR/PaperNestMac" "$APP/Contents/MacOS/PaperNest"
 # which breaks code signing).
 cp -R "$BIN_DIR/PaperNest_PaperNestUI.bundle" "$APP/Contents/Resources/"
 cp -R Apps/Mac/Resources/*.lproj "$APP/Contents/Resources/"
+# The Xcode target gets its icon from Apps/Shared/Assets.xcassets, which
+# nothing compiles here; this bundle carries the .icns instead. Both come
+# out of scripts/make-app-icon.py, so they cannot drift.
+cp Apps/Mac/PaperNest.icns "$APP/Contents/Resources/"
 
 # Placeholder identifier: replace via Config/Base.xcconfig for real builds.
 cat > "$APP/Contents/Info.plist" <<'PLIST'
@@ -43,6 +47,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleName</key><string>PaperNest</string>
     <key>CFBundleDisplayName</key><string>PaperNest</string>
     <key>CFBundleExecutable</key><string>PaperNest</string>
+    <key>CFBundleIconFile</key><string>PaperNest</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>0.1.0</string>
     <key>CFBundleVersion</key><string>1</string>

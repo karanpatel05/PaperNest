@@ -1,3 +1,33 @@
+## 2026-11-09 11:36 CST — App icon: generator, catalogue, both build paths (Claude)
+
+- The project had **no icon catalogue at all** — a hard App Store blocker found during the 2026-11-08 deployability
+  analysis. Added `scripts/make-app-icon.py`, which derives everything from the approved mark
+  `docs/brand/papernest-instagram-profile.png` (1080x1080, leaf-in-a-ring `#7545F8` on `#FAF9FF`) and draws it white
+  on a brand-purple gradient, the way the approved redesign board draws it. Nothing is hand-edited; re-run the script
+  if the mark changes.
+- First run was **wrong and was caught by looking at the output**: keying on distance-from-purple against an arbitrary
+  divisor gave the near-white background alpha 80, so every tile carried a pale square behind the mark. The real
+  background-to-brand L1 distance is 320, sampled from the art (background exactly `(250,249,255)`, 1,055,286 px;
+  mark `(117,69,248)`, 107,115 px). Re-keyed against the sampled background; the square is gone.
+- **Two build paths, both wired.** `scripts/build-mac-app.sh` assembles its bundle by hand from SwiftPM and compiles no
+  asset catalogue, so a catalogue alone would have left the app that actually runs here iconless; it now carries
+  `Apps/Mac/PaperNest.icns` with `CFBundleIconFile`. The Xcode targets take `Apps/Shared/Assets.xcassets` with
+  `ASSETCATALOG_COMPILER_APPICON_NAME`. Both come out of the one generator, so they cannot drift.
+- Verified, not assumed: `actool` compiles clean for **iphoneos and macosx with no diagnostics**; dev Mac build exit0
+  with `codesign --verify --strict` still passing; Xcode `PaperNest-iOS` **BUILD SUCCEEDED** (`Assets.car` +
+  `CFBundleIconName` + `AppIcon60x60@2x.png` in the bundle, no icon/asset warnings); Xcode `PaperNest-macOS`
+  **BUILD SUCCEEDED** (`AppIcon.icns` + `Assets.car`). `NSWorkspace.icon(forFile:)` renders the real mark for both the
+  dev and Xcode Mac bundles, so macOS resolves it rather than falling back to the generic app icon.
+- iOS Home screen **confirmed on iPhone 17 Pro / iOS 27.1**. First screenshot showed a dark placeholder glyph; that was
+  SpringBoard's icon cache, not a build fault — the installed bundle's own `AppIcon60x60@2x.png` was already the right
+  art, and the mark appeared after `launchctl stop com.apple.SpringBoard`. Five stale PaperNest installs from earlier
+  sessions were removed first so the tile under test was unambiguous.
+- Full suite after the change: **750 tests across 5 targets, all passed** (225/175/139/158/53), exit0.
+- **Not done / not verified.** No dark-mode or tinted iOS variant, and no layered iOS 26+ `.icon` (Icon Composer)
+  asset — iOS uses the single light tile for every appearance. Not checked on a physical device, not checked on iPad
+  hardware, and not run through App Store validation. The mark itself is the existing brand art, not a new design;
+  "PaperNest" remains an uncleared placeholder name, so the icon inherits that risk.
+
 ## 2026-11-08 15:12 CST — iOS27 prefilled-name/no-keyboard comparison (Codex heartbeat)
 
 - Temporarily prefilled NotebookCreationSheet name and skipped name focus/typing in the existing Notes creation helper; kept accessibilityXXXL, Notes entry, toolbar Create and editor assertion. iPad6528AE8B/iOS27 **1 passed,33.726s,exit0**, `/private/tmp/papernest-ios27-no-keyboard.log`,240-second bound.
