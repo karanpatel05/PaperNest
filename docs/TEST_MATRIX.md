@@ -27,11 +27,19 @@
   `testFirstLaunchWelcomeAndRelaunchInAllLanguages` (which covers en/fr/es) and
   `testWelcomeLargestTextKeepsContinueReachable`, the accessibility-size case where the wide branch is deliberately
   off. Screenshots retained at `docs/screenshots/welcome-brandmark-en-{iphone,ipad}.png`.
-- **Not done / not verified.** **The Mac welcome screen was never seen.** The owner declined screen access for
-  PaperNest, so no Mac screenshot was taken and the Mac composition is unverified by eye; what *is* evidence is that
-  the asset test resolves the image through `Bundle.module` while running on macOS under `swift test`, so the macOS
-  resource path works. The iPad simulator's panel grant went unanswered, so iPad captures came from `xcrun simctl io`
-  instead. No new fr/es screenshots were taken this round. **A pre-existing problem was found and left alone:** in
+- **Mac now verified by eye — 2026-11-10 13:39 CST, after the owner granted screen access.** The native dev app was
+  launched against a throwaway library with a fresh `-PaperNestDebugWelcomeKey`. The lockup draws the leaf mark; the
+  Mac-specific copy is correct (*Import a document…* and *Import PDFs, images and other files* with an import glyph,
+  not the camera); the action renders inline under the copy as the tall-window branch intends. **The flow works, not
+  just the layout**: pressing Get started completed the welcome and the app proceeded to the library. Screenshot
+  `docs/screenshots/welcome-brandmark-en-mac.png`. This supersedes the earlier "never seen" caveat.
+- **Found while there, not fixed:** the dashboard header (`LibraryHome.swift:119`) and two places in
+  `SubscriptionViews.swift` draw the SF Symbol `leaf.circle` rather than the brand mark. It reads as a leaf, so the
+  mismatch is subtle, but it is Apple's generic glyph and not our artwork — a third brand representation beside the
+  icon and the welcome lockup. Out of scope for what the owner asked for here and untouched.
+- **Not done / not verified.** The iPad simulator's panel grant went unanswered, so iPad captures came from
+  `xcrun simctl io` instead. No new fr/es screenshots were taken this round, and no Mac window-resize check was run,
+  so the Mac compact branch below 760 points is covered only by the iPhone runs. **A pre-existing problem was found and left alone:** in
   iPhone landscape the safe-area insets drop the usable width to just under the 760-point threshold, so it uses the
   compact layout in a 402-point-tall window and the title sits below the fold behind the button. That predates this
   change and is not fixed here.
