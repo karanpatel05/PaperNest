@@ -1,16 +1,5 @@
 import SwiftUI
 
-/// Where the brand mark lives.
-///
-/// Named here rather than inline so a test can prove the asset is really in
-/// the built resource bundle. A missing image is a silent failure in SwiftUI:
-/// `Image(_:bundle:)` draws nothing, the lockup still lays out, and the only
-/// sign is a mark that is not there.
-enum BrandMark {
-    static let assetName = "BrandMark"
-    static var bundle: Bundle { .module }
-}
-
 /// A single introduction; permissions are requested only when a tool needs them.
 struct WelcomeView: View {
     let onContinue: () -> Void
@@ -128,12 +117,7 @@ struct WelcomeView: View {
     /// `Theme.accent` and follow light and dark mode.
     private var brandLockup: some View {
         HStack(spacing: 9) {
-            Image(BrandMark.assetName, bundle: BrandMark.bundle)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: markSize, height: markSize)
-                .accessibilityHidden(true)
+            BrandMark.image(size: markSize)
             Text(L10n.welcomeBrand)
         }
         .font(.title2.weight(.bold))

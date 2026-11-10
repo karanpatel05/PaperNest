@@ -162,7 +162,8 @@ struct ProfileView: View {
         let state = store.state
         let kind = state.displayKind(at: now)
         return VStack(alignment: .leading, spacing: 16) {
-            Label(L10n.proTitle, systemImage: "leaf.circle").font(.title2.bold()).foregroundStyle(Theme.accent)
+            Label { Text(L10n.proTitle) } icon: { BrandMark.image(size: 24) }
+                .font(.title2.bold()).foregroundStyle(Theme.accent)
             if !store.hasLoaded { ProgressView(L10n.proLoading) }
             else if !store.lastRefreshSucceeded && state.productID == nil {
                 Text(L10n.proLoadError)
@@ -221,7 +222,7 @@ private struct ProPaperIllustration: View {
         ZStack {
             RoundedRectangle(cornerRadius: 16).fill(Theme.selection).frame(width: 120, height: 145).rotationEffect(.degrees(-12)).offset(x: -22, y: 5)
             VStack(alignment: .leading, spacing: 13) {
-                Image(systemName: "leaf.circle").font(.title).foregroundStyle(Theme.accent)
+                BrandMark.image(size: 28).foregroundStyle(Theme.accent)
                 ForEach(0..<3) { index in Capsule().fill(Theme.separator).frame(width: index == 2 ? 46 : 80, height: 4) }
             }.padding(24).frame(width: 130, height: 150).background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
                 .rotationEffect(.degrees(5)).shadow(color: Theme.paperShadow, radius: 10, y: 6)

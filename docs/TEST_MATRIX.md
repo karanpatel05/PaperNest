@@ -1,3 +1,39 @@
+## 2026-11-10 13:55 CST — Brand mark everywhere, and My Space moved under Recent (Claude)
+
+Two owner requests: put the real brand mark in the places still using a lookalike symbol, and move My Space below
+Recent instead of beside it on iPad and Mac.
+
+- **The mark, in all three remaining places.** `LibraryHome.swift` (dashboard header), and two in
+  `SubscriptionViews.swift` (the Pro card title, and the page glyph inside `ProPaperIllustration`) drew the SF Symbol
+  `leaf.circle` — Apple's generic leaf, close enough to pass at a glance and not our artwork. All three now go through
+  a new shared `BrandMark.image(size:)` in `Sources/PaperNestUI/BrandMark.swift`, which the welcome screen also uses.
+  The illustration glyph was included deliberately rather than left as decoration, because that makes the rule a clean
+  invariant — no lookalike symbol anywhere in the module — which is something a test can actually hold.
+- **Guards widened and proved red.** `BrandMarkTests` now asserts the invariant over **every** `.swift` file in
+  `Sources/PaperNestUI` (with `BrandMark.swift` exempt, since it names the symbols in prose to say why they are
+  wrong), plus that the three lockup files call the shared builder, plus the existing bundle check. Proved by putting
+  `leaf.circle` back in the header: the invariant test and the builder test both failed while the bundle test still
+  passed; green again after restoring, with `git status` confirming nothing left behind. A first version of the
+  invariant test did not compile (`try` inside `&&`) and was fixed before it ever ran green.
+- **My Space.** It sat in a fixed 240-point column beside Recent at regular width — a narrow strip next to a very
+  wide list. The branch is gone; every size now stacks Recent then My Space, which is what the phone already did.
+- **A regression I caused and caught by looking.** Stacking made the cards *narrower*, not wider: the adaptive grid
+  kept its 95-point minimum, so across a full-width row it packed in more, smaller columns and "Documents" broke
+  across two lines as "Docu-ments". The minimum is now 150 at regular width (95 compact, 220 at accessibility sizes).
+  Confirmed fixed on the second iPad capture.
+- Verified: **757 unit tests across 5 targets pass** (232/175/139/158/53); iOS Simulator and Mac builds clean with no
+  warnings. `HomeToolsUITests` **all 5 pass on iPad Pro 13-inch/iOS 26.5**, including English, French and
+  Spanish-largest-text, and both brand-heading tests. Seen on all three platforms with a seeded throwaway library:
+  iPhone 17 Pro, iPad Pro 13-inch, and the native Mac app — and on Mac all three mark sites were opened and looked at,
+  including the paywall illustration behind Profile → Upgrade to Pro. Screenshots
+  `docs/screenshots/home-myspace-en-{ipad,mac}.png` and `docs/screenshots/pro-brandmark-en-mac.png`.
+- **Not done / not verified.** The Pro card and paywall were seen on **Mac only**; not on iOS, and not in French or
+  Spanish. No Mac window-resize check, so the Mac compact branch below 760 points is still covered only by the iPhone
+  runs. Subscriptions remain deliberately unconfigured, so the paywall shows its unavailable state — that is expected
+  and unrelated. The dashboard's own layout above Recent (search, capture actions, tools) was not touched.
+- Both files are in Codex's `PaperNestUI` area, edited at the owner's explicit request; Codex has no active claim on
+  either.
+
 ## 2026-11-10 13:20 CST — Welcome screen: brand mark, and the wide layout for iPad/Mac (Claude)
 
 - **The welcome screen already existed on all three platforms**, with a two-column layout above 760 points, Mac-specific

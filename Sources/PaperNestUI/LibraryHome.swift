@@ -10,6 +10,8 @@ struct DashboardView: View {
     var showLibrary: () -> Void
     var newFolder: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Matches the `.title` the name beside it is set in, and grows with it.
+    @ScaledMetric(relativeTo: .title) private var headerMarkSize: CGFloat = 29
     @State private var filter = DashboardFilter.recent
     @State private var showProfile = false
     @State private var selectedTool: ToolsSheet.Tool?
@@ -37,15 +39,15 @@ struct DashboardView: View {
                     } label: { Label(folder.name, systemImage: "folder") }
                 }
             }
-            if compact || dynamicTypeSize.isAccessibilitySize {
-                recentSection
-                space
-            } else {
-                HStack(alignment: .top, spacing: 20) {
-                    recentSection.frame(maxWidth: .infinity)
-                    space.frame(width: 240)
-                }
-            }
+            // My Space reads as the next thing down the page rather than a
+            // sidebar off to the right. It used to sit in a fixed 240-point
+            // column beside Recent on iPad and Mac, which squeezed its folder
+            // grid into one narrow strip while Recent had the rest of a very
+            // wide window. Stacked, the grid flows across the full width and
+            // both sections get the room they need. The phone already did
+            // this; now every size does.
+            recentSection
+            space
         }
         .foregroundStyle(Theme.primaryText)
         .sheet(item: $selectedTool) { ToolsSheet(model: model, initialTool: $0) }
@@ -116,7 +118,7 @@ struct DashboardView: View {
                 HStack(spacing: 20) { headerControls }
             } else {
                 HStack(spacing: 10) {
-                    Image(systemName: "leaf.circle").font(.title).foregroundStyle(Theme.accent).accessibilityHidden(true)
+                    BrandMark.image(size: headerMarkSize).foregroundStyle(Theme.accent)
                     Text(verbatim: Brand.displayName).font(.title2.bold())
                     Spacer(minLength: 8)
                     headerControls
@@ -262,6 +264,18 @@ struct DashboardView: View {
         }.font(.subheadline).frame(minHeight: 44).accessibilityIdentifier("home-see-all")
     }
 
+    /// How wide a My Space card is allowed to get.
+    ///
+    /// 95 points was sized for the narrow column this section used to sit in
+    /// on iPad and Mac. Stacked under Recent the row is several times wider,
+    /// and at the old minimum the grid answered by making the cards *smaller*
+    /// still — enough that "Documents" broke across two lines. A regular-width
+    /// window gets cards with room for their own labels.
+    private var spaceCardMinimum: CGFloat {
+        if dynamicTypeSize.isAccessibilitySize { return 220 }
+        return compact ? 95 : 150
+    }
+
     private var space: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -270,7 +284,7 @@ struct DashboardView: View {
                 Button(action: newFolder) { Image(systemName: "folder.badge.plus").frame(width: 44, height: 44) }
                     .accessibilityLabel(L10n.newFolder).accessibilityIdentifier("home-new-folder")
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 220 : 95))], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: spaceCardMinimum))], spacing: 12) {
                 collection(L10n.premiumNotes, count: model.dashboardItems.filter { $0.item.kind == .notebook }.count, color: Theme.accent) {
                     model.contentKind = .notes; showLibrary()
                 }
