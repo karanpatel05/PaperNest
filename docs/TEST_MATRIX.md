@@ -1,3 +1,44 @@
+## 2026-11-10 13:20 CST — Welcome screen: brand mark, and the wide layout for iPad/Mac (Claude)
+
+- **The welcome screen already existed on all three platforms**, with a two-column layout above 760 points, Mac-specific
+  copy and en/fr/es strings — Codex built it on 2026-10-27 and released the files. The work here is the owner's two
+  asks against that: make the lockup's mark the app icon's, and make the wide layout hold a large screen.
+- **The mark.** The lockup drew `square.stack.3d.up.fill`, so the first screen after launch showed a different logo
+  from the icon the user had just tapped. `scripts/make-app-icon.py` now also emits
+  `Sources/PaperNestUI/Resources/Brand.xcassets/BrandMark.imageset` from the same brand art — alpha-only white, with
+  `template-rendering-intent`, so SwiftUI tints it with `Theme.accent` and it follows light and dark mode. No colour
+  had to be chosen: `Theme.accent` light is already `0x7545F8`, the exact purple sampled from the icon artwork.
+- **The wide layout.** The illustration was pinned at 160 points, a stamp adrift on a 13-inch iPad, and the pinned
+  action sat about 380 points below the copy with nothing between. The illustration now scales with window height
+  (clamped 0.95–1.55), and above 900 points of height the action moves inline under the copy, forming one column:
+  brand, illustration, title, subtitle, Get started. Shorter windows keep it pinned, where it cannot scroll out of
+  reach — that branch is why a Mac window and iPhone landscape still behave as before.
+- **A regression I introduced and caught by looking.** Moving `safeAreaInset` inside the `GeometryReader` left
+  `minHeight` using the full height while the scroll viewport was shorter, which pushed the iPhone's third feature row
+  behind the button. Fixed with two readers: the outer one decides where the action goes, the inner one measures
+  *inside* the inset so content centres in the room actually left. Caught on a screenshot, not by a test.
+- **Two guards, each proved red on its own.** `BrandMarkTests` checks the asset is in the built resource bundle and
+  that the lockup draws it rather than a system symbol. Both failures are silent, so both were proved: reverting the
+  lockup to `square.stack.3d.up.fill` failed the source check **while the asset check still passed**; deleting
+  `Brand.xcassets` failed the asset check **while the source check still passed**. Each catches only its own fault.
+  Both green again after restoring, and `git status` confirmed nothing was left behind.
+- Verified: **756 unit tests across 5 targets pass** (231/175/139/158/53), iOS Simulator build clean with no warnings,
+  Mac app build clean. Existing welcome UI tests **pass on both iPhone 17 Pro/iOS 27.1 and iPad Pro 13-inch/iOS 26.5** —
+  `testFirstLaunchWelcomeAndRelaunchInAllLanguages` (which covers en/fr/es) and
+  `testWelcomeLargestTextKeepsContinueReachable`, the accessibility-size case where the wide branch is deliberately
+  off. Screenshots retained at `docs/screenshots/welcome-brandmark-en-{iphone,ipad}.png`.
+- **Not done / not verified.** **The Mac welcome screen was never seen.** The owner declined screen access for
+  PaperNest, so no Mac screenshot was taken and the Mac composition is unverified by eye; what *is* evidence is that
+  the asset test resolves the image through `Bundle.module` while running on macOS under `swift test`, so the macOS
+  resource path works. The iPad simulator's panel grant went unanswered, so iPad captures came from `xcrun simctl io`
+  instead. No new fr/es screenshots were taken this round. **A pre-existing problem was found and left alone:** in
+  iPhone landscape the safe-area insets drop the usable width to just under the 760-point threshold, so it uses the
+  compact layout in a 402-point-tall window and the title sits below the fold behind the button. That predates this
+  change and is not fixed here.
+- This lands in Codex's `PaperNestUI` area deliberately, at the owner's explicit request. Codex's welcome claim from
+  2026-10-27 is released, so nothing was held; `docs/screenshots/welcome-*.png` from that work were left untouched and
+  the new captures were added beside them under different names.
+
 ## 2026-11-10 — iPad: the first touch in a freshly opened document was being eaten (Claude)
 
 - Owner report: "also on ipad i an not abe to zoom in and out fingers." The report named pinch; pinch turned out to

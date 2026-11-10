@@ -46,6 +46,18 @@ ICNS = ROOT / "Apps" / "Mac" / "PaperNest.icns"
 # are built from these, at 1x and 2x, so the two can never drift apart.
 MAC_POINTS = (16, 32, 128, 256, 512)
 
+# The same mark again, this time for the app itself to draw in its UI — the
+# welcome screen's brand lockup. Emitted as a **template** image: white
+# pixels carrying only the mark's alpha, so SwiftUI tints it with
+# `Theme.accent` and it follows light and dark mode instead of being a fixed
+# purple. It comes out of this script rather than being drawn by hand so the
+# lockup and the Home-screen icon cannot drift apart.
+BRAND_CATALOGUE = ROOT / "Sources" / "PaperNestUI" / "Resources" / "Brand.xcassets"
+BRAND_MARK_SET = BRAND_CATALOGUE / "BrandMark.imageset"
+# Points at 1x. The lockup draws it near text size; this is generous enough
+# to stay crisp if a later design uses it larger.
+BRAND_MARK_POINTS = 48
+
 # Sampled from the brand mark rather than chosen: 107,115 of its pixels are
 # exactly this purple.
 BRAND = (117, 69, 248)
@@ -210,6 +222,37 @@ def write_icns(tiles: dict[tuple[int, int], Image.Image]) -> None:
         )
 
 
+def write_brand_mark(mark: Image.Image) -> None:
+    """Emit the mark on its own, as a tintable template image.
+
+    Carries alpha only — every opaque pixel is white — because a template
+    image's colour comes from the view that draws it. Giving it the brand
+    purple here instead would freeze it to the light appearance.
+    """
+    BRAND_MARK_SET.mkdir(parents=True, exist_ok=True)
+    images: list[dict[str, str]] = []
+    for factor in (1, 2, 3):
+        pixels = BRAND_MARK_POINTS * factor
+        ratio = pixels / max(mark.size)
+        alpha = mark.resize(
+            (max(1, round(mark.size[0] * ratio)), max(1, round(mark.size[1] * ratio))),
+            Image.LANCZOS,
+        )
+        tile = Image.new("RGBA", alpha.size, (255, 255, 255, 255))
+        tile.putalpha(alpha)
+        name = f"brand-mark{'' if factor == 1 else f'@{factor}x'}.png"
+        tile.save(BRAND_MARK_SET / name)
+        images.append({"filename": name, "idiom": "universal", "scale": f"{factor}x"})
+    (BRAND_MARK_SET / "Contents.json").write_text(
+        json.dumps({
+            "images": images,
+            "info": {"author": "xcode", "version": 1},
+            "properties": {"template-rendering-intent": "template"},
+        }, indent=2) + "\n")
+    (BRAND_CATALOGUE / "Contents.json").write_text(
+        json.dumps({"info": {"author": "xcode", "version": 1}}, indent=2) + "\n")
+
+
 def main() -> int:
     if not SOURCE.exists():
         print(f"brand mark missing: {SOURCE}", file=sys.stderr)
@@ -254,8 +297,10 @@ def main() -> int:
     (CATALOGUE / "Contents.json").write_text(
         json.dumps({"info": {"author": "xcode", "version": 1}}, indent=2) + "\n")
     write_icns(tiles)
+    write_brand_mark(mark)
     print(f"wrote {len(images)} images to {ICON_SET.relative_to(ROOT)}")
     print(f"wrote {ICNS.relative_to(ROOT)}")
+    print(f"wrote {BRAND_MARK_SET.relative_to(ROOT)}")
     return 0
 
 
