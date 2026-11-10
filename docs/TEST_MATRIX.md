@@ -1,3 +1,46 @@
+## 2026-11-10 — iPad: the first touch in a freshly opened document was being eaten (Claude)
+
+- Owner report: "also on ipad i an not abe to zoom in and out fingers." The report named pinch; pinch turned out to
+  be innocent. **What was broken is that the FIRST touch of any kind in a freshly opened document did nothing.**
+- **Root cause, confirmed by direct manipulation rather than inference.** The tools inspector was auto-presented on
+  iPad from the moment the editor appeared, whatever the window width. Where the window is too narrow for SwiftUI to
+  lay `.inspector` out as a column it presents as an **overlay**, and that overlay's tap-outside-to-dismiss
+  **swallows the first touch outside it**. Forcing `_isShowingPDFTools` to `false` made the first tap land
+  (`Not selected` → `Selected`); restoring it made the tap vanish again.
+- **Width, not orientation, is the switch** — measured, first tap on the pen after opening a notebook:
+  **834pt (11-inch portrait) eaten**; **1032pt (13-inch portrait), 1210pt (11-inch landscape) and 1376pt (13-inch
+  landscape) all landed.** So the overlay/column boundary sits between 834 and 1032, and the fix's 900pt constant is
+  inside that measured bracket rather than guessed.
+- **How the gesture layer was cleared of blame.** `testZoomButtonsWithLassoAndPen` failed on iPad with the *same*
+  numbers as the pinch test (417.5 → 417.5), so two unrelated input paths were failing identically. Then a probe
+  showed zoom tap 1 does nothing and tap 2 works (100% → 150% → 200% → 300% → 400%), and that the first tap on the
+  **pen** is lost too. A 3-second wait does not rescue it, so it is not a settling artifact.
+- **Pinch was never broken.** Traced through the existing `-PaperNestDebugZoomTrace` hook (its `print` does not reach
+  the logs, so it was temporarily switched to `NSLog` to capture, then reverted). Pinching the **page** works both
+  ways — 100% → 50% with a full healthy trace, `state=2` repeatedly then `state=3`. Pinching the **scroll view
+  element** produces no recognizer callbacks at all, because XCUITest starts those two touches near the viewport
+  edges, outside the page. That is a test-geometry artifact.
+- **Fix, `DocumentView.swift` only:** auto-present the inspector only when the active window is at least
+  `inspectorColumnMinimumWidth` (900pt), decided in `init` from `activeWindowWidth()`. **Deciding up front matters
+  and was measured:** an intermediate version that presented from a later layout pass cost a 13-inch iPad in
+  landscape its first tap anyway (reproduced twice, ~150s each), because presenting an inspector *after* the editor
+  is on screen costs a touch of its own. The shipping fix keeps the original presentation path and changes only
+  whether it is taken. macOS untouched.
+- **The owner's "tools visible by default" still holds wherever it fits as a column** — including 13-inch portrait
+  at 1032pt. Below 900pt it is one deliberate tap away on the toolbar instead of silently eating the first one.
+  `EditorFirstTouchUITests` asserts both halves, keyed off the measured window width rather than orientation.
+- **Results.** New `EditorFirstTouchUITests` (3 tests) was **red first**: portrait tool tap and portrait zoom tap
+  failed, landscape passed — the landscape control proving the test was not simply broken. After the fix:
+  **iPad 11-inch 3/3 pass, iPad 13-inch 3/3 pass, iPhone 3/3 pass**, and Codex's
+  **`EditorWorkspaceUITests/testZoomButtonsWithLassoAndPen` now passes on iPad**, having failed before.
+  Full unit suite **754 tests, 0 failures, 0 warnings**, exit 0. iOS Simulator build clean.
+- **Still red, and deliberately not touched: `EditorWorkspaceUITests/testPinchZoomWithLassoAndPen`.** It pinches
+  `document-page-scroll`, whose touch start points fall outside the page, so it fails and then crashes the runner.
+  That is Codex's test and the one-line change (aim it at `document-page-image`) is theirs to make.
+- **Not done.** No physical iPad. No fr/es pass. No VoiceOver or Dynamic Type. Split-view and Stage Manager widths
+  were not exercised, only full-screen portrait and landscape on two iPad sizes. The 900pt constant is bracketed by
+  measurement at 834 and 1032, not read from a documented Apple threshold.
+
 ## 2026-11-09 19:25 CST — Mac: the editor's bottom scrollbar removed, the right one kept (Claude)
 
 - Owner asked, in session: "on mac remove scrollbar at bottom only keep it in right."

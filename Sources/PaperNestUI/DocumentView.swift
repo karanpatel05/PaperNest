@@ -89,7 +89,11 @@ struct DocumentView: View {
         _zoom = State(initialValue: retainedState?.zoom ?? 1)
         _model = State(initialValue: document)
         #if os(iOS)
-        _isShowingPDFTools = State(initialValue: UIDevice.current.userInterfaceIdiom == .pad)
+        // Only where it will lay out as a column. An inspector that has to
+        // overlay swallows the reader's first touch; see
+        // `inspectorColumnMinimumWidth`.
+        _isShowingPDFTools = State(initialValue: UIDevice.current.userInterfaceIdiom == .pad
+                                   && Self.activeWindowWidth() >= Self.inspectorColumnMinimumWidth)
         #else
         _isShowingPDFTools = State(initialValue: true)
         #endif
@@ -104,6 +108,41 @@ struct DocumentView: View {
         false
         #endif
     }
+
+    /// Below this width SwiftUI stops laying `.inspector` out as a column and
+    /// presents it as an **overlay**, and that overlay's tap-outside-to-dismiss
+    /// swallows the first touch outside it — so opening a document with the
+    /// tools panel already up cost the user their first tap or first pinch.
+    ///
+    /// Measured, first tap on a tool after opening a notebook: 834pt (11-inch
+    /// iPad portrait) **eaten**; 1032pt (13-inch portrait), 1210pt and 1376pt
+    /// (landscape) all landed. The switch therefore sits between 834 and 1032,
+    /// and 900 is inside that bracket rather than guessed. Auto-presenting is
+    /// skipped below it; the toolbar button still opens the panel by hand,
+    /// which costs a deliberate tap instead of a surprising one.
+    static let inspectorColumnMinimumWidth: CGFloat = 900
+
+    #if os(iOS)
+    /// The active window's width, read before the editor is ever on screen.
+    ///
+    /// The decision has to happen here rather than from a later layout pass:
+    /// presenting the inspector *after* the editor has appeared costs a touch
+    /// of its own even at widths where it lays out as a column — measured, a
+    /// 13-inch iPad in landscape lost its first tap that way. Deciding up
+    /// front keeps the original, working presentation path and changes only
+    /// whether it is taken.
+    static func activeWindowWidth() -> CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }?
+            .bounds.width
+            ?? UIApplication.shared.connectedScenes
+                .compactMap { ($0 as? UIWindowScene)?.screen.bounds.width }
+                .first
+            ?? 0
+    }
+    #endif
 
     var body: some View {
         Group {
