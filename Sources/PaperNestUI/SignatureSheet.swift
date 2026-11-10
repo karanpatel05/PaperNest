@@ -145,6 +145,20 @@ struct SignatureSheet: View {
         _draft = State(initialValue: retainedDraft ?? SignatureDraft(model: model, page: page))
     }
 
+    /// What the empty name field says for itself.
+    ///
+    /// macOS renders a grouped `Form` TextField's title as an *external leading
+    /// label* rather than as an in-field placeholder the way iOS does, so
+    /// without a prompt the field is a borderless strip with nothing drawn in
+    /// it, and clicking the one visible word — the "Name" label — focuses
+    /// nothing. `canSave` requires a name, so a field nobody can find leaves
+    /// Save Signature greyed out for good and the feature unreachable.
+    ///
+    /// It reuses `signature.name` on purpose: iOS already shows that very
+    /// string as the placeholder, so iOS keeps rendering exactly what it
+    /// rendered before and no new key enters the shared string tables.
+    static var namePrompt: String { L10n.signatureName }
+
     var body: some View {
         EditorToolNavigation(isEmbedded: isEmbedded, title: L10n.signatureTitle) {
             Form {
@@ -286,7 +300,7 @@ struct SignatureSheet: View {
     private var captureSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 6) {
-                TextField(L10n.signatureName, text: $draft.name)
+                TextField(L10n.signatureName, text: $draft.name, prompt: Text(Self.namePrompt))
                     .focused($nameFocused)
                     .onSubmit { nameFocused = false }
                     .accessibilityIdentifier("signature-name")

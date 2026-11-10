@@ -1,3 +1,57 @@
+## 2026-11-09 18:50 CST — Mac signature save: the Name field nobody could see (Claude)
+
+- **Owner report: "save signature feature is not working on mac."** The symptom, confirmed by the owner when asked
+  rather than guessed, is **"unable to enter name"**.
+- **Reproduced before anything was changed, and the first four attempts all PASSED** — which is the useful part of
+  the record, because it is what ruled the other candidates out. Against throwaway libraries only, never a real one:
+  (1) dev SwiftPM app, PDF document, typed name then drew then Save → saved, row `Everyday|633` in `signatures`;
+  (2) lined notebook with two pen strokes and a **lasso selection active** ("2 selected"), matching the state in the
+  owner's own window → saved, `Notebook Sig|779`; (3) quit, relaunch, reopen → **both signatures load**, `user_version`
+  9; (4) Xcode `PaperNest-macOS` build (what the owner actually runs), **drew first then named** → saved,
+  `Xcode Build Sig|983`. So the store, the premium gate, the `beforeAction` guard and persistence were all fine.
+- **Root cause, measured not inferred.** Every pass above reached the Name field by accessibility `element_index` —
+  something no person can do. Driving it the way a person does: the Name row renders the label **"Name"** and the hint
+  **"Enter a name to save your signature."** and **nothing else** — no box, no border, no placeholder. The editable
+  field is an **invisible 180×13 strip on the right** (`AXTextField [1344,402 180×13]`). A raw click on the one visible
+  word lands on `AXStaticText 'Name'` and **focuses nothing**; the keystrokes went to the AXWindow and the field stayed
+  empty. `canSave` requires a non-empty name, so Save Signature stays greyed out for good.
+  Mechanism: `TextField(title, text:)` in a macOS `.formStyle(.grouped)` Form renders its title as an **external
+  leading label**, not as the in-field placeholder iOS draws. Mac-only by construction.
+- **Fix: one argument.** `prompt: Text(Self.namePrompt)` on that TextField, where `namePrompt` reuses the existing
+  `signature.name` string — so **no new key enters the shared `Localizable.strings`** and iOS keeps rendering the same
+  string it already rendered. No layout, spacing, colour or structural change: the owner asked in session that the
+  signature section's design and template not be changed, and approved a prompt only.
+- **The test was written first and proved able to fail.** `Tests/PaperNestUITests/SignatureNameFieldTests.swift`,
+  4 tests. Red first (`type 'SignatureSheet' has no member 'namePrompt'`), green after.
+  **Then the fix was deliberately reverted to check the test has teeth:** with only
+  `, prompt: Text(Self.namePrompt)` removed, `theNameTextFieldStillHandsThatPromptToSwiftUI` **FAILED**
+  (`Expectation failed: field.contains("prompt:")`, exit 1) **and the other three still passed** — recorded because it
+  shows the three behavioural tests alone would not have guarded this fix at all. The guard reads the one line of
+  `SignatureSheet.swift` through `#filePath`, the way `LocalizationTests` already reads source. Fix restored.
+- **Full suite after the change: 753 tests across 5 targets, all passed** (228/175/139/158/53), exit 0, **0 warnings**.
+  (An earlier run of the same suite was piped through `tail`, so its exit code was `tail`'s; it was re-run with the
+  whole log captured before any of this was claimed.)
+- **Native Mac verification of the fix**, dev app rebuilt, throwaway library `/tmp/pn-sigfix`, dark appearance: the
+  Name row now draws a grey **"Name"** inside the field; **a raw click on that prompt text** (by coordinate, not by
+  element) reports "caret placed"; name entered, stroke drawn, Save Signature enabled and pressed; row `Karan|270`
+  present in `signatures`; app quit and relaunched, document and panel reopened, **the signature is listed with its
+  preview and placement preview**. That is the full lifecycle end to end.
+- **iOS, behaviourally: `PaperNest-iOS` builds clean for the iOS Simulator, exit 0, 0 warnings**, and the existing
+  iOS signature lifecycle UI test **`AppUITests/testSavedSignaturePlacesAndSurvivesReopen` PASSED** — 1 test,
+  0 failures, 110.007s, `** TEST SUCCEEDED **` (`scratchpad/ios-ui-sig.log`). That covers draw → name → save →
+  place → reopen on iPhone, so the added argument broke nothing on iOS.
+- **iOS, visually: NOT VERIFIED, and this is the one real gap.** The owner's constraint is about design, so the
+  honest check would be a screenshot of the iOS Name row counting how many times "Name" is visible. It was attempted
+  and could not be run here: the simulator panel reported access not granted for iPhone 17, and `Simulator.app`
+  could not be located under this machine's Xcode, so no iOS screenshot was taken. What bounds the risk is that the
+  prompt is **the same string as the title** (`signature.name`), so the worst possible iOS change is the word "Name"
+  appearing where that word already appears — no new or different text can be introduced on iOS by this change.
+  A `#if os(macOS)` fork around the prompt would remove even that, at the cost of a platform fork; not done.
+- **Not done / not verified.** Real hardware keystrokes were never delivered — the background automation writes text
+  through accessibility, so "typing on a physical keyboard reaches the focused field" is reasoned, not measured.
+  No fr/es Mac pass. No physical hardware. VoiceOver and Dynamic Type untouched. The owner's own running Xcode
+  instance (pid 27784) is a **pre-fix** build and will keep showing the old behaviour until they rebuild.
+
 ## 2026-11-09 12:38 CST — iOS dark and tinted icon appearances (Claude)
 
 - Checked Apple's current HIG ("App icons", updated 2026-10-28) before designing, and it corrected two assumptions.
