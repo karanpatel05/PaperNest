@@ -40,17 +40,16 @@
   iOS signature lifecycle UI test **`AppUITests/testSavedSignaturePlacesAndSurvivesReopen` PASSED** — 1 test,
   0 failures, 110.007s, `** TEST SUCCEEDED **` (`scratchpad/ios-ui-sig.log`). That covers draw → name → save →
   place → reopen on iPhone, so the added argument broke nothing on iOS.
-- **iOS, visually: NOT VERIFIED, and this is the one real gap.** The owner's constraint is about design, so the
-  honest check would be a screenshot of the iOS Name row counting how many times "Name" is visible. It was attempted
-  and could not be run here: the simulator panel reported access not granted for iPhone 17, and `Simulator.app`
-  could not be located under this machine's Xcode, so no iOS screenshot was taken.
-  **State the risk accurately rather than minimising it.** The prompt is the same string as the title
-  (`signature.name`), so no *new wording* can appear on iOS — but that is not the same as "no layout change".
-  **If iOS hides a TextField's title once a prompt is supplied, iOS is unchanged. If it does not, the row gains a
-  visible "Name" label beside a "Name" placeholder** — an extra element that shifts the field and could truncate
-  fr/es at the XXXL sizes Codex verified, which is precisely the kind of change the owner ruled out. Which of the
-  two it is was **not measured**. A `#if os(macOS)` fork around the prompt removes the risk entirely at the cost of
-  a platform fork, and is the one-line alternative if Codex or the owner prefers it.
+- **iOS, visually: MEASURED, and iOS is unchanged.** The open question was whether iOS, given a `prompt:`, would
+  *also* draw the TextField's title as a visible label — an extra element that would shift the field and could
+  truncate fr/es at the XXXL sizes Codex verified. The simulator panel would not grant device access and
+  `Simulator.app` is not present under this Xcode, so this was settled instead with a **throwaway XCUITest probe**
+  that navigated to the signature sheet and inspected the row directly (file added, run, then **deleted** — it is
+  not in the tree or in any commit). Result, on "PaperNest iPhone Duo", `** TEST SUCCEEDED **`, 48.226s:
+  **`placeholderValue = "Name"`** and **`visibleNameStaticTexts = 0`** — iOS draws the prompt as the placeholder,
+  exactly where the title's placeholder already was, and renders **no separate "Name" label**. Field frame
+  `(44.0, 349.33, 318.0, 22.0)`, one element, no added row content. So the iOS design is untouched and the
+  `#if os(macOS)` fork is unnecessary.
 - Test simulator used: **"PaperNest iPhone Duo" (F5269418)**, the project's own device, returned to Shutdown. The
   owner's iPhone 17 Pro Max (414752ED) was **not** booted, installed to, or touched, and neither was their running
   Mac Xcode instance (pid 27784).
