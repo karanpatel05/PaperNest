@@ -1803,6 +1803,15 @@ private struct PageViewer: View {
                     #endif
                 }
                 .accessibilityIdentifier("document-page-scroll")
+                #if os(macOS)
+                // The owner asked for the bar along the bottom gone and the
+                // one down the right kept. Hiding the indicator for one axis
+                // is presentation only: the page still pans horizontally by
+                // trackpad, scroll wheel and drag, and the vertical indicator
+                // keeps its normal behaviour. iOS already shows these only
+                // while scrolling, so it is left alone.
+                .scrollIndicators(.hidden, axes: .horizontal)
+                #endif
                 .onPreferenceChange(NotebookPageFrames.self) { frames in
                     selectVisiblePage(frames, viewport: proxy.frame(in: .global))
                 }

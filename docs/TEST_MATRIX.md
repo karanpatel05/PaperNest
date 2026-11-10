@@ -1,3 +1,28 @@
+## 2026-11-09 19:25 CST — Mac: the editor's bottom scrollbar removed, the right one kept (Claude)
+
+- Owner asked, in session: "on mac remove scrollbar at bottom only keep it in right."
+- **Identified by measurement, not by eye.** macOS overlay scrollbars fade and do not survive a screenshot, so the
+  editor's scrollbars were enumerated through the accessibility tree instead, with a notebook zoomed in far enough
+  to overflow both axes. **Before — three:** `AXScrollBar [277,700 1004×14]` (horizontal, along the bottom of the
+  page area — the one the owner means), `AXScrollBar [1267,148 14×565]` (vertical, down the right of the page area
+  — the one to keep), `AXScrollBar [1535,81 14×703]` (the PDF Tools sidebar's own).
+- **Change: one modifier**, `.scrollIndicators(.hidden, axes: .horizontal)`, on the `PageViewer` scroll view
+  (`document-page-scroll`, the `ScrollView([.horizontal, .vertical])` in `DocumentView.swift`), behind
+  `#if os(macOS)`. iOS already shows these only while scrolling and is deliberately left alone.
+- **After — two:** `AXScrollBar [1267,148 14×565]` and `AXScrollBar [1535,81 14×703]`. The horizontal bar is gone;
+  the right-hand one and the sidebar's own are untouched, at identical frames. Dev app rebuilt, exit 0, 0 warnings,
+  checked against a seeded throwaway library.
+- **Panning was not separately exercised.** `scrollIndicators` is documented as presentation-only, and the page
+  still overflows the viewport identically at the same zoom in the after-shot, which is what it would not do had
+  the axis been disabled and the content re-laid-out to fit. But no horizontal pan gesture was performed, so
+  "you can still pan sideways, you just cannot see the bar" is reasoned from those two facts, not measured.
+- **Full suite: 754 tests across 5 targets, all passed** (229/175/139/158/53), exit 0, **0 warnings**.
+- `DocumentView.swift` is under Codex's still-active "cross-platform editor zoom" claim. It was entered at the
+  owner's direct instruction, after `ls -lT` showed it untouched since 2026-11-08 15:15 with a clean tree; only the
+  indicator modifier was added, and no zoom logic, gesture routing, `PageZoom.swift` or `PageSelectionOverlay.swift`
+  was touched. The handoff says the same.
+- **Not done:** no fr/es pass, no iPad or iPhone check (the change is macOS-only by construction), no VoiceOver.
+
 ## 2026-11-09 18:50 CST — Mac signature save: the Name field nobody could see (Claude)
 
 - **Owner report: "save signature feature is not working on mac."** The symptom, confirmed by the owner when asked
@@ -31,6 +56,13 @@
 - **Full suite after the change: 753 tests across 5 targets, all passed** (228/175/139/158/53), exit 0, **0 warnings**.
   (An earlier run of the same suite was piped through `tail`, so its exit code was `tail`'s; it was re-run with the
   whole log captured before any of this was claimed.)
+  **Correction, 19:25 CST — that 753 understated the tree it was committed with.** The run happened while
+  `SignatureNameFieldTests` still had **three** tests; the fourth, the source-reading guard, was added afterwards
+  during the revert check and the full suite was *not* re-run before `a2f84c6` was committed. So the guard test
+  itself had only ever been exercised through `--filter`, and "753" named a tree one test smaller than the one that
+  landed. The suite has since been run against the committed state: **754 tests** (229/175/139/158/53), 0 failures,
+  0 warnings, exit 0. Nothing was failing at any point, but the count in that commit message describes the run, not
+  the commit.
 - **Native Mac verification of the fix**, dev app rebuilt, throwaway library `/tmp/pn-sigfix`, dark appearance: the
   Name row now draws a grey **"Name"** inside the field; **a raw click on that prompt text** (by coordinate, not by
   element) reports "caret placed"; name entered, stroke drawn, Save Signature enabled and pressed; row `Karan|270`
