@@ -1,3 +1,30 @@
+## 2026-11-11 — The pinch zoom test was aimed at the wrong element (Claude)
+
+- `EditorWorkspaceUITests/testPinchZoomWithLassoAndPen` had been failing on iPad and crashing the runner on iPhone.
+  It is a **test** defect, not a product one, and this is the change the 2026-11-10 entry said belonged to Codex.
+- **The variable is the element, isolated by a four-cell probe rather than guessed** — same closing gesture, same
+  scale, only the target and the zoom state varying:
+
+  | | pinch the scroll view | pinch the paper |
+  |---|---|---|
+  | page fits (100%) | 100% -> 100%, **no change** | 100% -> **50%** |
+  | page overflows (150%) | 150% -> 150%, **no change** | 150% -> **75%** |
+
+  So overflow state is irrelevant and the scroll view is simply the wrong target. The scroll view is the whole
+  viewport (481x1210 on an 11-inch iPad); a **closing** pinch starts its two touches near opposite edges of whatever
+  element it is given, which on the scroll view puts them above and below the paper, so the recognizer never sees
+  two touches on it. An **opening** pinch starts centred, which is why only the shrink half ever failed.
+- Fix: pinch `document-page-image` instead of `document-page-scroll`, and give the closing pinch a negative
+  velocity (UIKit reads the sign as direction; it had `velocity: 1` with `scale: 0.7`).
+- **Results: `testPinchZoomWithLassoAndPen` passes on iPad (37.9s) and on iPhone (27.4s)**, where it previously
+  failed and crashed respectively; `testZoomButtonsWithLassoAndPen` still passes on iPad (27.5s).
+- **This corrects a claim in the 2026-11-10 entry.** That entry said pinch works "in both directions", citing a
+  100% -> 50% shrink. That shrink started from a page that *fits*; the case a reader actually hits is shrinking one
+  that overflows, and it had not been tested. It was tested now and does work — the conclusion held, but it had
+  been resting on a narrower measurement than the wording implied.
+- **Not done.** No physical iPad. No fr/es. The probe ran on an 11-inch iPad only, so the edge-touch geometry is
+  measured at one viewport size.
+
 ## 2026-11-10 13:55 CST — Brand mark everywhere, and My Space moved under Recent (Claude)
 
 Two owner requests: put the real brand mark in the places still using a lookalike symbol, and move My Space below

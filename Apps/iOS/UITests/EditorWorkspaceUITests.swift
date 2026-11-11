@@ -19,15 +19,23 @@ import PaperNestStore
         app.launch(); defer { app.terminate() }
         XCTAssertTrue(app.buttons["studio-tool-lasso"].waitForExistence(timeout: 20))
         let page = app.images["document-page-image"]
-        let viewport = app.scrollViews["document-page-scroll"]
+        // Pinch the paper, not the scroll view. The scroll view is the whole
+        // viewport — on an 11-inch iPad 481x1210 — and a *closing* pinch starts
+        // its two touches near opposite edges of whatever it is given, so on
+        // the scroll view they begin above and below the paper and the
+        // recognizer never sees two touches on it. Measured: pinching the
+        // scroll view closed never changes the zoom, whether the page fits
+        // (100% -> 100%) or overflows (150% -> 150%), while pinching the paper
+        // shrinks it in both states (100% -> 50%, 150% -> 75%). An opening
+        // pinch starts centred, which is why only the shrink half ever failed.
         for tool in ["studio-tool-lasso", "studio-tool-pen"] {
             if app.buttons[tool].value as? String != "Selected" { app.buttons[tool].tap() }
             let before = page.frame.width
-            if pinch { viewport.pinch(withScale: 1.5, velocity: 1) }
+            if pinch { page.pinch(withScale: 1.5, velocity: 1) }
             else { app.buttons["editor-zoom-in"].tap() }
             XCTAssertGreaterThan(page.frame.width, before * 1.1, "Pinch must enlarge paper with \(tool)")
             let enlarged = page.frame.width
-            if pinch { viewport.pinch(withScale: 0.7, velocity: 1) }
+            if pinch { page.pinch(withScale: 0.7, velocity: -1) }
             else { app.buttons["editor-zoom-out"].tap() }
             for _ in 0..<30 where page.frame.width >= enlarged * 0.95 { try await Task.sleep(for: .milliseconds(100)) }
             XCTAssertLessThan(page.frame.width, enlarged * 0.95, "Pinch must shrink paper with \(tool)")
