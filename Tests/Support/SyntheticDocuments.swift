@@ -374,6 +374,54 @@ extension SyntheticDocuments {
 }
 
 extension SyntheticDocuments {
+    /// A three-page PDF **written out by hand**, whose first page carries a
+    /// link to its third page and a link to the web.
+    ///
+    /// By hand rather than through PDFKit, because a link test has to be a
+    /// test of *reading*: on iOS 27.1 a destination set with PDFKit and
+    /// written with `dataRepresentation()` came back with no page at all, so
+    /// a fixture made that way failed before PaperNest had read a byte. These
+    /// are the same bytes on every platform, with nothing opaque in them.
+    ///
+    /// Page 1 says "One", and so on, in 18-point Helvetica at (72, 652). The
+    /// internal link is at x 72…232, y 500…530 and the web link at y 400…430,
+    /// both measured from the bottom-left of a 612 × 792 page, as PDF does.
+    public static func handBuiltLinkedPDF(linkURL: String = "https://example.com/invoice") -> Data {
+        let page = "/Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 9 0 R >> >>"
+        func content(_ word: String) -> String {
+            let stream = "BT /F1 18 Tf 72 652 Td (\(word)) Tj ET"
+            return "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"
+        }
+        let objects = [
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >>",
+            "<< \(page) /Contents 6 0 R /Annots [10 0 R 11 0 R] >>",
+            "<< \(page) /Contents 7 0 R >>",
+            "<< \(page) /Contents 8 0 R >>",
+            content("One"), content("Two"), content("Three"),
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+            "<< /Type /Annot /Subtype /Link /Rect [72 500 232 530] /Border [0 0 0] /Dest [5 0 R /XYZ 0 792 null] >>",
+            "<< /Type /Annot /Subtype /Link /Rect [72 400 232 430] /Border [0 0 0] "
+                + "/A << /S /URI /URI (\(linkURL)) >> >>",
+        ]
+        var file = "%PDF-1.4\n"
+        var offsets: [Int] = []
+        for (index, body) in objects.enumerated() {
+            offsets.append(file.utf8.count)
+            file += "\(index + 1) 0 obj\n\(body)\nendobj\n"
+        }
+        let table = file.utf8.count
+        file += "xref\n0 \(objects.count + 1)\n0000000000 65535 f \n"
+        for offset in offsets {
+            let digits = String(offset)
+            file += String(repeating: "0", count: 10 - digits.count) + digits + " 00000 n \n"
+        }
+        file += "trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(table)\n%%EOF\n"
+        return Data(file.utf8)
+    }
+}
+
+extension SyntheticDocuments {
     /// A PDF carrying the things a redraw silently loses: a link and a text
     /// form field. Used to check that an unedited page is copied rather than
     /// reproduced as marks on a blank page.
