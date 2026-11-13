@@ -119,8 +119,14 @@ verified alone on a clean checkout of `0edf804` (809 tests). The screens, the UI
 they sit on top of this afternoon's uncommitted editor work. See Current claims in SESSION_HANDOFF.
 **Update, 2026-11-13:** the owner said "commit it right now", and the screens, the UI tests and this entry went
 in with the rest of the working tree — the toolbar, Document Utilities and iCloud sync screens included. Checked
-on that tree first: 934 unit tests, 0 failures, 0 warnings; Mac and iOS Simulator builds clean. **No UI suite was
-re-run on top of the sync screens**, so the device results in this entry describe the tree as it was the night before.
+on that tree first: 934 unit tests, 0 failures, 0 warnings; Mac and iOS Simulator builds clean.
+**Re-run on the commit itself (`9fb1098`), on top of the sync screens:** the three reader suites, 7 tests. iPad Pro
+13-inch/iOS 26.5: **7/7**, `/tmp/papernest-reader-ipad-postcommit.log`. PaperNest iPhone Duo/iOS 27.1: **6/7, then
+7/7** — `testGoToPageTakesANumberFromTheTitleMenu` failed its first run *at launch*: the editor had not appeared
+after 30 seconds, so nothing about Go to Page was reached (`/tmp/papernest-reader-iphone-postcommit.log`). Run
+alone straight afterwards it passed (`/tmp/papernest-gotopage-iphone-rerun.log`). The Mac's load average was
+between 89 and 145 at the time, with other builds running. That is a reason to believe it was the machine, not
+proof: one pass after one failure. No other UI suite was re-run on the commit.
 
 **Four defects of mine found by these runs and fixed.**
 
