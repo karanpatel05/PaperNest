@@ -1,5 +1,7 @@
 import XCTest
 
+/// Home after the owner's redesign of 2026-11-13: one row of quick actions,
+/// recent documents, and the Tools hub behind a button in the header.
 @MainActor final class HomeToolsUITests: XCTestCase {
     func testHomeHasOneBrandAndProfileRemainsReachable() {
         let app = XCUIApplication()
@@ -11,9 +13,11 @@ import XCTest
         let brand = app.staticTexts.matching(NSPredicate(format: "label == %@", "PaperNest"))
         XCTAssertEqual(brand.allElementsBoundByIndex.filter(\.isHittable).count, 1,
                        "Home should show the brand once across the sidebar and dashboard")
+        // The phone names Home in its bottom bar only. The wide layouts name
+        // it in the sidebar and again as the screen's own title.
         let home = app.staticTexts.matching(NSPredicate(format: "label == %@", "Home"))
-        XCTAssertEqual(home.allElementsBoundByIndex.filter(\.isHittable).count, 1,
-                       "Keep the Home tab/sidebar entry without a second dashboard heading")
+        XCTAssertEqual(home.allElementsBoundByIndex.filter(\.isHittable).count,
+                       UIDevice.current.userInterfaceIdiom == .phone ? 1 : 2)
         app.buttons["home-profile"].tap()
         XCTAssertTrue(app.buttons["profile-done"].waitForExistence(timeout: 5))
         app.buttons["profile-done"].tap()
@@ -29,75 +33,64 @@ import XCTest
     private func checkLanguages(_ languages: [String]) {
         continueAfterFailure = false
         for language in languages {
+            let largestText = language == "es"
             let app = XCUIApplication()
             app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-home-tools-\(UUID().uuidString)",
                 "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(\(language))", "-AppleLocale", "\(language)_US",
-                "-UIPreferredContentSizeCategoryName", language == "es" ? "UICTContentSizeCategoryAccessibilityXXXL" : "UICTContentSizeCategoryL"]
+                "-UIPreferredContentSizeCategoryName", largestText ? "UICTContentSizeCategoryAccessibilityXXXL" : "UICTContentSizeCategoryL"]
             app.launch()
-            XCTAssertTrue(app.buttons["home-import"].waitForExistence(timeout: 20))
+            let newNote = app.buttons["home-new-note"]
+            let importFile = app.buttons["home-import"]
+            let newFolder = app.buttons["home-new-folder"]
+            XCTAssertTrue(importFile.waitForExistence(timeout: 20))
             XCTAssertFalse(app.buttons["library-tools"].exists)
-            let merge = app.buttons["home-tool-merge"]
-            let extract = app.buttons["home-tool-extract"]
-            reveal(merge, in: app)
-            XCTAssertLessThan(app.buttons["home-import"].frame.minY, merge.frame.minY)
-            if UIDevice.current.userInterfaceIdiom == .phone {
-                XCTAssertEqual(merge.frame.minY, extract.frame.minY, accuracy: 2)
-                XCTAssertLessThan(merge.frame.maxX, extract.frame.maxX)
+            XCTAssertFalse(app.buttons["home-tool-merge"].exists, "Tools are behind the header button, not a second grid on Home")
+            for action in [newNote, importFile, newFolder] {
+                XCTAssertTrue(action.exists)
+                XCTAssertFalse(action.label.isEmpty)
+            }
+            if largestText {
+                // At the largest text the actions stack so each keeps its whole name.
+                XCTAssertLessThanOrEqual(newNote.frame.maxY, importFile.frame.minY + 1)
+                XCTAssertLessThanOrEqual(importFile.frame.maxY, newFolder.frame.minY + 1)
+            } else {
+                // One row, in order, inside the screen, in every language.
+                XCTAssertEqual(newNote.frame.minY, importFile.frame.minY, accuracy: 2)
+                XCTAssertEqual(importFile.frame.minY, newFolder.frame.minY, accuracy: 2)
+                XCTAssertLessThanOrEqual(newNote.frame.maxX, importFile.frame.minX + 1)
+                XCTAssertLessThanOrEqual(importFile.frame.maxX, newFolder.frame.minX + 1)
+                XCTAssertGreaterThanOrEqual(newNote.frame.minX, app.frame.minX)
+                XCTAssertLessThanOrEqual(newFolder.frame.maxX, app.frame.maxX)
+                for action in [newNote, importFile, newFolder] {
+                    XCTAssertTrue(action.isHittable)
+                    XCTAssertGreaterThanOrEqual(action.frame.height, 44)
+                }
             }
             let shot = XCTAttachment(screenshot: app.screenshot())
             shot.name = "home-tools-\(language)"; shot.lifetime = .keepAlways; add(shot)
-            for tool in ["merge", "extract", "split", "archive"] {
-                let card = app.buttons["home-tool-\(tool)"]
-                reveal(card, in: app)
-                let title = card.label
-                XCTAssertFalse(title.isEmpty)
-                XCTAssertFalse((card.value as? String ?? "").isEmpty)
-                card.tap()
-                let next = app.buttons["pick-continue"]
-                XCTAssertTrue(next.waitForExistence(timeout: 8), "\(tool) did not open its picker")
-                XCTAssertFalse(next.isEnabled, "Empty library cannot start an operation")
-                XCTAssertTrue(app.navigationBars[title].exists)
-                if app.buttons["tools-done"].isHittable { app.buttons["tools-done"].tap() }
-                else {
-                    app.navigationBars.buttons.firstMatch.tap()
-                    app.buttons["tools-done"].tap()
-                }
-                XCTAssertTrue(app.buttons["home-tools-all"].waitForExistence(timeout: 5))
-            }
-            reveal(app.buttons["home-tools-all"], in: app)
-            app.buttons["home-tools-all"].tap()
-            XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 5))
+
+            let tools = app.buttons["home-tools-all"]
+            XCTAssertTrue(tools.waitForExistence(timeout: 5))
+            XCTAssertTrue(tools.isHittable)
+            XCTAssertFalse(tools.label.isEmpty)
+            tools.tap()
+            XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 15))
             XCTAssertTrue(app.buttons["tool-import"].exists)
             XCTAssertTrue(app.descendants(matching: .any)["tool-photos"].firstMatch.exists)
             app.buttons["tools-done"].tap()
+            XCTAssertTrue(tools.waitForExistence(timeout: 5))
             app.terminate()
         }
-    }
-
-    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        XCTAssertTrue(element.waitForExistence(timeout: 10))
-        let top = app.frame.minY + 160
-        let bottom = app.frame.maxY - (UIDevice.current.userInterfaceIdiom == .phone ? 140 : 40)
-        // isHittable can be true for a thin exposed strip of a large card.
-        // Keep its entire touch target clear of navigation before tapping.
-        for _ in 0..<20 {
-            let frame = element.frame
-            if element.isHittable && frame.minY >= top && frame.maxY <= bottom { break }
-            let direction = frame.minY < top ? 1.0 : -1.0
-            let origin = app.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.55))
-            let destination = origin.withOffset(CGVector(dx: 0, dy: direction * 110))
-            origin.press(forDuration: 0.01, thenDragTo: destination)
-        }
-        XCTAssertGreaterThanOrEqual(element.frame.minY, top)
-        XCTAssertLessThanOrEqual(element.frame.maxY, bottom)
-        XCTAssertTrue(element.isHittable)
     }
 }
 
 
 extension HomeToolsUITests {
-    func testIPadSidebarNeverAddsBrandHeadingWhenChangingDestinations() throws {
+    /// The wide sidebar carries the brand, once, wherever the detail goes, and
+    /// Folders is one row that leads to every folder.
+    func testIPadSidebarKeepsTheBrandAndFoldersIsOneDestination() throws {
         guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad sidebar") }
+        continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-sidebar-brand-\(UUID().uuidString)",
                                "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)"]
@@ -110,22 +103,40 @@ extension HomeToolsUITests {
             let row = app.cells.containing(.staticText, identifier: title).firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
-            XCTAssertEqual(brand.allElementsBoundByIndex.filter(\.isHittable).count, 0,
-                           "Sidebar brand heading must stay hidden in \(title)")
+            XCTAssertEqual(brand.allElementsBoundByIndex.filter(\.isHittable).count, 1,
+                           "The brand must show once, in the sidebar, in \(title)")
         }
-        app.buttons["sidebar-new-folder"].tap()
+        let folders = app.cells.containing(.any, identifier: "sidebar-folders").firstMatch
+        XCTAssertTrue(folders.waitForExistence(timeout: 5))
+        folders.tap()
+        XCTAssertTrue(app.staticTexts["folders-title"].waitForExistence(timeout: 5))
+        XCTAssertTrue(folders.isSelected)
+        app.buttons["folders-new"].tap()
         let name = app.alerts.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 5))
         name.typeText("Study UI")
         app.alerts.buttons["OK"].tap()
         XCTAssertTrue(app.navigationBars["Study UI"].waitForExistence(timeout: 5))
-        XCTAssertEqual(brand.allElementsBoundByIndex.filter(\.isHittable).count, 0,
-                       "Sidebar brand heading must stay hidden in a folder")
+        XCTAssertTrue(folders.isSelected, "Folders stays lit while one of its folders is showing")
+        XCTAssertEqual(brand.allElementsBoundByIndex.filter(\.isHittable).count, 1)
+
+        // Back to the Folders screen: the new folder is a card with its real count.
+        folders.tap()
+        let card = app.buttons.matching(identifier: "folder-card").matching(NSPredicate(format: "label == %@", "Study UI")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        XCTAssertEqual(card.value as? String, "0 items")
         let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "ipad-folder-no-sidebar-brand"; shot.lifetime = .keepAlways; add(shot)
+        shot.name = "ipad-folders-screen"; shot.lifetime = .keepAlways; add(shot)
+        card.tap()
+        XCTAssertTrue(app.navigationBars["Study UI"].waitForExistence(timeout: 5))
+
+        // Home shows the same folder under its Folders heading.
         app.cells.containing(.any, identifier: "sidebar-home").firstMatch.tap()
         XCTAssertTrue(app.buttons["home-profile"].waitForExistence(timeout: 5))
-        XCTAssertEqual(brand.allElementsBoundByIndex.filter(\.isHittable).count, 1,
-                       "Returning Home must retain the dashboard logo/name")
+        XCTAssertTrue(app.buttons.matching(identifier: "folder-card").firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["home-folders-all"].exists)
+        XCTAssertEqual(brand.allElementsBoundByIndex.filter(\.isHittable).count, 1)
+        let home = XCTAttachment(screenshot: app.screenshot())
+        home.name = "ipad-home-with-folder"; home.lifetime = .keepAlways; add(home)
     }
 }

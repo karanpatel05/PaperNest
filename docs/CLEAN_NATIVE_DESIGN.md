@@ -1,3 +1,35 @@
+## Home and scanner redesign — owner brief, 2026-11-13
+
+The owner gave a written brief and two reference boards in session ("Paper NEST — Home screen & scanner complete UI redesign"). It supersedes the Home and Scan lines of the 2026-11-07 entry below, the 2026-11-05 rule that the wide sidebar carries no brand, and the 2026-11-04 "content-first Home without quick cards". Built by Claude on the owner's direct instruction. What was run is in TEST_MATRIX.
+
+**Home, every platform.** A greeting chosen from the local hour (no name: there is no account to take one from), one row of quick actions, then Recent Documents from the store. Nothing on Home appears twice.
+
+- **iPhone:** brand and mark in the header; New Note, Import File, New Folder on lavender cards; five recent documents as rows with a ⋯ menu; See All. Bottom bar: **Home, Notes, Scan, Files**. Files is the same root column showing All Documents, Favorites, Recently Deleted and the folders with New Folder.
+- **iPad:** sidebar with the brand, then Home, Notes, All Documents, Folders, Favorites, Recently Deleted, and the iCloud card at the foot. Detail: "Home", a lavender banner, **Scan**, New Note, Import File, New Folder, recent documents as a strip of thumbnail cards, then folder cards with real counts and See All.
+- **Mac:** the same sidebar and banner; New Note, Import File, New Folder only; recent documents in a table (Name, Modified, Size) that sorts, selects, opens on double-click and has the usual context menu. **No Scan anywhere on Mac Home.**
+- **Folders** is one sidebar row leading to a Folders screen of cards (open, rename, delete, New Folder). The row stays selected while one of its folders is showing.
+
+**Where the brief and its pictures disagree, the written brief wins.** The pictures show Documents in the phone's bar and three actions on iPad; the brief's text and acceptance criteria say Scan in the bar and a Scan action on iPad.
+
+**Calls made here, not by the owner — change them if they are wrong.**
+
+- **Tools and Profile sit where the pictures draw a bell.** There are no notifications to show. The Tools hub was reachable only from Home's old tool grid, so it became a header button (`home-tools-all`) instead of vanishing.
+- **Home has no search field.** The pictures have none; search stays in Notes, All Documents and every folder.
+- **The product is still "PaperNest".** The pictures letter it "Paper NEST". `Brand.displayName` and the real `BrandMark` are unchanged; renaming the product is not a layout decision.
+- **The sidebar row says "All Documents"**, not "Documents", because that is the title of the screen it opens.
+- **The selected sidebar row is the system's.** The pictures fill it purple; a custom row background makes iPadOS draw a second focus halo (see 2026-11-05), so selection is tinted, not repainted.
+- **The iCloud card always shows.** It reads the sync controller. In a build made without an iCloud container it says "Not set up in this build" rather than nothing, as the brief asks. The phone keeps the small status icon in its header, which still draws nothing in such a build.
+- **Size is the store's, not a guess.** A file shows its own bytes; a document shows the originals its live pages are made of (`LibraryStore.originalByteCount`, each original counted once). A notebook of drawn pages has nothing stored, so the Mac table shows "—" and the phone and iPad rows show its page count instead. Sizes are read only for the eight documents Home can list.
+- **Vault never existed in this app.** Nothing was removed; the UI test that asserts its absence stays.
+- **Colours.** New tokens `navy`, `lavender`, `homeBackground`, `border`, `deepAccent` in `Theme`, light values from the brief, dark values chosen here. `Theme.accent` (#7545F8) is one step from the brief's #7438F5 and was left alone so the editor does not shift.
+
+**Scanner, iPhone and iPad.** Dark in both appearances (`ScannerChrome`). Capture: Cancel and title, flash, a ⋯ menu (Import Photos, System scanner), a mode picker, the kept pages as a thumbnail with a count, the shutter, Auto/Manual. Review: stacked on a phone; on iPad the pages down the left, the page in the middle, the tools down the right and Save at the bottom.
+
+- **Modes: Document and Photo only.** Document finds, outlines and crops to the page's edges. Photo keeps the whole frame and turns Auto off. **ID Card and Book are not shown**: neither exists, and the brief says to show only modes that do something.
+- **Tools: Enhance, Crop, Rotate, Filter, Move earlier, Move later, Duplicate, Reset, Delete.** **Clean, OCR and Merge Pages are not in the scanner**: there is no clean-up filter, and recognition and merging happen on the saved document, where they already are. No button was added for something that does nothing.
+- Save still goes through the import-location sheet and the durable import; the scanner never reports a page saved before it is.
+- **A saved scan does not open in the editor; its export screen opens by itself** (owner, in session, after seeing the first build: "it should not open in notes section instead give option to export if user does not want to export bring back to home screen", then "export screen should automatically pops up when doc is saved"). Once the store has the document the ordinary export sheet is presented for it, with nothing in between. Closing the sheet, having exported or not, ends on Home with nothing pushed over it, and the scan is the newest row in Recent Documents. Importing a file and creating a note still open what they made.
+
 ## Sidebar toggle placement — owner approval, 2026-11-08
 
 Mac and iPad keep editor panel controls in the native navigation header: page thumbnails beside Back/title on the leading side, PDF tools beside Export on the trailing side. Both remain available when their panels are hidden. The centered writing row contains Pen, Eraser, Highlighter, Lasso, Image and Text only. Preserve the panel defaults, accessibility labels/IDs and existing actions. iPhone retains its current writing-row page toggle and More menu. Approved preview: `docs/design/mockups/sidebar-header-mac-approved-2026-11-08.png`.

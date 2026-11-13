@@ -814,6 +814,8 @@ struct CaptureActions: View {
 struct LibraryPresentations: ViewModifier {
     @State private var scannerName: String?
     @Bindable var model: LibraryModel
+    /// Where the app goes once a saved scan's export screen is closed.
+    var showHome: () -> Void = {}
 
     func body(content: Content) -> some View {
         content
@@ -848,13 +850,18 @@ struct LibraryPresentations: ViewModifier {
                     case .scanned(let images):
                         let name = scannerName ?? L10n.scanName(Date().formatted(date: .abbreviated, time: .shortened))
                         scannerName = nil
-                        Task { await model.importImages(images, name: name, openAfterSaving: true, chooseLocation: true) }
+                        Task { await model.importScan(images, name: name) }
                     case .cancelled:
                         break
                     case .failed:
                         model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.scanFailed)
                     }
                 }
+            }
+            // A saved scan stays closed. Export opens for it by itself, and
+            // closing Export, having exported or not, goes back to Home.
+            .sheet(item: $model.savedScan, onDismiss: showHome) { scan in
+                ExportLoader(itemID: scan.id, currentPageID: nil)
             }
             #endif
     }

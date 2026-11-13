@@ -7,7 +7,10 @@ import PaperNestStore
 /// which seeds the library at `libraryPath` with a page named "Crop target".
 @MainActor
 final class AppUITests: XCTestCase {
-    static let libraryPath = "/tmp/papernest-uitest-library"
+    /// `TEST_RUNNER_PAPERNEST_UITEST_LIBRARY=<dir> xcodebuild test …` points a run
+    /// at its own seeded copy, so two sessions testing at once do not wipe
+    /// each other's library. Without it, the one `scripts/ui-test-ios.sh` seeds.
+    static let libraryPath = ProcessInfo.processInfo.environment["PAPERNEST_UITEST_LIBRARY"] ?? "/tmp/papernest-uitest-library"
 
     private func launch(_ extra: [String], libraryPath: String = AppUITests.libraryPath, language: String = "en", skipWelcome: Bool = true) -> XCUIApplication {
         let app = XCUIApplication()
@@ -46,9 +49,13 @@ final class AppUITests: XCTestCase {
             app.staticTexts["Favorites"].firstMatch.tap()
             XCTAssertTrue(app.navigationBars["Favorites"].waitForExistence(timeout: 5))
             app.descendants(matching: .any)["sidebar-home"].firstMatch.tap()
-            XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 5))
         }
+        // Home has no search field of its own; the library's is one row away.
+        app.staticTexts["All Documents"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["All Documents"].waitForExistence(timeout: 5))
         let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
         search.typeText("Crop")
         XCTAssertEqual(search.value as? String, "Crop")
@@ -75,7 +82,7 @@ final class AppUITests: XCTestCase {
         guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad landscape") }
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = launch([])
-        XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15))
         XCUIDevice.shared.orientation = .landscapeLeft
         for _ in 0..<20 {
             if app.frame.width > app.frame.height { break }
@@ -92,7 +99,7 @@ final class AppUITests: XCTestCase {
 
     func testPremiumHomeAtLargestTextSize() throws {
         let app = launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
-        XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15))
         if UIDevice.current.userInterfaceIdiom == .phone {
             XCTAssertLessThan(app.staticTexts["PaperNest"].firstMatch.frame.height, 130,
                               "The brand must not wrap into character fragments")
@@ -190,6 +197,7 @@ final class AppUITests: XCTestCase {
         let document = app.descendants(matching: .any)["Crop target, 1 page"]
         XCTAssertTrue(document.waitForExistence(timeout: 15), "home did not open")
 
+        app.buttons["home-files"].tap()
         app.staticTexts["Favorites"].tap()
         XCTAssertTrue(app.staticTexts["No Favorites"].waitForExistence(timeout: 5))
 
@@ -198,7 +206,9 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(document.waitForExistence(timeout: 5), "All Documents did not reopen")
 
         document.tap()
-        XCTAssertTrue(app.buttons["Crop"].waitForExistence(timeout: 5), "document did not open")
+        // Crop moved into Document Utilities with the editor redesign, so the
+        // editor's own Back button is what says a document is open.
+        XCTAssertTrue(app.buttons["editor-back"].waitForExistence(timeout: 10), "document did not open")
     }
 
     func testSettingsShowsTheLibraryAndExportsABackup() throws {
@@ -253,6 +263,8 @@ final class AppUITests: XCTestCase {
         let document = app.descendants(matching: .any)["Crop target, 1 page"]
         XCTAssertTrue(document.waitForExistence(timeout: 15), "home did not open")
 
+        // Folders live under the Files tab, next to the library's scopes.
+        app.buttons["home-files"].tap()
         app.buttons["sidebar-new-folder"].tap()
         let name = app.alerts.textFields.firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -292,7 +304,7 @@ final class AppUITests: XCTestCase {
         XCTAssertFalse(app.buttons["library-import"].exists)
 
         recent.descendants(matching: .any)["Crop target, 1 page"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["editor-crop"].waitForExistence(timeout: 5), "document did not open from Recent")
+        XCTAssertTrue(app.buttons["editor-back"].waitForExistence(timeout: 10), "document did not open from Recent")
 
         app.navigationBars.buttons.element(boundBy: 0).tap()   // back to the home
         app.buttons["home-see-all"].tap()
@@ -535,6 +547,8 @@ final class AppUITests: XCTestCase {
         ] {
             app = launch([], libraryPath: library, language: language)
             if UIDevice.current.userInterfaceIdiom == .phone {
+                XCTAssertTrue(app.buttons["home-files"].waitForExistence(timeout: 15))
+                app.buttons["home-files"].tap()
                 XCTAssertTrue(app.staticTexts[all].waitForExistence(timeout: 15))
                 app.staticTexts[all].tap()
             }
@@ -1553,7 +1567,7 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         for language in ["en", "fr", "es"] {
             let app = launch([], libraryPath: "/tmp/papernest-note-bar-\(UUID().uuidString)", language: language)
-            XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 15))
+            XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15))
             homeTools(app).tap()
             app.buttons["tool-notebook"].tap()
             let name = app.textFields["notebook-name"]
@@ -1624,10 +1638,10 @@ final class AppUITests: XCTestCase {
             shot.lifetime = .keepAlways
             add(shot)
             start.tap()
-            XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 10))
             app.terminate()
             app = launch(args, libraryPath: library, language: language, skipWelcome: false)
-            XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 15))
+            XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15))
             XCTAssertFalse(app.buttons["welcome-continue"].exists)
             app.terminate()
         }
@@ -1649,7 +1663,7 @@ final class AppUITests: XCTestCase {
         shot.lifetime = .keepAlways
         add(shot)
         start.tap()
-        XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 10))
         app.terminate()
     }
 
@@ -1689,15 +1703,16 @@ final class AppUITests: XCTestCase {
         app.terminate()
     }
 
-    func testBottomFoldersReachesCreationInEmptyLibrary() throws {
+    func testBottomFilesReachesFolderCreationInEmptyLibrary() throws {
         guard UIDevice.current.userInterfaceIdiom == .phone else {
             throw XCTSkip("Compact iPhone home navigation")
         }
         let app = launch([], libraryPath: "/tmp/papernest-bottom-folders-\(UUID().uuidString)")
         defer { app.terminate() }
-        let folders = app.buttons["home-folders"]
+        let folders = app.buttons["home-files"]
         XCTAssertTrue(folders.waitForExistence(timeout: 15))
         folders.tap()
+        XCTAssertTrue(app.staticTexts["files-title"].waitForExistence(timeout: 5))
         let create = app.buttons["sidebar-new-folder"]
         XCTAssertTrue(create.waitForExistence(timeout: 5))
         XCTAssertTrue(create.isHittable, "Folders must reveal an actionable row")
@@ -1708,23 +1723,69 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["This Folder Is Empty"].waitForExistence(timeout: 5))
     }
 
-    func testStudioHomeHasContentFiltersAndNoQuickActionCards() throws {
+    /// Owner redesign of 2026-11-13: one set of quick actions, no filters,
+    /// and Scan in exactly one place per layout.
+    func testHomeHasOneSetOfQuickActionsAndFourPhoneTabs() throws {
         continueAfterFailure = false
         let app = launch([])
-        XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.buttons["home-new-note"].exists)
+        XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15))
+        for identifier in ["home-new-note", "home-import", "home-new-folder"] {
+            XCTAssertEqual(app.buttons.matching(identifier: identifier).count, 1, "\(identifier) must appear exactly once")
+        }
         XCTAssertFalse(app.buttons["home-create"].exists)
         XCTAssertFalse(app.buttons["library-import"].exists)
+        XCTAssertFalse(app.buttons["home-vault"].exists)
         XCTAssertFalse(app.buttons["home-filter-shared"].exists, "Unsupported shared collections must not appear as a working filter")
-        app.buttons["home-filter-recent"].tap()
-        app.buttons["home-notes"].tap()
-        XCTAssertTrue(app.navigationBars["Notes"].waitForExistence(timeout: 5))
-        app.buttons["home-documents"].tap()
-        XCTAssertTrue(app.buttons["Crop target, 1 page"].waitForExistence(timeout: 5))
-        app.buttons["home-tab"].tap()
-        XCTAssertTrue(app.buttons["home-filter-favorites"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["home-filter-favorites"].exists, "Favorites is a place in the library, not a second list on Home")
         let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "studio-home"; shot.lifetime = .keepAlways; add(shot)
+        shot.name = "redesign-home"; shot.lifetime = .keepAlways; add(shot)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertFalse(app.buttons["home-scan"].exists, "The phone's Scan is in the bottom bar, not on Home as well")
+            XCTAssertTrue(app.buttons["library-scan"].exists)
+            XCTAssertFalse(app.buttons["home-documents"].exists)
+            XCTAssertTrue(app.buttons["home-tab"].isSelected)
+            app.buttons["home-notes"].tap()
+            XCTAssertTrue(app.navigationBars["Notes"].waitForExistence(timeout: 5))
+            app.buttons["home-files"].tap()
+            XCTAssertTrue(app.staticTexts["files-title"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["home-files"].isSelected)
+            let files = XCTAttachment(screenshot: app.screenshot())
+            files.name = "redesign-files"; files.lifetime = .keepAlways; add(files)
+            app.staticTexts["All Documents"].tap()
+            XCTAssertTrue(app.buttons["Crop target, 1 page"].waitForExistence(timeout: 5))
+            app.buttons["home-tab"].tap()
+            XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["home-new-note"].exists)
+        } else {
+            XCTAssertEqual(app.buttons.matching(identifier: "home-scan").count, 1, "iPad Home has the one Scan action")
+            XCTAssertFalse(app.buttons["library-scan"].exists)
+            XCTAssertTrue(app.descendants(matching: .any)["sidebar-sync"].firstMatch.exists)
+            let folders = app.cells.containing(.any, identifier: "sidebar-folders").firstMatch
+            XCTAssertTrue(folders.waitForExistence(timeout: 5))
+            folders.tap()
+            XCTAssertTrue(app.staticTexts["folders-title"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["folders-new"].exists)
+            XCTAssertTrue(folders.isSelected)
+            let foldersShot = XCTAttachment(screenshot: app.screenshot())
+            foldersShot.name = "redesign-folders"; foldersShot.lifetime = .keepAlways; add(foldersShot)
+            app.cells.containing(.any, identifier: "sidebar-home").firstMatch.tap()
+            XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 5))
+        }
+    }
+
+    /// New Note on Home makes a real notebook and opens it.
+    func testHomeNewNoteCreatesAndOpensANotebook() throws {
+        continueAfterFailure = false
+        let app = launch([], libraryPath: "/tmp/papernest-home-new-note-\(UUID().uuidString)")
+        defer { app.terminate() }
+        let newNote = app.buttons["home-new-note"]
+        XCTAssertTrue(newNote.waitForExistence(timeout: 15))
+        newNote.tap()
+        let name = app.textFields["notebook-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText("Home note")
+        app.buttons["notebook-create"].tap()
+        XCTAssertTrue(app.scrollViews["notebook-tool-bar"].waitForExistence(timeout: 15), "the new notebook did not open")
     }
 
     func testStudioPenSavesAndReopensWithFloatingHistory() throws {
@@ -1786,12 +1847,12 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         for language in ["en", "fr", "es"] {
             let app = launch(language == "es" ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] : [], language: language)
-            XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 15))
-            XCTAssertFalse(app.buttons["home-new-note"].exists)
+            XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15))
+            XCTAssertTrue(app.buttons["home-new-note"].exists)
+            XCTAssertTrue(app.buttons["home-import"].exists)
+            XCTAssertTrue(app.buttons["home-new-folder"].exists)
             let shot = XCTAttachment(screenshot: app.screenshot())
             shot.name = "studio-home-\(language)"; shot.lifetime = .keepAlways; add(shot)
-            app.buttons["home-filter-favorites"].tap()
-            XCTAssertTrue(app.buttons["home-see-all"].exists)
             app.terminate()
         }
     }
@@ -1899,7 +1960,7 @@ extension AppUITests {
             XCTAssertTrue(app.navigationBars["Favorites"].waitForExistence(timeout: 5))
             XCTAssertFalse(home.isSelected)
             home.tap()
-            XCTAssertTrue(app.buttons["home-filter-recent"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 5))
             XCTAssertTrue(home.isSelected)
         }
         let notes = app.cells.containing(.any, identifier: "sidebar-notes").firstMatch

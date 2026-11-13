@@ -20,13 +20,13 @@ import PaperNestStore
         defer { app.terminate() }
         XCTAssertTrue(app.buttons["document-tab-add"].waitForExistence(timeout: 20))
         app.buttons["document-tab-add"].tap()
-        let documents = app.buttons["home-documents"]
-        if documents.isHittable { documents.tap() }
-        else {
-            let row = app.cells.containing(.staticText, identifier: "All Documents").firstMatch
-            if row.buttons["All Documents"].isHittable { row.buttons["All Documents"].tap() }
-            else if row.isHittable { row.tap() }
-        }
+        // The phone lists documents under its Files tab; the wide sidebar has the row itself.
+        let files = app.buttons["home-files"]
+        if files.isHittable { files.tap() }
+        let row = app.cells.containing(.staticText, identifier: "All Documents").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        if row.buttons["All Documents"].isHittable { row.buttons["All Documents"].tap() }
+        else if row.isHittable { row.tap() }
         let beta = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Tab Beta")).firstMatch
         XCTAssertTrue(beta.waitForExistence(timeout: 10)); beta.tap()
         XCTAssertTrue(app.buttons["document-tab-add"].waitForExistence(timeout: 10))

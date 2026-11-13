@@ -50,6 +50,11 @@ public final class LibraryModel {
     var isShowingTools = false
     /// The newest documents, for the iPhone home's Recent row.
     private(set) var dashboardItems: [LibraryStore.ItemSummary] = []
+    /// Bytes of the originals behind the documents Home lists, from the store.
+    /// A notebook of drawn pages has none and is absent.
+    private(set) var dashboardSizes: [ItemID: Int64] = [:]
+    /// How many recent documents Home can show; sizes are read for no more.
+    static let homeRecentLimit = 8
     private(set) var recentItems: [LibraryStore.ItemSummary] = []
 
     struct PendingPassword: Identifiable {
@@ -263,6 +268,39 @@ public final class LibraryModel {
         }
     }
 
+    /// A scan that has just been saved and whose export screen is due.
+    struct SavedScan: Identifiable, Equatable {
+        let id: ItemID
+        let name: String
+    }
+
+    /// Set once a scan is in the library. It presents the export screen for
+    /// that scan; closing the screen clears it and returns to Home.
+    var savedScan: SavedScan?
+
+    /// Saves a scan as one new document and leaves it closed. A scan is paper
+    /// someone wanted kept, so it does not open in the editor; its export
+    /// screen opens instead. `savedScan` is set only after the store has the
+    /// document, so Export never opens for a scan that is not saved.
+    func importScan(_ images: [Data], name: String) async {
+        guard let env = environment, !images.isEmpty, !isImporting else { return }
+        isImporting = true
+        defer { isImporting = false }
+        guard let choice = await chooseImportLocation() else { return }
+        let folderID: FolderID?
+        do { folderID = try await folderForImport(choice) }
+        catch { presentedError = .saveFailed(); return }
+        do {
+            let imported = try await env.importer.importScan(images: images, name: name, folderID: folderID)
+            session.didChange()
+            savedScan = SavedScan(id: imported.id, name: imported.name)
+        } catch let error as ImportError {
+            report([error])
+        } catch {
+            presentedError = .saveFailed()
+        }
+    }
+
     /// Photos picked from the system library, each becoming its own
     /// document — a photo of a receipt is a document, not a page of some
     /// other one. Failures are reported per photo and the rest still land.
@@ -428,6 +466,11 @@ public final class LibraryModel {
         if let all = try? await env.store.items(in: .all) {
             dashboardItems = all.sorted { $0.item.modifiedAt > $1.item.modifiedAt }
             recentItems = Array(dashboardItems.prefix(10))
+            var sizes: [ItemID: Int64] = [:]
+            for summary in dashboardItems.prefix(Self.homeRecentLimit) {
+                if let bytes = try? await env.store.originalByteCount(of: summary.id), bytes > 0 { sizes[summary.id] = bytes }
+            }
+            dashboardSizes = sizes
         }
     }
 

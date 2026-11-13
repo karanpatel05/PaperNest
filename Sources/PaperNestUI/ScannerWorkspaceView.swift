@@ -29,7 +29,10 @@ struct ScannerWorkspaceView: View {
     @State private var completed = false
     @State private var photoPickerPresented = false
     @State private var photoItems: [PhotosPickerItem] = []
+    @State private var kind = ScanKind.document
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         Group {
@@ -84,6 +87,9 @@ struct ScannerWorkspaceView: View {
             else { stopCamera(); torch = false }
         }
         .onChange(of: automatic) { _, value in camera.setAutomatic(value) }
+        // A photo has no sheet to wait for, so there is nothing to trigger an
+        // automatic exposure.
+        .onChange(of: kind) { _, value in if !value.findsEdges { automatic = false } }
         .onChange(of: reviewing) { _, value in
             if value { stopCamera(); torch = false } else if canRunCamera { camera.start() }
         }
@@ -150,7 +156,7 @@ struct ScannerWorkspaceView: View {
         VStack(spacing: 12) {
             Text(L10n.scannerReviewCapture).font(.headline).padding(.top, 12)
             Text(L10n.scannerReviewCaptureHint).font(.subheadline)
-                .foregroundStyle(Theme.secondaryText).multilineTextAlignment(.center).padding(.horizontal)
+                .foregroundStyle(ScannerChrome.secondaryText).multilineTextAlignment(.center).padding(.horizontal)
             Group {
                 if let image = pendingPreview {
                     ScannerZoomPreview(image: image, accessibilityValue: "")
@@ -166,14 +172,16 @@ struct ScannerWorkspaceView: View {
                 if pendingPreview == nil { failed = true }
             }
         }
-        .background(Theme.canvas)
+        .foregroundStyle(.white)
+        .background(ScannerChrome.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 16) { captureDecisionButtons }
                 VStack(spacing: 12) { captureDecisionButtons }
             }
-            .padding(16).frame(maxWidth: .infinity).background(Theme.surface)
+            .padding(16).frame(maxWidth: .infinity).background(ScannerChrome.panel)
         }
+        .environment(\.colorScheme, .dark)
         .interactiveDismissDisabled()
     }
 
@@ -185,7 +193,7 @@ struct ScannerWorkspaceView: View {
         Button { resolveCapture(keep: true) } label: {
             Label(L10n.scannerKeepScan, systemImage: "checkmark").frame(minWidth: 120, minHeight: 44)
         }
-        .buttonStyle(.borderedProminent).disabled(pendingPreview == nil)
+        .buttonStyle(.borderedProminent).tint(ScannerChrome.purple).disabled(pendingPreview == nil)
         .accessibilityIdentifier("scanner.capture-keep")
     }
 
@@ -200,34 +208,36 @@ struct ScannerWorkspaceView: View {
         if canRunCamera && scenePhase == .active { camera.start(waitForNextSheet: keep) }
     }
 
+    // MARK: - Capture
+
     private var capture: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            ScannerCameraPreview(camera: camera, outline: outline).ignoresSafeArea()
-            VStack {
-                HStack {
+            ScannerCameraPreview(camera: camera, outline: kind.findsEdges ? outline : []).ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack(spacing: 4) {
                     icon("xmark", label: L10n.cancel) { completed = true; onFinish(.cancelled) }
-                    Spacer()
-                    Text(L10n.scan).font(.headline)
-                    Button(automatic ? L10n.scannerAuto : L10n.scannerManual) { automatic.toggle() }
-                        .font(.caption).buttonStyle(.bordered).disabled(busy)
-                        .accessibilityIdentifier("scanner.mode")
+                    Text(L10n.scan).font(.headline).accessibilityAddTraits(.isHeader)
                     Spacer()
                     if hasTorch {
                         icon(torch ? "bolt.fill" : "bolt.slash", label: L10n.scannerFlash) { torch.toggle(); camera.torch(torch) }
                             .accessibilityValue(torch ? L10n.scannerOn : L10n.scannerOff)
                     }
                     Menu {
+                        Button { photoPickerPresented = true } label: {
+                            Label(L10n.importPhotos, systemImage: "photo")
+                        }
                         if DocumentCameraView.isSupported {
-                            Button(L10n.scannerNative) {
+                            Button {
                                 guard !busy else { return }
                                 captureGeneration = UUID(); stopCamera(); native = true
-                            }
+                            } label: { Label(L10n.scannerNative, systemImage: "doc.viewfinder") }
                         }
-                    } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                    } label: { Image(systemName: "ellipsis.circle").font(.title3).frame(width: 44, height: 44) }
                     .accessibilityLabel(L10n.more).disabled(busy)
+                    .accessibilityIdentifier("scanner.more")
                 }
-                .padding(.horizontal).background(.black.opacity(0.8))
+                .padding(.horizontal, 8).background(.black.opacity(0.8))
                 Spacer()
                 if !ready {
                     VStack(spacing: 12) {
@@ -235,122 +245,322 @@ struct ScannerWorkspaceView: View {
                         Button(L10n.scannerRetry) { camera.start() }.buttonStyle(.bordered).disabled(busy)
                     }.padding().background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 16)).padding()
                 }
-                HStack(spacing: 32) {
-                    Button { photoPickerPresented = true } label: {
-                        Image(systemName: "photo").frame(width: 48, height: 48)
-                    }.accessibilityLabel(L10n.importPhotos).disabled(busy)
+                ScannerKindSelector(kind: $kind).disabled(busy).padding(.bottom, 12)
+                HStack(spacing: 16) {
+                    reviewStackButton
                     Spacer(minLength: 0)
-                    Button {
-                        guard !busy, captureReview.pending == nil else { return }
-                        busy = true
-                        if let fixture = debugCaptureData {
-                            let generation = captureGeneration
-                            Task { await appendCapture(fixture, generation: generation) }
-                        } else { camera.capture() }
-                    } label: {
-                        ZStack {
-                            Circle().stroke(Theme.accent, lineWidth: 3).frame(width: 76, height: 76)
-                            Circle().fill(.white).frame(width: 64, height: 64)
-                            if busy { ProgressView().tint(.black) }
-                        }
+                    shutter
+                    Spacer(minLength: 0)
+                    Button { automatic.toggle() } label: {
+                        Text(automatic ? L10n.scannerAuto : L10n.scannerManual)
+                            .font(.footnote.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                            .padding(.horizontal, 12).frame(minWidth: 64, minHeight: 44)
+                            .background(automatic ? ScannerChrome.purple : ScannerChrome.raised, in: Capsule())
+                            .overlay { Capsule().strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
                     }
-                    .disabled((!ready && debugCaptureData == nil) || busy).accessibilityLabel(L10n.takePhoto)
-                    .accessibilityIdentifier("scanner.shutter")
-                    Spacer(minLength: 0)
-                    Button { reviewing = true } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: "square.stack")
-                            Text(verbatim: String(pages.count)).font(.caption.monospacedDigit())
-                        }.frame(width: 48, height: 48)
-                    }.disabled(pages.isEmpty || busy)
-                        .accessibilityLabel(L10n.scannerReview).accessibilityValue(String(pages.count))
-                        .accessibilityIdentifier("scanner.review")
-                }.padding(24).background(.black.opacity(0.85), in: UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24))
+                    .buttonStyle(.plain)
+                    .disabled(busy || !kind.findsEdges)
+                    .opacity(kind.findsEdges ? 1 : 0.45)
+                    .accessibilityValue(automatic ? L10n.scannerOn : L10n.scannerOff)
+                    .accessibilityIdentifier("scanner.mode")
+                }
+                .padding(.horizontal, 24).padding(.vertical, 18)
+                .background(.black.opacity(0.85), in: UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24))
             }.foregroundStyle(.white)
         }
     }
 
-    private var review: some View {
-        VStack(spacing: 12) {
-            HStack {
-                icon("chevron.left", label: L10n.scanPages) { guard !busy else { return }; reviewing = false }
-                Spacer()
-                Text(L10n.scannerEdit).font(.headline)
-                Spacer()
-                Button(L10n.exportSave) { finish() }.buttonStyle(.borderedProminent)
-                    .disabled(pages.isEmpty || busy).accessibilityIdentifier("scanner.finish")
-            }.padding(.horizontal)
-            TextField(L10n.documentName, text: $name).textFieldStyle(.roundedBorder).padding(.horizontal)
-                .focused($naming).submitLabel(.done).onSubmit { naming = false }
-                .accessibilityIdentifier("scanner.name")
-            ScrollView(.horizontal) {
-                HStack(spacing: 12) {
-                    ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
-                        Button { guard !busy else { return }; selected = index } label: {
-                            VStack(spacing: 4) {
-                                ScannerThumbnail(page: page).frame(width: 56, height: 70)
-                                Text(verbatim: String(index + 1)).font(.caption.monospacedDigit())
-                            }.padding(5).background(selected == index ? Theme.accent.opacity(0.16) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected == index ? Theme.accent : Color.secondary.opacity(0.2)))
-                        }.accessibilityIdentifier("scanner.page.\(index)")
-                            .accessibilityLabel(L10n.scannerReview + " " + String(index + 1))
-                            .accessibilityAddTraits(selected == index ? [.isSelected] : [])
-                            .contextMenu {
-                                Button(L10n.duplicate) { guard !busy else { return }; pages.insert(ScannerPage(original: page.original, quarterTurns: page.quarterTurns, filter: page.filter, enhanced: page.enhanced, corners: page.corners), at: index + 1); selected = index + 1 }
-                                Button(L10n.scannerMoveEarlier) { guard !busy else { return }; pages.swapAt(index, index - 1); selected = index - 1 }.disabled(index == 0)
-                                Button(L10n.scannerMoveLater) { guard !busy else { return }; pages.swapAt(index, index + 1); selected = index + 1 }.disabled(index == pages.count - 1)
-                            }
+    /// The pages kept so far: the latest one with a count, and the way into review.
+    private var reviewStackButton: some View {
+        Button { reviewing = true } label: {
+            ZStack(alignment: .topTrailing) {
+                Group {
+                    if let last = pages.last {
+                        ScannerThumbnail(page: last)
+                    } else {
+                        Image(systemName: "square.stack").font(.title3)
                     }
-                    icon("plus", label: L10n.scanPages) { guard !busy else { return }; reviewing = false }
-                }.padding(.horizontal)
+                }
+                .frame(width: 44, height: 56)
+                .background(ScannerChrome.raised, in: RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
+                if !pages.isEmpty {
+                    Text(verbatim: String(pages.count)).font(.caption2.weight(.bold).monospacedDigit())
+                        .padding(.horizontal, 5).frame(minWidth: 20, minHeight: 20)
+                        .background(ScannerChrome.purple, in: Capsule())
+                        .offset(x: 8, y: -8)
+                }
             }
-            Group {
-                if cropping && pages.indices.contains(selected) {
-                    ScannerCornerEditor(page: Binding(
-                        get: { pages[selected] },
-                        set: { if !busy && pages.indices.contains(selected) { pages[selected] = $0 } }
-                    ))
-                } else if let image = previewImage {
-                    ScannerZoomPreview(image: image,
-                        accessibilityValue: "\(selected + 1); \(L10n.rotate) \(pages[selected].quarterTurns); \(L10n.filter) \(pages[selected].filter)")
-                        .id(pages[selected].id)
-                } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
-            }
-            .task(id: previewKey) {
-                guard pages.indices.contains(selected), !cropping else { return }
-                let page = pages[selected]
-                previewImage = nil
-                let data = await Task.detached(priority: .userInitiated) { page.rendered(maxDimension: 1600)?.jpegData(compressionQuality: 0.85) }.value
-                guard !Task.isCancelled, !completed else { return }
-                previewImage = data.flatMap { UIImage(data: $0) }
-            }
-            ScrollView(.horizontal) {
-                HStack(spacing: 20) {
-                    reviewTool("crop", label: L10n.crop) { cropping.toggle() }
-                    reviewTool("rotate.right", label: L10n.rotate) { pages[selected].quarterTurns = (pages[selected].quarterTurns + 1) % 4 }
-                    Menu {
-                        Button(L10n.filterOriginal) { guard !busy else { return }; pages[selected].filter = 0 }
-                        Button(L10n.filterGrayscale) { guard !busy else { return }; pages[selected].filter = 1 }
-                        Button(L10n.filterBlackAndWhite) { guard !busy else { return }; pages[selected].filter = 2 }
-                    } label: { VStack(spacing: 4) { Image(systemName: "camera.filters"); Text(L10n.filter).font(.caption) }.frame(minWidth: 44, minHeight: 44) }
-                    reviewTool("sparkles", label: L10n.scannerEnhance) { pages[selected].enhanced.toggle() }
-                        .foregroundStyle(pages.indices.contains(selected) && pages[selected].enhanced ? Theme.accent : Theme.primaryText)
-                        .accessibilityValue(pages.indices.contains(selected) && pages[selected].enhanced ? L10n.selectionOn : L10n.selectionOff)
-                    reviewTool("arrow.counterclockwise", label: L10n.cropReset) {
-                        pages[selected].quarterTurns = 0; pages[selected].filter = 0; pages[selected].enhanced = false; pages[selected].corners = ScannerPage(original: pages[selected].original).corners
-                    }
-                    reviewTool("trash", label: L10n.delete) {
-                        pages.remove(at: selected); selected = max(0, min(selected, pages.count - 1))
-                        if pages.isEmpty { reviewing = false }
-                    }
-                }.padding(12).background(Theme.surface, in: RoundedRectangle(cornerRadius: 18)).padding(.horizontal)
-            }.disabled(pages.isEmpty || busy)
+            .frame(minWidth: 64, minHeight: 56)
         }
-        .padding(.vertical, 12)
-        .background(Theme.canvas)
+        .buttonStyle(.plain)
+        .disabled(pages.isEmpty || busy)
+        .opacity(pages.isEmpty ? 0.45 : 1)
+        .accessibilityLabel(L10n.scannerReview).accessibilityValue(String(pages.count))
+        .accessibilityIdentifier("scanner.review")
+    }
+
+    private var shutter: some View {
+        Button {
+            guard !busy, captureReview.pending == nil else { return }
+            busy = true
+            if let fixture = debugCaptureData {
+                let generation = captureGeneration
+                Task { await appendCapture(fixture, generation: generation) }
+            } else { camera.capture() }
+        } label: {
+            ZStack {
+                Circle().stroke(Theme.accent, lineWidth: 3).frame(width: 76, height: 76)
+                Circle().fill(.white).frame(width: 64, height: 64)
+                if busy { ProgressView().tint(.black) }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled((!ready && debugCaptureData == nil) || busy).accessibilityLabel(L10n.takePhoto)
+        .accessibilityIdentifier("scanner.shutter")
+    }
+
+    // MARK: - Review
+
+    /// iPad has room for the pages, the page and its tools side by side.
+    /// The phone, and any size at accessibility text sizes, stacks them.
+    private var review: some View {
+        Group {
+            if horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize { wideReview } else { stackedReview }
+        }
+        .foregroundStyle(.white)
+        .background(ScannerChrome.background.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
         .disabled(busy)
         .interactiveDismissDisabled(busy)
         .overlay { if busy { ProgressView().padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
+    }
+
+    private var stackedReview: some View {
+        VStack(spacing: 12) {
+            HStack {
+                backToCamera
+                Spacer()
+                Text(L10n.scannerEdit).font(.headline).accessibilityAddTraits(.isHeader)
+                Spacer()
+                saveButton
+            }.padding(.horizontal, 8)
+            nameField.padding(.horizontal)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    pageThumbnails
+                    addPageButton
+                }.padding(.horizontal)
+            }
+            previewArea
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 20) {
+                    cropTool; rotateTool; filterTool(vertical: false); enhanceTool; resetTool; deleteTool
+                }
+                .padding(12)
+                .background(ScannerChrome.panel, in: RoundedRectangle(cornerRadius: 18))
+                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
+                .padding(.horizontal)
+            }.disabled(pages.isEmpty || busy)
+        }
+        .padding(.vertical, 12)
+    }
+
+    private var wideReview: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                backToCamera
+                Text(L10n.scannerEdit).font(.headline).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 12)
+                nameField.frame(maxWidth: 360)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(ScannerChrome.panel)
+            HStack(spacing: 0) {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 12) {
+                        pageThumbnails
+                        addPageButton
+                    }.padding(.vertical, 14).frame(maxWidth: .infinity)
+                }
+                .frame(width: 104)
+                .background(ScannerChrome.panel.opacity(0.6))
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(L10n.scannerPages)
+                previewArea.padding(12).frame(maxWidth: .infinity, maxHeight: .infinity)
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 8) {
+                        enhanceTool; cropTool; rotateTool; filterTool(vertical: true)
+                        moveTool(by: -1); moveTool(by: 1); duplicateTool
+                        resetTool; deleteTool
+                    }.padding(12)
+                }
+                .frame(width: 208)
+                .background(ScannerChrome.panel.opacity(0.6))
+                .disabled(pages.isEmpty || busy)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(L10n.scannerTools)
+            }
+            HStack {
+                Spacer()
+                saveButton
+            }
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .background(ScannerChrome.panel)
+        }
+        .environment(\.scannerToolsVertical, true)
+    }
+
+    private var backToCamera: some View {
+        icon("chevron.left", label: L10n.scanPages) { guard !busy else { return }; reviewing = false }
+    }
+
+    private var saveButton: some View {
+        Button { finish() } label: {
+            Text(L10n.exportSave).font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 20).frame(minHeight: 44)
+                .background(ScannerChrome.purple, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(pages.isEmpty || busy)
+        .opacity(pages.isEmpty ? 0.45 : 1)
+        .accessibilityIdentifier("scanner.finish")
+    }
+
+    private var nameField: some View {
+        TextField(L10n.documentName, text: $name)
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 12).frame(minHeight: 44)
+            .background(ScannerChrome.raised, in: RoundedRectangle(cornerRadius: 10))
+            .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
+            .focused($naming).submitLabel(.done).onSubmit { naming = false }
+            .accessibilityIdentifier("scanner.name")
+    }
+
+    private var pageThumbnails: some View {
+        ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
+            Button { guard !busy else { return }; selected = index } label: {
+                VStack(spacing: 4) {
+                    ScannerThumbnail(page: page).frame(width: 56, height: 70)
+                    Text(verbatim: String(index + 1)).font(.caption.monospacedDigit())
+                }
+                .padding(5)
+                .background(selected == index ? ScannerChrome.purple.opacity(0.28) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected == index ? Theme.accent : ScannerChrome.stroke,
+                                                                  lineWidth: selected == index ? 2 : 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("scanner.page.\(index)")
+            .accessibilityLabel(L10n.scannerReview + " " + String(index + 1))
+            .accessibilityAddTraits(selected == index ? [.isSelected] : [])
+            .contextMenu {
+                Button(L10n.duplicate) { duplicatePage(at: index) }
+                Button(L10n.scannerMoveEarlier) { movePage(at: index, by: -1) }.disabled(index == 0)
+                Button(L10n.scannerMoveLater) { movePage(at: index, by: 1) }.disabled(index == pages.count - 1)
+            }
+        }
+    }
+
+    private var addPageButton: some View {
+        Button { guard !busy else { return }; reviewing = false } label: {
+            Image(systemName: "plus").font(.title3)
+                .frame(width: 56, height: 56)
+                .background(ScannerChrome.raised, in: RoundedRectangle(cornerRadius: 10))
+                .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.scanPages)
+        .accessibilityIdentifier("scanner.add-page")
+    }
+
+    private var previewArea: some View {
+        Group {
+            if cropping && pages.indices.contains(selected) {
+                ScannerCornerEditor(page: Binding(
+                    get: { pages[selected] },
+                    set: { if !busy && pages.indices.contains(selected) { pages[selected] = $0 } }
+                ))
+            } else if let image = previewImage, pages.indices.contains(selected) {
+                ScannerZoomPreview(image: image,
+                    accessibilityValue: "\(selected + 1); \(L10n.rotate) \(pages[selected].quarterTurns); \(L10n.filter) \(pages[selected].filter)")
+                    .id(pages[selected].id)
+            } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+        }
+        .task(id: previewKey) {
+            guard pages.indices.contains(selected), !cropping else { return }
+            let page = pages[selected]
+            previewImage = nil
+            let data = await Task.detached(priority: .userInitiated) { page.rendered(maxDimension: 1600)?.jpegData(compressionQuality: 0.85) }.value
+            guard !Task.isCancelled, !completed else { return }
+            previewImage = data.flatMap { UIImage(data: $0) }
+        }
+    }
+
+    // MARK: - Page tools
+
+    private var selectedPage: ScannerPage? { pages.indices.contains(selected) ? pages[selected] : nil }
+
+    private var cropTool: some View {
+        reviewTool("crop", label: L10n.crop, active: cropping) { cropping.toggle() }
+    }
+
+    private var rotateTool: some View {
+        reviewTool("rotate.right", label: L10n.rotate) { pages[selected].quarterTurns = (pages[selected].quarterTurns + 1) % 4 }
+    }
+
+    private func filterTool(vertical: Bool) -> some View {
+        Menu {
+            Button(L10n.filterOriginal) { guard !busy else { return }; pages[selected].filter = 0 }
+            Button(L10n.filterGrayscale) { guard !busy else { return }; pages[selected].filter = 1 }
+            Button(L10n.filterBlackAndWhite) { guard !busy else { return }; pages[selected].filter = 2 }
+        } label: {
+            ScannerToolLabel(symbol: "camera.filters", title: L10n.filter, active: (selectedPage?.filter ?? 0) != 0)
+        }
+        .accessibilityLabel(L10n.filter)
+        .accessibilityIdentifier("scanner.tool.camera.filters")
+    }
+
+    private var enhanceTool: some View {
+        reviewTool("sparkles", label: L10n.scannerEnhance, active: selectedPage?.enhanced ?? false) { pages[selected].enhanced.toggle() }
+            .accessibilityValue(selectedPage?.enhanced ?? false ? L10n.selectionOn : L10n.selectionOff)
+    }
+
+    private var resetTool: some View {
+        reviewTool("arrow.counterclockwise", label: L10n.cropReset) {
+            pages[selected].quarterTurns = 0; pages[selected].filter = 0; pages[selected].enhanced = false; pages[selected].corners = ScannerPage(original: pages[selected].original).corners
+        }
+    }
+
+    private var deleteTool: some View {
+        reviewTool("trash", label: L10n.delete) {
+            pages.remove(at: selected); selected = max(0, min(selected, pages.count - 1))
+            if pages.isEmpty { reviewing = false }
+        }
+    }
+
+    private var duplicateTool: some View {
+        reviewTool("plus.square.on.square", label: L10n.duplicate) { duplicatePage(at: selected) }
+    }
+
+    private func moveTool(by offset: Int) -> some View {
+        reviewTool(offset < 0 ? "arrow.up" : "arrow.down",
+                   label: offset < 0 ? L10n.scannerMoveEarlier : L10n.scannerMoveLater) { movePage(at: selected, by: offset) }
+            .disabled(!pages.indices.contains(selected + offset))
+    }
+
+    private func duplicatePage(at index: Int) {
+        guard !busy, pages.indices.contains(index) else { return }
+        let page = pages[index]
+        pages.insert(ScannerPage(original: page.original, quarterTurns: page.quarterTurns, filter: page.filter,
+                                 enhanced: page.enhanced, corners: page.corners), at: index + 1)
+        selected = index + 1
+    }
+
+    private func movePage(at index: Int, by offset: Int) {
+        guard !busy, pages.indices.contains(index), pages.indices.contains(index + offset) else { return }
+        pages.swapAt(index, index + offset)
+        selected = index + offset
     }
 
     private func icon(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
@@ -359,7 +569,13 @@ struct ScannerWorkspaceView: View {
     }
 
     private func appendCapture(_ data: Data, generation: UUID) async {
-        let corners = await Task.detached(priority: .userInitiated) { ScannerPage.detectedCorners(data) }.value
+        // A document is cropped to the edges found in it. A photo keeps the
+        // whole frame, so it only has to be an image that decodes.
+        let findsEdges = kind.findsEdges
+        let corners = await Task.detached(priority: .userInitiated) {
+            findsEdges ? ScannerPage.detectedCorners(data)
+                       : (UIImage(data: data) == nil ? nil : ScannerPage(original: data).corners)
+        }.value
         guard !completed, !native, !reviewing, generation == captureGeneration else { return }
         guard let corners else {
             busy = false; failed = true
@@ -382,11 +598,12 @@ struct ScannerWorkspaceView: View {
         return "\(page.id)-\(page.quarterTurns)-\(page.filter)-\(page.enhanced)-\(page.corners)-\(cropping)"
     }
 
-    private func reviewTool(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
-        Button { guard !busy else { return }; action() } label: {
-            VStack(spacing: 5) { Image(systemName: symbol); Text(label).font(.caption) }
-                .frame(minWidth: 44, minHeight: 44)
-        }.accessibilityLabel(label).accessibilityIdentifier("scanner.tool.\(symbol)")
+    private func reviewTool(_ symbol: String, label: String, active: Bool = false, action: @escaping () -> Void) -> some View {
+        Button { guard !busy, pages.indices.contains(selected) else { return }; action() } label: {
+            ScannerToolLabel(symbol: symbol, title: label, active: active)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label).accessibilityIdentifier("scanner.tool.\(symbol)")
     }
 
     private func stopCamera() {

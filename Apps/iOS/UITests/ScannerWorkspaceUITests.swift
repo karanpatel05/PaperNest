@@ -74,11 +74,18 @@ import UIKit
         app.buttons["scanner.tool.arrow.counterclockwise"].tap()
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         XCTAssertTrue((preview.value as? String ?? "").contains("Rotate 0"))
+        // On iPad the tools panel has its own Duplicate and Move earlier, so
+        // the page's menu items are the ones without a tool identifier.
+        func menuItem(_ title: String) -> XCUIElement {
+            app.buttons.matching(NSPredicate(format: "label == %@ AND NOT (identifier BEGINSWITH %@)", title, "scanner.tool.")).firstMatch
+        }
         app.buttons["scanner.page.1"].press(forDuration: 1)
-        app.buttons["Duplicate"].tap()
+        XCTAssertTrue(menuItem("Duplicate").waitForExistence(timeout: 5))
+        menuItem("Duplicate").tap()
         XCTAssertTrue(app.buttons["scanner.page.2"].waitForExistence(timeout: 5))
         app.buttons["scanner.page.2"].press(forDuration: 1)
-        app.buttons["Move earlier"].tap()
+        XCTAssertTrue(menuItem("Move earlier").waitForExistence(timeout: 5))
+        menuItem("Move earlier").tap()
         app.buttons["scanner.tool.trash"].tap()
         XCTAssertFalse(app.buttons["scanner.page.2"].exists)
         XCTAssertTrue(finish.isHittable, "Save must remain reachable after review edits")
@@ -86,12 +93,122 @@ import UIKit
         finish.tap()
         XCTAssertTrue(app.buttons["import-location-save"].waitForExistence(timeout: 15))
         app.buttons["import-location-save"].tap()
-        XCTAssertTrue(app.buttons["editor-export"].waitForExistence(timeout: 20))
+        // A saved scan stays closed. Export opens for it by itself, and
+        // closing Export goes back to Home.
+        let export = app.buttons["export-start"].firstMatch
+        XCTAssertTrue(export.waitForExistence(timeout: 30), "saving a scan must open its export screen")
+        XCTAssertFalse(app.buttons["editor-back"].exists, "a saved scan must not open in the editor")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "scan-saved-export"; shot.lifetime = .keepAlways; add(shot)
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15), "closing Export returns to Home")
+        XCTAssertFalse(app.buttons["editor-back"].exists)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Scanner workflow, 2 pages")).firstMatch
+            .waitForExistence(timeout: 15), "the saved scan is in Home's recent documents")
         app.terminate()
         app.launchArguments = base + ["-PaperNestDebugOpenItem", "Scanner workflow"]
         app.launch()
-        XCTAssertTrue(app.buttons["editor-export"].waitForExistence(timeout: 20))
+        // The editor's Back button says the saved scan opens; which toolbar
+        // items fit beside it is the editor's business, not the scanner's.
+        XCTAssertTrue(app.buttons["editor-back"].waitForExistence(timeout: 30))
+        XCTAssertEqual(app.descendants(matching: .any)["document-page-image"].firstMatch.label, "Page 1 of 2")
     }
+
+    /// The owner's rule for a saved scan, on its own and without the long
+    /// editing sequence above: Export opens by itself, the editor does not,
+    /// and closing Export without exporting lands on Home.
+    func testSavingAScanOpensExportAndClosingItReturnsHome() throws {
+        continueAfterFailure = false
+        let fixture = URL(fileURLWithPath: "/tmp/papernest-scanner-export-\(UUID().uuidString).png")
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 240, height: 320), format: format).image { context in
+            UIColor.white.setFill(); context.fill(CGRect(x: 0, y: 0, width: 240, height: 320))
+            UIColor.purple.setFill(); context.fill(CGRect(x: 24, y: 36, width: 120, height: 200))
+        }
+        try XCTUnwrap(image.pngData()).write(to: fixture)
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        let app = XCUIApplication()
+        app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-scanner-export-\(UUID().uuidString)",
+                               "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-PaperNestDebugScannerImages", fixture.path]
+        app.launch()
+        defer { app.terminate() }
+        let finish = app.buttons["scanner.finish"]
+        XCTAssertTrue(finish.waitForExistence(timeout: 25))
+        finish.tap()
+        XCTAssertTrue(app.buttons["import-location-save"].waitForExistence(timeout: 15))
+        app.buttons["import-location-save"].tap()
+        XCTAssertTrue(app.buttons["export-start"].firstMatch.waitForExistence(timeout: 30),
+                      "saving a scan must open its export screen without being asked")
+        XCTAssertFalse(app.buttons["editor-back"].exists, "a saved scan must not open in the editor")
+        XCTAssertEqual(app.alerts.count, 0, "nothing stands between saving and the export screen")
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15), "closing Export returns to Home")
+        XCTAssertFalse(app.buttons["export-start"].exists)
+        XCTAssertFalse(app.buttons["editor-back"].exists)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Scan ")).firstMatch
+            .waitForExistence(timeout: 15), "the saved scan is in Home's recent documents")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "scan-saved-home"; shot.lifetime = .keepAlways; add(shot)
+    }
+
+    /// Photo is a mode that does something: it keeps the whole frame instead of
+    /// cropping to detected edges, and it has no automatic shutter. The shutter
+    /// takes the test's fixture bytes through the same path a camera still takes.
+    func testPhotoModeKeepsTheWholeFrameAndTurnsAutoOff() throws {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("iPad stages each capture first; the mode logic is shared") }
+        continueAfterFailure = false
+        let fixture = URL(fileURLWithPath: "/tmp/papernest-scanner-photo-\(UUID().uuidString).png")
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 240, height: 320), format: format).image { context in
+            UIColor.white.setFill(); context.fill(CGRect(x: 0, y: 0, width: 240, height: 320))
+            UIColor.purple.setFill(); context.fill(CGRect(x: 24, y: 36, width: 120, height: 200))
+        }
+        try XCTUnwrap(image.pngData()).write(to: fixture)
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        let app = XCUIApplication()
+        app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-scanner-photo-\(UUID().uuidString)",
+                               "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-PaperNestDebugScannerImages", fixture.path, "-PaperNestDebugScannerPendingCapture", "YES"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["scanner.add-page"].waitForExistence(timeout: 25))
+        app.buttons["scanner.add-page"].tap()
+
+        let document = app.buttons["scanner.kind.document"]
+        let photo = app.buttons["scanner.kind.photo"]
+        let auto = app.buttons["scanner.mode"]
+        XCTAssertTrue(photo.waitForExistence(timeout: 10))
+        XCTAssertTrue(document.isSelected)
+        XCTAssertTrue(auto.isEnabled)
+        XCTAssertFalse(app.buttons["scanner.kind.idcard"].exists, "only modes that do something are offered")
+        XCTAssertFalse(app.buttons["scanner.kind.book"].exists, "only modes that do something are offered")
+        auto.tap()
+        XCTAssertEqual(auto.value as? String, "On")
+        photo.tap()
+        XCTAssertTrue(photo.isSelected)
+        XCTAssertFalse(auto.isEnabled, "a photo has no sheet to wait for, so no automatic shutter")
+        XCTAssertEqual(auto.value as? String, "Off", "choosing Photo turns Auto off")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "scanner-photo-mode"; shot.lifetime = .keepAlways; add(shot)
+
+        let review = app.buttons["scanner.review"]
+        XCTAssertEqual(review.value as? String, "1")
+        app.buttons["scanner.shutter"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "2"), evaluatedWith: review)], timeout: 20)
+        review.tap()
+        XCTAssertTrue(app.buttons["scanner.page.1"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["scanner.page.1"].isSelected, "the new capture is the page being shown")
+        app.buttons["scanner.tool.crop"].tap()
+        let topLeft = app.descendants(matching: .any)["scanner.corner.0"].firstMatch
+        let bottomRight = app.descendants(matching: .any)["scanner.corner.2"].firstMatch
+        XCTAssertTrue(topLeft.waitForExistence(timeout: 10))
+        XCTAssertEqual(topLeft.value as? String, "0, 0", "a photo keeps its whole frame")
+        XCTAssertEqual(bottomRight.value as? String, "100, 100", "a photo keeps its whole frame")
+    }
+
     func testIPadKeepsOrDeletesCaptureBeforeQueueing() throws {
         guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad capture decisions") }
         continueAfterFailure = false

@@ -18,7 +18,12 @@ public struct RootView: View {
     @State private var folderName = ""
     @State private var deletingFolder: Folder?
     @State private var dashboardVisible = true
-    @State private var folderScrollRequest = false
+    /// The wide layouts' Folders screen, reached from the sidebar and from
+    /// Home's See All. Like Home it is a destination of its own, not a scope.
+    @State private var foldersVisible = false
+    /// The phone's Files tab: the same root column as Home, showing the
+    /// library's scopes and folders instead of the dashboard.
+    @State private var compactFiles = false
     @State private var homeFilePreview: FilePreviewRequest?
     @State private var showFirstProOffer = false
     @AppStorage("PaperNestFirstProOfferHandled") private var proOfferHandled = false
@@ -26,12 +31,15 @@ public struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #else
+    @Environment(\.openSettings) private var openSettings
     #endif
 
-    /// View-only destinations let Home and Notes participate in native list selection.
+    /// View-only destinations let Home, Notes and Folders participate in native list selection.
     private enum SidebarDestination: Hashable {
         case home
         case notes
+        case folders
         case library(LibraryStore.Scope)
     }
 
@@ -148,66 +156,33 @@ public struct RootView: View {
 
     private var splitView: some View {
         NavigationSplitView {
-            ScrollViewReader { proxy in
             List(selection: sidebarBinding) {
                 if showsHome {
-                    Section {} header: {
-                        dashboard(compact: true).textCase(nil).id("dashboard-top")
+                    if compactFiles {
+                        compactFilesRows
+                    } else {
+                        Section {} header: {
+                            dashboard(compact: true).textCase(nil).id("dashboard-top")
+                        }
                     }
                 } else {
-                    sidebarDestination(L10n.homeTitle, symbol: "house.fill", destination: .home)
-                        .tag(SidebarDestination.home)
-                        .accessibilityIdentifier("sidebar-home")
-                }
-                Section(L10n.sidebarLibrary) {
-                    sidebarDestination(L10n.premiumNotes, symbol: "pencil.tip", destination: .notes)
-                        .tag(SidebarDestination.notes)
-                        .accessibilityIdentifier("sidebar-notes")
-
-                    sidebarDestination(L10n.allDocuments, symbol: "doc.on.doc", destination: .library(.all))
-                        .tag(SidebarDestination.library(.all))
-                    sidebarDestination(L10n.favorites, symbol: "star", destination: .library(.favorites))
-                        .badge(usesLargeSidebar ? 0 : model.counts.favorites)
-                        .tag(SidebarDestination.library(.favorites))
-                    sidebarDestination(L10n.recentlyDeleted, symbol: "trash", destination: .library(.recentlyDeleted))
-                        .badge(usesLargeSidebar ? 0 : model.counts.recentlyDeleted)
-                        .tag(SidebarDestination.library(.recentlyDeleted))
-                }
-                Section {
-                    ForEach(model.folders) { folder in
-                        sidebarDestination(folder.name, symbol: "folder", destination: .library(.folder(folder.id)))
-                            .badge(usesLargeSidebar ? 0 : model.counts.folders[folder.id, default: 0])
-                            .tag(SidebarDestination.library(.folder(folder.id)))
-                            .contextMenu {
-                                Button(L10n.rename) {
-                                    folderName = folder.name
-                                    folderPrompt = .rename(folder)
-                                }
-                                Button(L10n.deleteFolder, role: .destructive) { deletingFolder = folder }
-                            }
-                            .accessibilityIdentifier("sidebar-folder")
-                    }
-                    Button {
-                        folderName = ""
-                        folderPrompt = .create
-                    } label: {
-                        Label(L10n.newFolder, systemImage: "folder.badge.plus")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("sidebar-new-folder")
-                    // List scroll targets must identify a row, not a child of
-                    // a section header. Keep this row even with no folders.
-                    .id("folders-section")
-                } header: {
-                    Text(L10n.folders)
+                    wideSidebarRows
                 }
             }
             .listStyle(.sidebar)
-            .tint(showsHome ? Theme.accent : .blue)
+            // The system tints the selected row's label rather than filling the
+            // row, so this has to read on the sidebar in both appearances.
+            .tint(Theme.accent)
             .scrollContentBackground(.hidden)
-            .background(Theme.sidebar)
+            .background(showsHome ? Theme.homeBackground : Theme.sidebar)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !showsHome {
+                    CloudSyncCard(session: model.session, action: showSyncSettings)
+                        .padding(.horizontal, 12).padding(.bottom, 12).padding(.top, 6)
+                }
+            }
             .onChange(of: model.sidebarSelection) { _, selected in
-                if selected != nil { dashboardVisible = false }
+                if selected != nil { dashboardVisible = false; foldersVisible = false }
             }
             .task(id: model.session.changeToken) { await model.reloadSidebar() }
             .navigationDestination(item: $model.homeDocument) { id in
@@ -235,10 +210,6 @@ public struct RootView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .onChange(of: folderScrollRequest) { _, _ in
-                proxy.scrollTo("folders-section", anchor: .top)
-            }
-            }
             .navigationSplitViewColumnWidth(min: usesLargeSidebar ? 420 : 200,
                                             ideal: usesLargeSidebar ? 460 : 240)
         } detail: {
@@ -249,12 +220,15 @@ public struct RootView: View {
                             dashboard(compact: false).padding(28)
                                 .frame(maxWidth: 1400).frame(maxWidth: .infinity)
                         }
-                        .background(Theme.libraryBackground)
+                        .background(Theme.homeBackground)
                         // Home appears once in navigation on every platform.
                         .navigationTitle("")
                         #if os(iOS)
                         .navigationBarTitleDisplayMode(.inline)
                         #endif
+                    } else if foldersVisible && !showsHome {
+                        FoldersView(model: model, open: openFolder, newFolder: promptNewFolder,
+                                    rename: promptRename, delete: { deletingFolder = $0 })
                     } else {
                         LibraryView(model: model)
                     }
@@ -267,75 +241,226 @@ public struct RootView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if showsHome && model.homeDocument == nil && model.path.isEmpty { compactNavigation }
         }
-        .modifier(LibraryPresentations(model: model))
+        .modifier(LibraryPresentations(model: model, showHome: showHomeAfterScan))
         .focusedSceneValue(\.libraryModel, model)
         #if DEBUG
         .task { await openDebugItemIfRequested() }
         #endif
     }
 
+    // MARK: - Sidebar rows
+
+    /// iPad and Mac: the brand, then the six places the library has.
+    @ViewBuilder private var wideSidebarRows: some View {
+        Section {
+            sidebarDestination(L10n.homeTitle, symbol: "house.fill", destination: .home)
+                .tag(SidebarDestination.home)
+                .accessibilityIdentifier("sidebar-home")
+            sidebarDestination(L10n.premiumNotes, symbol: "pencil.tip", destination: .notes)
+                .tag(SidebarDestination.notes)
+                .accessibilityIdentifier("sidebar-notes")
+            sidebarDestination(L10n.allDocuments, symbol: "doc.on.doc", destination: .library(.all))
+                .tag(SidebarDestination.library(.all))
+                .accessibilityIdentifier("sidebar-documents")
+            sidebarDestination(L10n.folders, symbol: "folder", destination: .folders)
+                .badge(usesLargeSidebar ? 0 : model.folders.count)
+                .tag(SidebarDestination.folders)
+                .accessibilityIdentifier("sidebar-folders")
+            sidebarDestination(L10n.favorites, symbol: "star", destination: .library(.favorites))
+                .badge(usesLargeSidebar ? 0 : model.counts.favorites)
+                .tag(SidebarDestination.library(.favorites))
+                .accessibilityIdentifier("sidebar-favorites")
+            sidebarDestination(L10n.recentlyDeleted, symbol: "trash", destination: .library(.recentlyDeleted))
+                .badge(usesLargeSidebar ? 0 : model.counts.recentlyDeleted)
+                .tag(SidebarDestination.library(.recentlyDeleted))
+                .accessibilityIdentifier("sidebar-recently-deleted")
+        } header: {
+            HStack(spacing: 8) {
+                BrandMark.image(size: 26).foregroundStyle(Theme.accent)
+                // The mark is hidden from accessibility, so the name is the
+                // one element here. Combining the row left the name in the
+                // tree a second time.
+                Text(verbatim: Brand.displayName).font(.title3.bold()).foregroundStyle(Theme.navy)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("sidebar-brand")
+            }
+            .textCase(nil)
+            .padding(.bottom, 8)
+        }
+    }
+
+    /// The phone's Files tab: every document, the two special scopes, and
+    /// the folders with their own management.
+    @ViewBuilder private var compactFilesRows: some View {
+        Section {
+            sidebarDestination(L10n.allDocuments, symbol: "doc.on.doc", destination: .library(.all))
+                .tag(SidebarDestination.library(.all))
+                .accessibilityIdentifier("files-documents")
+            sidebarDestination(L10n.favorites, symbol: "star", destination: .library(.favorites))
+                .badge(model.counts.favorites)
+                .tag(SidebarDestination.library(.favorites))
+                .accessibilityIdentifier("files-favorites")
+            sidebarDestination(L10n.recentlyDeleted, symbol: "trash", destination: .library(.recentlyDeleted))
+                .badge(model.counts.recentlyDeleted)
+                .tag(SidebarDestination.library(.recentlyDeleted))
+                .accessibilityIdentifier("files-recently-deleted")
+        } header: {
+            Text(L10n.homeFiles).font(.largeTitle.bold()).foregroundStyle(Theme.navy)
+                .textCase(nil).padding(.bottom, 6)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("files-title")
+        }
+        Section {
+            ForEach(model.folders) { folder in
+                sidebarDestination(folder.name, symbol: "folder", destination: .library(.folder(folder.id)))
+                    .badge(model.counts.folders[folder.id, default: 0])
+                    .tag(SidebarDestination.library(.folder(folder.id)))
+                    .contextMenu {
+                        Button(L10n.rename) { promptRename(folder) }
+                        Button(L10n.deleteFolder, role: .destructive) { deletingFolder = folder }
+                    }
+                    .accessibilityIdentifier("sidebar-folder")
+            }
+            Button(action: promptNewFolder) {
+                Label(L10n.newFolder, systemImage: "folder.badge.plus")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.accent)
+            .accessibilityIdentifier("sidebar-new-folder")
+        } header: {
+            Text(L10n.folders)
+        }
+    }
+
+    private func promptNewFolder() {
+        folderName = ""
+        folderPrompt = .create
+    }
+
+    private func promptRename(_ folder: Folder) {
+        folderName = folder.name
+        folderPrompt = .rename(folder)
+    }
+
+    private func openFolder(_ folder: Folder) {
+        model.path = []
+        model.contentKind = .all
+        dashboardVisible = false
+        foldersVisible = false
+        model.sidebarSelection = .folder(folder.id)
+    }
+
+    /// A scan was saved and dealt with: Home, with nothing pushed over it.
+    private func showHomeAfterScan() {
+        model.path = []
+        model.homeDocument = nil
+        if showsHome { showCompactHome() } else { sidebarBinding.wrappedValue = .home }
+    }
+
+    private func showSyncSettings() {
+        #if os(iOS)
+        model.isShowingSettings = true
+        #else
+        openSettings()
+        #endif
+    }
+
+    // MARK: - The phone's bottom bar
+
+    private func showCompactHome() {
+        compactFiles = false
+        model.sidebarSelection = nil
+        dashboardVisible = true
+    }
+
+    private func showCompactNotes() {
+        model.path = []
+        model.contentKind = .notes
+        dashboardVisible = false
+        model.sidebarSelection = .all
+    }
+
+    private func showCompactFiles() {
+        model.path = []
+        compactFiles = true
+        model.sidebarSelection = nil
+        dashboardVisible = true
+    }
+
+    private var compactHomeSelected: Bool { model.sidebarSelection == nil && !compactFiles }
+    private var compactNotesSelected: Bool { model.sidebarSelection != nil && model.contentKind == .notes }
+    private var compactFilesSelected: Bool {
+        model.sidebarSelection == nil ? compactFiles : model.contentKind != .notes
+    }
+
+    /// Home, Notes, Scan, Files. Scan opens the scanner rather than a place,
+    /// so it is never the selected tab.
     private var compactNavigation: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 Menu {
-                    Button(L10n.homeTitle) { model.sidebarSelection = nil; dashboardVisible = true }
-                    Button(L10n.premiumNotes) { model.path = []; model.contentKind = .notes; dashboardVisible = false; model.sidebarSelection = .all }
+                    Button(L10n.homeTitle, action: showCompactHome)
+                    Button(L10n.premiumNotes, action: showCompactNotes)
                         .accessibilityIdentifier("home-notes")
-                    Button(L10n.toolsDocuments) { model.path = []; model.contentKind = .documents; dashboardVisible = false; model.sidebarSelection = .all }
                     #if os(iOS)
                     Button(L10n.scan) { model.isShowingScanner = true }.disabled(!DocumentCameraView.isSupported)
                     #endif
-                    Button(L10n.folders) { model.sidebarSelection = nil; dashboardVisible = true; folderScrollRequest.toggle() }
+                    Button(L10n.homeFiles, action: showCompactFiles)
+                        .accessibilityIdentifier("home-files")
                 } label: {
                     Label(L10n.sidebarLibrary, systemImage: "line.3.horizontal")
                         .font(.body).frame(maxWidth: .infinity, minHeight: 44)
-                }.accessibilityIdentifier("home-navigation-menu")
+                }
+                .foregroundStyle(Theme.accent)
+                .accessibilityIdentifier("home-navigation-menu")
             } else {
                 navigationButtons
             }
         }
-        .buttonStyle(.plain).foregroundStyle(Theme.accent)
+        .buttonStyle(.plain)
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(Theme.surface)
+        .overlay(alignment: .top) { Theme.border.frame(height: 0.5) }
     }
 
     private var navigationButtons: some View {
         HStack(spacing: 4) {
-            Button {
-                model.sidebarSelection = nil
-                dashboardVisible = true
-            } label: {
-                tabLabel(L10n.homeTitle, symbol: "house.fill")
-                    .background(model.sidebarSelection == nil ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 14))
-            }.accessibilityIdentifier("home-tab")
-            Button { model.path = []; model.contentKind = .notes; dashboardVisible = false; model.sidebarSelection = .all } label: {
-                tabLabel(L10n.premiumNotes, symbol: "pencil.tip")
-                    .background(model.sidebarSelection != nil && model.contentKind == .notes ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 14))
-            }.accessibilityIdentifier("home-notes")
-            Button { model.path = []; model.contentKind = .documents; dashboardVisible = false; model.sidebarSelection = .all } label: {
-                tabLabel(L10n.toolsDocuments, symbol: "doc.on.doc")
-                    .background(model.sidebarSelection != nil && model.contentKind == .documents ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 14))
-            }.accessibilityIdentifier("home-documents")
+            Button(action: showCompactHome) {
+                tabLabel(L10n.homeTitle, symbol: "house.fill", selected: compactHomeSelected)
+            }
+            .accessibilityIdentifier("home-tab")
+            .accessibilityAddTraits(compactHomeSelected ? .isSelected : [])
+            Button(action: showCompactNotes) {
+                tabLabel(L10n.premiumNotes, symbol: "pencil.tip", selected: compactNotesSelected)
+            }
+            .accessibilityIdentifier("home-notes")
+            .accessibilityAddTraits(compactNotesSelected ? .isSelected : [])
             #if os(iOS)
             Button { model.isShowingScanner = true } label: {
-                tabLabel(L10n.premiumScan, symbol: "doc.viewfinder")
-            }.disabled(!DocumentCameraView.isSupported)
-                .accessibilityHint(DocumentCameraView.isSupported ? "" : L10n.scanUnsupported)
-                .accessibilityIdentifier("library-scan")
+                tabLabel(L10n.premiumScan, symbol: "doc.viewfinder", selected: false)
+            }
+            .disabled(!DocumentCameraView.isSupported)
+            .accessibilityHint(DocumentCameraView.isSupported ? "" : L10n.scanUnsupported)
+            .accessibilityIdentifier("library-scan")
             #endif
-            Button {
-                model.sidebarSelection = nil
-                dashboardVisible = true
-                folderScrollRequest.toggle()
-            } label: { tabLabel(L10n.folders, symbol: "folder") }
-                .accessibilityIdentifier("home-folders")
+            Button(action: showCompactFiles) {
+                tabLabel(L10n.homeFiles, symbol: "folder", selected: compactFilesSelected)
+            }
+            .accessibilityIdentifier("home-files")
+            .accessibilityAddTraits(compactFilesSelected ? .isSelected : [])
         }
     }
 
     private var sidebarBinding: Binding<SidebarDestination?> {
         Binding(get: {
-            if dashboardVisible && !showsHome { return .home }
+            if !showsHome {
+                if dashboardVisible { return .home }
+                if foldersVisible { return .folders }
+            }
             guard let scope = model.sidebarSelection else { return nil }
+            // The wide sidebar has one Folders row, which stays lit while a
+            // folder opened from it is showing.
+            if !showsHome, case .folder(.some) = scope { return .folders }
             if model.contentKind == .notes && scope == .all { return .notes }
             return .library(scope)
         }, set: { selected in
@@ -348,15 +473,26 @@ public struct RootView: View {
                 model.sidebarSelection = .all
                 model.sidebarSelection = nil
                 model.path = []
+                foldersVisible = false
                 dashboardVisible = true
+            case .folders:
+                // The same reset as Home, so opening the folder that was
+                // showing before reloads it.
+                model.sidebarSelection = .all
+                model.sidebarSelection = nil
+                model.path = []
+                dashboardVisible = false
+                foldersVisible = true
             case .notes:
                 model.path = []
                 model.contentKind = .notes
                 dashboardVisible = false
+                foldersVisible = false
                 model.sidebarSelection = .all
             case .library(let scope):
                 model.path = []
                 dashboardVisible = false
+                foldersVisible = false
                 model.contentKind = scope == .all ? .documents : .all
                 model.sidebarSelection = scope
             case nil:
@@ -367,11 +503,16 @@ public struct RootView: View {
         })
     }
 
-    private func tabLabel(_ title: String, symbol: String) -> some View {
+    private func tabLabel(_ title: String, symbol: String, selected: Bool) -> some View {
         VStack(spacing: 4) {
             Image(systemName: symbol).font(.title3)
-            Text(title).font(.caption2).fixedSize(horizontal: false, vertical: true)
-        }.frame(minWidth: 52, maxWidth: .infinity, minHeight: 44)
+            Text(title).font(.caption2.weight(selected ? .semibold : .regular))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(selected ? Theme.accent : Theme.secondaryText)
+        .frame(minWidth: 52, maxWidth: .infinity, minHeight: 48)
+        .background(selected ? Theme.lavender : .clear, in: RoundedRectangle(cornerRadius: 14))
+        .contentShape(Rectangle())
     }
 
     private func dashboard(compact: Bool) -> some View {
@@ -380,10 +521,10 @@ public struct RootView: View {
         }, showLibrary: {
             dashboardVisible = false
             model.sidebarSelection = .all
-        }, newFolder: {
-            folderName = ""
-            folderPrompt = .create
-        })
+        }, showFolders: {
+            sidebarBinding.wrappedValue = .folders
+        }, openFolder: openFolder, newFolder: promptNewFolder,
+           renameFolder: promptRename, deleteFolder: { deletingFolder = $0 })
     }
 
     private var usesLargeSidebar: Bool { dynamicTypeSize.isAccessibilitySize && !showsHome }

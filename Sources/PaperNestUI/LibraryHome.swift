@@ -2,55 +2,53 @@ import PaperNestCore
 import PaperNestStore
 import SwiftUI
 
-/// Content-first dashboard. All counts and rows come from the library store.
+/// Home. One set of quick actions, the documents touched most recently and,
+/// on the wide layouts, the folders. Every count and row comes from the
+/// library store.
+///
+/// The phone keeps it short — greeting, three actions, five documents —
+/// because Scan and Files are one tap away in the bar underneath. iPad and
+/// Mac have the room for a banner, thumbnails or a table, and folder cards.
 struct DashboardView: View {
     @Bindable var model: LibraryModel
     var compact: Bool
     var openFile: (LibraryStore.ItemSummary) -> Void
     var showLibrary: () -> Void
+    var showFolders: () -> Void
+    var openFolder: (Folder) -> Void
     var newFolder: () -> Void
+    var renameFolder: (Folder) -> Void
+    var deleteFolder: (Folder) -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    /// Matches the `.title` the name beside it is set in, and grows with it.
-    @ScaledMetric(relativeTo: .title) private var headerMarkSize: CGFloat = 29
-    @State private var filter = DashboardFilter.recent
+    /// Matches the `.title2` the name beside it is set in, and grows with it.
+    @ScaledMetric(relativeTo: .title2) private var headerMarkSize: CGFloat = 29
     @State private var showProfile = false
-    @State private var selectedTool: ToolsSheet.Tool?
+    @State private var creatingNotebook = false
+    @State private var createdItemID: ItemID?
     @State private var renaming: LibraryStore.ItemSummary?
     @State private var renameText = ""
     @State private var exporting: LibraryStore.ItemSummary?
 
+    /// The phone shows five; the wide layouts have room for a few more.
     private var recent: [LibraryStore.ItemSummary] {
-        Array(model.dashboardItems.filter { filter != .favorites || $0.item.isFavorite }.prefix(6))
+        Array(model.dashboardItems.prefix(compact ? 5 : LibraryModel.homeRecentLimit))
     }
 
+    /// How many folder cards Home shows before See All takes over.
+    private static let folderLimit = 8
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: compact ? 18 : 22) {
             header
-            search
-            captureActions
-            tools
-            if !model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                ForEach(model.folders.filter { $0.name.localizedStandardContains(model.searchText) }) { folder in
-                    Button {
-                        model.searchText = ""
-                        model.contentKind = .all
-                        showLibrary()
-                        model.sidebarSelection = .folder(folder.id)
-                    } label: { Label(folder.name, systemImage: "folder") }
-                }
-            }
-            // My Space reads as the next thing down the page rather than a
-            // sidebar off to the right. It used to sit in a fixed 240-point
-            // column beside Recent on iPad and Mac, which squeezed its folder
-            // grid into one narrow strip while Recent had the rest of a very
-            // wide window. Stacked, the grid flows across the full width and
-            // both sections get the room they need. The phone already did
-            // this; now every size does.
+            if compact { greeting } else { HomeBanner() }
+            HomeQuickActionsRow(actions: quickActions, tinted: compact)
             recentSection
-            space
+            if !compact && !model.folders.isEmpty { foldersSection }
         }
-        .foregroundStyle(Theme.primaryText)
-        .sheet(item: $selectedTool) { ToolsSheet(model: model, initialTool: $0) }
+        .foregroundStyle(Theme.navy)
+        .sheet(isPresented: $creatingNotebook, onDismiss: openCreatedNotebook) {
+            NotebookCreationSheet(model: model) { createdItemID = $0 }
+        }
         .sheet(item: $exporting) { ExportLoader(itemID: $0.id, currentPageID: nil) }
         .alert(L10n.renameTitle, isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }), presenting: renaming) { item in
             TextField(L10n.renamePlaceholder, text: $renameText)
@@ -79,267 +77,203 @@ struct DashboardView: View {
         #endif
     }
 
+    // MARK: - Header
+
+    private var header: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 10) {
+                    headerTitle
+                    HStack(spacing: 20) { headerControls }
+                }
+            } else {
+                HStack(spacing: 10) {
+                    headerTitle
+                    Spacer(minLength: 8)
+                    headerControls
+                }
+            }
+        }
+    }
+
+    /// The phone has no sidebar to carry the brand, so Home does. On the wide
+    /// layouts the sidebar has it, and this is the screen's own title.
+    @ViewBuilder private var headerTitle: some View {
+        if compact {
+            HStack(spacing: 10) {
+                if !dynamicTypeSize.isAccessibilitySize {
+                    BrandMark.image(size: headerMarkSize).foregroundStyle(Theme.accent)
+                }
+                Text(verbatim: Brand.displayName).font(.title2.bold())
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("home-brand")
+            }
+        } else {
+            Text(L10n.homeTitle).font(.largeTitle.bold())
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("home-title")
+        }
+    }
+
+    @ViewBuilder private var headerControls: some View {
+        if compact {
+            // Draws nothing in a build without iCloud. The wide layouts show
+            // sync in the sidebar instead.
+            CloudSyncStatusView(session: model.session, style: .compact)
+        }
+        Button { model.isShowingTools = true } label: {
+            Image(systemName: "square.grid.2x2")
+                .font(.title3)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.toolsTitle)
+        .accessibilityIdentifier("home-tools-all")
+        #if os(macOS)
+        .help(L10n.toolsTitle)
+        #endif
+        Button { showProfile = true } label: {
+            Image(systemName: "person.crop.circle")
+                .font(.title)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.profile)
+        .accessibilityIdentifier("home-profile")
+        #if os(macOS)
+        .help(L10n.profile)
+        #endif
+        .sheet(isPresented: $showProfile) { ProfileView(session: model.session, store: .shared) }
+    }
+
+    private var greeting: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            VStack(alignment: .leading, spacing: 4) {
+                Text(HomeGreeting.text(at: context.date)).font(.title2.bold())
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("home-greeting")
+                Text(L10n.homeSubtitle).font(.subheadline).foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    // MARK: - Quick actions
+
+    /// New Note, Import File and New Folder everywhere. iPad adds Scan, which
+    /// its sidebar does not have; the phone has Scan in its bottom bar; the
+    /// Mac has no camera to scan with.
+    private var quickActions: [HomeQuickAction] {
+        var actions: [HomeQuickAction] = []
+        #if os(iOS)
+        if !compact {
+            actions.append(HomeQuickAction(id: "home-scan", title: L10n.scan, symbol: "doc.viewfinder",
+                                           isEnabled: DocumentCameraView.isSupported,
+                                           hint: DocumentCameraView.isSupported ? "" : L10n.scanUnsupported) {
+                model.isShowingScanner = true
+            })
+        }
+        #endif
+        actions.append(HomeQuickAction(id: "home-new-note", title: L10n.homeNewNote, symbol: "pencil.line") {
+            creatingNotebook = true
+        })
+        actions.append(HomeQuickAction(id: "home-import", title: L10n.homeImportFile, symbol: "square.and.arrow.down") {
+            model.isShowingFileImporter = true
+        })
+        actions.append(HomeQuickAction(id: "home-new-folder", title: L10n.newFolder, symbol: "folder.badge.plus",
+                                       action: newFolder))
+        return actions
+    }
+
+    private func openCreatedNotebook() {
+        guard let id = createdItemID else { return }
+        createdItemID = nil
+        model.open(id)
+    }
+
+    // MARK: - Recent documents
+
     private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ViewThatFits(in: .horizontal) {
-                HStack { filters; Spacer(); seeAll }
-                VStack(alignment: .leading) { filters; seeAll }
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(L10n.homeRecentDocuments, identifier: "home-recent-heading") {
+                Button {
+                    model.contentKind = .all
+                    showLibrary()
+                } label: { seeAllLabel }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.homeSeeAll + ", " + L10n.homeRecentDocuments)
+                    .accessibilityIdentifier("home-see-all")
             }
             if recent.isEmpty {
                 ContentUnavailableView(L10n.premiumEmpty, systemImage: "doc",
                                        description: Text(L10n.premiumEmptyDetail))
+                    .frame(maxWidth: .infinity)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(recent) { summary in
-                        HStack(spacing: 0) {
-                            Button { open(summary) } label: {
-                                recentRow(summary)
-                            }.buttonStyle(.plain)
-                            Menu { actions(summary) } label: {
-                                Image(systemName: "ellipsis").frame(width: 44, height: 44)
-                            }.menuStyle(.borderlessButton)
-                                .accessibilityLabel(L10n.more)
-                        }
-                        .contextMenu { actions(summary) }
-                        if summary.id != recent.last?.id { Divider().padding(.leading, 68) }
-                    }
-                }.padding(4).modifier(PremiumCard())
+                // A container of its own, so the identifier names the list
+                // and each row keeps its own label for VoiceOver and tests.
+                recentContent
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("home-recent")
             }
         }
     }
 
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if dynamicTypeSize.isAccessibilitySize {
-                Text(verbatim: Brand.displayName).font(.headline)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 20) { headerControls }
-            } else {
-                HStack(spacing: 10) {
-                    BrandMark.image(size: headerMarkSize).foregroundStyle(Theme.accent)
-                    Text(verbatim: Brand.displayName).font(.title2.bold())
-                    Spacer(minLength: 8)
-                    headerControls
-                }
-            }
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(greeting(at: context.date)).font(compact ? .title3.bold() : .title.bold())
-                    Text(L10n.premiumWelcome).font(.caption).foregroundStyle(Theme.secondaryText)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder private var headerControls: some View {
-        // Draws nothing in a build without iCloud.
-        CloudSyncStatusView(session: model.session, style: compact ? .compact : .labeled)
-        Button { showProfile = true } label: {
-            Label(L10n.profile, systemImage: "person.crop.circle")
-                .labelStyle(.iconOnly)
-                .font(.title)
-                .foregroundStyle(Theme.primaryText)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Circle())
-        }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L10n.profile)
-            .accessibilityIdentifier("home-profile")
-            .sheet(isPresented: $showProfile) { ProfileView(session: model.session, store: .shared) }
-
-    }
-
-    private var search: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField(L10n.searchPrompt, text: $model.searchText)
-                .textFieldStyle(.plain).onSubmit { model.contentKind = .all; showLibrary() }
-                #if os(iOS)
-                .submitLabel(.search)
-                #endif
-                .accessibilityIdentifier("home-search")
-        }.padding(.horizontal, 12).frame(minHeight: 44).modifier(PremiumCard())
-    }
-
-    private var toolColumns: [GridItem] {
-        compact
-            ? [GridItem(.flexible(), spacing: 12, alignment: .top), GridItem(.flexible(), spacing: 12, alignment: .top)]
-            : [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 220 : 130), spacing: 12, alignment: .top)]
-    }
-
-    private var captureActions: some View {
-        LazyVGrid(columns: toolColumns, spacing: 12) {
-            #if os(iOS)
-            Button { model.isShowingScanner = true } label: {
-                homeActionLabel(L10n.scan, symbol: "doc.viewfinder")
-            }.disabled(!DocumentCameraView.isSupported)
-                .accessibilityHint(DocumentCameraView.isSupported ? "" : L10n.scanUnsupported)
-                .accessibilityIdentifier("home-scan")
-            #endif
-            Button { model.isShowingFileImporter = true } label: {
-                homeActionLabel(L10n.importFiles, symbol: "square.and.arrow.down")
-            }.accessibilityIdentifier("home-import")
-        }.buttonStyle(PremiumButtonStyle())
-    }
-
-    private var tools: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(L10n.toolsTitle).font(.subheadline.bold()).accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("home-tools-heading")
-                Spacer(minLength: 8)
-                Button(L10n.homeSeeAll) { model.isShowingTools = true }
-                    .font(.subheadline).frame(minHeight: 44)
-                    .accessibilityLabel(L10n.homeSeeAll + ", " + L10n.toolsTitle)
-                    .accessibilityIdentifier("home-tools-all")
-            }
-            LazyVGrid(columns: toolColumns, spacing: 12) {
-                ForEach(ToolsSheet.Tool.allCases) { tool in
-                    Button { selectedTool = tool } label: {
-                        homeActionLabel(tool.compactTitle, symbol: tool.systemImage)
-                    }.buttonStyle(PremiumButtonStyle())
-                        .accessibilityLabel(tool.title)
-                        .accessibilityIdentifier("home-tool-\(tool.rawValue)")
-                        .accessibilityValue(tool.prompt)
-                }
-            }
-        }
-    }
-
-    private func homeActionLabel(_ title: String, symbol: String) -> some View {
-        Group {
-            if !dynamicTypeSize.isAccessibilitySize {
-                HStack(spacing: 10) {
-                    homeActionIcon(symbol)
-                    Text(title).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    homeActionIcon(symbol)
-                    Text(title).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .foregroundStyle(Theme.primaryText).multilineTextAlignment(.leading)
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .frame(maxWidth: .infinity, minHeight: dynamicTypeSize.isAccessibilitySize ? 76 : 44)
-        .modifier(PremiumCard()).contentShape(RoundedRectangle(cornerRadius: Theme.radius))
-        .accessibilityElement(children: .ignore).accessibilityLabel(title)
-    }
-
-    private func homeActionIcon(_ symbol: String) -> some View {
-        Image(systemName: symbol).resizable().scaledToFit().frame(width: 22, height: 22)
-            .foregroundStyle(Theme.accent).frame(width: 26, height: 28)
-            .accessibilityHidden(true)
-    }
-
-    @ViewBuilder private var filters: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 4) { filterChoices }
+    @ViewBuilder private var recentContent: some View {
+        #if os(macOS)
+        HomeRecentTable(items: recent, sizes: model.dashboardSizes, open: open, actions: actions)
+        #else
+        if compact || dynamicTypeSize.isAccessibilitySize {
+            HomeRecentList(items: recent, sizes: model.dashboardSizes, open: open, actions: actions)
         } else {
-            HStack(spacing: 4) { filterChoices }
+            HomeRecentCards(items: recent, open: open, actions: actions)
         }
+        #endif
     }
 
-    @ViewBuilder private var filterChoices: some View {
-        filterButton(.recent, title: L10n.homeRecent)
-        filterButton(.favorites, title: L10n.favorites)
-    }
+    // MARK: - Folders
 
-    private func filterButton(_ value: DashboardFilter, title: String) -> some View {
-        Button { filter = value } label: {
-            Text(title).font(.subheadline.weight(filter == value ? .semibold : .regular))
-                .padding(.horizontal, 12).frame(minHeight: 44)
-                .background(filter == value ? Theme.selection : .clear, in: Capsule())
-        }.buttonStyle(.plain)
-            .accessibilityIdentifier("home-filter-\(value.rawValue)")
-            .accessibilityValue(filter == value ? L10n.selectionOn : L10n.selectionOff)
-    }
-
-    private var seeAll: some View {
-        Button(L10n.homeSeeAll) {
-            model.contentKind = .all
-            showLibrary()
-            if filter == .favorites { model.sidebarSelection = .favorites }
-        }.font(.subheadline).frame(minHeight: 44).accessibilityIdentifier("home-see-all")
-    }
-
-    /// How wide a My Space card is allowed to get.
-    ///
-    /// 95 points was sized for the narrow column this section used to sit in
-    /// on iPad and Mac. Stacked under Recent the row is several times wider,
-    /// and at the old minimum the grid answered by making the cards *smaller*
-    /// still — enough that "Documents" broke across two lines. A regular-width
-    /// window gets cards with room for their own labels.
-    private var spaceCardMinimum: CGFloat {
-        if dynamicTypeSize.isAccessibilitySize { return 220 }
-        return compact ? 95 : 150
-    }
-
-    private var space: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(L10n.studioMySpace).font(.subheadline.bold())
-                Spacer()
-                Button(action: newFolder) { Image(systemName: "folder.badge.plus").frame(width: 44, height: 44) }
-                    .accessibilityLabel(L10n.newFolder).accessibilityIdentifier("home-new-folder")
+    private var foldersSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(L10n.folders, identifier: "home-folders-heading") {
+                Button(action: showFolders) { seeAllLabel }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.homeSeeAll + ", " + L10n.folders)
+                    .accessibilityIdentifier("home-folders-all")
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: spaceCardMinimum))], spacing: 12) {
-                collection(L10n.premiumNotes, count: model.dashboardItems.filter { $0.item.kind == .notebook }.count, color: Theme.accent) {
-                    model.contentKind = .notes; showLibrary()
-                }
-                collection(L10n.toolsDocuments, count: model.dashboardItems.filter { $0.item.kind != .notebook }.count, color: .blue) {
-                    model.contentKind = .documents; showLibrary()
-                }
-                ForEach(Array(model.folders.prefix(2).enumerated()), id: \.element.id) { index, folder in
-                    collection(folder.name, count: model.counts.folders[folder.id, default: 0], color: index == 0 ? .orange : .green) {
-                        model.contentKind = .all
-                        showLibrary()
-                        model.sidebarSelection = .folder(folder.id)
-                    }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 170), spacing: 14)],
+                      spacing: 14) {
+                ForEach(Array(model.folders.prefix(Self.folderLimit).enumerated()), id: \.element.id) { index, folder in
+                    FolderCard(folder: folder, count: model.counts.folders[folder.id, default: 0],
+                               tint: FolderTint.color(at: index),
+                               open: { openFolder(folder) }, rename: { renameFolder(folder) },
+                               delete: { deleteFolder(folder) })
                 }
             }
         }
     }
 
-    private func collection(_ title: String, count: Int, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: "folder").font(.title2).foregroundStyle(color)
-                Text(title).font(.subheadline.bold()).lineLimit(2)
-                Text(L10n.itemCount(count)).font(.caption).foregroundStyle(.secondary)
-            }.frame(maxWidth: .infinity, minHeight: 70)
-                .padding(10).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: Theme.radius))
-        }.buttonStyle(PremiumButtonStyle())
+    // MARK: - Pieces
+
+    private func sectionHeader<Trailing: View>(_ title: String, identifier: String,
+                                               @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier(identifier)
+            Spacer(minLength: 8)
+            trailing().font(.subheadline).frame(minHeight: 44)
+        }
     }
 
-    private func recentRow(_ summary: LibraryStore.ItemSummary) -> some View {
-        HStack(spacing: 12) {
-            Group {
-                if let page = summary.coverPage {
-                    PageImageView(page: page, pixelSize: 180)
-                } else {
-                    Image(systemName: summary.file.map { FileKind.symbol(for: $0.uti) } ?? "doc.text")
-                        .font(.title2).foregroundStyle(Theme.accent)
-                }
-            }.frame(width: 34, height: 42)
-                .background(Theme.preview, in: RoundedRectangle(cornerRadius: 6))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(summary.item.name).font(.subheadline.weight(.semibold)).lineLimit(2)
-                Text(summary.item.modifiedAt, style: .relative).font(.caption2).foregroundStyle(.secondary)
-            }.frame(maxWidth: .infinity, alignment: .leading)
-            if summary.item.isFavorite {
-                Image(systemName: "star.fill").font(.caption).foregroundStyle(Theme.accent)
-                    .accessibilityLabel(L10n.favorites)
-            }
-        }.padding(.horizontal, 8).padding(.vertical, 6).contentShape(Rectangle())
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(L10n.itemAccessibilityLabel(name: summary.item.name,
-                pages: summary.file.map { FileKind.size($0.byteCount) } ?? L10n.pageCount(summary.pageCount)))
+    private var seeAllLabel: some View {
+        HStack(spacing: 4) {
+            Text(L10n.homeSeeAll)
+            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).accessibilityHidden(true)
+        }
+        .foregroundStyle(Theme.accent)
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder private func actions(_ summary: LibraryStore.ItemSummary) -> some View {
@@ -371,14 +305,4 @@ struct DashboardView: View {
             }
         }
     }
-
-    private func greeting(at date: Date) -> String {
-        switch Calendar.current.component(.hour, from: date) {
-        case 5..<12: L10n.premiumMorning
-        case 12..<18: L10n.premiumAfternoon
-        default: L10n.premiumEvening
-        }
-    }
 }
-
-private enum DashboardFilter: String { case recent, favorites }

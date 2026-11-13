@@ -985,4 +985,19 @@ extension L10n {
     static var syncItemCloudOnly: String { tr("sync.item.cloudOnly") }
     static var syncEnableFailed: String { tr("sync.enableFailed") }
     static var syncActionFailed: String { tr("sync.actionFailed") }
+
+    // Home and scanner redesign
+    static var homeSubtitle: String { tr("home.subtitle") }
+    static var homeNewNote: String { tr("home.newNote") }
+    static var homeImportFile: String { tr("home.importFile") }
+    static var homeRecentDocuments: String { tr("home.recentDocuments") }
+    static var homeFiles: String { tr("home.files") }
+    static var homeSyncNotSetUp: String { tr("home.sync.notSetUp") }
+    static var foldersEmpty: String { tr("folders.empty") }
+    static var foldersEmptyDetail: String { tr("folders.emptyDetail") }
+    static var scannerKind: String { tr("scanner.kind") }
+    static var scannerKindDocument: String { tr("scanner.kind.document") }
+    static var scannerKindPhoto: String { tr("scanner.kind.photo") }
+    static var scannerPages: String { tr("scanner.pages") }
+    static var scannerTools: String { tr("scanner.tools") }
 }

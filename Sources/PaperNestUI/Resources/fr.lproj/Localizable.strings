@@ -879,3 +879,18 @@
 "sync.item.cloudOnly" = "Dans iCloud, non téléchargé";
 "sync.enableFailed" = "Impossible d’activer la synchronisation iCloud. Vérifiez que vous êtes connecté à iCloud, puis réessayez.";
 "sync.actionFailed" = "Cette action n’a pas pu aboutir. Rien n’a été supprimé. Réessayez quand iCloud sera joignable.";
+
+/* Home and scanner redesign */
+"home.subtitle" = "Vos notes, documents et fichiers au même endroit.";
+"home.newNote" = "Nouvelle note";
+"home.importFile" = "Importer un fichier";
+"home.recentDocuments" = "Documents récents";
+"home.files" = "Fichiers";
+"home.sync.notSetUp" = "Non configuré dans cette version";
+"folders.empty" = "Aucun dossier pour l’instant";
+"folders.emptyDetail" = "Créez un dossier pour regrouper des documents.";
+"scanner.kind" = "Mode de numérisation";
+"scanner.kind.document" = "Document";
+"scanner.kind.photo" = "Photo";
+"scanner.pages" = "Pages";
+"scanner.tools" = "Outils de page";

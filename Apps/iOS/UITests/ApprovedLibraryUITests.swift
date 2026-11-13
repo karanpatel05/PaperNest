@@ -55,6 +55,10 @@ import XCTest
         let button = app.buttons[identifier]
         if button.exists, button.isHittable { button.tap() }
         else {
+            // The phone reaches documents through its Files tab; the wide
+            // sidebar lists them directly.
+            let files = app.buttons["home-files"]
+            if files.exists, files.isHittable { files.tap() }
             let row = app.cells.containing(.staticText, identifier: title).firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 5))
             // Wide sidebar rows contain explicit Buttons. Address their action,

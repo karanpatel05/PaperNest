@@ -20,6 +20,13 @@ enum Theme {
     static let primaryText = adaptive(0x17172B, 0xF6F2FF)
     static let secondaryText = adaptive(0x77768C, 0xBAB6CB)
     static let radius: CGFloat = 18
+    // Home dashboard, owner palette of 2026-11-13. The dark values are this
+    // app's own: the brief gives light colours and asks for native dark mode.
+    static let deepAccent = adaptive(0x5521CB, 0x9A7BFF)
+    static let lavender = adaptive(0xF2EDFF, 0x2A2440)
+    static let homeBackground = adaptive(0xF8F9FD, 0x141320)
+    static let border = adaptive(0xE7E5F0, 0x3A3550)
+    static let navy = adaptive(0x172347, 0xF6F2FF)
     // Filled actions retain contrast with their existing white labels in both appearances.
     static let gradient = LinearGradient(colors: [adaptive(0x7545F8, 0x6839D8), adaptive(0x6737DA, 0x7545F8)], startPoint: .leading, endPoint: .trailing)
     static let headerGradient = LinearGradient(colors: [Color(red: 0.12, green: 0.21, blue: 0.38), Color(red: 0.39, green: 0.30, blue: 0.48)], startPoint: .topLeading, endPoint: .bottomTrailing)

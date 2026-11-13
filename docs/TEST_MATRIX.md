@@ -1,3 +1,79 @@
+## 2026-11-13 — Home and scanner redesign (Claude, owner's brief and two reference boards in session)
+
+What was built and every call made where the brief was silent: top entry of `docs/CLEAN_NATIVE_DESIGN.md`.
+Home on iPhone, iPad and Mac; a four-item phone bar (Home, Notes, Scan, Files); a Folders screen; the iCloud card;
+the scanner in its own dark surface with Document and Photo modes and a three-column iPad review; and, by two
+later instructions the same afternoon, a saved scan that opens its export screen by itself and returns to Home.
+
+**Read first.** (1) **The Mac was never seen in a real window** — screen access was asked for and declined. Its
+detail column was looked at in an offscreen render; **its sidebar, and every click on the Mac, were not**. (2) **No
+camera was involved in anything below.** The Simulator has none, so edge outlines, the automatic shutter, flash and
+a real Photo-mode still are untested; the scanner tests feed fixture bytes through the same path a still takes.
+(3) **Only 29 of the 113 UI tests were run**, the ones that pass through Home, the sidebar, the phone bar, folders
+or the scanner. (4) Every run happened with other sessions building in this tree and the Mac's load average
+between 60 and 480; where a result looks like load, it says so and says what would settle it.
+
+| Check | Result |
+|---|---|
+| **This commit alone**, clean worktree, 16:45 | `./scripts/test.sh`: **passed, 957 tests** (302 + 49 + 175 + 163 + 158 + 110), 0 failures, 0 compiler warnings. `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`: succeeded, 0 compiler warnings. **A first attempt at the commit failed this same check and never reached the branch:** four files also held the reader session's uncommitted bookmark lines, and the patch that took only this work's lines put its block of `L10n` accessors one line too low, outside the type. The working tree was never wrong. The split now rebuilds each file from the working tree's own text. **No UI test was run on the commit alone**: the UI passes below ran on the working tree, which also held that bookmark work. |
+| `./scripts/test.sh`, final source, 16:25 | **Passed: 982 tests** (311 + 49 + 191 + 163 + 158 + 110), 0 failures, 0 compiler warnings. **Not a clean checkout:** the tree also held the reader session's uncommitted print, night-mode and bookmark work, and its tests are in that count. |
+| `./scripts/swift.sh build` (macOS), final source | Clean, 0 warnings. `./scripts/build-mac-app.sh` and `scripts/build-ios-sim-app.sh` last produced app bundles at 11:20, **before** most of this work; neither was rebuilt afterwards. |
+| iOS Simulator build (inside `xcodebuild test`, own derived-data folder) | Compiled with 0 compiler warnings. The only `warning:` lines are the usual App Intents note and two runtime "priority inversion" diagnostics marked `[Internal]` during scanner tests, not looked into. |
+| **iPhone 17 / iOS 26.5** (`883EEC1B`), final source, 20 selected tests, 16:03–16:12 | **19 passed, 1 failed, then that one passed alone.** `testPremiumDashboardActionsAndLocalizedLayout` ran out its 10 s wait for `notebook-tool-bar`; the hierarchy captured at the failure has the new notebook open with that tool bar in it, and the existence check itself took about 40 s to answer. Re-run alone at 16:14: passed (77 s). It had also passed on the two builds before. Treated as load; a quiet machine would settle it. |
+| **iPad Air 11-inch (M4) / iOS 26.5** (`ED3A3A21`), final source, 20 selected tests, 16:15–16:24 | **20 passed, 0 failed**, 1 skipped by design (the Photo-mode test is phone-only). |
+| Tests in those passes | `HomeToolsUITests` (5), `ApprovedLibraryUITests` (2), `DocumentTabsUITests` (1), `ScannerWorkspaceUITests` (4), and from `AppUITests`: `testHomeHasOneSetOfQuickActionsAndFourPhoneTabs`, `testHomeNewNoteCreatesAndOpensANotebook`, `testPremiumFolderActionCreatesARealFolder`, `testPremiumHomeAtLargestTextSize`, `testStudioHomeLocalizedAndAccessible`; phone only `testAFolderMadeInTheSidebarHoldsAMovedDocument`, `testHomeRecentOpensADocumentAndSeeAllShowsTheGrid`, `testSidebarNavigationKeepsWorkingAfterGoingBack`, `testBottomFilesReachesFolderCreationInEmptyLibrary`, `testPremiumDashboardActionsAndLocalizedLayout`; iPad only `testDashboardCanReturnToTheSameSidebarScope`, `testPremiumLandscapeDashboard`, `testHomeSidebarSelectionFollowsNavigation`, `testNotesSidebarCreatesAndReopensOnlyNotebooks`. |
+| Three tests whose only change was the Home probe they start from, iPhone 17, 16:30 | `testFirstLaunchWelcomeAndRelaunchInAllLanguages` passed, `testWelcomeLargestTextKeepsContinueReachable` passed. `testNotebookToolsAreSideBySide` **failed** at "Empty notes must keep Add Page and Undo available" — the assertion this file already records failing with the same message at baseline `0edf804` (2026-11-12, Notes editor toolbar redesign). It got there through the new Home, the Tools button and a new notebook, which is all this change touches in it. Not fixed here: it is the editor's. |
+| Saved scan → Export → Home (`testSavingAScanOpensExportAndClosingItReturnsHome`, and the end of `testReviewEditsSaveAndReopen`) | Passed on both devices. After Save and the location sheet, `export-start` appears with no alert and no editor; Cancel lands on Home with the scan as the newest recent row; relaunched, the scan opens with "Page 1 of 2". **Exporting itself from that sheet was not driven** — the sheet is the ordinary one, opened and closed. |
+| Photo mode (`testPhotoModeKeepsTheWholeFrameAndTurnsAutoOff`, iPhone) | Passed. Document is selected first; choosing Photo turns Auto off and disables it; the shutter adds a page whose crop corners read `0, 0` and `100, 100`; no ID Card or Book control exists. Fixture bytes, not a camera. |
+| iPad sidebar and Folders (`testIPadSidebarKeepsTheBrandAndFoldersIsOneDestination`) | Passed. Brand shows once in Notes, All Documents, Favorites, a folder and Home; Folders opens the Folders screen, makes a folder, stays selected while that folder shows, lists it as a card reading "0 items", and Home shows the same card. |
+| Localization | `LocalizationTests` 5/5 inside the unit run. en/fr/es Home on iPhone looked at in screenshots, plus es at AX-XXXL; iPad Home looked at in en (light), fr (dark) and es at AX-XXXL. Nothing truncated; French and Spanish action names wrap to two lines and the cards keep one height. |
+
+**Looked at, as pictures:** iPhone Home, Files tab, scanner capture (camera-unavailable state) and review, the
+export sheet after a save and Home after closing it; iPad Home light and dark, the three-column scanner review,
+Home in landscape (the test's own screenshot, taken mid-rotation). Mac Home detail column, offscreen, after its
+fixes: banner, three actions, six table rows with sizes, See All as a link.
+
+**Found by running it, and fixed.**
+
+- `home-recent` on the list of recent rows replaced every row's own label for XCUITest (and so for anything
+  finding a row by name). The list is now an accessibility container and the rows keep their labels.
+- The wide sidebar's brand was in the accessibility tree twice, so VoiceOver would have read it twice.
+- At AX-XXXL the iCloud card's symbol sat on top of its text; it now takes the width it needs.
+- French and Spanish action names wrapped and left the cards different heights.
+- The selected sidebar row was dark purple on dark grey in dark mode.
+- On the Mac, the recent table cut off its last row, See All drew as a grey push button, and Size was "—" for
+  every document. Size now comes from `LibraryStore.originalByteCount`.
+
+**Tests changed, and why.** `HomeToolsUITests` is rewritten: Home no longer has a tool grid, and the wide sidebar
+now carries the brand on purpose. `testStudioHomeHasContentFiltersAndNoQuickActionCards` became
+`testHomeHasOneSetOfQuickActionsAndFourPhoneTabs`, and `testBottomFoldersReachesCreationInEmptyLibrary` became
+`testBottomFilesReachesFolderCreationInEmptyLibrary`: the owner's brief reverses "no quick action cards" and
+replaces the Documents and Folders tabs with Files. Two assertions that said "document did not open" were waiting
+for a Crop button the editor moved into Document Utilities some time ago; the documents had opened, and the tests
+now wait for `editor-back`. The scanner test waits for `editor-back` and the page label on reopen instead of
+`editor-export`, for the reason in the next paragraph. `AppUITests.libraryPath` reads `PAPERNEST_UITEST_LIBRARY`
+when set (see SESSION_HANDOFF): at 15:20 another session's `scripts/ui-test-ios.sh` re-seeded
+`/tmp/papernest-uitest-library` under a run of these tests and four of them failed on an empty Home.
+
+**Not this change, seen in passing.** On iPhone 17 a document titled "Scanner workflow" opened with Export and
+Document Utilities folded into the navigation bar's system overflow beside Find, so `editor-export` was not on
+screen; "Crop target" kept all three. That is the editor's toolbar. Noted for the reader-features session.
+
+**Not run, not seen.**
+
+- The other 84 UI tests, on either device. `testDocumentToolsLocalizedSelectionOrderAndCancellation` was edited
+  (it now opens Files before All Documents on a phone) and **not run**: it needs
+  `/tmp/papernest-file-tools-layout-library` re-seeded, which would have wiped it under another session.
+- The Mac in a window: the sidebar's brand, six rows and iCloud card; the table's sorting, selection, double-click
+  and context menu; clicking New Note, Import File and New Folder; the Folders screen; the Settings window opening
+  from the iCloud card. None of it has been clicked or seen.
+- A camera: live edge outline, automatic capture, flash, the system scanner from the ⋯ menu, a real Photo still.
+- The iCloud card with a container. Every build here says "Not set up in this build"; the states it would show
+  come straight from the sync controller and were not seen.
+- VoiceOver by ear, iPhone in landscape, and iPad in a compact (Slide Over or split) window.
+- One test that failed once and has not since: on iPad at AX-XXXL in Spanish, the Tools sheet was not open 5 s
+  after the tap (load average above 250). It passed in the two later passes with a 15 s wait. Not explained.
+
 ## 2026-11-13 — Reader features R5: Night mode (Claude, owner's queue)
 
 Second in this session's part of the owner's "most features of Adobe PDF reader" queue. This entry is **Night
