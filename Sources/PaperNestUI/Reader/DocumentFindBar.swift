@@ -268,6 +268,20 @@ struct FindHighlightsOverlay: View {
 
     private static let every = Color(red: 1, green: 0.84, blue: 0.04).opacity(0.5)
     private static let current = Color(red: 1, green: 0.55, blue: 0).opacity(0.62)
+    /// Night mode lays its filter over this overlay as well as the page, and
+    /// that filter turns a pale yellow almost black (see `NightPalette`). So
+    /// at night the hits are filled with the colours the filter turns *into*
+    /// an amber band and, for the current hit, an orange one, under white words.
+    private static let everyAtNight = Color(.sRGB, red: 0.77, green: 0.69, blue: 0.35)
+    private static let currentAtNight = Color(.sRGB, red: 0.93, green: 0.61, blue: 0.31)
+
+    /// What a hit is filled with, before the page's own blending and filter.
+    static func fill(isCurrent: Bool, isNight: Bool) -> Color {
+        if isNight { return isCurrent ? currentAtNight : everyAtNight }
+        return isCurrent ? current : every
+    }
+
+    @Environment(\.pageNightMode) private var isNight
 
     var body: some View {
         let hits = find.hits(on: page.id)
@@ -289,7 +303,7 @@ struct FindHighlightsOverlay: View {
                 ForEach(Array((boxes[hit] ?? []).enumerated()), id: \.offset) { index, box in
                     let rect = box.denormalized(in: page.sourceSize).applying(sourceToView)
                     RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(isCurrent ? Self.current : Self.every)
+                        .fill(Self.fill(isCurrent: isCurrent, isNight: isNight))
                         .frame(width: max(rect.width, 2), height: max(rect.height, 2))
                         // The anchor is the first line of the current hit:
                         // that is where the page scrolls to.

@@ -87,6 +87,8 @@ struct DocumentView: View {
     @State private var goToPageText = ""
     /// Print: makes the PDF and shows the system's print panel.
     @State private var printer = DocumentPrinter()
+    /// Night mode: pages shown light on dark. A preference, not part of the document.
+    @AppStorage(NightMode.storageKey) private var isNightMode = false
 
     init(itemID: ItemID, session: LibrarySession, retainedState: DocumentEditorState? = nil,
          workspaceHeader: AnyView? = nil) {
@@ -455,6 +457,7 @@ struct DocumentView: View {
         }
         .modifier(PasswordPrompt(model: importModel))
         .documentPrinting(printer)
+        .environment(\.pageNightMode, isNightMode)
         .focusedSceneValue(\.documentCommands, commandContext)
         .focusedSceneValue(\.documentPrinter, printer)
     }
@@ -1065,7 +1068,7 @@ struct DocumentView: View {
                 .accessibilityIdentifier("studio-tool-settings")
                 .help(L10n.displaySettings)
                 .popover(isPresented: $isShowingDisplaySettings, arrowEdge: .bottom) {
-                    DisplaySettingsPopover(zoom: $zoom, fingerDrawing: $isFingerDrawing,
+                    DisplaySettingsPopover(zoom: $zoom, fingerDrawing: $isFingerDrawing, nightMode: $isNightMode,
                                            fitWidth: isCompact ? nil : { fitWidthRequest += 1 },
                                            close: { isShowingDisplaySettings = false })
                         .presentationCompactAdaptation(.sheet)
@@ -1642,6 +1645,7 @@ private struct PageViewer: View {
         #endif
     }
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.pageNightMode) private var isNight
     @State private var pinchBase: CGFloat?
     @State private var selectedMark: PageObjectID?
     @State private var pageFrame: CGRect = .zero
@@ -1737,7 +1741,7 @@ private struct PageViewer: View {
                     reader.scrollTo(id, anchor: .center)
                     hasPositionedInitialPage = true
                 }
-                .background(Theme.canvas)
+                .background(isNight ? NightMode.canvas : Theme.canvas)
                 .onChange(of: recenterRequest) { _, _ in
                     guard let id = model.selectedPageID else { return }
                     reader.scrollTo(id, anchor: .center)
@@ -1855,7 +1859,8 @@ private struct PageViewer: View {
                       includesInk: !active || pageShowsInk || pageDrawsProtectedInk(on: page),
                       excludingObjectIDs: (textSession.page?.id == page.id ? textSession.excludedIDs : [])
                           .union(active ? lassoHiddenIDs : [])
-                          .union(active && pageDrawsProtectedInk(on: page) ? Set(canvasObjects(on: page).map(\.id)) : []))
+                          .union(active && pageDrawsProtectedInk(on: page) ? Set(canvasObjects(on: page).map(\.id)) : []),
+                      isNight: isNight)
             .accessibilityIdentifier(active ? "document-page-image" : "notebook-preview-\(page.id)")
             .accessibilityValue(active ? L10n.strokeCount(model.selectedPageObjects.filter {
                 guard $0.pageID == page.id else { return false }
@@ -1999,6 +2004,9 @@ private struct PageViewer: View {
                     .accessibilityLabel(L10n.pageLabel(index + 1, of: model.pages.count))
                 }
             }
+            // Night mode turns the page and everything drawn on it, live
+            // ink and typing included. Last, so nothing is left out.
+            .nightFilter(isNight)
     }
 
     private func fittedSize(_ page: CGSize, in container: CGSize) -> CGSize {

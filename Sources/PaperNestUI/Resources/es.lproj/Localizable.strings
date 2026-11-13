@@ -819,6 +819,11 @@
 "print.preparing" = "Preparando la impresión…";
 "print.failed" = "No se pudo imprimir este documento.";
 
+/* Night mode (Claude, 2026-11-13) */
+"display.reading" = "Lectura";
+"display.nightMode" = "Modo nocturno";
+"display.nightMode.detail" = "Muestra las páginas en claro sobre fondo oscuro. El documento y lo que se exporte o imprima de él no cambian.";
+
 /* iCloud sync (Claude, 2026-11-13) */
 "sync.status.savedLocally" = "Guardado en este dispositivo";
 "sync.status.waiting" = "Pendiente de sincronizar";

@@ -22,6 +22,7 @@ enum DocumentUtilitiesStorage {
         guard EditorToolSettingsStore.standardStorage(defaults) == nil else { return }
         defaults.removeObject(forKey: pagesExpanded)
         defaults.removeObject(forKey: toolsExpanded)
+        NightMode.resetForThrowawayLibrary(defaults)
     }()
 }
 
@@ -410,11 +411,28 @@ struct UtilitiesDrawer<Content: View>: View {
 struct DisplaySettingsPopover: View {
     @Binding var zoom: CGFloat
     @Binding var fingerDrawing: Bool
+    /// Night mode, where the editor offers it.
+    var nightMode: Binding<Bool>?
     /// Nil where fitting the width is what "fit" already does (a phone).
     var fitWidth: (() -> Void)?
     let close: () -> Void
 
     var body: some View {
+        // As tall as what is in it where there is room (a popover on iPad
+        // and Mac). On a phone it is a half-height sheet, and with the
+        // Reading section added there is more here than half a phone shows,
+        // so there it scrolls.
+        ViewThatFits(in: .vertical) {
+            settings
+            ScrollView { settings }.accessibilityIdentifier("display-settings-scroll")
+        }
+        .foregroundStyle(EditorChrome.navy)
+        .tint(EditorChrome.purple)
+        .frame(minWidth: 300, idealWidth: 360, maxWidth: .infinity)
+        .background(EditorChrome.secondaryBackground)
+    }
+
+    private var settings: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(L10n.displaySettings).font(.headline).accessibilityAddTraits(.isHeader)
@@ -441,6 +459,7 @@ struct DisplaySettingsPopover: View {
                     }
                 }
             }
+            if let nightMode { NightModeSection(isOn: nightMode) }
             #if os(iOS)
             PanelSection(title: L10n.markup) {
                 PanelToggleRow(title: L10n.drawWithFinger, systemImage: "hand.draw", isOn: $fingerDrawing,
@@ -449,10 +468,6 @@ struct DisplaySettingsPopover: View {
             #endif
         }
         .padding(16)
-        .foregroundStyle(EditorChrome.navy)
-        .tint(EditorChrome.purple)
-        .frame(minWidth: 300, idealWidth: 360, maxWidth: .infinity)
-        .background(EditorChrome.secondaryBackground)
     }
 
     private func fitButton(_ title: String, symbol: String, id: String, action: @escaping () -> Void) -> some View {

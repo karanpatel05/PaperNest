@@ -819,6 +819,11 @@
 "print.preparing" = "Preparing to print…";
 "print.failed" = "This document couldn’t be printed.";
 
+/* Night mode (Claude, 2026-11-13) */
+"display.reading" = "Reading";
+"display.nightMode" = "Night Mode";
+"display.nightMode.detail" = "Shows pages light on dark. The document and anything exported or printed from it stay as they are.";
+
 /* iCloud sync (Claude, 2026-11-13) */
 "sync.status.savedLocally" = "Saved on this device";
 "sync.status.waiting" = "Waiting to sync";

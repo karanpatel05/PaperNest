@@ -922,6 +922,13 @@ extension L10n {
     static var printFailed: String { tr("print.failed") }
 }
 
+// Night mode (Claude, 2026-11-13).
+extension L10n {
+    static var displayReading: String { tr("display.reading") }
+    static var nightMode: String { tr("display.nightMode") }
+    static var nightModeDetail: String { tr("display.nightMode.detail") }
+}
+
 // iCloud sync (Claude, 2026-11-13).
 extension L10n {
     static var syncStatusSavedLocally: String { tr("sync.status.savedLocally") }

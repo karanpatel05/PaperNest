@@ -1,3 +1,137 @@
+## 2026-11-13 — Reader features R5: Night mode (Claude, owner's queue)
+
+Second in this session's part of the owner's "most features of Adobe PDF reader" queue. This entry is **Night
+mode** only; two-page view, the other half of R5, is not built.
+
+**What changed in the app.** Display settings (the sliders button in the lower bar) has a **Night Mode** switch
+under a new "Reading" heading. On, the page being read is shown light on dark: white paper black, black print
+white, coloured ink a lighter shade of the same colour, and a highlight a dim band of its own colour under white
+words. The canvas around the page goes dark with it. It is one setting for the whole app and is remembered. It is
+a way of showing a page and nothing else: the switch is a preference, not part of the library, and what is stored,
+exported and printed is the page as it always was.
+
+**How it is built** (`Sources/PaperNestUI/Reader/NightMode.swift`). Two pieces that work together:
+
+- `NightPalette` recolours the page's own picture pixel by pixel, off the main thread, on its way to the screen.
+  The rule keeps a colour's hue and strength and turns its lightness over. One correction: a highlight is
+  paper-pale, so it turns paper-dark, and a dark yellow needs less blue than a screen has — a plain turn-over
+  clips it to black and the highlight is gone. Where that would happen the colour is lifted just far enough to
+  fit. The last few night pictures are kept so turning back to a page does not show it blank.
+- `nightFilter` (SwiftUI's `colorInvert` then `hueRotation(180°)`) is laid over the whole page surface, so that
+  everything drawn *live* on the page turns too: the stroke under the pen, text being typed, a selection, the
+  lasso. Those are other views — PencilKit's canvas and a `UITextView` among them — and a filter over the lot is
+  the one way to turn all of them without editing each.
+
+That filter is right for ink and wrong for highlights, which is why the picture is not left to it: the picture
+is put through the *same* filter once before it goes under it. The filter is its own opposite, so the picture
+arrives on screen in the palette's colours whatever arithmetic the system's filter really uses. Find's hits are
+drawn over the page and would have gone almost black, so at night they are filled with the colours the filter
+turns into an amber band and an orange one.
+
+Shared files: `PageImageView.swift` (an `isNight` flag, default off, so thumbnails and every other page picture
+are untouched), `DocumentView.swift` (the `@AppStorage`, one environment value, the popover's binding, the
+canvas colour, and `nightFilter` as the last modifier on the page surface), `DocumentUtilitiesSidebar.swift`
+(the row, and the reset for throwaway libraries), `Reader/DocumentFindBar.swift` (find's night colours).
+**Not touched:** `InkCanvas.swift`, `PageZoom.swift`, gesture routing, `PageRenderer`, `ThumbnailCache`, the
+store, the exporter.
+
+**Results.**
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh`, on the commit alone (clean worktree of `HEAD` + this slice) | **Passed: 957 tests** (302 + 49 + 175 + 163 + 158 + 110), 0 failures, 0 compiler warnings — `/tmp/papernest-night-clean-unit.log` |
+| `NightModeTests` (new, 13) | **Passed** |
+| `./scripts/build-mac-app.sh`, clean worktree | **Built**, 0 warnings |
+| `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`, clean worktree | **BUILD SUCCEEDED**, 0 warnings |
+| `NightModeUITests` (new, 3), iPad Pro 13-inch (M5), iOS 26.5 | **3/3** — `/tmp/papernest-night-clean-ipad-1.log` |
+| `NightModeUITests`, PaperNest iPhone Duo, iOS 27.1 | **3/3** — `/tmp/papernest-night-clean-iphone-1.log` |
+| `DocumentUtilitiesUITests` (2; it uses the Display popover) | iPad **2/2**, iPhone **2/2** — the two logs above |
+| `DocumentFindUITests` 3, `TextSelectionUITests` 2, `PageLinksUITests` 2, `DocumentPrintUITests` 2 — iPad | **9/9** — `/tmp/papernest-night-clean-ipad-1.log` |
+| The same four suites — iPhone | **8/9, then the one failure 2/2 on its own.** Find 3/3, print 2/2, links 2/2, and `TextSelectionUITests` 1/2: `testPressingAWordSelectsItAndTheSelectionIsCopiedAndHighlighted` ran for **599 seconds** and failed at "Copy did not say it had copied", with this Mac's load average between 300 and 530 from another session's simulator run (`/tmp/papernest-night-clean-iphone-2.log`). Run alone straight afterwards the suite passed 2/2 in 70 seconds (`/tmp/papernest-night-clean-iphone-3.log`). One pass after one failure: reason to believe it was the machine, not proof |
+
+**Why a clean worktree, and why not the script.** As for Print: this slice was laid alone on `2ce8567` in
+`~/Library/Caches/PaperNest/verify-reader-queue` and everything above was run there, so the results are for the
+tree this commit holds. The UI runs called the last two lines of `scripts/ui-test-ios.sh` directly (`xcodegen
+generate`, then its `xcodebuild test`) and **skipped its seeding**: another session was running the same script
+from the shared tree, and both delete and re-seed the same fixed libraries under `/tmp`. My first attempt, through
+the script, removed `/tmp/papernest-uitest-library` under that session's run and then failed to seed it again
+(SESSION_HANDOFF has the note to that session). None of these suites uses the seeded libraries; each makes its own.
+
+**What the tests prove.** `NightModeTests` (13), on the palette, the picture and the filter:
+
+- White paper is black and black print is white; greys swap ends and keep their order.
+- Each of six highlighter colours, as the renderer leaves it on paper, stays a band that is at least as easy to
+  tell from the page at night as by day (ΔE, at least 0.8 of the daytime difference and never under 15), keeps
+  its hue, and carries white words at 4.5:1 or better.
+- Each of nine ink colours stays at 4.5:1 or better against the night page and keeps its hue.
+- Over a 9 × 9 × 9 grid of colours every result is a real colour, and anything 4.5:1 on white paper is at least
+  3:1 on the night page.
+- A bitmap is recoloured pixel for pixel (within one level), the picture it was made from is untouched, and the
+  same picture asked for twice is made once.
+- A page rendered by the real `PageRenderer`, with a pen stroke and a highlight on it, has dark paper, light ink
+  and an amber highlight; and the day picture is still the day picture.
+- A throwaway library resets the switch; a real one keeps it.
+- The filter turns black light and white dark, and applied twice gives back each of seven colours within 3%.
+- Find's hits at night are an amber band, or an orange one for the current hit, with white words at 4.5:1.
+
+**Proved able to fail.** Taking the lift out of `NightPalette` made four assertions fail — the default yellow
+and pure yellow in the palette test, and the highlight in the rendered-page test — then it was put back.
+
+`NightModeUITests` (3) read the **pixels on the simulator's screen** at known points of the page:
+
+- By day: white paper, the fixture's black square, an amber highlight. Night Mode switched on in Display settings:
+  paper no brighter than 40 of 255, the black square at 215 or more, the highlight within 26 levels of the
+  palette's amber (89, 73, 0) with blue under 30, red ink still red and light. The page's label and stroke count
+  are unchanged, and — read from the library on disk by the test — **the page's revision, transform and every
+  object on it are identical before, during and after**. Switched off, the day colours are back within 6 levels.
+- **Live ink.** With Night Mode on and a black pen, a finger stroke is saved **black** (read from the library),
+  and on screen it is light both while the ink canvas is still the one drawing it and after the pen is put down
+  and the page's own picture draws it. This was the open question: the canvas is PencilKit's, a UIKit view, and
+  the filter reaches it.
+- In French and Spanish the switch is named, can be reached, is a full-width row and works.
+
+**Defects of mine these runs found, all fixed.**
+
+1. **Without a compositing group the filter was wrong for anything that multiplies.** SwiftUI hands a colour
+   filter down to each view beneath it and blends them afterwards. For plain layers that is the same thing; for a
+   multiplied layer it is not, and a find hit came out as nothing at all on black paper. Found by a unit test that
+   renders through `ImageRenderer`; `nightFilter` now composites the page first.
+2. **Find's hits vanished at night** for a different reason: a pale yellow turns nearly black under the filter.
+   They are filled with other colours at night, chosen so the filter turns them into amber and orange.
+3. **Display settings no longer fitted a phone's half-height sheet** once the Reading section was in it. It is
+   as tall as its contents where there is room and scrolls where there is not (`ViewThatFits`); the iPad's popover
+   is unchanged. `DocumentUtilitiesUITests`, which uses that popover, passes on both devices.
+4. Between one night picture and the next the page showed blank dark paper. It keeps the last picture up until
+   the new one is ready.
+
+Screenshots: `docs/screenshots/night-mode-2026-11-13/` (the page by day and at night, a stroke under the pen at
+night, the settings sheet in French).
+
+**Not verified, plainly.**
+
+- **The Mac was never seen.** It builds. There the ink canvas is `MacInkCanvas` and Display settings is a
+  popover; neither was looked at with the switch on. The filter's arithmetic was measured on macOS through
+  `ImageRenderer`, which is not a window.
+- **Text being typed at night** was not exercised. The text view is a UIKit view under the same filter as the ink
+  canvas, so it is expected to turn the same way; expected is not seen. Likewise the lasso, a shape being drawn,
+  a placed picture being moved, and find's hits in the running app (those are unit-tested only).
+- **Switching Night Mode while a text box is being typed in** rebuilds the page surface, because the filter is
+  there only at night. What that does to the keyboard was not tried.
+- Notebooks' continuous pages, rotated and cropped pages, scans and photographs were not looked at. A photograph
+  is turned like everything else and looks like it; there is no option to leave pictures alone.
+- **Cost.** Nothing timed the recolouring of a page at 400% (about thirteen million pixels; it runs off the main
+  thread, in bands across the cores), and nothing measured what a filter over PencilKit's canvas does to pen
+  latency on a real device. Only night mode pays either.
+- The system's own dark appearance together with Night Mode, VoiceOver, the largest Dynamic Type sizes, Apple
+  Pencil and a physical device.
+- That export and print ignore the switch is true by construction — nothing in `PaperNestExport`,
+  `PaperNestRender` or the store can see it — and no test exports with it on.
+
+**Limits by design.** Night mode is about the page: the toolbars, the sidebar and its page thumbnails stay as
+they are. It is one preference for the app on this device, not a property of a document, and it is not synced.
+A throwaway library (every UI test and dev run) starts by day. Saturated colours keep their hue but not always
+their strength: pure blue ink shows as light blue, because pure blue on black cannot be read.
+
 ## 2026-11-13 — Reader features R4: Print (Claude, owner's queue)
 
 Next in the owner's "most features of Adobe PDF reader" queue (`docs/FEATURE_EXPANSION.md`, rows R1–R7). This
