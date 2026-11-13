@@ -14,7 +14,7 @@ public actor LibraryStore {
 
     // Internal so focused store extensions share this actor's transaction boundary.
     let db: SQLiteDatabase
-    private let now: @Sendable () -> Date
+    let now: @Sendable () -> Date
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.outputFormatting = [.sortedKeys]
@@ -602,11 +602,25 @@ public actor LibraryStore {
     /// Launch housekeeping: permanently removes pages deleted in a previous
     /// session (no undo stack survives a relaunch). Run before
     /// `sweepOrphanAssets` so their originals can be reclaimed.
+    ///
+    /// With iCloud sync on, a deleted page is a tombstone other devices still
+    /// have to hear about, and may yet object to: one that edited the page
+    /// without having seen the deletion brings it back. So such pages are
+    /// kept for `RetentionPolicy.syncTombstoneDays`, and never purged while
+    /// their deletion is still waiting to be sent.
     @discardableResult
     public func purgeDeletedPages() throws -> Int {
         try db.transaction {
-            try db.run("DELETE FROM search_index WHERE page_id IN (SELECT id FROM pages WHERE deleted_at IS NOT NULL)")
-            return try db.run("DELETE FROM pages WHERE deleted_at IS NOT NULL")
+            var doomed = "deleted_at IS NOT NULL"
+            if try syncIsEnabled() {
+                let cutoff = RetentionPolicy.syncTombstoneCutoff(now: now()).timeIntervalSinceReferenceDate
+                doomed += """
+                     AND deleted_at < \(cutoff) AND NOT EXISTS
+                    (SELECT 1 FROM sync_outbox o WHERE o.record_type = 'page' AND o.record_id = pages.id)
+                    """
+            }
+            try db.run("DELETE FROM search_index WHERE page_id IN (SELECT id FROM pages WHERE \(doomed))")
+            return try db.run("DELETE FROM pages WHERE \(doomed)")
         }
     }
 
@@ -933,7 +947,7 @@ public actor LibraryStore {
         ])
     }
 
-    private func upsertRecognitionRow(_ r: PageRecognition) throws {
+    func upsertRecognitionRow(_ r: PageRecognition) throws {
         try db.run("INSERT OR REPLACE INTO page_recognition (page_id, source_revision, engine_version, status, result_json) VALUES (?, ?, ?, ?, ?)", [
             .text(r.pageID.rawValue), .int(Int64(r.sourceRevision)), .text(r.engineVersion), .text(r.status.rawValue), .text(try json(r)),
         ])
@@ -1049,7 +1063,7 @@ public actor LibraryStore {
         }
     }
 
-    private func deleteUnreferencedAssetRows() throws -> [(AssetID, AssetKind)] {
+    func deleteUnreferencedAssetRows() throws -> [(AssetID, AssetKind)] {
         // Placed images inside page objects also reference assets.
         let placed = Set(try db.query("SELECT payload_json FROM page_objects WHERE kind = 'image'") {
             try decoder.decode(PageObject.Payload.self, from: Data($0.text(0).utf8))
@@ -1098,7 +1112,7 @@ public actor LibraryStore {
         try touchItem(page.itemID, at: timestamp)
     }
 
-    private func reindexTitle(_ item: LibraryItem) throws {
+    func reindexTitle(_ item: LibraryItem) throws {
         try db.run("DELETE FROM search_index WHERE item_id = ? AND field = 'title'", [.text(item.id.rawValue)])
         try db.run("INSERT INTO search_index (item_id, page_id, field, content) VALUES (?, NULL, 'title', ?)",
                    [.text(item.id.rawValue), .text(item.name)])
@@ -1119,7 +1133,7 @@ public actor LibraryStore {
         return ordered
     }
 
-    private func json(_ value: some Encodable) throws -> String {
+    func json(_ value: some Encodable) throws -> String {
         String(decoding: try encoder.encode(value), as: UTF8.self)
     }
 }

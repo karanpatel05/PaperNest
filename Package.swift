@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "PaperNestImport", targets: ["PaperNestImport"]),
         .library(name: "PaperNestRender", targets: ["PaperNestRender"]),
         .library(name: "PaperNestExport", targets: ["PaperNestExport"]),
+        .library(name: "PaperNestSync", targets: ["PaperNestSync"]),
         .library(name: "PaperNestUI", targets: ["PaperNestUI"]),
         .executable(name: "PaperNestMac", targets: ["PaperNestMac"]),
     ],
@@ -23,9 +24,13 @@ let package = Package(
         .target(name: "PaperNestImport", dependencies: ["PaperNestCore", "PaperNestStore"]),
         .target(name: "PaperNestRender", dependencies: ["PaperNestCore", "PaperNestStore"]),
         .target(name: "PaperNestExport", dependencies: ["PaperNestCore", "PaperNestStore", "PaperNestRender"]),
+        // iCloud sync: the CKSyncEngine adapter, asset transfer and the
+        // controller the UI observes. The merge and outbox logic it drives
+        // lives in PaperNestStore, beside the data it protects.
+        .target(name: "PaperNestSync", dependencies: ["PaperNestCore", "PaperNestStore"]),
         .target(
             name: "PaperNestUI",
-            dependencies: ["PaperNestCore", "PaperNestStore", "PaperNestImport", "PaperNestRender", "PaperNestExport"],
+            dependencies: ["PaperNestCore", "PaperNestStore", "PaperNestImport", "PaperNestRender", "PaperNestExport", "PaperNestSync"],
             resources: [.process("Resources")]
         ),
         .executableTarget(
@@ -50,6 +55,7 @@ let package = Package(
         ),
         .testTarget(name: "PaperNestCoreTests", dependencies: ["PaperNestCore"]),
         .testTarget(name: "PaperNestStoreTests", dependencies: ["PaperNestStore"]),
+        .testTarget(name: "PaperNestSyncTests", dependencies: ["PaperNestSync", "PaperNestStore", "PaperNestCore"]),
         .testTarget(name: "PaperNestImportTests", dependencies: ["PaperNestImport", "PaperNestRender", "PaperNestTestSupport"]),
         .testTarget(name: "PaperNestExportTests", dependencies: ["PaperNestExport", "PaperNestImport", "PaperNestTestSupport"]),
         .testTarget(name: "PaperNestUITests", dependencies: ["PaperNestUI", "PaperNestImport", "PaperNestTestSupport"]),

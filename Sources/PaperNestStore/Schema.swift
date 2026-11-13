@@ -259,5 +259,8 @@ enum Schema {
         );
         CREATE INDEX signatures_by_created ON signatures(created_at, id);
         """),
+        // M2: what iCloud sync remembers, and the triggers that queue every
+        // change in the transaction that made it. See `SyncSchema`.
+        Migration(version: 10, sql: SyncSchema.sql),
     ]
 }
