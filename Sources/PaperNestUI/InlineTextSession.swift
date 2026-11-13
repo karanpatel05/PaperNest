@@ -20,6 +20,9 @@ final class InlineTextSession {
     private var generation = UUID()
     private(set) var isFinishing = false
     @ObservationIgnored var commitNative: (() -> Void)?
+    /// Dresses a box placed from scratch in the Text tool's current type
+    /// settings. Left nil, a new box is 18-point Helvetica as it always was.
+    @ObservationIgnored var styleForNewBox: ((inout TextBox) -> Void)?
     private var terminal: Task<Bool, Never>?
     private var pending: Task<Bool, Never>?
     private var debounce: Task<Void, Never>?
@@ -36,7 +39,9 @@ final class InlineTextSession {
             width: min(240, page.sourceSize.width * 0.6), height: 90), within: page.sourceSize)
         self.page = page
         captureCanvas(page: page, sourceToView: sourceToView, zoom: zoom)
-        box = TextBox(frame: frame, text: "", fontSize: 18)
+        var fresh = TextBox(frame: frame, text: "", fontSize: 18)
+        styleForNewBox?(&fresh)
+        box = fresh
         original = nil
         generation = UUID()
         hasFailure = false

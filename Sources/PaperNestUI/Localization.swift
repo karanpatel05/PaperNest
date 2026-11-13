@@ -58,7 +58,8 @@ enum L10n {
 
     // PDF tools sidebar
     static var pdfTools: String { tr("pdfTools.title") }
-    static var showPDFTools: String { tr("pdfTools.show") }
+    // Editor side panels (Claude, merged panel control 2026-11-10)
+    static var editorPanels: String { tr("studio.panels") }
     static var hidePDFTools: String { tr("pdfTools.hide") }
 
     // PDF form workspace
@@ -756,4 +757,218 @@ extension L10n {
     static var selectionFreehand: String { tr("selection.freehand") }
     static var selectionRectangle: String { tr("selection.rectangle") }
     static var selectionEdit: String { tr("selection.edit") }
+}
+
+// Notes Editor toolbar redesign (Claude, 2026-11-12).
+extension L10n {
+    static var toolShapes: String { tr("editorTools.shapes") }
+    static var toolText: String { tr("editorTools.text") }
+    static var toolImage: String { tr("editorTools.image") }
+    static var toolSticker: String { tr("editorTools.sticker") }
+    static var toolInsert: String { tr("editorTools.insert") }
+    static var toolRestoreDefaults: String { tr("editorTools.restoreDefaults") }
+    static func toolDecrease(_ name: String) -> String { tr("editorTools.decrease", name) }
+    static func toolIncrease(_ name: String) -> String { tr("editorTools.increase", name) }
+    static func toolPointsShort(_ value: String) -> String { tr("editorTools.pointsShort", value) }
+    static var toolAdvanced: String { tr("editorTools.advanced") }
+    static var toolFingerDetail: String { tr("editorTools.fingerDetail") }
+    static var colorBlack: String { tr("tools.color.black") }
+    static var colorSky: String { tr("tools.color.sky") }
+    static var colorPink: String { tr("tools.color.pink") }
+    static var colorRecent: String { tr("tools.color.recent") }
+    static var colorFavorites: String { tr("tools.color.favorites") }
+    static var colorAddFavorite: String { tr("tools.color.addFavorite") }
+    static var colorRemoveFavorite: String { tr("tools.color.removeFavorite") }
+    static func colorCustomNumbered(_ number: Int) -> String { tr("tools.color.customNumbered", number) }
+    static var penFountain: String { tr("pen.fountain") }
+    static var penBallpoint: String { tr("pen.ballpoint") }
+    static var penGel: String { tr("pen.gel") }
+    static var penPencil: String { tr("pen.pencil") }
+    static var penMarker: String { tr("pen.marker") }
+    static var penBrush: String { tr("pen.brush") }
+    static var penType: String { tr("pen.type") }
+    static var penStrokeAndSize: String { tr("pen.strokeAndSize") }
+    static var penPressure: String { tr("pen.pressure") }
+    static var penPressureDetail: String { tr("pen.pressure.detail") }
+    static var penSnap: String { tr("pen.snap") }
+    static var penSnapDetail: String { tr("pen.snap.detail") }
+    static var penSmoothing: String { tr("pen.smoothing") }
+    static var highlighterStandard: String { tr("highlighter.standard") }
+    static var highlighterFlat: String { tr("highlighter.flat") }
+    static var highlighterUnderline: String { tr("highlighter.underline") }
+    static var highlighterMarker: String { tr("highlighter.marker") }
+    static var highlighterStraight: String { tr("highlighter.straight") }
+    static var highlighterStyle: String { tr("highlighter.style") }
+    static var highlighterPreview: String { tr("highlighter.preview") }
+    static var highlighterSample: String { tr("highlighter.sample") }
+    static var highlighterReadable: String { tr("highlighter.readable") }
+    static var highlighterStrength: String { tr("highlighter.strength") }
+    static var highlighterSnapToText: String { tr("highlighter.snapToText") }
+    static var highlighterSnapToTextDetail: String { tr("highlighter.snapToText.detail") }
+    static var eraserTarget: String { tr("eraser.target") }
+    static var eraserTargetAll: String { tr("eraser.target.all") }
+    static var eraserTargetHandwriting: String { tr("eraser.target.handwriting") }
+    static var eraserTargetHighlights: String { tr("eraser.target.highlights") }
+    static var eraserProtected: String { tr("eraser.protected") }
+    static var lassoHandwriting: String { tr("lasso.handwriting") }
+    static var lassoHighlights: String { tr("lasso.highlights") }
+    static var lassoTextBoxes: String { tr("lasso.textBoxes") }
+    static var lassoImages: String { tr("lasso.images") }
+    static var lassoContent: String { tr("lasso.content") }
+    static var lassoActions: String { tr("lasso.actions") }
+    static var lassoActionsDetail: String { tr("lasso.actions.detail") }
+    static var shapeRoundedRectangle: String { tr("shape.roundedRectangle") }
+    static var shapeTriangle: String { tr("shape.triangle") }
+    static var shapeDiamond: String { tr("shape.diamond") }
+    static var shapePentagon: String { tr("shape.pentagon") }
+    static var shapeHexagon: String { tr("shape.hexagon") }
+    static var shapeSpeechBubble: String { tr("shape.speechBubble") }
+    static var shapeDragToDraw: String { tr("shape.dragToDraw") }
+    static var shapeLockAspect: String { tr("shape.lockAspect") }
+    static var shapeLockAspectDetail: String { tr("shape.lockAspect.detail") }
+    static var textSelectedBox: String { tr("textTool.selected") }
+    static var textNewBoxes: String { tr("textTool.new") }
+    static var textPlace: String { tr("textTool.place") }
+    static var imageOnPage: String { tr("imageTool.onPage") }
+    static var imageOnPageDetail: String { tr("imageTool.onPage.detail") }
+    static var stickerAll: String { tr("sticker.all") }
+    static var stickerSearch: String { tr("sticker.search") }
+    static var stickerNoFavorites: String { tr("sticker.noFavorites") }
+    static var stickerNoMatches: String { tr("sticker.noMatches") }
+    static var stickerHint: String { tr("sticker.hint") }
+    static var stickerProductivity: String { tr("sticker.category.productivity") }
+    static var stickerPlanning: String { tr("sticker.category.planning") }
+    static var stickerEducation: String { tr("sticker.category.education") }
+    static var stickerDecorative: String { tr("sticker.category.decorative") }
+    static var stickerCheck: String { tr("sticker.name.check") }
+    static var stickerStar: String { tr("sticker.name.star") }
+    static var stickerFlag: String { tr("sticker.name.flag") }
+    static var stickerImportant: String { tr("sticker.name.important") }
+    static var stickerIdea: String { tr("sticker.name.idea") }
+    static var stickerCalendar: String { tr("sticker.name.calendar") }
+    static var stickerClock: String { tr("sticker.name.clock") }
+    static var stickerTarget: String { tr("sticker.name.target") }
+    static var stickerNote: String { tr("sticker.name.note") }
+    static var stickerBook: String { tr("sticker.name.book") }
+    static var stickerPencil: String { tr("sticker.name.pencil") }
+    static var stickerGrade: String { tr("sticker.name.grade") }
+    static var stickerHeart: String { tr("sticker.name.heart") }
+    static var stickerArrow: String { tr("sticker.name.arrow") }
+    static var stickerRibbon: String { tr("sticker.name.ribbon") }
+    static var stickerBubble: String { tr("sticker.name.bubble") }
+    static var insertPageDetail: String { tr("insert.page.detail") }
+    static var insertOnPage: String { tr("insert.onPage") }
+    static var insertDateTime: String { tr("insert.dateTime") }
+    static var insertDivider: String { tr("insert.divider") }
+    static var insertFromFiles: String { tr("insert.fromFiles") }
+    static var insertDuplicatePage: String { tr("insert.duplicatePage") }
+    static var insertOrganize: String { tr("insert.organize") }
+}
+
+// Document Utilities sidebar and viewport bar (Claude, 2026-11-12).
+extension L10n {
+    static var documentUtilities: String { tr("utilities.title") }
+    static var documentUtilitiesSubtitle: String { tr("utilities.subtitle") }
+    static var documentUtilitiesClose: String { tr("utilities.close") }
+    static func documentUtilitiesPages(_ count: Int) -> String { tr("utilities.pages", count) }
+    static var sectionExpanded: String { tr("utilities.expanded") }
+    static var sectionCollapsed: String { tr("utilities.collapsed") }
+    static var documentUtilitiesAddPage: String { tr("utilities.addPage") }
+    static var displaySettings: String { tr("display.title") }
+    static var displayZoom: String { tr("display.zoom") }
+    static var displayFitWidth: String { tr("display.fitWidth") }
+    static var displayDrawingMode: String { tr("display.drawingMode") }
+}
+
+// Find in document (Claude, 2026-11-12).
+extension L10n {
+    static var find: String { tr("find.title") }
+    static var findMenu: String { tr("find.menu") }
+    static var findPlaceholder: String { tr("find.placeholder") }
+    static var findNext: String { tr("find.next") }
+    static var findPrevious: String { tr("find.previous") }
+    static var findClear: String { tr("find.clear") }
+    static func findCount(_ number: Int, of total: Int) -> String { tr("find.count", number, total) }
+    static var findNoResults: String { tr("find.noResults") }
+    static var findNoText: String { tr("find.noText") }
+    static var findNoTextDetail: String { tr("find.noText.detail") }
+    static var findSearching: String { tr("find.searching") }
+    static var findOnPage: String { tr("find.onPage") }
+}
+
+// Select and copy text (Claude, 2026-11-12).
+extension L10n {
+    static var textSelection: String { tr("textSelection.title") }
+    static var textCopied: String { tr("textSelection.copied") }
+}
+
+// Links and Go to Page (Claude, 2026-11-12).
+extension L10n {
+    static var linkOpenTitle: String { tr("link.open.title") }
+    static var linkOpen: String { tr("link.open") }
+    static var linkCopy: String { tr("link.copy") }
+    static func linkToAddress(_ address: String) -> String { tr("link.address", address) }
+    static func linkToPage(_ number: Int) -> String { tr("link.page", number) }
+    static var goToPage: String { tr("goToPage.title") }
+    static func goToPageMessage(_ count: Int) -> String { tr("goToPage.message", count) }
+    static var goToPageField: String { tr("goToPage.field") }
+    static var goToPageGo: String { tr("goToPage.go") }
+}
+
+// iCloud sync (Claude, 2026-11-13).
+extension L10n {
+    static var syncStatusSavedLocally: String { tr("sync.status.savedLocally") }
+    static var syncStatusWaiting: String { tr("sync.status.waiting") }
+    static var syncStatusSyncing: String { tr("sync.status.syncing") }
+    static var syncStatusUpToDate: String { tr("sync.status.upToDate") }
+    static var syncStatusOffline: String { tr("sync.status.offline") }
+    static var syncStatusCloudUnavailable: String { tr("sync.status.cloudUnavailable") }
+    static var syncStatusConflict: String { tr("sync.status.conflict") }
+    static var syncStatusNeedsAttention: String { tr("sync.status.needsAttention") }
+    static var syncSettingsTitle: String { tr("sync.settings.title") }
+    static var syncSettingsToggle: String { tr("sync.settings.toggle") }
+    static var syncSettingsFooter: String { tr("sync.settings.footer") }
+    static var syncSettingsNotConfigured: String { tr("sync.settings.notConfigured", Brand.displayName) }
+    static var syncSettingsAccount: String { tr("sync.settings.account") }
+    static var syncAccountReady: String { tr("sync.account.ready") }
+    static var syncAccountChecking: String { tr("sync.account.checking") }
+    static var syncAccountNoAccount: String { tr("sync.account.noAccount") }
+    static var syncAccountRestricted: String { tr("sync.account.restricted") }
+    static var syncAccountTemporarilyUnavailable: String { tr("sync.account.temporarilyUnavailable") }
+    static var syncAccountUnknown: String { tr("sync.account.unknown") }
+    static var syncAccountChangedTitle: String { tr("sync.account.changed.title") }
+    static var syncAccountChangedMessage: String { tr("sync.account.changed.message") }
+    static var syncAccountUseCurrent: String { tr("sync.account.useCurrent") }
+    static var syncAccountUseCurrentConfirm: String { tr("sync.account.useCurrent.confirm") }
+    static var syncAccountStop: String { tr("sync.account.stop") }
+    static var syncSettingsStatus: String { tr("sync.settings.status") }
+    static var syncSettingsLastSynced: String { tr("sync.settings.lastSynced") }
+    static var syncSettingsNever: String { tr("sync.settings.never") }
+    static var syncSettingsPending: String { tr("sync.settings.pending") }
+    static var syncSettingsPendingUploads: String { tr("sync.settings.pendingUploads") }
+    static var syncSettingsPendingDownloads: String { tr("sync.settings.pendingDownloads") }
+    static var syncSettingsSyncNow: String { tr("sync.settings.syncNow") }
+    static var syncSettingsOnDemand: String { tr("sync.settings.onDemand") }
+    static var syncSettingsOnDemandFooter: String { tr("sync.settings.onDemand.footer") }
+    static var syncIssueQuota: String { tr("sync.issue.quota") }
+    static var syncIssueCloudDeleted: String { tr("sync.issue.cloudDeleted", Brand.displayName) }
+    static var syncIssueNewerApp: String { tr("sync.issue.newerApp", Brand.displayName) }
+    static var syncIssueGeneral: String { tr("sync.issue.general") }
+    static var syncConflictTitle: String { tr("sync.conflict.title") }
+    static func syncConflictPage(_ name: String) -> String { tr("sync.conflict.page", name) }
+    static func syncConflictObject(_ name: String) -> String { tr("sync.conflict.object", name) }
+    static var syncConflictSomeDocument: String { tr("sync.conflict.someDocument") }
+    static var syncConflictKeepBoth: String { tr("sync.conflict.keepBoth") }
+    static var syncConflictRemoveCopy: String { tr("sync.conflict.removeCopy") }
+    static var syncTroubleTitle: String { tr("sync.trouble.title") }
+    static var syncTroubleText: String { tr("sync.trouble.text") }
+    static var syncDeleteCloud: String { tr("sync.deleteCloud") }
+    static var syncDeleteCloudTitle: String { tr("sync.deleteCloud.title", Brand.displayName) }
+    static var syncDeleteCloudMessage: String { tr("sync.deleteCloud.message") }
+    static var syncDeleteCloudConfirm: String { tr("sync.deleteCloud.confirm") }
+    static var syncItemDownload: String { tr("sync.item.download") }
+    static var syncItemRemoveDownload: String { tr("sync.item.removeDownload") }
+    static var syncItemCloudOnly: String { tr("sync.item.cloudOnly") }
+    static var syncEnableFailed: String { tr("sync.enableFailed") }
+    static var syncActionFailed: String { tr("sync.actionFailed") }
 }

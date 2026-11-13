@@ -475,7 +475,7 @@ final class DocumentModel {
     /// The bytes are staged durably first and the row that references them is
     /// written in the same transaction by `placeImage`, so the housekeeping
     /// sweep cannot take the file in between.
-    func addImage(_ data: Data, named filename: String?, to page: Page,
+    func addImage(_ data: Data, named filename: String?, to page: Page, frame placement: CGRect? = nil,
                   undoManager: UndoManager?) async throws {
         await finishPendingHistory()
         guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
@@ -485,13 +485,37 @@ final class DocumentModel {
             throw StoreError.invalidPlacement
         }
         let staged = try store.assets.store(data, kind: kind, originalFilename: filename)
-        let frame = Self.imageFrame(pixels: Self.pixelSize(of: data), on: page)
+        let frame = placement ?? Self.imageFrame(pixels: Self.pixelSize(of: data), on: page)
         let result = try await store.placeImage(staged, on: page.id, frame: frame)
         replace(result.page)
         let change = InkChange(pageID: page.id, saved: [result.object], replaced: [], deleted: [])
         registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.insertImage)
         await loadSelectedPageObjects()
         session.didChange()
+    }
+
+    /// Where a sticker lands: a sixth of the page's shorter side, square, in
+    /// the upper middle. A photo fills half the page because it is the point
+    /// of the page; a sticker is a mark on it, and one that arrived photo-sized
+    /// would have to be shrunk every single time.
+    nonisolated static func stickerFrame(on page: Page) -> CGRect {
+        let source = page.sourceSize
+        let side = max(min(source.width, source.height) * 0.16, 1)
+        return CGRect(x: (source.width - side) / 2, y: source.height * 0.2, width: side, height: side)
+    }
+
+    /// A horizontal rule across the page, as a stroke in source space.
+    ///
+    /// Laid out on the page as it is shown — cropped and turned — and mapped
+    /// back through `PageGeometry`, so it is level on the page the reader sees
+    /// and not on the scan underneath it.
+    nonisolated static func dividerStroke(on page: Page, color: RGBAColor, width: Double) -> InkStroke {
+        let size = page.geometry.pageSize
+        let ends = [CGPoint(x: size.width * 0.1, y: size.height * 0.3), CGPoint(x: size.width * 0.9, y: size.height * 0.3)]
+        return InkStroke(tool: .pen, color: color, width: width, points: ends.map {
+            let source = $0.applying(page.geometry.pageToSource)
+            return InkPoint(x: source.x, y: source.y)
+        })
     }
 
     /// The image's own pixel dimensions, or nil when they cannot be read.

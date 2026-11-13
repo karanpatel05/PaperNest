@@ -36,6 +36,13 @@ public struct PaperNestCommands: Commands {
             // that logs them cannot run here today.
             Button(L10n.outline) { document?.showOutline() }
                 .disabled(document?.model.pages.isEmpty ?? true)
+            // Find has ⌘F, but on the editor's own button: the system keeps
+            // a Find submenu under Edit with the same key, and two menu
+            // items sharing one is the clash this project has met before.
+            Button(L10n.findMenu) { document?.showFind() }
+                .disabled(document?.model.pages.isEmpty ?? true)
+            Button(L10n.goToPage) { document?.showGoToPage() }
+                .disabled((document?.model.pages.count ?? 0) < 2)
             Button(L10n.textBox) { document?.showTextBox() }
                 .disabled(document?.model.selectedPage == nil)
             Button(L10n.insertImage) { document?.showInsertImage() }

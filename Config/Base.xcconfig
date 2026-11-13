@@ -12,4 +12,22 @@
 PAPERNEST_BUNDLE_ID = com.example.papernest
 PAPERNEST_TEAM_ID =
 
+// iCloud sync is OFF in a build until a container exists for it. To turn it
+// on, create the container in the developer portal (docs/APPLE_SETUP.md,
+// section 2) and add these three lines to Config/Signing.local.xcconfig:
+//
+//   PAPERNEST_ICLOUD_CONTAINER = iCloud.$(PAPERNEST_BUNDLE_ID)
+//   PAPERNEST_IOS_ENTITLEMENTS = Apps/iOS/PaperNest.iCloud.entitlements
+//   PAPERNEST_MAC_ENTITLEMENTS = Apps/Mac/PaperNest.iCloud.entitlements
+//
+// With the container left empty the app has no iCloud entitlement, never
+// creates a CKContainer, and Settings says sync is not available in this
+// build. That keeps unsigned, Simulator and Command Line Tools builds working.
+PAPERNEST_ICLOUD_CONTAINER =
+PAPERNEST_IOS_ENTITLEMENTS =
+PAPERNEST_MAC_ENTITLEMENTS = Apps/Mac/PaperNest.entitlements
+// development while testing; Xcode switches it to production when archiving
+// for distribution.
+PAPERNEST_APS_ENVIRONMENT = development
+
 #include? "Signing.local.xcconfig"

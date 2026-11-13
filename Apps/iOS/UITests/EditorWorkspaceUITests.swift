@@ -64,38 +64,43 @@ import PaperNestStore
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
         app.launch()
         defer { app.terminate() }
-        let thumbnails = app.buttons["editor-toggle-thumbnails"]
-        XCTAssertTrue(thumbnails.waitForExistence(timeout: 20))
-        if UIDevice.current.userInterfaceIdiom == .pad {
+        // One control shows and hides Document Utilities — pages and tools
+        // together — on every device (owner's 2026-11-12 redesign). The page
+        // strip and the tools list no longer have a switch each.
+        let onPad = UIDevice.current.userInterfaceIdiom == .pad
+        let panels = app.buttons["editor-panels"]
+        XCTAssertTrue(panels.waitForExistence(timeout: 20))
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "editor-toggle-thumbnails").count, 0,
+                       "There is no separate page-strip control")
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "editor-toggle-pdf-tools").count, 0,
+                       "There is no separate tools control")
+        let sidebar = app.scrollViews["pdf-tools-list"]
+        if onPad {
             let writingTools = app.scrollViews["notebook-tool-bar"]
-            let inspectorToggle = app.buttons["studio-more-tools"]
-            XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
-            XCTAssertLessThanOrEqual(thumbnails.frame.maxY, writingTools.frame.minY,
-                                     "Pages belongs in the navigation header above the writing tools")
-            XCTAssertLessThanOrEqual(inspectorToggle.frame.maxY, writingTools.frame.minY,
-                                     "PDF tools belongs in the navigation header above the writing tools")
-            XCTAssertGreaterThan(inspectorToggle.frame.midX, thumbnails.frame.midX)
-            let sidebar = app.scrollViews["pdf-tools-list"]
+            XCTAssertLessThanOrEqual(panels.frame.maxY, writingTools.frame.minY,
+                                     "The panel control belongs in the navigation header above the writing tools")
             XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
-            inspectorToggle.tap()
+            panels.tap()
             XCTAssertTrue(sidebar.waitForNonExistence(timeout: 5))
-            XCTAssertTrue(inspectorToggle.isHittable, "Hidden inspector can be reopened from the header")
-            inspectorToggle.tap()
+            panels.tap()
             XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["page-thumbnail-1"].exists, "pages and tools share the one panel")
+        } else {
+            XCTAssertFalse(sidebar.exists, "a phone opens with the page to itself")
+            panels.tap()
+            XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["page-thumbnail-1"].exists, "pages and tools share the one panel")
+            app.buttons["pdf-tools-close"].tap()
+            XCTAssertTrue(sidebar.waitForNonExistence(timeout: 5))
         }
         attachWorkspace(app, stage: "initial", kind: kind, language: language)
-        let selected = thumbnails.value as? String
-        thumbnails.tap()
-        let hidden = NSPredicate(format: "value != %@", selected ?? "")
-        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: hidden, object: thumbnails)], timeout: 5) == .completed)
-        XCTAssertNotEqual(thumbnails.value as? String, selected)
-        thumbnails.tap()
-        let shown = NSPredicate(format: "value == %@", selected ?? "")
-        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: shown, object: thumbnails)], timeout: 5) == .completed)
-        XCTAssertEqual(thumbnails.value as? String, selected)
         let text = app.buttons["editor-text-box"]
         XCTAssertTrue(text.exists)
-        XCTAssertLessThanOrEqual(text.frame.width, 48, "PDF and notebook Text Box use the same compact icon target")
+        // A named tool is wider than its icon; the 2026-11-12 redesign names
+        // tools wherever there is room, so the compact target is a phone's.
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertLessThanOrEqual(text.frame.width, 48, "PDF and notebook Text Box use the same compact icon target")
+        }
         XCTAssertTrue(app.buttons["studio-drawing-toggle"].exists, "Both document types expose the floating palette")
         let pen = app.buttons["studio-tool-pen"]
         pen.tap(); pen.tap()
@@ -103,9 +108,9 @@ import PaperNestStore
         XCTAssertTrue(width.waitForExistence(timeout: 5))
         let done = app.buttons["studio-settings-done"]
         XCTAssertTrue(done.exists)
-        // The bounded iOS Form lazily materializes opacity below its colors.
+        // Opacity sits below the stroke preview and may need scrolling into reach.
         let opacity = app.sliders["studio-opacity-slider"]
-        let settingsForm = app.collectionViews.containing(.slider, identifier: "studio-width-slider").firstMatch
+        let settingsForm = app.scrollViews["tool-panel-scroll"]
         XCTAssertTrue(settingsForm.exists)
         let settingsFrame = settingsForm.frame.intersection(app.frame)
         for _ in 0..<6 where !opacity.isHittable {
@@ -142,6 +147,7 @@ import PaperNestStore
         XCTAssertTrue(pen.exists)
     }
 
+
     private func revealTool(_ identifier: String, in app: XCUIApplication, isPad: Bool) -> XCUIElement {
         let target = app.buttons[identifier]
         if isPad {
@@ -149,37 +155,14 @@ import PaperNestStore
             XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
             for _ in 0..<10 where !target.isHittable { sidebar.swipeUp() }
         } else {
-            let more = app.buttons["studio-more-tools"]
-            let toolbar = app.scrollViews["notebook-tool-bar"]
-            for _ in 0..<8 where !more.isHittable { toolbar.swipeLeft() }
-            XCTAssertTrue(more.isHittable)
-            more.tap()
-            let initialMenu = app.collectionViews.containing(.button, identifier: "editor-shapes").firstMatch
-            XCTAssertTrue(initialMenu.waitForExistence(timeout: 5))
-            guard let menuIndex = app.collectionViews.allElementsBoundByIndex.firstIndex(where: {
-                $0.buttons["editor-shapes"].exists
-            }) else { XCTFail("The native More menu must have its own collection"); return target }
-            // The menu collection's AX frame can extend beyond the visible
-            // popup. Its hittable row centers are reliable drag endpoints.
-            // Reacquire by index after Shapes itself is virtualized offscreen.
-            let menu = app.collectionViews.element(boundBy: menuIndex)
-            for _ in 0..<10 where !target.isHittable {
-                let rows = menu.buttons.allElementsBoundByIndex.filter { $0.isHittable }
-                    .map(\.frame).filter { !$0.isEmpty && app.frame.contains(CGPoint(x: $0.midX, y: $0.midY)) }
-                    .sorted { $0.midY < $1.midY }
-                guard let first = rows.first, let last = rows.last, last.midY - first.midY > 40 else {
-                    XCTFail("Native menu needs visible rows for an in-menu scroll"); break
-                }
-                let left = max(first.minX, last.minX)
-                let right = min(first.maxX, last.maxX)
-                XCTAssertGreaterThan(right, left)
-                let x = (left + right) / 2
-                let start = app.coordinate(withNormalizedOffset: .zero)
-                    .withOffset(CGVector(dx: x, dy: last.midY))
-                let end = app.coordinate(withNormalizedOffset: .zero)
-                    .withOffset(CGVector(dx: x, dy: first.midY))
-                start.press(forDuration: 0.1, thenDragTo: end)
-            }
+            // A phone reaches the same tools in the same Document Utilities
+            // panel, drawn as a drawer (owner's 2026-11-12 redesign). This
+            // used to scroll the native More menu, which on a short screen
+            // shows too few rows to drag between.
+            let sidebar = app.scrollViews["pdf-tools-list"]
+            if !sidebar.exists { app.buttons["editor-panels"].tap() }
+            XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
+            for _ in 0..<10 where !(target.exists && target.isHittable) { sidebar.swipeUp() }
         }
         XCTAssertTrue(target.waitForExistence(timeout: 5))
         XCTAssertTrue(target.isHittable)
@@ -208,7 +191,8 @@ import PaperNestStore
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
         defer { app.terminate() }
-        XCTAssertTrue(app.buttons["editor-toggle-thumbnails"].waitForExistence(timeout: 20))
+        let editorLoaded = app.buttons["editor-panels"]
+        XCTAssertTrue(editorLoaded.waitForExistence(timeout: 20))
         revealTool("editor-signature", in: app, isPad: UIDevice.current.userInterfaceIdiom == .pad).tap()
         let cancel = app.buttons["signature-cancel"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 5))
@@ -314,14 +298,14 @@ import PaperNestStore
         XCTAssertEqual(lasso.value as? String, "Selected")
         let pen = app.buttons["studio-tool-pen"]
         pen.tap(); pen.tap()
-        let settings = app.collectionViews.containing(.slider, identifier: "studio-width-slider").firstMatch
+        let settings = app.scrollViews["tool-panel-scroll"]
         let finger = app.switches["studio-finger-drawing"]
         for _ in 0..<8 where !finger.isHittable { settings.swipeUp() }
         XCTAssertTrue(finger.isHittable)
         if finger.value as? String != "1" {
             finger.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         }
-        app.buttons["studio-settings-done"].tap()
+        app.closeToolSettings()
         page.twoFingerTap()
         XCTAssertEqual(pen.value as? String, "Selected")
         let original = try await store.pages(of: item.id)

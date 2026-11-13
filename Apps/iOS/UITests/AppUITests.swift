@@ -1497,12 +1497,30 @@ final class AppUITests: XCTestCase {
         }
     }
 
+    /// Show or hide Document Utilities through its one control. Idempotent:
+    /// it looks at whether the panel is up before deciding to tap.
+    private func setToolsPanel(_ shown: Bool, in app: XCUIApplication) {
+        let panels = app.buttons["editor-panels"]
+        XCTAssertTrue(panels.waitForExistence(timeout: 10))
+        let list = app.scrollViews["pdf-tools-list"]
+        if list.exists != shown { panels.tap() }
+        if shown { XCTAssertTrue(list.waitForExistence(timeout: 5)) }
+        else { XCTAssertTrue(list.waitForNonExistence(timeout: 5)) }
+    }
+
+    /// The control that reaches the editor's secondary tools: the merged
+    /// panels popover on iPad and Mac, the overflow menu on the phone.
+    private func toolsEntryPoint(_ app: XCUIApplication) -> XCUIElement {
+        UIDevice.current.userInterfaceIdiom == .pad
+            ? app.buttons["editor-panels"] : app.buttons["studio-more-tools"]
+    }
+
     /// Secondary notebook tools now live in More; history remains in the palette.
     private func revealEditorTool(_ app: XCUIApplication, identifier: String) {
         if app.buttons[identifier].isHittable { return }
         let sidebar = app.scrollViews["pdf-tools-list"]
         if UIDevice.current.userInterfaceIdiom == .pad {
-            if !sidebar.exists { app.buttons["studio-more-tools"].tap() }
+            if !sidebar.exists { setToolsPanel(true, in: app) }
             XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
             for _ in 0..<10 where !app.buttons[identifier].isHittable { sidebar.swipeUp() }
             if !app.buttons[identifier].isHittable {
@@ -1726,7 +1744,7 @@ final class AppUITests: XCTestCase {
             app.buttons["studio-tool-settings"].tap()
             let finger = app.switches["studio-finger-drawing"]
             for _ in 0..<6 where !finger.isHittable {
-                let form = app.collectionViews.element(boundBy: app.collectionViews.count - 1)
+                let form = app.scrollViews["tool-panel-scroll"]
                 let frame = form.frame.intersection(app.frame)
                 let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.maxX - 8, dy: frame.maxY - 40))
                 start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -200)))
@@ -1998,20 +2016,31 @@ extension AppUITests {
         XCTAssertTrue(pen.waitForExistence(timeout: 20))
         XCTAssertTrue(app.buttons["editor-insert-image"].exists, "Image belongs in the primary toolbar")
         XCTAssertTrue(app.buttons["editor-text-box"].exists, "Text Box belongs in the primary toolbar")
-        XCTAssertFalse(pen.staticTexts["Pen"].exists, "Keep the primary toolbar icon-only")
-        XCTAssertLessThan(eraser.frame.minX, highlight.frame.minX, "Eraser must sit directly after Pen")
-        XCTAssertFalse(app.buttons["editor-shapes"].exists, "Secondary tools belong in More")
+        // Owner's 2026-11-12 toolbar redesign: tools are named where they all
+        // fit (iPad, Mac) and icon-only on a phone, and the order is Pen,
+        // Highlighter, Eraser, Lasso. These two lines used to pin the
+        // previous approved layout — icon-only everywhere, Eraser after Pen.
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertFalse(pen.staticTexts["Pen"].exists, "A phone's toolbar is icon-only")
+        }
+        XCTAssertLessThan(highlight.frame.minX, eraser.frame.minX, "Highlighter sits directly after Pen")
+        XCTAssertFalse(app.buttons["editor-shapes"].exists, "The placement sheet for shapes stays in More")
+        XCTAssertTrue(app.buttons["studio-tool-shape"].exists, "Drag-to-draw Shapes is a primary tool")
         pen.tap(); pen.tap()
         let width = app.sliders["studio-width-slider"]
         XCTAssertTrue(width.waitForExistence(timeout: 5))
         let done = app.buttons["studio-settings-done"]
         XCTAssertGreaterThan(done.frame.minY, pen.frame.maxY, "Pen settings open below the top tool")
-        XCTAssertLessThan(done.frame.minY, pen.frame.maxY + 140, "Settings stay near Pen, not the lower palette")
+        // On iPad they are a popover anchored to the tool. On a phone the
+        // 2026-11-12 redesign makes them a bottom sheet, which is not near it.
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            XCTAssertLessThan(done.frame.minY, pen.frame.maxY + 140, "Settings stay near Pen, not the lower palette")
+        }
         width.adjust(toNormalizedSliderPosition: 0.75)
         let afterWidth = XCTAttachment(screenshot: app.screenshot())
         afterWidth.name = "pen-settings-after-width"; afterWidth.lifetime = .keepAlways; add(afterWidth)
         let opacity = app.sliders["studio-opacity-slider"]
-        let settingsForm = app.collectionViews.containing(.slider, identifier: "studio-width-slider").firstMatch
+        let settingsForm = app.scrollViews["tool-panel-scroll"]
         XCTAssertTrue(settingsForm.exists)
         let settingsFrame = settingsForm.frame.intersection(app.frame)
         for _ in 0..<6 where !opacity.isHittable {
@@ -2025,13 +2054,13 @@ extension AppUITests {
         XCTAssertEqual(opacity.value as? String, chosenOpacity, "Choosing color preserves opacity")
         let settings = XCTAttachment(screenshot: app.screenshot())
         settings.name = "notebook-pen-controls"; settings.lifetime = .keepAlways; add(settings)
-        app.buttons["studio-settings-done"].tap()
+        app.closeToolSettings()
         eraser.tap()
         XCTAssertEqual(eraser.value as? String, "Selected")
         pen.tap(); pen.tap()
         XCTAssertTrue(width.waitForExistence(timeout: 5))
         XCTAssertEqual(width.value as? String, chosenWidth)
-        app.buttons["studio-settings-done"].tap()
+        app.closeToolSettings()
         app.buttons["editor-insert-image"].tap()
         XCTAssertTrue(app.buttons["editor-image-photos"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["editor-image-files"].exists)
@@ -2046,7 +2075,7 @@ extension AppUITests {
         text.typeText("Toolbar text")
         app.buttons["inline-text-done"].tap()
         XCTAssertTrue(text.waitForNonExistence(timeout: 10))
-        app.buttons["studio-more-tools"].tap()
+        revealEditorTool(app, identifier: "editor-shapes")
         let shapes = app.buttons["editor-shapes"]
         XCTAssertTrue(shapes.waitForExistence(timeout: 5)); shapes.tap()
         XCTAssertTrue(app.buttons["shape-save"].waitForExistence(timeout: 5))
@@ -2214,15 +2243,21 @@ extension AppUITests {
         app.buttons["inline-text-done"].tap()
         XCTAssertTrue(mark.waitForExistence(timeout: 10))
 
-        let bar = app.scrollViews["notebook-tool-bar"]
-        let more = app.buttons["studio-more-tools"]
-        for _ in 0..<5 where !more.isHittable { bar.swipeLeft() }
-        XCTAssertTrue(more.isHittable)
+        // Only the phone keeps an overflow button in the writing bar; iPad
+        // and Mac reach the same actions inside the tools inspector.
         let textTool = app.buttons["editor-text-box"]
-        XCTAssertTrue(textTool.isHittable)
-        XCTAssertGreaterThan(more.frame.minX, textTool.frame.minX)
-        XCTAssertLessThanOrEqual(more.frame.minX - textTool.frame.maxX, 20, "More stays directly next to Text Box")
-        XCTAssertEqual(more.frame.midY, textTool.frame.midY, accuracy: 3)
+        if UIDevice.current.userInterfaceIdiom != .pad {
+            let bar = app.scrollViews["notebook-tool-bar"]
+            let more = app.buttons["studio-more-tools"]
+            for _ in 0..<5 where !more.isHittable { bar.swipeLeft() }
+            XCTAssertTrue(more.isHittable)
+            XCTAssertTrue(textTool.isHittable)
+            XCTAssertGreaterThan(more.frame.minX, textTool.frame.minX)
+            XCTAssertLessThanOrEqual(more.frame.minX - textTool.frame.maxX, 20, "More stays directly next to Text Box")
+            XCTAssertEqual(more.frame.midY, textTool.frame.midY, accuracy: 3)
+        } else {
+            XCTAssertTrue(textTool.isHittable)
+        }
         revealEditorTool(app, identifier: "editor-crop")
         let crop = app.buttons["editor-crop"]
         XCTAssertTrue(crop.waitForExistence(timeout: 5)); crop.tap()
@@ -2374,7 +2409,7 @@ extension AppUITests {
         let library = "/tmp/papernest-pdf-workspace-ui"
         let app = launch(["-PaperNestDebugOpenItem", "Interactive Form"], libraryPath: library)
         defer { app.terminate() }
-        XCTAssertTrue(app.buttons["studio-more-tools"].waitForExistence(timeout: 20))
+        XCTAssertTrue(toolsEntryPoint(app).waitForExistence(timeout: 20))
         revealEditorTool(app, identifier: "editor-fill-form")
         app.buttons["editor-fill-form"].tap()
         let customer = app.textFields["form-field-customer"]
@@ -2397,7 +2432,7 @@ extension AppUITests {
         app.launchArguments = ["-PaperNestLibraryPath", library, "-PaperNestDebugOpenItem", copyName,
                                "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)"]
         app.launch()
-        XCTAssertTrue(app.buttons["studio-more-tools"].waitForExistence(timeout: 20))
+        XCTAssertTrue(toolsEntryPoint(app).waitForExistence(timeout: 20))
         revealEditorTool(app, identifier: "editor-fill-form")
         app.buttons["editor-fill-form"].tap()
         XCTAssertTrue(customer.waitForExistence(timeout: 15))
@@ -2563,7 +2598,7 @@ extension AppUITests {
         lasso.tap()
         XCTAssertTrue(app.buttons["studio-lasso-rectangle"].waitForExistence(timeout: 5))
         app.buttons["studio-lasso-rectangle"].tap()
-        app.buttons["studio-settings-done"].tap()
+        app.closeToolSettings()
         let canvas = app.descendants(matching: .any)["page-selection-canvas"].firstMatch
         XCTAssertTrue(canvas.waitForExistence(timeout: 5))
         // Enclose the visible text, leaving most of its 240 × 90 frame outside.
@@ -2670,7 +2705,7 @@ extension AppUITests {
         app.buttons["studio-eraser-size-36"].tap()
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "round-eraser-controls"; shot.lifetime = .keepAlways; add(shot)
-        let form = app.collectionViews.containing(.slider, identifier: "studio-eraser-size").firstMatch
+        let form = app.scrollViews["tool-panel-scroll"]
         let finger = app.switches["studio-finger-drawing"]
         for _ in 0..<8 where !finger.isHittable { form.swipeUp() }
         XCTAssertTrue(finger.isHittable)
@@ -2678,7 +2713,7 @@ extension AppUITests {
             finger.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         }
         await fulfillment(of: [expectation(for: NSPredicate(format: "value == %@", "1"), evaluatedWith: finger)], timeout: 5)
-        app.buttons["studio-settings-done"].tap()
+        app.closeToolSettings()
         let canvas = app.descendants(matching: .any)["ink-canvas"].firstMatch
         XCTAssertTrue(canvas.waitForExistence(timeout: 5))
         canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
@@ -2731,7 +2766,7 @@ extension AppUITests {
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             name.tap(); name.typeText("PDF tools")
             app.buttons["notebook-create"].tap()
-            let more = app.buttons["studio-more-tools"]
+            let more = toolsEntryPoint(app)
             XCTAssertTrue(more.waitForExistence(timeout: 15))
             let panel = app.scrollViews["pdf-tools-list"]
             if isPad {
@@ -2747,8 +2782,10 @@ extension AppUITests {
                 // Close from both the panel and its persistent toolbar button.
                 app.buttons["pdf-tools-close"].tap()
                 XCTAssertTrue(panel.waitForNonExistence(timeout: 5))
-                more.tap(); XCTAssertTrue(panel.waitForExistence(timeout: 5))
-                more.tap(); XCTAssertTrue(panel.waitForNonExistence(timeout: 5))
+                // Reopening and closing now go through the merged popover
+                // rather than a toolbar button that toggled on its own.
+                setToolsPanel(true, in: app); XCTAssertTrue(panel.waitForExistence(timeout: 5))
+                setToolsPanel(false, in: app); XCTAssertTrue(panel.waitForNonExistence(timeout: 5))
                 revealEditorTool(app, identifier: "editor-signature")
             }
             app.buttons["editor-signature"].tap()

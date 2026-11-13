@@ -31,6 +31,14 @@
 	<!-- English base text; translations live in <lang>.lproj/InfoPlist.strings. -->
 	<key>NSCameraUsageDescription</key>
 	<string>PaperNest uses the camera to scan documents and add photos to notes. Captures are saved in your library on this device.</string>
+	<!-- iCloud sync: the container this build uses (empty = sync not set up),
+	     and permission to be woken by iCloud's silent "something changed" push. -->
+	<key>PaperNestICloudContainer</key>
+	<string>$(PAPERNEST_ICLOUD_CONTAINER)</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

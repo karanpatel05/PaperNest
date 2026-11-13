@@ -27,10 +27,17 @@ struct MacInkCanvas: View {
     let color: RGBAColor
     let width: Double
     var eraserMode: InkEraserMode = .precision
+    /// Which pen is in hand and how its strokes are shaped and saved.
+    var style = InkDrawingStyle()
     let undoManager: UndoManager?
 
     /// The drag in progress, in view points.
     @State private var points: [CGPoint] = []
+    /// When each of `points` arrived, in seconds since the drag began. Speed
+    /// shapes several of the pens, and the pause before the pointer lifts is
+    /// how a stroke asks to be straightened.
+    @State private var stamps: [TimeInterval] = []
+    @State private var dragBegan: Date?
     @State private var cursorPoint: CGPoint?
     @State private var isErasing = false
     /// What the lasso has hold of, by **id**: the strokes themselves are read
@@ -95,26 +102,31 @@ struct MacInkCanvas: View {
                 .onChanged { value in
                     guard !isErasing else { return }
                     cursorPoint = value.location
+                    let began = dragBegan ?? value.time
+                    dragBegan = began
+                    let stamp = value.time.timeIntervalSince(began)
                     if points.isEmpty, !isMovingSelection {
                         isMovingSelection = tool == .lasso && startsOnSelection(value.startLocation)
-                        if !isMovingSelection { points.append(value.startLocation) }
+                        if !isMovingSelection { points.append(value.startLocation); stamps.append(stamp) }
                     }
                     if isMovingSelection {
                         moveTranslation = value.translation
                     } else {
-                        points.append(value.location)
+                        points.append(value.location); stamps.append(stamp)
                     }
                 }
                 .onEnded { value in
                     guard !isErasing else { return }
+                    let lifted = value.time.timeIntervalSince(dragBegan ?? value.time)
+                    dragBegan = nil
                     if isMovingSelection {
                         isMovingSelection = false
                         moveTranslation = .zero
                         commitMove(value.translation)
                         return
                     }
-                    if points.last != value.location { points.append(value.location) }
-                    commit()
+                    if points.last != value.location { points.append(value.location); stamps.append(lifted) }
+                    commit(liftedAt: lifted)
                 }
         )
         // A selection belongs to one tool on one page. Leaving it up after a
@@ -131,7 +143,7 @@ struct MacInkCanvas: View {
     }
 
     private func clearSelection() {
-        points = []; cursorPoint = nil
+        points = []; stamps = []; dragBegan = nil; cursorPoint = nil
         selection = []
         isMovingSelection = false
         moveTranslation = .zero
@@ -178,11 +190,26 @@ struct MacInkCanvas: View {
                            style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
             return
         }
-        // A click with no movement is a dot, as it is when drawn.
-        if points.count == 1 { path.addLine(to: first) }
-        context.stroke(path, with: .color(previewColor),
-                       style: StrokeStyle(lineWidth: width * scale, lineCap: .round, lineJoin: .round))
+        // Drawn by the code that shapes the saved stroke, so the line under
+        // the pointer is the line that lands: a fountain pen thins along its
+        // nib while it is being drawn, not a moment after.
+        guard let inkTool = tool.ink else { return }
+        let samples = zip(points, stamps).map { PenSample(x: $0.x, y: $0.y, time: $1) }
+        let preview: [InkPoint]
+        if style.straightens, let last = points.last {
+            preview = [InkPoint(x: first.x, y: first.y), InkPoint(x: last.x, y: last.y)]
+        } else if inkTool == .highlighter {
+            preview = samples.map { InkPoint(x: $0.x, y: $0.y) }
+        } else {
+            preview = PenDynamics.points(from: StrokeSmoothing.smooth(samples, amount: style.smoothing),
+                                         preset: style.preset, usesPressure: style.usesPressure)
+        }
+        InkPainter.draw(preview, width: width * scale, color: color, tool: inkTool, cap: style.cap, in: &context)
     }
+
+    /// How far the pointer may drift, in view points, and still count as
+    /// resting at the end of a stroke.
+    static let holdGrip: CGFloat = 5
 
     private func startsOnSelection(_ location: CGPoint) -> Bool {
         guard let bounds = Self.selectionBounds(of: selectedObjects) else { return false }
@@ -191,15 +218,17 @@ struct MacInkCanvas: View {
             .contains(location)
     }
 
-    private func commit() {
-        let captured = points
-        points = []
+    private func commit(liftedAt: TimeInterval) {
+        let captured = points, capturedStamps = stamps
+        points = []; stamps = []
         guard !captured.isEmpty else { return }
         let viewToSource = sourceToView.inverted()
         switch tool {
         case .eraser:
             let path = captured.map { $0.applying(viewToSource) }
-            let capturedObjects = pageObjects
+            // Only the ink this eraser is set to take. Text boxes, images and
+            // the page are never offered to it at all.
+            let capturedObjects = style.eraserTarget.erasable(in: pageObjects)
             isErasing = true
             Task {
                 defer { isErasing = false }
@@ -213,10 +242,18 @@ struct MacInkCanvas: View {
             // click on empty page lets go of what was held.
             selection = Self.lassoSelection(from: captured, in: pageObjects, sourceToView: sourceToView).map(\.id)
         case .pen, .highlighter:
-            guard let inkTool = tool.ink,
-                  let stroke = Self.stroke(from: captured, sourceToView: sourceToView,
-                                           tool: inkTool, color: color, width: width) else { return }
+            guard let inkTool = tool.ink else { return }
+            let samples = zip(captured, capturedStamps).map { point, stamp -> PenSample in
+                let inSource = point.applying(viewToSource)
+                return PenSample(x: inSource.x, y: inSource.y, time: stamp)
+            }
+            guard let stroke = style.stroke(from: samples, endTime: liftedAt, grip: Self.holdGrip / scale,
+                                            tool: inkTool, color: color, width: width) else { return }
             Task { try? await model.addInkStroke(stroke, to: page, undoManager: undoManager) }
+        case .shape:
+            // Shapes are dragged out on their own layer; this canvas is not
+            // on screen while that tool is armed.
+            break
         }
     }
 

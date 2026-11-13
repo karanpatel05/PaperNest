@@ -36,7 +36,15 @@ struct InkConversion {
         return stroke.maskedPathRanges.compactMap { range in
             let samples = Array(stroke.path.interpolatedPoints(in: range, by: .distance(Self.sampleSpacing)))
             guard !samples.isEmpty else { return nil }
-            let widths = samples.map { Double(max($0.size.width, 0.1) * widthToSource) }
+            let fountain = stroke.ink.inkType == .fountainPen
+            let widths = samples.indices.map { index -> Double in
+                let sample = samples[index]
+                guard fountain else { return Double(max(sample.size.width, 0.1) * widthToSource) }
+                let before = samples[max(index - 1, 0)].location, after = samples[min(index + 1, samples.count - 1)].location
+                let across = Self.nibWidth(size: sample.size, azimuth: sample.azimuth,
+                                           travel: CGVector(dx: after.x - before.x, dy: after.y - before.y))
+                return Double(max(across, 0.1) * widthToSource)
+            }
             let nominal = widths.max() ?? 1
             let points = zip(samples, widths).map { sample, width in
                 let at = sample.location.applying(toSource)
@@ -57,6 +65,23 @@ struct InkConversion {
         let type: PKInk.InkType = ink.tool == .highlighter ? .marker : .pen
         return PKStroke(ink: PKInk(type, color: Self.color(ink.color)), path: PKStrokePath(controlPoints: points, creationDate: Date()),
                         randomSeed: seed)
+    }
+
+    /// How wide a fountain-pen nib draws when it travels in a direction.
+    ///
+    /// The nib is an ellipse `size` across, turned to `azimuth`. A stored
+    /// stroke has one width per point, so what is kept is the nib's extent
+    /// across the direction of travel — thin when it moves along its own
+    /// edge, full when it moves across it. That is the calligraphy, and it is
+    /// all of the nib that a width can hold.
+    static func nibWidth(size: CGSize, azimuth: CGFloat, travel: CGVector) -> CGFloat {
+        let length = hypot(travel.dx, travel.dy)
+        guard length > 0.0001 else { return max(size.width, size.height) }
+        // The unit normal to the direction of travel, in the nib's own axes.
+        let nx = -travel.dy / length, ny = travel.dx / length
+        let along = nx * cos(azimuth) + ny * sin(azimuth)
+        let across = -nx * sin(azimuth) + ny * cos(azimuth)
+        return sqrt(pow(size.width * along, 2) + pow(size.height * across, 2))
     }
 
     static func uniformScale(_ t: CGAffineTransform) -> CGFloat {

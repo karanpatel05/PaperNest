@@ -479,6 +479,9 @@ struct DocumentCommandContext {
     let showReplacePage: () -> Void
     let showCrop: () -> Void
     let showOutline: () -> Void
+    /// Opens find in the document. Defaulted so a context built without it still compiles.
+    var showFind: () -> Void = {}
+    var showGoToPage: () -> Void = {}
     let showTextBox: () -> Void
     let showInsertImage: () -> Void
     var beforeAction: (() async -> Bool)? = nil

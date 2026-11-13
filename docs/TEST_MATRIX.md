@@ -1,3 +1,377 @@
+## 2026-11-13 — iCloud sync (M2): engine, CloudKit adapter, status UI (Claude, owner's request)
+
+Owner's brief in session: real two-way iCloud sync across iPhone, iPad and Mac. Design and file map:
+`docs/ARCHITECTURE.md` → "Sync". Manual Apple steps: `docs/APPLE_SETUP.md` §2.
+
+**The one thing to read first: this has never talked to iCloud's servers with data.** No container exists for the
+bundle ID, so no record has been saved to or fetched from CloudKit. Everything below marked "pretend server" runs
+the real store, merge rules, controller and asset mover against `Tests/PaperNestSyncTests/FakeCloud.swift`.
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh` | **Passed: 934 tests** (279 + 49 + 175 + 163 + 158 + 110), 0 failures, 0 compiler warnings |
+| Engine files alone on clean `HEAD` (separate worktree) | **Passed: 858 tests**; committed as `49cd82d` |
+| `PaperNestSyncTests` (49: 30 multi-device scenarios, 19 unit) | **Passed**, pretend server |
+| `xcodebuild` `PaperNest-iOS`, generic iOS Simulator, iCloud off | **Built**, 0 warnings; Info.plist container empty, no iCloud entitlement |
+| Same, iCloud on (`PAPERNEST_ICLOUD_CONTAINER`, iOS iCloud entitlements passed on the command line) | **Built**; simulated entitlements carry CloudKit, the container and `aps-environment` |
+| `xcodebuild` `PaperNest-macOS`, iCloud off | **Built**, 0 warnings |
+| `PaperNest-macOS` with iCloud entitlements | **Not run.** Needs a provisioning profile for a container that does not exist yet |
+| iCloud-on build launched in iPhone 17 Simulator (iOS 26.5), throwaway library | **Launched, no crash.** CloudKit logged real `account-status` calls; home shows the "Saved on this device" icon. Simulator not signed in to iCloud |
+| Settings → iCloud Sync screen | **Not seen.** Simulator control was not granted, so nothing was tapped. Compiles; never looked at, in any language |
+| Editor indicator, cloud badge, Download / Remove Download menu items | **Not seen**, same reason |
+| iOS UI tests (`scripts/ui-test-ios.sh`) | **Not run** after this change |
+| Real devices, same Apple Account | **Not run.** Outstanding |
+| Thread sanitizer | **Not run** |
+
+**What the pretend-server scenarios cover:** notebook iPad → iPhone → Mac and still editable ink; folders, rename,
+move, favorite, label; offline edits then reconnect; independent strokes merge; rotate + crop merge; same page
+turned two ways keeps both and reports a conflict; same text box edited twice keeps both; two renames converge;
+Recently Deleted, restore and permanent delete across devices; edit beats delete (page, document, stroke); page
+tombstones; folder deleted under an offline document; 100-page PDF with checksum; pictures, file items, signatures;
+download on demand, corrupt download refused, eviction only when iCloud really has the file; originals leave
+iCloud after 30 days; first-time migration of an existing library, twice, with no duplicates; migration cut short
+and resumed; upload whose answer was lost; two devices with the same library; quota exceeded; account switch;
+iCloud data deleted; sync off deletes nothing; out-of-order arrival; a record from a newer app; relaunch.
+
+**Known limits.**
+
+- **Vault:** the app has no Vault. Nothing to sync, nothing uploaded. If one is added it must not ride this path.
+- **OCR results are not synced**; each device recognizes text itself.
+- A page's objects deleted for good elsewhere arrive before their document only across separate fetch batches;
+  within one batch documents are handled first. In the cross-batch case a restored document can come back
+  without marks that were on it.
+- A device offline for more than 30 days can reference an original another device has since removed from iCloud.
+  It re-checks on every new reference, which narrows this; it does not close it.
+- One `CKRecord` per stroke. A notebook with tens of thousands of strokes makes a slow first upload. Not measured.
+- No iCloud storage figure is shown: CloudKit offers no quota API. Full storage is reported when a save is refused.
+- No byte-level transfer progress; counts only.
+- The recovery copy made when sync is first turned on is the database only. Originals are separate immutable files.
+- French and Spanish strings for this slice are unreviewed by a native speaker, like the rest.
+- Two-device checklist once a container exists: enable on device A with an existing library; enable on B; create,
+  edit, rename, move, favorite, delete, restore on each; airplane-mode edits on both to the same page; kill the app
+  mid-upload; sign out and into a second account; fill iCloud; delete iCloud data from A and watch B.
+
+## 2026-11-12 (night) — Reader features R1, R2 and part of R3: find, select and copy, links, Go to Page (Claude, owner's request)
+
+Owner: **"I want to implement most features of adobe PDF reader into my app"**, then **"You pick the order."** The
+order and the ledger are under "Reader features" in `docs/FEATURE_EXPANSION.md`. This entry is the first two and
+the links and Go to Page half of the third; bookmarks are not built.
+
+**What changed in the app.**
+
+- **Find.** A magnifier in the editor's toolbar (⌘F) opens a find bar under the tools: a field, "2 of 7", previous
+  and next (⇧⌘G, ⌘G; Return is next), Done. Every hit on the page is lit yellow and the current one orange; moving
+  to a hit on another page turns to it, and scrolls to it when the page is zoomed. Case and accents do not matter,
+  a phrase is found across a line break, and the search starts from the page being read rather than from page 1.
+  It searches a PDF's own text, recognised text and typed text boxes. A document with no text at all says
+  **No Text** and points at Recognize Text, instead of "No Results" — which would read as "that word is not here".
+- **Select and copy.** While reading (no drawing tool armed): press and hold a word on iPhone/iPad and drag on, or
+  drag with the pointer on a Mac (double-click for a word). A small bar offers **Copy**, **Highlight**,
+  **Underline**, **Strikethrough**. The three marks are saved as the same editable ink every highlight already is,
+  so they undo, recolour, remove and export like the rest — and this is the first screen for word-level markup
+  (inventory row 20), which until now could only mark whole recognised lines.
+
+- **Links.** The links a PDF carries can be followed while reading. A link to another page turns to it, and
+  follows that page through reorders; one whose page was deleted is not offered at all. A link out of the document
+  **shows its whole address and asks** — Open, Copy Link, Cancel — because the words under a link say whatever their
+  author liked. Only `http`, `https`, `mailto` and `tel` are made tappable; a `file:` path, a script or an app's
+  private scheme is left as plain paper.
+- **Go to Page…** in the title's menu (and the Page menu on a Mac): type a number. Past either end means that end.
+
+**How it is built.** `PageTextLayout` (Core) holds a page's words and where they are, in upright source space: a box
+per **character** from a digital PDF, a box per **word** from recognition, one box per typed text box.
+`PageRenderer.textLayout(for:)` (Render) reads it; `searchTexts(for:)` reads text only, so find can hold every page
+of a long document and work out boxes just for the page on screen. No schema change, nothing cached on disk.
+
+**Results, final code.** Unit suite **885 tests, 0 failures, 0 warnings** (811 before; 74 new). `./scripts/build-mac-app.sh`
+clean, and `xcodebuild … -destination 'generic/platform=iOS Simulator' build` clean. UI tests, each device run on
+its own, `-parallel-testing-enabled NO`:
+
+| Suite | iPad Pro 13-inch (M5), iOS 26.5 | PaperNest iPhone Duo, iOS 27.1 |
+|---|---|---|
+| `DocumentFindUITests` (new, 3) | 3/3 — `/tmp/papernest-reader-ipad-4.log` | 3/3 — `/tmp/papernest-reader-iphone-6.log` |
+| `TextSelectionUITests` (new, 2) | 2/2 — `/tmp/papernest-reader-ipad-4.log` | 2/2 — `/tmp/papernest-reader-iphone-6.log` |
+| `PageLinksUITests` (new, 2) | 2/2 — `/tmp/papernest-links-ipad-2.log` | 2/2 — `/tmp/papernest-links-iphone-2.log` |
+
+`DocumentFindUITests` proves: the bar opens ready to type and **every typed letter lands**; three hits counted across
+a three-page PDF; next and previous turn the page and wrap at both ends; a word that is not there says No Results
+and disables the arrows; Done removes the bar and the highlights and leaves the editor's controls answering; a
+blank notebook says No Text with its explanation; text typed onto a notebook page is found; and in French and
+Spanish every part of the bar is on screen, none overlapping, with room to type. `TextSelectionUITests` proves: a
+press on a word selects that word; Copy acknowledges, and **the word can then be pasted by hand into the find field**
+(the clipboard really holds it); press-and-drag past the line's end selects the phrase; Highlight saves exactly one
+stroke and lets go of the selection; a tap elsewhere lets go without changing the page; a press on empty paper
+selects nothing. `PageLinksUITests` proves: both links of a page are offered and named ("Go to page 3", "Link:
+https://…"); the web link raises a question that **shows the address**, and Cancel leaves the page where it was; the
+internal link turns to page 3; and Go to Page from the title menu goes to 3, then to 1 for "0" and to 3 for "250".
+
+**The unit tests that matter most** are in `PageTextReaderTests`: they render the page and look at the **pixels**
+under a hit's box — ink inside it, clean paper in a sliver either side — for a plain PDF, `/Rotate` 90/180/270, an
+offset crop box, and a page the reader turned in PaperNest. **Proved able to fail:** shifting the character index by
+one made six of them fail, then was reverted. `PageLinkReaderTests` likewise: letting every URL scheme through
+made the scheme test fail, then was reverted.
+
+Screenshots from the final iPad and iPhone runs: `docs/screenshots/reader-2026-11-12/` (find with its hits lit, a
+selected phrase with its actions, the link question showing its address, the French find bar on a phone).
+
+**Committed:** the engine only, as `b2d52c0` — Core and Render sources, their tests and the hand-built fixture,
+verified alone on a clean checkout of `0edf804` (809 tests). The screens, the UI tests and this entry are not:
+they sit on top of this afternoon's uncommitted editor work. See Current claims in SESSION_HANDOFF.
+**Update, 2026-11-13:** the owner said "commit it right now", and the screens, the UI tests and this entry went
+in with the rest of the working tree — the toolbar, Document Utilities and iCloud sync screens included. Checked
+on that tree first: 934 unit tests, 0 failures, 0 warnings; Mac and iOS Simulator builds clean. **No UI suite was
+re-run on top of the sync screens**, so the device results in this entry describe the tree as it was the night before.
+
+**Four defects of mine found by these runs and fixed.**
+
+1. **The find field was 22 points wide in French on a phone** ("Aucun résultat" and "Terminé" took the row). The bar
+   now drops the count and the arrows to a second row whenever the field would be under 240 points.
+2. **The keyboard was lost after the first letter.** My first fix for (1) used `ViewThatFits`, which swaps one
+   branch of views for another; the field in the new branch is a new field, and the swap happened the moment the
+   first count appeared. Typing "BUDGET" left "B". **The test still passed its count**, because "b" also occurs
+   three times in the fixture — it was the screenshot that showed it. Now a custom `Layout` (`FindBarLayout`) places
+   the same five views either way, and the test asserts the field's value.
+3. **A page with no hits still exposed an empty "search results" element** to accessibility (iPad, continuous
+   notebook). Nothing is created for such a page now.
+4. On a phone the bottom palette sat over what the keyboard left of the page, covering the hit just found. It
+   stands down while the find field has the keyboard, as it already did for a text box.
+
+**A trap, for whoever writes the next PDF fixture.** On the iOS 27.1 Simulator, a link whose `destination` is set
+with PDFKit and written with `dataRepresentation()` reads back with **no page** (`page = -1`); on iOS 26.5 and on
+the Mac the same code round-trips. So a link fixture authored inside an iOS test fails before PaperNest has read a
+byte — my first `PageLinksUITests` did exactly that, on the phone only. `SyntheticDocuments.handBuiltLinkedPDF()`
+writes the file out by hand instead, the same bytes everywhere, and with it the phone passes: **reading** links on
+iOS 27.1 is fine. Whether iOS 27.1's *writer* is at fault or its reader of its own output is not known, and no
+PaperNest feature writes a link.
+
+**Not verified, plainly.**
+
+- **The Mac was never seen.** Screen access was asked for once and declined. It compiles; nobody has watched find
+  or a pointer drag-select on it. In particular **⌘F/⌘G on a Mac are unproven**: they are on the bar's own buttons
+  because the system keeps a Find submenu under Edit with the same keys, and which wins has not been observed.
+- **Open was never tapped.** The test cancels the question; nothing has been seen to hand a link to Safari, Mail
+  or the phone. Links were read from two synthetic PDFs only — no PDF made by a word processor, no named
+  destinations, no links on a rotated page in the running app (the mapping is the one the text boxes use, and that
+  is pixel-tested).
+- **No physical device.** The press-and-hold is a `UILongPressGestureRecognizer` added to the page's scroll view
+  (`TextSelectionPress`, the `PagePinchZoom` pattern). XCUITest's synthesized press drives it; a real finger, an
+  Apple Pencil, and whether a real scroll still feels right with it attached have not been tried. Read the
+  2026-11-11 one-finger-scrolling entry before trusting a synthesized gesture here.
+- iPad hardware-keyboard shortcuts, VoiceOver, Dynamic Type at the largest sizes and dark mode were not looked at.
+  The selection bar was seen in English only.
+- In the running app only an upright, uncropped digital PDF and a notebook were used. Rotated and cropped pages
+  and recognised scans are covered by unit tests, not by a UI test.
+- Long documents: laying out a 1,320-character page took 68 ms in a unit test, opening the file included. Nothing
+  measured a thousand-page PDF in the app.
+
+**Limits by design — say these rather than discover them.**
+
+- A hit inside a **recognised** word lights the whole word, and one inside a typed text box lights the whole box:
+  recognition gives no per-letter boxes and dividing a box by its letters drifts on a proportional font.
+- A word hyphenated across a line break is two words to find.
+- Text a crop hides is not found and cannot be selected; export still carries it, as before.
+- Selection needs no drawing tool armed. **A notebook opens with the lasso armed**, so there it needs Markup off
+  first. There are no drag handles yet: to change a selection, press again.
+- Highlight from a selection uses the default colours and the same Pro gate as Annotate Text.
+- Find does not look inside private page comments.
+
+**Existing suites after these changes**, iPad Pro 13-inch (M5), iOS 26.5, `/tmp/papernest-reader-ipad-regress.log`:
+`DocumentUtilitiesUITests` 2/2, `EditorFirstTouchUITests` 3/3, `NotesToolbarUITests` 3/3, `EditorWorkspaceUITests`
+10/11 — the one red is `testPinchZoomWithLassoAndPen`, which the entry below already records as red at clean
+`0edf804`. So the same 18 of 19 as before this work. **Not re-run:** the bulk of `AppUITests`, and none of these on
+the phone.
+
+## 2026-11-12 (later) — Document Utilities: one sidebar, one toggle, and the lower bar (Claude, owner's request)
+
+Owner circled the PDF Tools panel on a device screenshot, then supplied a mockup and a written brief: replace the
+page strip and the PDF Tools list with **one** right-hand Document Utilities sidebar behind **one** top-right
+toggle, and refine the lower floating bar. Built on top of the toolbar slice below; same day, same uncommitted tree.
+
+**What changed in the app.**
+
+- **One panel.** Header with the app's own leaf mark (`BrandMark`), then two sections that fold independently and
+  remember it: **Pages (n)** — a horizontal gallery of the document's real pages, the current one outlined, a menu on
+  each (move earlier/later, rotate, duplicate, export, delete), and an Add Page menu — and **PDF Tools**, ten compact
+  tiles two to a row plus the longer actions a row each. Every tile is the editor's existing button; nothing is a
+  placeholder. iPad and Mac show it as the inspector column; a phone shows the same view as a bottom drawer.
+- **One control.** A stacked-layers button at the top right on every device (`editor-panels`). The separate page-strip
+  column, the phone's thumbnail strip and its toggle, and the two-switch panels popover are gone.
+- **Lower bar.** Zoom out, fit, zoom in | drawing mode | display settings | current zoom. The armed tool's icon (a
+  second Lasso) and the colour swatches are gone from it. Display settings holds zoom presets, Fit Page, Fit to Width
+  (new; iPad/Mac) and Draw with Finger.
+- **The current page is held when the panel opens or closes** (and on rotation or resize). It was not: the pages
+  refit to the new width and the visible-page tracker moved the selection to a neighbour.
+
+**Results, final code.** Unit suite **811 tests, 0 failures, 0 warnings.** Mac build clean. UI tests, each device
+run on its own:
+
+| Suite | iPad Pro 13-inch (M5), iOS 26.5 | PaperNest iPhone Duo, iOS 27.1 |
+|---|---|---|
+| `DocumentUtilitiesUITests` (new, 2) | 2/2 | 2/2 |
+| `NotesToolbarUITests` (3) | 3/3 | 3/3 |
+| `EditorFirstTouchUITests` (3) | 3/3 | 3/3 |
+| `EditorWorkspaceUITests` | 10/11 — only `testPinchZoomWithLassoAndPen`, red at `0edf804` too | `testNotebookWorkspaceEnglish`, `testPDFWorkspaceEnglish`: passed |
+| `AppUITests`: CompactNotebookTools, RoundEraser, StudioPen, NoteImageMenu | not run | 4/4 |
+
+`DocumentUtilitiesUITests` proves: exactly one toggle and none of the old ones; the panel closing gives the page its
+room back (iPad) or the drawer opening (phone); the Pages header carrying the real count; a tap on a thumbnail
+selecting that page; each section folding without the other; the panel's close button being the same switch; the
+page still being page 3 after closing; Delete Page in the panel removing a page from the library on disk; the lower
+bar zooming 100 → 150 → 100, the display popover's presets, and Lasso appearing once.
+
+**Five defects of mine found by these runs and fixed — the first two hung the app:**
+
+1. **Hang at launch on iPad, full CPU.** I reset two `UserDefaults` keys in the editor's initializer. Changing
+   defaults notifies every `@AppStorage` in the window; a view above the editor rebuilt, initialised the editor
+   again, which reset the keys again. Found by sampling the stuck process (`DocumentWorkspace.body` →
+   `DocumentView.init` → `NSUserDefaults` → `UserDefaultObserver`). Now a once-per-launch constant.
+2. **Still hung after that.** I had made the inspector's visibility depend on the horizontal size class and widened
+   the column from 320 to 340. **I changed both back in one step and the hang went away, so which of the two was
+   sufficient is not isolated.** The column-or-drawer decision is by device kind now, which cannot flip.
+3. Page thumbnails were not exposed as buttons, so nothing could find or activate them by role.
+4. The current page changed when the panel closed (above).
+5. On a phone, with the strip gone, the hidden top of a tall page lay under the toolbar and accessibility reported
+   the tool buttons as covered (real taps still landed). One point of top padding keeps the scroll view out from
+   under the toolbar. Also made the colour swatches eager instead of lazy, for the same findability reason.
+
+**Tests changed, and why.** Passages that drove the old page-strip toggle and the panels popover's switches now drive
+the one control. On a phone `EditorWorkspaceUITests.revealTool` reaches a tool through the Document Utilities drawer
+instead of scrolling the native More menu; before that change the two phone workspace tests failed in that menu
+(drag of 3 points per attempt on this short screen), and **that failure was never baselined**. The other session's
+uncommitted `editor-panels` popover in `DocumentView.swift` is superseded by this at the owner's instruction and is
+gone from the working tree; `Apps/iOS/UITests/PanelControls.swift` is untouched and still used.
+
+**Unexplained, and I cannot rule my changes out:** on the iPhone Duo simulator a test that launches the app
+immediately after another test terminated it sometimes gets an app with an **empty accessibility tree** for the whole
+30-second wait. Seen four times today (twice after the Spanish run, twice elsewhere), never on the iPad, no crash
+report written. Each affected test passed when run again. Cause not investigated.
+
+**Not verified.** The Mac — never seen, so the resizable sidebar, hover and the toggle in a Mac toolbar are compiled
+only. Dark mode by me. VoiceOver (including whether fix 5 matters to it). Fit to Width (no test drives it; hidden on
+a phone). The thumbnail menu's move, rotate, duplicate and export (only delete and select are driven). Opening
+pickers and the camera from the phone drawer (Signature and Pages are driven; the others rely on the same
+drawer-steps-aside rule). 11-inch iPad, split view, landscape phone. The rest of `AppUITests`.
+
+**Not built.** Drag-and-drop reordering of thumbnails (the menu's Move Earlier/Later does it instead). Continuous
+versus single-page switching and page background in display settings — the viewer does not support switching, so
+they are not offered. The mockup's search button. The More (…) menu still lists the same tools on every device.
+
+## 2026-11-12 — Notes editor toolbar redesign (Claude, at the owner's direct request)
+
+Owner supplied a new mockup and a written spec ("Paper NEST — complete notes editor toolbar redesign") and said to
+implement it rather than stop at mockups. This is `PaperNestUI` work, done by Claude on that instruction.
+
+**What is real now** — each line is a control that changes what is saved, not a picture of one:
+
+- **Toolbar.** Pen, Highlighter, Eraser, Lasso | Shapes, Text, Image, Sticker, Insert | Undo, Redo, More. Named where
+  every tool still fits, icon-only otherwise (measured in the language on screen). On a phone the row scrolls, More is
+  pinned at its end and Undo/Redo stay in the lower palette. ⌥⌘1…9 pick the tools.
+- **Settings.** One panel frame for all nine tools: popover anchored to the tool on iPad/Mac, bottom sheet on a phone.
+  Every setting is saved as it is changed (`EditorToolSettingsStore`, `UserDefaults`, one JSON blob). A launch pointed
+  at a throwaway library keeps settings in memory, so UI tests cannot leak state into each other.
+- **Pen.** Six presets, each with its own width, colour and opacity. On the Mac every preset shapes its own line
+  (`PenDynamics`); on iPad each maps to the PencilKit ink whose strokes survive storage (monoline / pen / fountain pen).
+  Hold-to-straighten recognises line, ellipse, rectangle, triangle on both.
+- **Highlighter.** Standard, Flat (new stored `InkStroke.cap`), Underline, Marker, Straight; each keeps its own width
+  and strength. **Eraser.** Pixel/Stroke, size, and All ink / Handwriting / Highlights. **Lasso.** Mode plus which
+  content it may pick up. **Shapes.** Eleven shapes dragged out on the page. **Text.** Type settings for the selected
+  box or the next one. **Image.** Photos, Camera, Files. **Sticker.** Sixteen original stickers, placed as images.
+  **Insert.** Blank/Lined/Grid page, text box, image, date & time, divider, import, duplicate, organise.
+
+**Unit suite: 811 tests, 0 failures, 0 warnings** (`./scripts/test.sh`; was 757). New: `PenDynamicsTests`,
+`StrokeSmoothingTests`, `StrokeSnappingTests`, `InkStrokeCapTests` (Core); `InkStyleRenderTests` (flat tip stops at the
+stroke's ends, a faded pen of varying width is one even tone); `EditorToolSettingsTests`, `InkDrawingStyleTests`,
+`ToolTargetTests`, `StickerLibraryTests` (UI); four additions to `ShapeAnnotationTests`. Two were red first and fixed
+in the product, not the test: line recognition judged by path length rejected a jittery straight line, and three
+French strings had a plain space before a colon.
+
+**Builds.** `scripts/swift.sh build` (Mac) and `scripts/build-ios-sim-app.sh` both clean, 0 warnings.
+Screenshots from the test runs: `docs/screenshots/notes-toolbar-2026-11-12/`.
+
+**New UI tests — `NotesToolbarUITests`, 3/3 on both devices, final runs:**
+
+| | PaperNest iPhone Duo, iOS 27.1 | iPad Pro 13-inch (M5), iOS 26.5 |
+|---|---|---|
+| `testEveryToolChangesWhatIsSaved` | passed (101.7s) | passed (127.2s) |
+| `testRestingAtTheEndOfAStrokeStraightensIt` | passed (15.1s) | passed (25.7s) |
+| `testTranslatedPanelsFit` (fr, es) | passed (66.8s) | passed (65.5s) |
+
+The first one reads the library back from disk after every step: shipped pen stroke saved; ballpoint in the chosen
+blue with one width end to end; straight-line highlighter saved as exactly two points; a dragged triangle saved as
+twelve points; undo and redo of it; a sticker saved as a 96-point square image; a grid page added; the eraser's
+"Highlights" choice surviving the panel being closed; text settings reachable. The second proves the PencilKit path
+of hold-to-straighten: lifted at once the stroke keeps its points, rested on it is saved as two.
+
+**Existing UI tests re-run, with a clean-checkout baseline wherever one failed.** "Baseline" is the same test at
+`0edf804` in a separate `git worktree`, same simulator — nobody's uncommitted work in it.
+
+| Test | Device | Working tree | Baseline at `0edf804` |
+|---|---|---|---|
+| `EditorFirstTouchUITests` (3) | iPhone Duo; iPad 13 | 3/3; 3/3 | not needed |
+| `testCompactNotebookToolsAndPenControls` | iPhone Duo | passed | not needed |
+| `testRoundEraserSizesPartialEraseUndoAndReopen` | iPhone Duo | passed | not needed |
+| `testStudioPenSavesAndReopensWithFloatingHistory` | iPhone Duo | passed | not needed |
+| `testNoteImageMenuOffersCameraPhotosAndFiles` | iPhone Duo | passed | not needed |
+| `EditorWorkspaceUITests`, the other nine | iPad 13 | 9/9 | not needed |
+| `testFrenchSignatureAtLargestTextSize` | iPad 13 | **passed alone (17.9s)**; failed once under load | passed (25.2s) |
+| `testPinchZoomWithLassoAndPen` | iPad 13 | failed, 419.5 not < 398.525 | **failed, same numbers** |
+| `testMixedLassoDefaultsToSelectionAndMovesAllObjectKinds` | iPhone Duo | failed, "0 selected" | **failed, same assertion** |
+| `testNotebookToolsAreSideBySide` | iPhone Duo | failed, "Empty notes must keep Add Page and Undo available" | **failed, same message** |
+| `testNotebookWorkspaceEnglish` | iPhone Duo | failed at `revealTool("editor-pages")` | **not run** |
+
+- The three rows that fail in both columns are **not caused by this slice**. The pinch one is worth a note for
+  whoever owns it: yesterday's fix was measured on an 11-inch iPad only, and on the 13-inch it is red at `0edf804`.
+- `testNotebookWorkspaceEnglish` on the phone: every toolbar and settings step in it passed (pen settings, width,
+  opacity, close, Signature through More). It then failed scrolling the *native More menu* to reach Pages — the log
+  shows the in-menu drag moving 3 points per attempt. **No baseline was run, so whether this slice caused it is not
+  known.** It passes on iPad.
+- `testFrenchSignatureAtLargestTextSize` failed once at 208s while a second full build was running on the same Mac;
+  in that run `testFirstZoomTapChangesTheZoomInPortrait` took 283s against its usual 13s. Run alone it passes. Do not
+  run two `xcodebuild` jobs at once and trust the timings.
+- One earlier working-tree run of `testNotebookToolsAreSideBySide` failed sooner, at the pen not being hittable
+  straight after a notebook was created. It did not happen again, and the new test asserts Pen and Highlighter are
+  hittable on a freshly opened page and passes on both devices. Read that as "not reproduced", not "explained".
+
+**Assertions changed in tests that pinned the previous approved toolbar** — the owner's new mockup overrides each:
+"Keep the primary toolbar icon-only" now applies to a phone only; "Eraser must sit directly after Pen" is now
+Highlighter-before-Eraser; "Settings stay near Pen" now applies to iPad only (a phone gets a bottom sheet); the
+48-point Text Box width now applies to a phone only. Settings forms are found as `tool-panel-scroll` instead of a
+`collectionView`, and `app.closeToolSettings()` waits for the sheet to finish leaving before the next touch.
+
+**Found on the way, about testing here rather than about the app:**
+
+- On the iPhone Duo the page is centred in a viewport shorter than the page, so its top ~130 points are above the
+  visible area. A drag aimed at the page element's own frame lands on the page strip. The new test aims at the
+  reachable part of the page; that is likely why `testMixedLasso…` is red on this simulator at `0edf804`.
+- `isHittable` on a button scrolled out of a horizontal scroll view does not return false, it records a failure.
+- **Unexplained:** launched immediately after the Spanish run of `testTranslatedPanelsFit`, the app came up with an
+  empty accessibility tree twice in a row. The translated test now runs last. The cause was not investigated.
+
+**Not verified — please do not read any of these as done:**
+
+- **The Mac was never seen.** Screen access to the dev build was declined in session, so the Mac toolbar, popovers,
+  hover states, ⌥⌘ shortcuts, the Mac pen dynamics on screen, stroke smoothing and Mac hold-to-straighten are
+  unit-tested and compiled, and nothing more.
+- **Dark mode** was not looked at by me. The owner's own device screenshot (16:06) shows the toolbar in dark mode on a
+  physical iPad in landscape with all nine named tools, Undo, Redo and More fitting; that is their observation.
+- **No Apple Pencil.** Pressure, the pressure switch, tilt, and hold-to-straighten with a Pencil (which keeps
+  reporting while held still) were exercised only by synthesized finger touches.
+- **The eraser's Handwriting/Highlights limit on iOS** is unit-tested for what it selects, and the setting is
+  UI-tested for persisting, but no test erases with the limit on. It gives PencilKit only the permitted ink and has
+  the page draw the rest; whether that flickers on switching was not looked at.
+- The Photos, Files and Camera pickers opened from the Image panel: the buttons are asserted, the pickers appearing
+  after the panel closes is not. Insert → Date & Time, Divider, Duplicate, Organise: not driven by a test.
+- VoiceOver, Dynamic Type other than one French largest-size launch, iPad portrait at 11 inches, split view, Stage
+  Manager. French and Spanish need a native reader. `UIKit:MenuBuilder` shortcut-clash logging was not captured.
+- The rest of `AppUITests` (roughly a hundred tests) was **not** run. Only the tests named above were.
+
+**Not built** (from the owner's spec; nothing on screen pretends otherwise): shape fill, dashed and dotted outlines,
+corner radius, rotation and grouping; object and selection erasers; lasso copy/cut/paste/duplicate/delete/recolor/
+reorder/group; text underline, strikethrough, lists, spacing, box background and border, hyperlinks, find and
+replace; image crop/rotate/flip/adjust/border/background removal/lock/replace; custom sticker import and emoji
+stickers; tables, links, audio, checklists, dot-grid paper, paper size and margins; tilt; pencil graphite texture;
+a repositionable toolbar; "save preset".
+
 ## 2026-11-11 — The pinch zoom test was aimed at the wrong element (Claude)
 
 - `EditorWorkspaceUITests/testPinchZoomWithLassoAndPen` had been failing on iPad and crashing the runner on iPhone.
@@ -24,6 +398,47 @@
   been resting on a narrower measurement than the wording implied.
 - **Not done.** No physical iPad. No fr/es. The probe ran on an 11-inch iPad only, so the edge-touch geometry is
   measured at one viewport size.
+
+## 2026-11-11 — iPad: a finger that cannot draw could not scroll either (Claude)
+
+Owner: "i cannot scroll pages thirugh hands on ipad".
+
+- **Root cause, in two settings that contradict each other.** While markup is armed the page scroll view raises its
+  pan recognizer to `minimumNumberOfTouches = 2`, reserving one finger for drawing
+  (`NotebookTouchScrolling(requiresTwoFingers: isMarkingUp)`). But on iPad **"Draw with Finger" defaults to off**
+  (`isFingerDrawing = false`, phone-only override at `DocumentView.swift:888`), which runs PencilKit at
+  `.pencilOnly` (`InkCanvas.swift:63`). With the Pen armed the finger was therefore refused by the canvas *and*
+  refused by the scroll view. Only a Pencil worked.
+- Fix: `PageScrollTouchPolicy.requiresTwoFingers(markingUp:tool:fingerDrawing:)`. One line changes in
+  `DocumentView.swift`; the rule lives in a new UIKit-free file so it can be tested anywhere, and is read through a
+  `pageNeedsTwoFingers` property because inlining it pushed `PageViewer`'s body past the type-checker's limit.
+- **The first version of the fix was wrong, and the owner caught it.** It read `markingUp && fingerDrawing`, which
+  frees the finger whenever "Draw with Finger" is off — including while **lasso** is armed. Lasso selects rather than
+  draws, so that setting does not gate it and a finger lassoes regardless; handing the finger to the scroll view
+  there would have stopped lasso selection working at all. The rule is now about the *tool*:
+  `markingUp && (tool == .lasso || fingerDrawing)`. Added as a failing test first — only the lasso case went red
+  against the previous rule, the other three stayed green — then made to pass.
+- **Two wrong turns, both corrected by measuring, both worth recording.** First I claimed the cause was notebooks
+  auto-arming markup; a probe disproved it — lasso scrolled on the **first** drag. Then a single long probe appeared
+  to show "Pen armed: 10 drags, no movement", and I reported that as the bug. Re-measured from a **fresh launch per
+  condition** it collapsed: lasso **1**, pen with finger drawing off **1**, pen with finger drawing on **1**, markup
+  off **1**. The earlier figure was an artifact of state left by previous drags in the same session.
+- **The simulator cannot test this at all, which is the important limitation.** Even with finger drawing ON — where
+  `minimumNumberOfTouches` is 2 — a synthesized one-finger XCUITest drag still scrolled in 1. XCUITest's drags do not
+  honour that requirement, so a UI test passes with or without the fix. A UI test written for this was deleted rather
+  than kept: **it passed before the fix and so could never have caught the bug.**
+- What is verified: `PageScrollTouchPolicyTests` — 3 tests, proved red by restoring the old `markingUp` rule (only the
+  finger-cannot-draw case failed, the other two stayed green), green again after. Full unit suite **235 in the UI
+  target**, 5 targets all passing. iOS Simulator and Mac builds clean, no warnings. On iPad, Codex's
+  `testTwoFingerContactDoesNotDrawAndSingleFingerStillWrites`, `testNotebookScrollsBetweenExistingPages` and
+  `testScrollAppendsOneMatchingNotebookPage` all **pass** — the first of those turns finger drawing on, so the path
+  where the reservation still applies is unchanged.
+- **Not verified: that this fixes the owner's problem.** The behaviour only differs under real touches, and no
+  physical iPad was used. The owner should confirm on hardware.
+- `DocumentView.swift` is inside Codex's "cross-platform editor zoom" claim of 2026-11-08, still active and
+  unreleased. Entered on the owner's direct instruction, and said plainly here. `ls -lT` before editing:
+  `EditorWorkspaceUITests.swift` untouched since 2026-11-08 15:22, tree carrying only this session's work.
+  `PageZoom.swift`, `PageSelectionOverlay.swift`, `InkCanvas.swift` and all gesture routing **untouched**.
 
 ## 2026-11-10 13:55 CST — Brand mark everywhere, and My Space moved under Recent (Claude)
 

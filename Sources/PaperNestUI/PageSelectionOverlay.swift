@@ -11,6 +11,9 @@ struct PageSelectionOverlay: View {
     let mode: PageSelectionMode
     let selectAllRequest: Int
     var enablesTwoFingerNavigation = false
+    /// The kinds of content a loop may pick up. Anything else on the page is
+    /// invisible to the lasso: not selected, not moved, not counted.
+    var allowed: Set<LassoContent> = Set(LassoContent.allCases)
     let undoManager: UndoManager?
     @Binding var hiddenIDs: Set<PageObjectID>
     let onOpen: (PageObject) -> Void
@@ -27,7 +30,11 @@ struct PageSelectionOverlay: View {
     @State private var movingPreview: CGImage?
 
     private var objects: [PageObject] {
-        model.selectedPageObjects.filter { $0.pageID == page.id && PageSelectionGeometry.bounds(of: $0) != nil }
+        model.selectedPageObjects.filter { object in
+            guard object.pageID == page.id, PageSelectionGeometry.bounds(of: object) != nil,
+                  let kind = LassoContent.kind(of: object) else { return false }
+            return allowed.contains(kind)
+        }
     }
     private var selected: [PageObject] { objects.filter { selectedIDs.contains($0.id) } }
     private var previewKey: String { "\(page.id.rawValue):\(page.revision):\(selectedIDs.map(\.rawValue).sorted().joined(separator: ","))" }
@@ -113,6 +120,8 @@ struct PageSelectionOverlay: View {
         .onChange(of: page.id) { _, _ in reset(); clearSelection() }
         .onChange(of: page.geometry) { _, _ in reset(); clearSelection() }
         .onChange(of: mode) { _, _ in reset(); clearSelection() }
+        // Narrowing what the lasso may hold lets go of anything it no longer may.
+        .onChange(of: allowed) { _, _ in reset(); clearSelection() }
         .onDisappear { hiddenIDs = [] }
     }
 

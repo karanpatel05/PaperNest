@@ -70,7 +70,7 @@ Migrations, in order: **v2** adds `pages.deleted_at` (soft delete until next lau
 
 SQLite cannot alter a CHECK constraint, so v5, v6 and v7 rebuild their tables. Those migrations run with foreign keys disabled and are checked with `PRAGMA foreign_key_check` before they commit, which is SQLite's documented procedure: with foreign keys enforced, `DROP TABLE items` performs an implicit delete that **cascades into `pages`** and empties the library. Each migration runs in its own transaction with its `user_version` bump, so an interrupted one leaves the previous, consistent version in place.
 
-**The next migration must be v8**, which planned sync takes. Shape annotations and embedded PDF text needed none: shapes save as ordinary ink, and `search_index` is derived, rebuildable and has an unconstrained `field`. See `Sources/PaperNestStore/Schema.swift`.
+Sync took **v10**; the next migration is v11. Shape annotations and embedded PDF text needed none: shapes save as ordinary ink, and `search_index` is derived, rebuildable and has an unconstrained `field`. See `Sources/PaperNestStore/Schema.swift`.
 
 ### Ordering
 
@@ -120,18 +120,46 @@ Image handling:
 - Mac commands are wired through `FocusedValues`. Windows reload when `changeToken` changes, so multiple windows stay consistent.
 - Localization: `L10n` looks up keys in `PaperNestUI`'s bundle, using en/fr/es `.lproj` `Localizable.strings` plus `.stringsdict` plurals. String Catalogs need `xcstringstool` (Xcode only), so migrating to `.xcstrings` is a follow-up once Xcode builds are routine. `LocalizationTests` enforces key parity, matching format arguments, no unused keys, French typography and plural rules.
 
-## Sync design (M2, not yet implemented)
+## Sync (M2, implemented; not yet run against a real iCloud container)
 
-- **Engine:** `CKSyncEngine` on the private database, in a custom zone. Its serialized state is persisted in a `sync_state` table (a planned v8-or-later migration; v5 took file items, v6 took HEIC and v7 took page comments) and restored at launch.
-- **Single owner:** an `outbox` table is written *in the same transaction* as each edit (record name and change kind). The engine's "next batch" is built from the outbox, so a crash can't lose a pending change or double-apply one. IDs are stable UUIDs and SHA-256 hashes, so retries are idempotent.
-- **Records:** `Item`, `Folder`, `Page`, `PageObject` (one record per stroke or text box), and `Asset` (CKAsset keyed by SHA-256). OCR and thumbnails are derived and not synced.
-- **Ordering of arrival:** a page whose asset hasn't arrived gets `availability = remoteOnly` and is shown as downloading, never as available offline.
-- **Conflicts:**
-  - Independent fields merge (name, favorite, folder, sort key).
-  - Independent strokes merge naturally because each is its own record.
-  - When the same object or page transform is changed concurrently, the server version is kept and the local version becomes a **conflict copy** (an object or page marked as a conflict). The newest whole document is never chosen silently.
-- **Deletion:** `pages.deleted_at` already marks deleted pages. `tombstones` keep deleted record names through the retention window, so an offline device can't resurrect deleted content. Recently Deleted is honored across devices.
-- **Accounts:** the iCloud account identity is recorded per library. Sign-out or an account switch pauses sync and asks the user what to do. Documents are never deleted, and one account's documents are never uploaded to another.
+**Why CKSyncEngine.** The library is a custom SQLite store with content-addressed files, so the choice was between
+`CKSyncEngine` and iCloud Documents. Core Data mirroring does not apply (no Core Data, and it would own the
+conflict policy). iCloud Documents would mean syncing `Library.sqlite` as a file, which is the one thing that must
+never happen to a live database. `CKSyncEngine` gives scheduling, pushes, retry and back-off, and leaves every
+merge decision with the store. One mechanism per kind of data: records through the engine, original files through
+plain CloudKit asset records. Nothing is in iCloud Drive.
+
+**Where the code is.** `PaperNestStore/Sync` owns everything that touches data: schema v10, the outbox, the
+three-way merge (`SyncMerge`), applying remote changes and deletions (`SyncApply`), and where each original stands
+(`SyncAssets`). `PaperNestSync` owns everything that touches the network: `CloudKitSyncBackend` (the
+`CKSyncEngineDelegate`), `CloudKitBlobTransport`, `BlobSyncer` and `CloudSyncController`, which the UI observes.
+The backend is behind a protocol (`SyncBackend`), and the tests replace only that.
+
+- **Outbox by trigger.** Schema v10 adds triggers on `folders`, `items`, `pages`, `page_objects`, `signatures`,
+  `file_items` and `assets`. A trigger runs in the transaction that made the change, whichever of the store's many
+  methods made it, so "saved locally" and "queued for iCloud" commit together. They do nothing while sync is off
+  or while a remote change is being applied. **A migration that rebuilds one of those tables must recreate its
+  triggers** (`SyncSchema.triggerSQL`); `SyncSchemaTests` fails otherwise.
+- **Records:** `Folder`, `Item` (a file item's payload rides on it), `Page`, `PageObject` (one per stroke, text box,
+  placed image or comment) and `Signature`, in zone `PaperNestLibrary`. A page's `revision` and `modified_at` are
+  local bookkeeping and are not synced. OCR, search rows, thumbnails and undo history are derived and not synced.
+- **Originals:** one `Original` record per SHA-256 with a `CKAsset`, in zone `PaperNestOriginals`, which the engine
+  is told not to fetch (`nextFetchChangesOptions`). A device learns a document exists without downloading it;
+  the page's asset row is `remoteOnly` until the bytes arrive and pass their checksum. A record that points at an
+  original is held back until the upload is confirmed.
+- **Ancestry.** `sync_records` keeps, per record, the server's change tag and the fields as last confirmed. A
+  conflict is merged against that ancestor, field by field. Timestamps decide only who wins a same-field clash on
+  a document's name, folder, favorite or label.
+- **Conflicts.** Independent strokes are independent records. A rotation here and a crop there merge. The same
+  page setting, or the same mark, changed two ways: the server's version stays, this device's becomes a copy (a
+  page right after, or a second mark), and a row in `sync_conflicts` drives "Review changes".
+- **Deletion.** Recently Deleted is a field. With sync on, a deleted page is kept 30 days as a tombstone. An edit
+  beats a deletion: the device that still holds the content sends it again. A document deleted for good elsewhere
+  but live here goes to Recently Deleted here. An original leaves iCloud 30 days after its last local use.
+- **Accounts.** The account's record name is stored with the library. A different account stops sync until the
+  person chooses; choosing to sync forgets everything the old account confirmed and uploads as new.
+
+Known limits are listed in TEST_MATRIX under the 2026-11-13 entry.
 
 ## Billing design (M5, not yet implemented)
 

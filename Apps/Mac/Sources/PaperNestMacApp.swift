@@ -9,11 +9,15 @@ import SwiftUI
 struct PaperNestMacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var session = LibrarySession()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup(Brand.displayName) {
             RootView(session: session)
                 .frame(minWidth: 760, minHeight: 520)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await session.appBecameActive() } }
         }
         .commands {
             PaperNestCommands()

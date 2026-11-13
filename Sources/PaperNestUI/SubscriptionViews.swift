@@ -118,6 +118,9 @@ struct ProPaywallView: View {
 struct ProfileView: View {
     let session: LibrarySession
     @Bindable var store: SubscriptionStore
+    /// Grows with the Pro title beside it. A fixed size left the mark
+    /// shrinking away from the text at accessibility sizes.
+    @ScaledMetric(relativeTo: .title2) private var proMarkSize: CGFloat = 24
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var showPaywall = false
@@ -162,7 +165,7 @@ struct ProfileView: View {
         let state = store.state
         let kind = state.displayKind(at: now)
         return VStack(alignment: .leading, spacing: 16) {
-            Label { Text(L10n.proTitle) } icon: { BrandMark.image(size: 24) }
+            Label { Text(L10n.proTitle) } icon: { BrandMark.image(size: proMarkSize) }
                 .font(.title2.bold()).foregroundStyle(Theme.accent)
             if !store.hasLoaded { ProgressView(L10n.proLoading) }
             else if !store.lastRefreshSucceeded && state.productID == nil {

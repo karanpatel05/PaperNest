@@ -44,7 +44,12 @@ import PaperNestStore
         } else {
             XCTAssertFalse(panel.exists,
                            "at \(width)pt it would have to overlay, so it is not opened for you")
-            app.buttons["studio-more-tools"].tap()
+            let panels = app.buttons["editor-panels"]
+            XCTAssertTrue(panels.waitForExistence(timeout: 10))
+            // One control shows and hides the whole Document Utilities panel
+            // since the owner's 2026-11-12 redesign; there is no popover of
+            // switches in between any more.
+            panels.tap()
             XCTAssertTrue(panel.waitForExistence(timeout: 10),
                           "and the toolbar button still opens it by hand")
         }

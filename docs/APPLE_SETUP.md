@@ -37,14 +37,44 @@ Everything here is manual, and it all needs your Apple Developer account. Claude
 
 ## 2. iCloud / CloudKit (M2)
 
-- Create the container `iCloud.<bundle id>` and attach it to the App ID.
-- Add these entitlements to both apps; `Apps/Mac/PaperNest.entitlements` has them commented out:
-  - `com.apple.developer.icloud-container-identifiers`
-  - `com.apple.developer.icloud-services` = `CloudKit`
-  - `com.apple.security.network.client` (Mac)
-- Enable the iCloud capability for both targets in `project.yml`.
-- Develop against the **Development** environment. Deploying the schema to **Production** is an explicit release step that needs your approval. Claude will not deploy it.
-- Testing needs at least two devices (or a device plus a Mac) signed into the same test Apple Account.
+The code is in place and iCloud is **off in every build until these steps are done**. Until then the app has no
+iCloud entitlement, never creates a `CKContainer`, and Settings says sync is not available in this build.
+
+**In the developer portal (or Xcode → Signing & Capabilities), once:**
+
+1. Certificates, Identifiers & Profiles → Identifiers → **iCloud Containers** → add `iCloud.<bundle id>`. With the
+   current local identity that is `iCloud.com.karanpatel.papernest.dev48u7v37436`. Container IDs cannot be deleted
+   or renamed, so use the real bundle ID before doing this for a release.
+2. On the **App ID** for the bundle ID, enable **iCloud** (CloudKit, with that container ticked) and **Push
+   Notifications**. iOS and macOS share the bundle ID, so this is one App ID.
+3. Let Xcode regenerate the provisioning profiles (automatic signing does it the first time each target is built
+   from the Xcode UI, or `xcodebuild -allowProvisioningUpdates`).
+
+**In this repository:** add three lines to `Config/Signing.local.xcconfig` (git-ignored), then `xcodegen generate`:
+
+```
+PAPERNEST_ICLOUD_CONTAINER = iCloud.$(PAPERNEST_BUNDLE_ID)
+PAPERNEST_IOS_ENTITLEMENTS = Apps/iOS/PaperNest.iCloud.entitlements
+PAPERNEST_MAC_ENTITLEMENTS = Apps/Mac/PaperNest.iCloud.entitlements
+```
+
+That gives both apps `icloud-services = CloudKit`, the container, `aps-environment` (silent pushes), and on the Mac
+`network.client`. `UIBackgroundModes = remote-notification` is already in the iOS Info.plist.
+
+**The schema.** In the Development environment CloudKit creates record types as the app first saves them, so run
+the app once on a signed-in device with sync on and make one of everything (a folder, a notebook with a stroke, an
+imported PDF, a file item, a saved signature). The types are `Folder`, `Item`, `Page`, `PageObject`, `Signature`
+in zone `PaperNestLibrary`, and `Original` in zone `PaperNestOriginals`. Nothing is queried, so **no indexes are
+needed**. The fields `name`, `payload`, `strokes`, `fileName` and `assetName` are written as *encrypted* fields;
+that choice cannot be changed for a field once the schema is in Production.
+
+**Production.** App Store and TestFlight builds use the Production environment, which starts **empty**: nothing
+syncs for real users until the schema is deployed. CloudKit Console → the container → Deploy Schema Changes →
+review → deploy. Production only ever gains types and fields; it cannot drop or rename them. This is an explicit
+release step that needs your approval. Claude will not deploy it.
+
+**Testing** needs at least two devices (or a device and a Mac) signed in to the same Apple Account, each running a
+build with the three lines above. The two-device checklist is in TEST_MATRIX.
 
 ## 3. App Store Connect (M5)
 

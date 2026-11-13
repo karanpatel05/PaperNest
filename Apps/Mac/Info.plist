@@ -30,6 +30,9 @@
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<!-- iCloud sync: the container this build uses (empty = sync not set up). -->
+	<key>PaperNestICloudContainer</key>
+	<string>$(PAPERNEST_ICLOUD_CONTAINER)</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>

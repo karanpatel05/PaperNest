@@ -86,9 +86,9 @@ final class SettingsModel {
 }
 
 /// App settings. iPhone and iPad present it as a sheet from the library;
-/// the Mac shows it in the standard Settings window (⌘,). Sync and Pro
-/// sections arrive with milestones M2 and M5; until then nothing here
-/// pretends to offer them.
+/// the Mac shows it in the standard Settings window (⌘,). iCloud Sync shows
+/// its real state, including "not available in this build"; the Pro section
+/// arrives with milestone M5 and nothing here pretends to offer it.
 public struct SettingsView: View {
     @State private var model: SettingsModel
     @State private var isShowingSaver = false
@@ -190,6 +190,8 @@ public struct SettingsView: View {
             } footer: {
                 Text(L10n.settingsExportAllFooter)
             }
+
+            CloudSyncSettingsSections(session: model.session)
 
             Section {
                 LabeledContent(L10n.settingsLanguage, value: Self.currentLanguageName)

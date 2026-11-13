@@ -83,6 +83,34 @@ These workstreams extend M1/M3/M4 and preserve M2 sync, M5 subscriptions and M6 
 
 The sequence above is the delivery breakdown within F7, not a release-date commitment. Media is part of PaperNest's intended product scope alongside document tools.
 
+## Reader features — owner request, 2026-11-12
+
+Owner, in session: **"I want to implement most features of adobe PDF reader into my app"**, then **"You pick the
+order."** Adobe Reader is the capability reference here in the same sense the earlier screenshots were: what a
+reader can *do*, never its look, its icons or its wording.
+
+Most of Acrobat's **tools** were already in the pipeline above and many ship. What PaperNest lacked was the
+**reading** side, and that is what this list is. PaperNest draws its own pages rather than hosting Apple's
+`PDFView`, so none of this comes for free from PDFKit: each feature is built on `PageTextLayout`
+(`Sources/PaperNestCore/PageTextLayout.swift`), which holds a page's words and where they are — a box per character
+from a digital PDF, a box per word from recognition, one box per typed text box — in the same upright source space
+ink and OCR already use.
+
+| # | Reader capability | Status | Notes |
+|---|---|---|---|
+| R1 | Find in a document, hits highlighted, next/previous | **Done 2026-11-12** — iPhone and iPad Simulator; Mac built, not seen | Case- and accent-blind; a phrase is found across a line break; digital text, recognised text and typed text boxes are all searched; a scan with no recognised text says **No Text** instead of "No Results" |
+| R2 | Select text on the page and copy it | **Done 2026-11-12** — iPhone and iPad Simulator; Mac built, not seen | Press and hold then drag (touch), or drag (pointer). Copy, Highlight, Underline, Strikethrough: the first screen for word-level markup (inventory row 20). No drag handles yet. Only while no drawing tool is armed |
+| R3 | Follow links inside a PDF; go to a page by number; the reader's own bookmarks | **Links and Go to Page: see TEST_MATRIX, 2026-11-12.** Bookmarks planned | A web link shows its whole address and asks before opening; only http, https, mailto and tel are made tappable. An internal link follows its page through reorders and is dropped when the page is gone. Bookmarks need a schema migration |
+| R4 | Print; read aloud | Planned | |
+| R5 | Night mode; two-page view | Planned | |
+| R6 | Notes placed at a spot on the page and carried in the exported PDF | Planned | Today's comments are private and per page |
+| R7 | Screens for Compress and Redact | Planned | Both engines exist and are tested; neither is reachable (rows 26 and 35) |
+
+**Not in this list, deliberately.** Editing a PDF's existing text is still the open build-or-license decision
+(inventory row 25). Office conversion was dropped by the owner on 2026-10-28. Certificate signatures, comparing two
+files, watermarks and Bates numbering are Acrobat Pro features rather than Reader's and have not been asked for by
+name; they are not planned until they are.
+
 ## Architecture and quality gates
 
 - SQLite LibraryStore remains the single metadata authority; assets remain immutable/content-addressed. General files use schema v5 with `file_items`, never dummy PDF pages. Color labels use v4 and HEIC assets use v6; page comments use v7; planned sync must use v8 or the next unused migration.

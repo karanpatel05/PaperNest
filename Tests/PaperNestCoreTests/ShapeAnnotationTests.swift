@@ -53,4 +53,45 @@ import Testing
         #expect(throws: ShapeAnnotationError.self) { try ShapeAnnotation.line.stroke(from: .zero, to: .init(x: 1, y: 1), geometry: g, color: .black, width: 0) }
         #expect(throws: ShapeAnnotationError.self) { try ShapeAnnotation.arrow.stroke(from: .zero, to: .init(x: 1, y: 1), geometry: g, color: .init(red: 0, green: 0, blue: 0, alpha: 0), width: 2) }
     }
+
+    /// The Shapes tool's grid. The two older lists are pinned above and must
+    /// not change when this one grows.
+    @Test func theLibraryOffersEveryShapeOnceAndNoStampButTheStar() {
+        #expect(ShapeAnnotation.library == [.line, .arrow, .rectangle, .roundedRectangle, .ellipse, .triangle,
+                                            .diamond, .pentagon, .hexagon, .star, .speechBubble])
+        #expect(Set(ShapeAnnotation.library).count == ShapeAnnotation.library.count)
+    }
+
+    @Test(arguments: ShapeAnnotation.library) func closedShapesEndWhereTheyBegin(_ kind: ShapeAnnotation) throws {
+        let geometry = PageGeometry(sourceSize: CGSize(width: 600, height: 800))
+        let stroke = try kind.stroke(from: CGPoint(x: 0.2, y: 0.2), to: CGPoint(x: 0.7, y: 0.6), geometry: geometry,
+                                     color: .black, width: 2)
+        let first = try #require(stroke.points.first), last = try #require(stroke.points.last)
+        #expect(stroke.points.count >= 2)
+        if kind.isClosed {
+            #expect(abs(first.x - last.x) < 0.001 && abs(first.y - last.y) < 0.001, "\(kind)")
+        }
+        // Every point is inside the box that was dragged out.
+        let box = CGRect(x: 120, y: 160, width: 300, height: 320).insetBy(dx: -0.01, dy: -0.01)
+        #expect(stroke.points.allSatisfy { box.contains(CGPoint(x: $0.x, y: $0.y)) }, "\(kind)")
+    }
+
+    @Test func aPolygonHasTheNumberOfCornersItsNamePromises() throws {
+        let geometry = PageGeometry(sourceSize: CGSize(width: 600, height: 800))
+        for (kind, corners) in [(ShapeAnnotation.triangle, 3), (.diamond, 4), (.pentagon, 5), (.hexagon, 6)] {
+            let stroke = try kind.stroke(from: CGPoint(x: 0.2, y: 0.2), to: CGPoint(x: 0.7, y: 0.6), geometry: geometry,
+                                         color: .black, width: 2)
+            // Each corner is written three times and the first is repeated to close.
+            #expect(stroke.points.count == (corners + 1) * 3, "\(kind)")
+            let distinct = Set(stroke.points.map { "\(Int(($0.x * 100).rounded())),\(Int(($0.y * 100).rounded()))" })
+            #expect(distinct.count == corners, "\(kind)")
+        }
+    }
+
+    @Test(arguments: ShapeAnnotation.allCases) func everyShapeHasAPictureForItsButton(_ kind: ShapeAnnotation) {
+        let rect = CGRect(x: 4, y: 4, width: 30, height: 30)
+        let outline = kind.previewOutline(in: rect)
+        #expect(outline.count >= 2, "\(kind)")
+        #expect(outline.allSatisfy { rect.insetBy(dx: -0.01, dy: -0.01).contains($0) }, "\(kind)")
+    }
 }

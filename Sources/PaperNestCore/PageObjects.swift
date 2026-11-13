@@ -66,6 +66,11 @@ public struct InkStroke: Hashable, Codable, Sendable {
         case pen, highlighter
     }
 
+    /// How a stroke's ends are finished.
+    public enum Cap: String, Codable, Sendable {
+        case round, flat
+    }
+
     public var tool: Tool
     /// The color the user picked, at full strength. The highlighter's
     /// translucency is added when drawing (`highlighterOpacity`), never
@@ -74,6 +79,10 @@ public struct InkStroke: Hashable, Codable, Sendable {
     /// Nominal width in source points; each point scales it.
     public var width: Double
     public var points: [InkPoint]
+    /// Nil means round, which is every stroke saved before this existed and
+    /// every pen stroke since. Only a flat-edged highlighter sets it, so the
+    /// stored form of all other ink is byte-for-byte what it always was.
+    public var cap: Cap?
 
     /// How opaque highlighter ink is drawn over the page.
     public static let highlighterOpacity = 0.35
@@ -84,11 +93,12 @@ public struct InkStroke: Hashable, Codable, Sendable {
         width * min(max(point.widthScale, 0.05), 4)
     }
 
-    public init(tool: Tool, color: RGBAColor, width: Double, points: [InkPoint]) {
+    public init(tool: Tool, color: RGBAColor, width: Double, points: [InkPoint], cap: Cap? = nil) {
         self.tool = tool
         self.color = color
         self.width = width
         self.points = points
+        self.cap = cap
     }
 }
 

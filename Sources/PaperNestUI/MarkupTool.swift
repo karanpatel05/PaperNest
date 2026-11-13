@@ -11,13 +11,17 @@ import PaperNestCore
 /// stroke that claims to be one.
 enum MacMarkupTool: String, Hashable, CaseIterable {
     case pen, highlighter, eraser, lasso
+    /// Dragging out one of the Shapes tool's outlines. It saves ink, but as
+    /// a whole shape on release rather than a freehand stroke, so it is not
+    /// an `ink` tool here and the freehand canvases never see it.
+    case shape
 
     /// The stroke this tool draws, or nil when it draws nothing.
     var ink: InkStroke.Tool? {
         switch self {
         case .pen: .pen
         case .highlighter: .highlighter
-        case .eraser, .lasso: nil
+        case .eraser, .lasso, .shape: nil
         }
     }
 
@@ -43,7 +47,7 @@ enum MacMarkupTool: String, Hashable, CaseIterable {
             case .medium: 20
             case .thick: 30
             }
-        case .eraser, .lasso: 0
+        case .eraser, .lasso, .shape: 0
         }
     }
 }

@@ -5,6 +5,12 @@ import PaperNestExport
 import PaperNestImport
 import PaperNestRender
 import PaperNestStore
+import PaperNestSync
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 /// The services one library needs, created together.
 public struct AppEnvironment: Sendable {
@@ -61,6 +67,10 @@ public final class LibrarySession {
     private(set) var backgroundTextWork: Task<Void, Never>?
     private var backgroundTextWorkNeedsAnotherPass = false
     let thumbnails = ThumbnailCache()
+    /// iCloud sync for this library. Nil until the library is open. In a
+    /// build made without an iCloud container it exists and reports exactly
+    /// that; it never pretends.
+    public private(set) var sync: CloudSyncController?
 
     private let libraryURL: URL?
 
@@ -91,6 +101,19 @@ public final class LibrarySession {
             }.value
             state = .ready(env)
             startBackgroundTextWork()
+            let controller = CloudSyncController.forApp(store: env.store)
+            controller.onLibraryChanged = { [weak self] _ in self?.remoteDidChange() }
+            sync = controller
+            await controller.start()
+            if controller.availability != .notConfigured {
+                // iCloud tells the app about changes from other devices with
+                // a silent push; this is the app asking to be told.
+                #if os(iOS)
+                UIApplication.shared.registerForRemoteNotifications()
+                #elseif os(macOS)
+                NSApplication.shared.registerForRemoteNotifications()
+                #endif
+            }
         } catch StoreError.newerSchema {
             state = .failed(title: L10n.libraryErrorTitle, message: L10n.libraryNewer)
         } catch {
@@ -99,6 +122,23 @@ public final class LibrarySession {
     }
 
     public func didChange() {
+        changeToken &+= 1
+        startBackgroundTextWork()
+        // The edit is already committed and already in the outbox; this only
+        // tells sync there is something to look at.
+        sync?.localDidChange()
+    }
+
+    /// The app came to the front: see who is signed in to iCloud and fetch
+    /// what other devices did meanwhile.
+    public func appBecameActive() async {
+        await sync?.appBecameActive()
+    }
+
+    /// Another device's changes were written to the library, or a file
+    /// finished downloading: everything on screen reloads, and nothing is
+    /// reported back to sync as a local edit.
+    private func remoteDidChange() {
         changeToken &+= 1
         startBackgroundTextWork()
     }

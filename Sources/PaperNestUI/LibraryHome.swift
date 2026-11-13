@@ -134,6 +134,8 @@ struct DashboardView: View {
     }
 
     @ViewBuilder private var headerControls: some View {
+        // Draws nothing in a build without iCloud.
+        CloudSyncStatusView(session: model.session, style: compact ? .compact : .labeled)
         Button { showProfile = true } label: {
             Label(L10n.profile, systemImage: "person.crop.circle")
                 .labelStyle(.iconOnly)

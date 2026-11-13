@@ -44,6 +44,8 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
+        # Empty unless Signing.local.xcconfig turns iCloud on; see Base.xcconfig.
+        CODE_SIGN_ENTITLEMENTS: $(PAPERNEST_IOS_ENTITLEMENTS)
     dependencies:
       - package: PaperNestKit
         product: PaperNestUI
@@ -116,7 +118,8 @@ targets:
       base:
         INFOPLIST_FILE: Apps/Mac/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: Apps/Mac/PaperNest.entitlements
+        # The sandbox-only file, or the iCloud one when Signing.local.xcconfig says so.
+        CODE_SIGN_ENTITLEMENTS: $(PAPERNEST_MAC_ENTITLEMENTS)
         ENABLE_HARDENED_RUNTIME: YES
     dependencies:
       - package: PaperNestKit

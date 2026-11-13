@@ -8,11 +8,9 @@
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 	<!--
-	iCloud (milestone M2) needs these once a real container exists. They
-	require a provisioning profile, so they stay out until then:
-	com.apple.developer.icloud-container-identifiers
-	com.apple.developer.icloud-services = CloudKit
-	com.apple.security.network.client
+	iCloud sync needs a provisioning profile, so its entitlements live in
+	PaperNest.iCloud.entitlements and are used only when
+	Config/Signing.local.xcconfig turns iCloud on (see Config/Base.xcconfig).
 	-->
 </dict>
 </plist>

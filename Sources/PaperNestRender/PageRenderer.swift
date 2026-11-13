@@ -462,9 +462,24 @@ public struct PageRenderer: Sendable {
         let c = stroke.color
         ctx.saveGState()
         defer { ctx.restoreGState() }
-        ctx.setLineCap(.round)
+        ctx.setLineCap(stroke.cap == .flat ? .butt : .round)
         ctx.setLineJoin(.round)
         let point = { (p: InkPoint) in CGPoint(x: p.x, y: p.y) }
+
+        // A see-through pen whose width varies — a pencil, a faded brush —
+        // is drawn opaque into a layer and the layer faded as a whole. Drawn
+        // segment by segment at its own alpha, every join between two widths
+        // would overlap and show as a darker bead along the line.
+        let isUniform = stroke.points.allSatisfy { stroke.width(at: $0) == stroke.width(at: first) }
+        if stroke.tool == .pen, c.alpha < 0.999, !isUniform, stroke.points.count > 1 {
+            ctx.setAlpha(c.alpha)
+            ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+            defer { ctx.endTransparencyLayer() }
+            var opaque = stroke
+            opaque.color.alpha = 1
+            drawInk(opaque, in: ctx)
+            return
+        }
 
         if stroke.tool == .highlighter || c.alpha < 0.999 {
             let opacity = stroke.tool == .highlighter ? InkStroke.highlighterOpacity : 1

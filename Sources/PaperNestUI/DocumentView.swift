@@ -19,7 +19,9 @@ struct DocumentView: View {
     #endif
     @State private var isShowingExport = false
     @State private var isShowingPDFTools = false
-    @State private var isShowingThumbnails = true
+    @State private var isShowingDisplaySettings = false
+    /// Bumped to ask the page viewer to fit the page's width to the window.
+    @State private var fitWidthRequest = 0
     @State private var isAppendingNotebookPage = false
     @State private var inspectorTool: InspectorTool?
     @State private var signatureDrafts: [PageID: SignatureDraft] = [:]
@@ -53,16 +55,13 @@ struct DocumentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var inkTool: MacMarkupTool = .pen
-    @State private var lassoMode: PageSelectionMode = .freehand
     @State private var lassoSelectAllRequest = 0
     @State private var didChooseInitialTool = false
-    @State private var inkColor = RGBAColor(red: 0, green: 0, blue: 0, alpha: 1)
-    @State private var isShowingInkSettings = false
-    @State private var inkWeight: MarkupWeight = .medium
-    @State private var penWidth = 2.0
-    @State private var highlighterWidth = 20.0
-    @State private var eraserWidth = 36.0
-    @State private var eraserMode: InkEraserMode = .precision
+    /// Every tool's settings: one set for the whole app, saved as it changes,
+    /// so the pen in hand in one document is the pen in hand in the next.
+    @State private var toolSettings = EditorToolSettingsStore.shared
+    /// The tool whose settings panel is open, if any.
+    @State private var openToolPanel: EditorTool?
     @State private var isShowingImagePicker = false
     @State private var isShowingPhotoPicker = false
     @State private var selectedPhoto: PhotosPickerItem?
@@ -80,11 +79,18 @@ struct DocumentView: View {
     @State private var isFingerDrawing = false
     @State private var renameText = ""
     @State private var zoom: CGFloat = 1
+    /// Find in document: the bar under the toolbar and the hits over the page.
+    @State private var find = DocumentFind()
+    /// The words selected on the page being read.
+    @State private var textSelection = PageTextSelectionModel()
+    @State private var isShowingGoToPage = false
+    @State private var goToPageText = ""
 
     init(itemID: ItemID, session: LibrarySession, retainedState: DocumentEditorState? = nil,
          workspaceHeader: AnyView? = nil) {
         self.workspaceHeader = workspaceHeader
         self.retainedState = retainedState
+        _ = DocumentUtilitiesStorage.freshStartForThrowawayLibrary
         let document = retainedState?.model ?? DocumentModel(itemID: itemID, session: session)
         _zoom = State(initialValue: retainedState?.zoom ?? 1)
         _model = State(initialValue: document)
@@ -158,46 +164,35 @@ struct DocumentView: View {
                 }
             } else if isCompact {
                 VStack(spacing: 0) {
-                    // Retain the user's thumbnail preference, but give the
-                    // focused text editor room above the compact keyboard.
-                    if isShowingThumbnails && !textSession.isSelected { pageNavigation }
                     PageViewer(model: model, textSession: textSession, zoom: $zoom, showsZoomButtons: false,
                                isMarkingUp: isMarkingUp, fingerDrawing: isFingerDrawing, undoManager: undoManager,
-                               inkTool: inkTool, inkColor: inkColor, inkWidth: drawingWidth, eraserMode: eraserMode,
-                               usesStudioTools: true, lassoMode: lassoMode, selectAllRequest: lassoSelectAllRequest,
+                               inkTool: inkTool, tools: toolSettings.settings,
+                               usesStudioTools: true, selectAllRequest: lassoSelectAllRequest,
+                               fitWidthRequest: fitWidthRequest,
                                onLeaveSelection: { isMarkingUp = false },
                                appendNotebookPage: isNotebook ? { appendContinuation(after: $0) } : nil,
-                               canAppendNotebookPage: !isToolBusy && !textSession.isSelected)
+                               canAppendNotebookPage: !isToolBusy && !textSession.isSelected, find: find,
+                               textSelection: textSelection)
+                        // One point of padding keeps the scroll view from
+                        // extending under the toolbar above it. Without it
+                        // the hidden top of a page taller than the screen
+                        // lies beneath the toolbar and, to accessibility,
+                        // on top of it: the tool buttons are then reported as
+                        // covered. The page strip used to sit in that gap.
+                        .padding(.top, 1)
                 }
             } else {
                 HStack(spacing: 0) {
-                    if isShowingThumbnails {
-                    PageStrip(model: model, undoManager: undoManager, beforeSelection: { await textSession.finish(undoManager: undoManager) })
-                        .safeAreaInset(edge: .bottom, spacing: 0) {
-                            addPagesMenu {
-                                Image(systemName: "plus")
-                                    .font(.body.weight(.semibold))
-                                    .frame(maxWidth: .infinity, minHeight: 32)
-                            }
-                            .menuIndicator(.hidden)
-                            .buttonStyle(.bordered)
-                            .padding(10)
-                            .background(Theme.surface)
-                            .accessibilityLabel(L10n.addOrReplacePages)
-                            .accessibilityIdentifier("strip-add-pages")
-                        }
-                        .frame(width: 112)
-                        .disabled(textSession.isSelected)
-                    Divider()
-                    }
                     VStack(spacing: 0) {
                         PageViewer(model: model, textSession: textSession, zoom: $zoom, showsZoomButtons: true, isMarkingUp: isMarkingUp,
                                    fingerDrawing: isFingerDrawing, undoManager: undoManager,
-                                   inkTool: inkTool, inkColor: inkColor,
-                                   inkWidth: drawingWidth, eraserMode: eraserMode, usesStudioTools: true, lassoMode: lassoMode, selectAllRequest: lassoSelectAllRequest,
+                                   inkTool: inkTool, tools: toolSettings.settings,
+                                   usesStudioTools: true, selectAllRequest: lassoSelectAllRequest,
+                                   fitWidthRequest: fitWidthRequest,
                                onLeaveSelection: { isMarkingUp = false },
                                appendNotebookPage: isNotebook ? { appendContinuation(after: $0) } : nil,
-                               canAppendNotebookPage: !isToolBusy && !textSession.isSelected)
+                               canAppendNotebookPage: !isToolBusy && !textSession.isSelected, find: find,
+                               textSelection: textSelection)
                     }
                 }
             }
@@ -215,6 +210,11 @@ struct DocumentView: View {
             VStack(spacing: 0) {
                 if let workspaceHeader { workspaceHeader }
                 if !model.pages.isEmpty { NotebookToolbar(editor: self) }
+                if find.isPresented && !model.pages.isEmpty {
+                    DocumentFindBar(find: find, model: model) { id in
+                        Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
+                    }
+                }
                 if textSession.hasFailure && (model.selectedPageID != textSession.page?.id ||
                     !model.pages.contains(where: { $0.id == textSession.page?.id })) {
                     InlineTextRecoveryBar(session: textSession, undoManager: undoManager)
@@ -223,14 +223,28 @@ struct DocumentView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !model.pages.isEmpty && !(isCompact && textSession.isSelected) {
+            // A phone's keyboard leaves little enough of the page; the palette
+            // would cover what is left, including the hit just found.
+            if !model.pages.isEmpty && !(isCompact && (textSession.isSelected || find.isTyping)) {
                 studioPalette.opacity(textSession.isSelected ? 0 : 1)
                     .allowsHitTesting(!textSession.isSelected)
                     .accessibilityHidden(textSession.isSelected)
             }
         }
+        .overlay {
+            // A phone has no room for a column, so the same panel rises from
+            // the bottom instead — drawn here, not as a system sheet, because
+            // the tools in it open sheets of their own.
+            if !usesPDFToolsSidebar && isShowingPDFTools {
+                UtilitiesDrawer(close: { closeUtilities() }) { PDFToolsSidebar(editor: self) }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .onChange(of: isPresentingOverUtilities) { _, presenting in
+            if presenting && !usesPDFToolsSidebar { isShowingPDFTools = false }
+        }
         .toolbar { toolbar }
-        .inspector(isPresented: $isShowingPDFTools) {
+        .inspector(isPresented: inspectorBinding) {
             PDFToolsSidebar(editor: self)
                 .inspectorColumnWidth(min: 280, ideal: 320, max: 400)
         }
@@ -242,6 +256,8 @@ struct DocumentView: View {
             editingGuard.owner = editingOwner
             editingGuard.finish = { await finishEditing() }
             commandContext = makeCommandContext()
+            let settings = toolSettings
+            textSession.styleForNewBox = { settings.settings.text.apply(to: &$0) }
         }
         .onDisappear {
             Task { await textSession.commitAndFlush(undoManager: undoManager) }
@@ -258,12 +274,28 @@ struct DocumentView: View {
                 Task { await model.rename(to: name) }
             }
         }
+        .alert(L10n.goToPage, isPresented: $isShowingGoToPage) {
+            TextField(L10n.goToPageField, text: $goToPageText)
+                #if os(iOS)
+                .keyboardType(.numberPad)
+                #endif
+            Button(L10n.cancel, role: .cancel) {}
+            Button(L10n.goToPageGo) {
+                guard let index = PageNumberEntry.pageIndex(for: goToPageText, pageCount: model.pages.count)
+                else { return }
+                model.selectedPageID = model.pages[index].id
+            }
+        } message: {
+            Text(L10n.goToPageMessage(model.pages.count))
+        }
         .onChange(of: model.hasLoaded, initial: true) { _, loaded in
             guard loaded, !didChooseInitialTool else { return }
             didChooseInitialTool = true
             if isNotebook { inkTool = .lasso; isMarkingUp = true }
         }
         .task(id: model.session.changeToken) { await model.load() }
+        // Opening a document that is only in iCloud fetches it.
+        .task(id: model.itemID) { await model.session.sync?.downloadIfNeeded(model.itemID) }
         .task(id: model.selectedPageID) { await model.loadSelectedPageObjects() }
         #if DEBUG
         // Dev/screenshot hooks: `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`,
@@ -478,6 +510,8 @@ struct DocumentView: View {
             showReplacePage: { finishThen { openFilePicker(.replace) } },
             showCrop: { finishThen { isShowingCrop = true } },
             showOutline: { finishThen { isShowingOutline = true } },
+            showFind: { finishThen { find.isPresented = true } },
+            showGoToPage: { showGoToPage() },
             showTextBox: { armText() },
             showInsertImage: { finishThen { isShowingImagePicker = true } },
             beforeAction: { await finishForAction() })
@@ -492,12 +526,30 @@ struct DocumentView: View {
                 Task { if await finishEditing() { dismiss() } }
             } label: { Label(L10n.inlineBack, systemImage: "chevron.left") }
             .accessibilityIdentifier("editor-back")
-            if usesPDFToolsSidebar { pageSidebarToggle }
         }
         ToolbarItemGroup(placement: .primaryAction) {
+            // Saved-and-synced state, beside the title. Nothing in a build
+            // without iCloud.
+            CloudSyncStatusView(session: model.session, style: .compact)
+            findButton
             exportButton
-            if usesPDFToolsSidebar { editorMoreMenu }
+            // The one control for everything beside the page, on every device.
+            UtilitiesToggleButton(isOn: $isShowingPDFTools).disabled(isToolBusy)
         }
+    }
+
+    /// Opens find, or closes it if it is already up. ⌘F lives on the button
+    /// rather than in the menu bar, where the system keeps a Find of its own.
+    private var findButton: some View {
+        Button { toggleFind() } label: { Label(L10n.find, systemImage: "magnifyingglass") }
+            .keyboardShortcut("f", modifiers: .command)
+            .disabled(model.pages.isEmpty)
+            .accessibilityIdentifier("editor-find")
+            .help(L10n.find)
+    }
+
+    private func toggleFind() {
+        if find.isPresented { find.close() } else { finishThen { find.isPresented = true } }
     }
 
     @ViewBuilder
@@ -523,6 +575,15 @@ struct DocumentView: View {
             Label(L10n.export, systemImage: "square.and.arrow.up")
         }
         .disabled(model.pages.isEmpty)
+        Button { showGoToPage() } label: {
+            Label(L10n.goToPage, systemImage: "arrow.right.doc.on.clipboard")
+        }
+        .disabled(model.pages.count < 2)
+    }
+
+    private func showGoToPage() {
+        goToPageText = ""
+        finishThen { isShowingGoToPage = true }
     }
 
     /// The page-editing tools (the mockups' tool group): Markup (iPad), then
@@ -560,44 +621,6 @@ struct DocumentView: View {
         filterMenu
     }
 
-    #if os(macOS)
-    /// Pen or highlighter, how thick, and what colour. Shown only while the
-    /// Mac canvas is up, in the content area rather than the toolbar, where a
-    /// colour picker has no room.
-    private var macInkTools: some View {
-        HStack(spacing: 16) {
-            Picker(L10n.markup, selection: $inkTool) {
-                Text(L10n.inkPen).tag(MacMarkupTool.pen)
-                Text(L10n.inkHighlighter).tag(MacMarkupTool.highlighter)
-                Text(L10n.inkEraser).tag(MacMarkupTool.eraser)
-                Text(L10n.inkLasso).tag(MacMarkupTool.lasso)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 420)
-            .accessibilityIdentifier("ink-tool")
-            if inkTool.ink != nil {
-                // Thin, Medium and Thick rather than numbers, because what
-                // they are worth depends on the tool: see `width(for:)`.
-                Picker(L10n.shapeWidth, selection: $inkWeight) {
-                    Text(L10n.shapeThin).tag(MarkupWeight.thin)
-                    Text(L10n.shapeMedium).tag(MarkupWeight.medium)
-                    Text(L10n.shapeThick).tag(MarkupWeight.thick)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 220)
-                .accessibilityIdentifier("ink-width")
-                MarkupColorPicker(color: $inkColor)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Theme.surface)
-    }
-    #endif
-
     /// A real View boundary defers the toolbar's large generic value until
     /// SwiftUI evaluates its own body. A computed property or Group evaluates
     /// it inside DocumentView.body, exhausting the device's debug-build stack.
@@ -607,51 +630,132 @@ struct DocumentView: View {
         var body: some View { editor.notebookTools }
     }
 
-    /// Keep notebook actions in the content area so native toolbars never
-    /// collapse them into an overflow menu. The row scrolls at narrow widths.
+    /// The notes editor's main toolbar, in the content area so a native
+    /// toolbar never collapses it into an overflow menu. It scrolls sideways
+    /// when the window is narrower than the tools.
     private var notebookTools: some View {
-        GeometryReader { toolbarGeometry in
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                if !usesPDFToolsSidebar { pageSidebarToggle }
-                studioTool(.pen, title: L10n.inkPen, icon: .pen)
-                studioTool(.eraser, title: L10n.inkEraser, icon: .eraser)
-                studioTool(.highlighter, title: L10n.inkHighlighter, icon: .highlighter)
-                studioTool(.lasso, title: L10n.inkLasso, icon: .lasso)
-                Rectangle().fill(Theme.separator).frame(width: 1, height: 22).padding(.horizontal, 3)
-                    .accessibilityHidden(true)
-                imageButton
-                textBoxButton
-                if !usesPDFToolsSidebar { editorMoreMenu }
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(6)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18))
-            .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.separator.opacity(0.65), lineWidth: 0.75) }
-            .frame(minWidth: toolbarGeometry.size.width)
+        NotesEditorToolbar(store: toolSettings, session: textSession, markupTool: $inkTool,
+                           isMarkingUp: $isMarkingUp, fingerDrawing: $isFingerDrawing,
+                           openPanel: $openToolPanel, context: toolbarContext) {
+            EmptyView()
+        } trailing: {
+            editorMoreMenu
         }
-        }
-        .frame(height: 60)
-        .buttonStyle(.plain)
-        .foregroundStyle(Theme.primaryText)
-        .padding(.horizontal, 12).padding(.vertical, 6)
-        .background(Theme.libraryBackground)
-        .accessibilityIdentifier("notebook-tool-bar")
     }
 
-    private var pageSidebarToggle: some View {
-        Button { isShowingThumbnails.toggle() } label: {
-            Image(systemName: "sidebar.left")
-                .font(.system(size: 19)).frame(width: 44, height: 44)
-                .background(isShowingThumbnails && !usesPDFToolsSidebar ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 12))
-                .contentShape(Rectangle())
+    private var isPhone: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    private var toolbarContext: NotesToolbarContext {
+        NotesToolbarContext(
+            showsLabels: !isCompact, isCompact: isCompact, isPhone: isPhone, hasPage: model.selectedPage != nil,
+            isChangingPage: model.isChangingNotebookPage, isLoadingPhoto: isLoadingPhoto,
+            undoManager: undoManager, historyRevision: model.historyRevision,
+            finishText: { await textSession.finish(undoManager: undoManager) },
+            armText: { armText() },
+            selectAll: { lassoSelectAllRequest += 1 },
+            highlightText: model.selectedPage == nil || model.isRecognizing ? nil : { annotationPage = model.selectedPage },
+            image: imageToolActions,
+            insertSticker: { insertSticker($0) },
+            insert: insertToolActions)
+    }
+
+    private var imageToolActions: ImageToolActions {
+        var actions = ImageToolActions(photos: {
+            isMarkingUp = false
+            selectedPhoto = nil
+            photoTargetPage = model.selectedPage
+            isShowingPhotoPicker = true
+        }, files: { isMarkingUp = false; isShowingImagePicker = true })
+        #if os(iOS)
+        actions.cameraSupported = PhotoCameraView.isSupported
+        actions.camera = {
+            guard let page = model.selectedPage else { return }
+            isMarkingUp = false
+            isLoadingPhoto = true
+            Task {
+                defer { isLoadingPhoto = false }
+                guard await PhotoCameraView.requestAccess() else {
+                    model.presentedError = PresentedError(title: L10n.genericErrorTitle,
+                                                         message: L10n.photoCameraPermission)
+                    return
+                }
+                photoCameraPage = page
+            }
         }
-        .accessibilityLabel(isShowingThumbnails ? L10n.hidePageThumbnails : L10n.showPageThumbnails)
-        .accessibilityValue(isShowingThumbnails ? L10n.selectionOn : L10n.selectionOff)
-        .accessibilityIdentifier("editor-toggle-thumbnails")
-        .foregroundStyle(usesPDFToolsSidebar
-            ? (isShowingThumbnails ? Theme.accent : Theme.secondaryText) : Theme.primaryText)
-        .help(isShowingThumbnails ? L10n.hidePageThumbnails : L10n.showPageThumbnails)
+        #endif
+        return actions
+    }
+
+    private var insertToolActions: InsertToolActions {
+        InsertToolActions(
+            addPage: isNotebook ? { template in
+                Task {
+                    do { try await model.addNotebookPage(template, after: model.selectedPageID, undoManager: undoManager) }
+                    catch is ProAccessError { presentProRequired() }
+                    catch { model.presentedError = .saveFailed() }
+                }
+            } : nil,
+            importPages: { openFilePicker(.add) },
+            textBox: { armText() },
+            image: { openToolPanel = .image },
+            dateAndTime: { insertDateAndTime() },
+            divider: { insertDivider() },
+            duplicatePage: {
+                Task {
+                    do { try await model.duplicateSelectedPage(undoManager: undoManager) }
+                    catch is ProAccessError { presentProRequired() }
+                    catch { model.presentedError = .saveFailed() }
+                }
+            },
+            organizePages: { openInspectorTool(.pages) })
+    }
+
+    private func presentProRequired() {
+        model.presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
+    }
+
+    /// Places one of the app's own stickers on the selected page, as an image
+    /// like any other: it can be moved, resized, deleted, undone and exported.
+    private func insertSticker(_ sticker: Sticker) {
+        guard let page = model.selectedPage, let data = StickerLibrary.pngData(for: sticker) else { return }
+        isMarkingUp = false
+        Task {
+            do {
+                try await model.addImage(data, named: "sticker-\(sticker.id).png", to: page,
+                                         frame: DocumentModel.stickerFrame(on: page), undoManager: undoManager)
+                toolSettings.update { $0.noteStickerUsed(sticker.id) }
+            } catch { model.presentedError = .saveFailed() }
+        }
+    }
+
+    /// Today's date and the time, as a text box in the Text tool's current
+    /// type settings. Typed text, so it can be corrected like any other.
+    private func insertDateAndTime() {
+        guard let page = model.selectedPage else { return }
+        let style = toolSettings.settings.text
+        let stamp = Date.now.formatted(date: .long, time: .shortened)
+        isMarkingUp = false
+        Task {
+            do {
+                try await model.addTextBox(to: page, text: stamp, fontSize: style.fontSize, color: style.color,
+                                           alignment: style.alignment, undoManager: undoManager)
+            } catch { model.presentedError = .saveFailed() }
+        }
+    }
+
+    private func insertDivider() {
+        guard let page = model.selectedPage else { return }
+        let stroke = DocumentModel.dividerStroke(on: page, color: RGBAColor(red: 0.42, green: 0.44, blue: 0.56), width: 1.5)
+        Task {
+            do { try await model.addInkStroke(stroke, to: page, undoManager: undoManager) }
+            catch { model.presentedError = .saveFailed() }
+        }
     }
 
     private var usesPDFToolsSidebar: Bool {
@@ -662,49 +766,156 @@ struct DocumentView: View {
         #endif
     }
 
+    /// Document Utilities as a column on iPad and Mac; a phone shows the same
+    /// state as a drawer instead.
+    ///
+    /// Decided by the kind of device, never by the size class. The column's
+    /// own presence narrows the page, and a rule that read the width to
+    /// decide whether to show the column could close it, widen the page, and
+    /// open it again without end.
+    private var inspectorBinding: Binding<Bool> {
+        usesPDFToolsSidebar ? $isShowingPDFTools : .constant(false)
+    }
+
+    private func closeUtilities() {
+        withAnimation(.easeInOut(duration: 0.25)) { isShowingPDFTools = false }
+    }
+
+    /// Whether something that presents itself — a sheet, a picker, a camera —
+    /// has been asked for. On a phone the utilities drawer steps aside for it.
+    private var isPresentingOverUtilities: Bool {
+        var presenting = shapePage != nil || stampPage != nil || commentsPage != nil || annotationPage != nil
+            || managedMarkupPage != nil || signaturePage != nil || notebookPageRequest != nil
+            || isShowingCrop || isShowingFilePicker || isShowingPDFForm || isShowingPageOrganizer
+            || isShowingExport || isShowingAdjustments || isShowingOutline || isShowingImagePicker
+            || isShowingPhotoPicker
+        #if os(iOS)
+        presenting = presenting || cameraPurpose != nil || photoCameraPage != nil
+        #endif
+        return presenting
+    }
+
+    private var signatureButton: some View {
+        Button { if let page = model.selectedPage { openInspectorTool(.signature(page)) } } label: {
+            Label(L10n.signatureTitle, systemImage: "signature")
+        }.accessibilityIdentifier("editor-signature")
+    }
+
+    private var formButton: some View {
+        Button { openInspectorTool(.form) } label: {
+            Label(L10n.formTitle, systemImage: "list.bullet.rectangle")
+        }.accessibilityIdentifier("editor-fill-form")
+    }
+
+    private var pagesOrganizerButton: some View {
+        Button { openInspectorTool(.pages) } label: {
+            Label(L10n.pages, systemImage: "square.grid.2x2")
+        }.accessibilityIdentifier("editor-pages")
+    }
+
+    /// The compact tools, two to a row.
     @ViewBuilder
-    private var editorMoreMenu: some View {
-        if usesPDFToolsSidebar {
-            Button { isShowingPDFTools.toggle() } label: {
-                Image(systemName: "sidebar.right")
-                    .font(.system(size: 20))
-                    .frame(width: 44, height: 44)
-                    .foregroundStyle(isShowingPDFTools ? Theme.accent : Theme.secondaryText)
-                    .contentShape(Rectangle())
+    private var utilityGridTools: some View {
+        signatureButton
+        shapeButton
+        UtilityToggleTile(title: L10n.markup, systemImage: "pencil.tip.crop.circle", isOn: $isMarkingUp,
+                          id: "editor-markup")
+            .disabled(model.selectedPage == nil)
+        #if os(iOS)
+        UtilityToggleTile(title: L10n.drawWithFinger, systemImage: "hand.draw", isOn: $isFingerDrawing,
+                          id: "editor-finger-drawing")
+        #endif
+        cropButton
+        rotateMenu
+        filterMenu
+        stampButton
+        commentsButton
+        annotateTextButton
+    }
+
+    /// The longer actions, a row each.
+    @ViewBuilder
+    private var utilityRowTools: some View {
+        if !isNotebook { formButton }
+        manageMarkupButton
+        recognizeTextButton
+        addPagesItems
+        pagesOrganizerButton
+        deleteButton
+    }
+
+    private var utilitiesAddPage: some View {
+        addPagesMenu {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                Text(L10n.documentUtilitiesAddPage)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.down").font(.caption.weight(.semibold))
             }
-            .disabled(isToolBusy)
-            .accessibilityIdentifier("studio-more-tools")
-            .accessibilityLabel(isShowingPDFTools ? L10n.hidePDFTools : L10n.showPDFTools)
-            .accessibilityValue(isShowingPDFTools ? L10n.selectedPage : "")
-            .accessibilityAddTraits(isShowingPDFTools ? .isSelected : [])
-            .help(isShowingPDFTools ? L10n.hidePDFTools : L10n.showPDFTools)
-        } else {
-            Menu { editorMoreActions } label: {
-                if isNotebook {
-                    NotebookToolFace(kind: .more).accessibilityLabel(L10n.more)
-                } else {
-                    Label(L10n.more, systemImage: "ellipsis")
-                        .labelStyle(.iconOnly).font(.system(size: 20)).frame(width: 44, height: 44)
-                }
-            }
-            .accessibilityIdentifier("studio-more-tools")
-            .accessibilityLabel(L10n.more)
-            .help(L10n.more)
-            .disabled(textSession.isSelected)
+            .font(.subheadline.weight(.medium))
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(Rectangle())
         }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .disabled(textSession.isSelected)
+        .accessibilityLabel(L10n.addOrReplacePages)
+        .accessibilityIdentifier("strip-add-pages")
+    }
+
+    /// What a thumbnail's menu does. Each action first makes that page the
+    /// current one, because the document's page operations act on the current
+    /// page — and the reader should see the page that is about to change.
+    private var pageGalleryActions: PageGalleryActions {
+        func onPage(_ id: PageID, _ work: @escaping () async -> Void) {
+            Task {
+                guard await finishForAction(), model.pages.contains(where: { $0.id == id }) else { return }
+                model.selectedPageID = id
+                await work()
+            }
+        }
+        return PageGalleryActions(
+            select: { id in
+                Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
+            },
+            move: { id, delta in onPage(id) { await model.moveSelected(by: delta, undoManager: undoManager) } },
+            duplicate: { id in
+                onPage(id) {
+                    do { try await model.duplicateSelectedPage(undoManager: undoManager) }
+                    catch is ProAccessError { presentProRequired() }
+                    catch { model.presentedError = .saveFailed() }
+                }
+            },
+            rotate: { id, clockwise in onPage(id) { await model.rotate(clockwise: clockwise, undoManager: undoManager) } },
+            delete: { id in onPage(id) { await model.deleteSelectedPage(undoManager: undoManager) } },
+            export: { id in onPage(id) { isShowingExport = true } })
+    }
+
+    /// The phone's overflow menu. It is only ever built where there is no
+    /// tools inspector — iPad and Mac reach these same actions inside that
+    /// panel, which `panelsMenu` opens.
+    private var editorMoreMenu: some View {
+        Menu { editorMoreActions } label: {
+            if isNotebook {
+                NotebookToolFace(kind: .more).accessibilityLabel(L10n.more)
+            } else {
+                Label(L10n.more, systemImage: "ellipsis")
+                    .labelStyle(.iconOnly).font(.system(size: 20)).frame(width: 44, height: 44)
+            }
+        }
+        .accessibilityIdentifier("studio-more-tools")
+        .accessibilityLabel(L10n.more)
+        .help(L10n.more)
+        .disabled(textSession.isSelected)
     }
 
     // Shared actions retain the existing sheets, history and subscription checks.
     @ViewBuilder
     private var editorMoreActions: some View {
-        if !isNotebook {
-            Button { openInspectorTool(.form) } label: {
-                Label(L10n.formTitle, systemImage: "list.bullet.rectangle")
-            }.accessibilityIdentifier("editor-fill-form")
-        }
-        Button { if let page = model.selectedPage { openInspectorTool(.signature(page)) } } label: {
-            Label(L10n.signatureTitle, systemImage: "signature")
-        }.accessibilityIdentifier("editor-signature")
+        if !isNotebook { formButton }
+        signatureButton
         shapeButton
         Divider()
         editingTools
@@ -715,9 +926,7 @@ struct DocumentView: View {
         recognizeTextButton
         Divider()
         addPagesItems
-        Button { openInspectorTool(.pages) } label: {
-            Label(L10n.pages, systemImage: "square.grid.2x2")
-        }.accessibilityIdentifier("editor-pages")
+        pagesOrganizerButton
         deleteButton
     }
 
@@ -778,33 +987,15 @@ struct DocumentView: View {
         }
 
         private var toolList: some View {
-            VStack(spacing: 0) {
-                HStack {
-                    Text(L10n.pdfTools).font(.headline)
-                    Spacer()
-                    Button { editor.isShowingPDFTools = false } label: {
-                        Image(systemName: "xmark").frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(editor.isToolBusy)
-                    .accessibilityLabel(L10n.hidePDFTools)
-                    .accessibilityIdentifier("pdf-tools-close")
-                }
-                .padding(.horizontal, 16)
-                Divider()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 6) {
-                        editor.editorMoreActions
-                    }
-                    .labelStyle(.titleAndIcon)
-                    .buttonStyle(PDFToolRowStyle())
-                    .disabled(editor.textSession.isSelected)
-                    .padding(12)
-                }
-                .accessibilityIdentifier("pdf-tools-list")
+            DocumentUtilitiesSidebar(model: editor.model, canClose: !editor.isToolBusy,
+                                     close: { editor.closeUtilities() },
+                                     pageActions: editor.pageGalleryActions) {
+                editor.utilitiesAddPage
+            } gridTools: {
+                editor.utilityGridTools.disabled(editor.textSession.isSelected)
+            } rowTools: {
+                editor.utilityRowTools.disabled(editor.textSession.isSelected)
             }
-            .foregroundStyle(Theme.primaryText)
-            .background(Theme.libraryBackground)
         }
     }
 
@@ -825,118 +1016,66 @@ struct DocumentView: View {
         }
     }
 
-    private func studioTool(_ tool: MacMarkupTool, title: String, icon: NotebookToolIcon.Kind) -> some View {
-        Button {
-            Task {
-                guard await textSession.finish(undoManager: undoManager) else { return }
-                if isMarkingUp && inkTool == tool { isShowingInkSettings = true }
-                inkTool = tool
-                isMarkingUp = true
-                #if os(iOS)
-                if UIDevice.current.userInterfaceIdiom == .phone { isFingerDrawing = true }
-                #endif
-            }
-        } label: {
-            NotebookToolFace(kind: icon, selected: isMarkingUp && inkTool == tool)
-        }
-        .disabled(model.selectedPage == nil)
-        .accessibilityIdentifier("studio-tool-\(tool.rawValue)")
-        .accessibilityLabel(title)
-        .help(title)
-        .popover(isPresented: Binding(
-            get: { isShowingInkSettings && inkTool == tool },
-            set: { isShowingInkSettings = $0 }
-        ), arrowEdge: .top) {
-            NotebookInkSettings(tool: inkTool, width: studioWidth, eraserMode: $eraserMode, color: studioColor,
-                                opacity: $inkColor.alpha, fingerDrawing: $isFingerDrawing,
-                                selectionMode: $lassoMode, selectAll: {
-                                    isShowingInkSettings = false; lassoSelectAllRequest += 1
-                                }) {
-                isShowingInkSettings = false
-            }
-            .presentationCompactAdaptation(.popover)
-        }
-        .accessibilityValue(isMarkingUp && inkTool == tool ? L10n.selectionOn : L10n.selectionOff)
-    }
-
-    private var studioWidth: Binding<Double> {
-        inkTool == .eraser ? $eraserWidth : inkTool == .highlighter ? $highlighterWidth : $penWidth
-    }
-
-    private var drawingWidth: Double {
-        studioWidth.wrappedValue
-    }
-
-    /// Swatches/custom colors change hue without resetting the chosen opacity.
-    private var studioColor: Binding<RGBAColor> {
-        Binding(get: { inkColor }, set: { value in
-            var color = value
-            color.alpha = inkColor.alpha
-            inkColor = color
-        })
-    }
-
-    private func isStudioColor(_ color: RGBAColor) -> Bool {
-        inkColor.red == color.red && inkColor.green == color.green && inkColor.blue == color.blue
-    }
-
-    private var studioToolIcon: NotebookToolIcon.Kind {
-        switch inkTool {
-        case .pen: .pen
-        case .highlighter: .highlighter
-        case .eraser: .eraser
-        case .lasso: .lasso
-        }
-    }
-
+    /// The lower floating bar: how the page is viewed, and nothing else.
+    ///
+    /// Zoom out, fit, zoom in; then whether a touch draws or moves the page;
+    /// then display settings and the zoom in force. It used to show the armed
+    /// tool's own icon as well — a second Lasso button under the first — and
+    /// a row of colour swatches; tools and their colours live in the toolbar
+    /// above and its panels now.
     private var studioPalette: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage,
-                                       historyRevision: model.historyRevision,
-                                       beforeAction: { await textSession.finish(undoManager: undoManager) })
-                    .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
-                PageZoomControls(zoom: $zoom)
-                Divider().frame(height: 28)
-                Button { isMarkingUp.toggle() } label: {
-                    Group {
-                        if isMarkingUp { NotebookToolIcon(kind: studioToolIcon) }
-                        else { Image(systemName: "hand.draw").font(.system(size: 20, weight: .regular)) }
-                    }
-                        .foregroundStyle(isMarkingUp ? Theme.accent : Theme.primaryText)
-                        .frame(width: 44, height: 44)
-                        .background(isMarkingUp ? Theme.selection : .clear, in: Circle())
-                }.accessibilityLabel(L10n.markup)
-                    .accessibilityValue(isMarkingUp ? L10n.selectionOn : L10n.selectionOff)
-                    .accessibilityIdentifier("studio-drawing-toggle")
-                if inkTool.ink != nil {
-                    Button { isShowingInkSettings = true } label: {
-                        Capsule().fill(inkColor.swiftUIColor)
-                            .frame(width: 32, height: max(2, drawingWidth / 2))
-                            .frame(width: 44, height: 44)
-                    }.accessibilityLabel(L10n.studioToolSettings)
-                    ForEach(MarkupColorPicker.presets, id: \.id) { preset in
-                        Button { studioColor.wrappedValue = preset.color } label: {
-                            Circle().fill(preset.color.swiftUIColor).frame(width: 24, height: 24)
-                                .padding(5)
-                                .overlay { Circle().strokeBorder(isStudioColor(preset.color) ? Theme.accent : .clear, lineWidth: 2) }
-                                .frame(width: 44, height: 44)
-                        }.accessibilityLabel(preset.name)
-                            .accessibilityValue(isStudioColor(preset.color) ? L10n.selectionOn : L10n.selectionOff)
-                            .accessibilityIdentifier("studio-color-\(preset.id)")
-                    }
+        let percent = Double(zoom).formatted(.percent.precision(.fractionLength(0)))
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // On a phone, undo and redo stay down here under the thumb.
+                // Wider windows have them at the end of the main toolbar.
+                if isCompact {
+                    NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage,
+                                           historyRevision: model.historyRevision,
+                                           beforeAction: { await textSession.finish(undoManager: undoManager) })
+                        .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
                 }
-                Button { isShowingInkSettings = true } label: {
-                    Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44)
-                }.accessibilityLabel(L10n.studioToolSettings)
-                    .accessibilityIdentifier("studio-tool-settings")
-
-            }.padding(8)
+                PageZoomControls(zoom: $zoom)
+                Rectangle().fill(EditorChrome.border).frame(width: 1, height: 26).accessibilityHidden(true)
+                Button { isMarkingUp.toggle() } label: {
+                    Image(systemName: "hand.draw").font(.system(size: 19))
+                        .foregroundStyle(isMarkingUp ? Color.white : EditorChrome.navy)
+                        .frame(width: 40, height: 40)
+                        .background { if isMarkingUp { Circle().fill(EditorChrome.selection) } }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(L10n.displayDrawingMode)
+                .accessibilityValue(isMarkingUp ? L10n.selectionOn : L10n.selectionOff)
+                .accessibilityIdentifier("studio-drawing-toggle")
+                .help(L10n.displayDrawingMode)
+                Button { isShowingDisplaySettings = true } label: {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 18)).frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(L10n.displaySettings)
+                .accessibilityIdentifier("studio-tool-settings")
+                .help(L10n.displaySettings)
+                .popover(isPresented: $isShowingDisplaySettings, arrowEdge: .bottom) {
+                    DisplaySettingsPopover(zoom: $zoom, fingerDrawing: $isFingerDrawing,
+                                           fitWidth: isCompact ? nil : { fitWidthRequest += 1 },
+                                           close: { isShowingDisplaySettings = false })
+                        .presentationCompactAdaptation(.sheet)
+                        .presentationDetents([.medium])
+                }
+                Text(verbatim: percent)
+                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .frame(minWidth: 52, minHeight: 32)
+                    .background(EditorChrome.lavender, in: Capsule())
+                    .accessibilityLabel(L10n.displayZoom)
+                    .accessibilityValue(percent)
+                    .accessibilityIdentifier("editor-zoom-percent")
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
         }
-        .buttonStyle(.plain).foregroundStyle(Theme.primaryText)
-        .background(Theme.surface, in: Capsule())
-        .shadow(color: Theme.paperShadow, radius: 12, y: 4)
-        .frame(maxWidth: 650)
+        .buttonStyle(.plain).foregroundStyle(EditorChrome.navy)
+        .editorFloatingSurface(radius: 30)
+        .frame(maxWidth: 520)
         .padding(12)
     }
 
@@ -1113,25 +1252,6 @@ struct DocumentView: View {
         }
         .disabled(model.selectedPage == nil)
         .accessibilityIdentifier("editor-manage-markup")
-    }
-
-    private var pageNavigation: some View {
-        VStack(spacing: 0) {
-            if let index = model.selectedIndex {
-                Text(L10n.pageLabel(index + 1, of: model.pages.count))
-                    .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    .padding(.top, 10)
-            }
-            HStack(spacing: 0) {
-                PageScroller(model: model, beforeSelection: { await textSession.finish(undoManager: undoManager) })
-                addPagesMenu {
-                    Label(L10n.addPages, systemImage: "plus")
-                        .labelStyle(EditorToolLabelStyle())
-                        .padding(8).background(Theme.selection, in: RoundedRectangle(cornerRadius: 12))
-                }.padding(.trailing, 12).disabled(textSession.isSelected).accessibilityIdentifier("scan-add-page")
-            }
-        }
-        .background(Theme.surface)
     }
 
     #if os(iOS)
@@ -1416,190 +1536,6 @@ struct DocumentView: View {
     }
 }
 
-/// Separate view evaluation keeps the notebook editor's body small on devices.
-private struct NotebookInkSettings: View {
-    let tool: MacMarkupTool
-    @Binding var width: Double
-    @Binding var eraserMode: InkEraserMode
-    @Binding var color: RGBAColor
-    @Binding var opacity: Double
-    @Binding var fingerDrawing: Bool
-    @Binding var selectionMode: PageSelectionMode
-    let selectAll: () -> Void
-    let done: () -> Void
-
-    private var title: String {
-        switch tool {
-        case .pen: L10n.inkPen
-        case .highlighter: L10n.inkHighlighter
-        case .eraser: L10n.inkEraser
-        case .lasso: L10n.inkLasso
-        }
-    }
-
-    private var resizableEraser: Bool {
-        #if os(iOS)
-        eraserMode == .precision
-        #else
-        true
-        #endif
-    }
-
-    private var eraserPreviewDiameter: Double {
-        #if os(iOS)
-        InkCanvas.eraser(mode: .precision, size: width).width
-        #else
-        width
-        #endif
-    }
-
-    private var eraserSizeValue: String { ((width - 8) / 56).formatted(.percent.precision(.fractionLength(0))) }
-
-    private var swatchColor: Binding<RGBAColor> {
-        Binding(get: {
-            var value = color
-            value.alpha = 1
-            return value
-        }, set: { color = $0 })
-    }
-
-    private var widthPresets: some View {
-        ForEach(MarkupWeight.allCases, id: \.self) { weight in
-            Button { width = tool.width(for: weight) } label: {
-                Text(weight == .thin ? L10n.shapeThin : weight == .medium ? L10n.shapeMedium : L10n.shapeThick)
-                    .font(.subheadline)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 44)
-                    .background(abs(width - tool.width(for: weight)) < 0.01 ? Theme.selection : Theme.libraryBackground,
-                                in: RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-            .accessibilityValue(abs(width - tool.width(for: weight)) < 0.01 ? L10n.selectionOn : L10n.selectionOff)
-            .accessibilityIdentifier("studio-width-\(weight.rawValue)")
-        }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(title).font(.headline)
-                Spacer()
-                Button(L10n.done, action: done)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .accessibilityIdentifier("studio-settings-done")
-            }.padding(.horizontal, 20).padding(.top, 8)
-            Form {
-                if tool.ink != nil {
-                    Section(L10n.studioStrokePreview) {
-                        GeometryReader { geometry in
-                            Path { path in
-                                path.move(to: CGPoint(x: 16, y: 40))
-                                path.addCurve(to: CGPoint(x: geometry.size.width - 16, y: 32),
-                                              control1: CGPoint(x: geometry.size.width * 0.35, y: 0),
-                                              control2: CGPoint(x: geometry.size.width * 0.65, y: 72))
-                            }
-                            .stroke(color.swiftUIColor, style: StrokeStyle(lineWidth: width, lineCap: .round))
-                        }
-                        .frame(height: 72)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
-                        .accessibilityHidden(true)
-                    }
-                    Section(L10n.shapeWidth) {
-                        LabeledContent(L10n.shapeWidth, value: L10n.studioWidthValue(width.formatted(.number.precision(.fractionLength(1)))))
-                        Slider(value: $width, in: tool == .highlighter ? 4...40 : 0.5...12, step: 0.1) {
-                            Text(L10n.shapeWidth)
-                        }
-                        .accessibilityValue(L10n.studioWidthValue(width.formatted(.number.precision(.fractionLength(1)))))
-                        .accessibilityIdentifier("studio-width-slider")
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: 8) { widthPresets }.fixedSize(horizontal: true, vertical: false)
-                            VStack(alignment: .leading, spacing: 8) { widthPresets }
-                        }
-                    }
-                    Section(L10n.markupCustomColor) {
-                        MarkupColorPicker(color: swatchColor)
-                        LabeledContent(L10n.studioOpacity, value: opacity.formatted(.percent.precision(.fractionLength(0))))
-                        Slider(value: $opacity, in: 0.1...1) { Text(L10n.studioOpacity) }
-                            .accessibilityIdentifier("studio-opacity-slider")
-                    }
-                } else if tool == .eraser {
-                    if resizableEraser {
-                    Section(L10n.eraserSize) {
-                        Circle().strokeBorder(Theme.accent, lineWidth: 2)
-                            .background(Circle().fill(Theme.selection.opacity(0.5)))
-                            .frame(width: eraserPreviewDiameter, height: eraserPreviewDiameter)
-                            .frame(maxWidth: .infinity, minHeight: 88)
-                            .accessibilityHidden(true)
-                        LabeledContent(L10n.eraserSize, value: eraserSizeValue)
-                        Slider(value: $width, in: 8...64) { Text(L10n.eraserSize) }
-                            .accessibilityIdentifier("studio-eraser-size")
-                            .accessibilityValue(eraserSizeValue)
-                        ForEach([8.0, 36, 64], id: \.self) { size in
-                            Button { width = size } label: {
-                                HStack {
-                                    Image(systemName: "circle").frame(width: 28)
-                                    Text(size == 8 ? L10n.eraserSmall : size == 36 ? L10n.eraserMedium : L10n.eraserLarge)
-                                    Spacer()
-                                    if width == size { Image(systemName: "checkmark") }
-                                }.padding(.horizontal, 10).frame(minHeight: 44)
-                                    .background(width == size ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 12))
-                                    .contentShape(Rectangle())
-                            }.buttonStyle(.plain)
-                            .accessibilityValue(width == size ? L10n.selectionOn : L10n.selectionOff)
-                            .accessibilityIdentifier("studio-eraser-size-\(Int(size))")
-                        }
-                    }
-                    }
-                    Section(L10n.eraserMode) {
-                        ForEach(InkEraserMode.allCases, id: \.self) { mode in
-                            Button { eraserMode = mode } label: {
-                                HStack {
-                                    Text(mode == .precision ? L10n.eraserPrecision : L10n.eraserStroke)
-                                    Spacer()
-                                    if eraserMode == mode { Image(systemName: "checkmark") }
-                                }.padding(.horizontal, 10).frame(minHeight: 44)
-                                    .background(eraserMode == mode ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 12))
-                                    .contentShape(Rectangle())
-                            }.buttonStyle(.plain)
-                            .accessibilityValue(eraserMode == mode ? L10n.selectionOn : L10n.selectionOff)
-                            .accessibilityIdentifier("studio-eraser-mode-\(mode.rawValue)")
-                        }
-                        Text(eraserMode == .precision ? L10n.eraserPrecisionDetail : L10n.studioEraserDetail)
-                    }
-                } else if tool == .lasso {
-                    Text(L10n.lassoInkHint)
-                    Section(L10n.selectionMode) {
-                        ForEach(PageSelectionMode.allCases, id: \.self) { mode in
-                            Button { selectionMode = mode } label: {
-                                HStack {
-                                    Text(mode == .freehand ? L10n.selectionFreehand : L10n.selectionRectangle)
-                                    Spacer()
-                                    if selectionMode == mode { Image(systemName: "checkmark") }
-                                }.frame(minHeight: 44)
-                            }
-                            .accessibilityValue(selectionMode == mode ? L10n.selectionOn : L10n.selectionOff)
-                            .accessibilityIdentifier("studio-lasso-\(mode.rawValue)")
-                        }
-                        Button(L10n.selectAll, action: selectAll)
-                            .accessibilityIdentifier("studio-lasso-select-all")
-                    }
-                }
-                #if os(iOS)
-                if tool != .lasso {
-                    Section {
-                        Toggle(L10n.drawWithFinger, isOn: $fingerDrawing)
-                            .accessibilityIdentifier("studio-finger-drawing")
-                    }
-                }
-                #endif
-            }
-            .formStyle(.grouped)
-
-        }
-        .frame(minWidth: 280, idealWidth: 360, minHeight: 400, idealHeight: 620)
-    }
-}
-
 /// Text stays visible below each tool on phones. At larger type sizes the
 /// row scrolls instead of squeezing the translated labels into tiny targets.
 private struct EditorToolLabelStyle: LabelStyle {
@@ -1622,121 +1558,6 @@ enum PageSourcePurpose: Hashable, Identifiable {
     var id: Self { self }
 }
 
-/// Thumbnails of every page in a vertical list; drag to reorder.
-private struct PageStrip: View {
-    @Bindable var model: DocumentModel
-    let undoManager: UndoManager?
-    var beforeSelection: (() async -> Bool)? = nil
-
-    var body: some View {
-        List(selection: Binding(get: { model.selectedPageID }, set: { id in
-            Task { if await beforeSelection?() ?? true { model.selectedPageID = id } }
-        })) {
-            ForEach(Array(model.pages.enumerated()), id: \.element.id) { index, page in
-                VStack(spacing: 4) {
-                    PageImageView(page: page, pixelSize: 260, accessibilityLabel: L10n.pageLabel(index + 1, of: model.pages.count))
-                        #if os(macOS)
-                        // AppKit's List measures an ideal row height repeatedly.
-                        // A flexible aspect-fit thumbnail can feed that measurement
-                        // back into itself during opening/window zoom. Reserve a
-                        // stable preview slot while the image loads and resizes.
-                        .frame(height: 150)
-                        #else
-                        .frame(maxHeight: 150)
-                        #endif
-                    Text(verbatim: "\(index + 1)")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                }
-                .padding(.vertical, 4)
-                .frame(maxWidth: .infinity)
-                .tag(page.id)
-            }
-            .onMove { offsets, destination in
-                Task { await model.movePages(from: offsets, to: destination, undoManager: undoManager) }
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(Theme.surface)
-        .accessibilityLabel(L10n.pages)
-    }
-}
-
-/// Compact-width page picker: a horizontal row of thumbnails.
-private struct PageScroller: View {
-    @Bindable var model: DocumentModel
-    var beforeSelection: (() async -> Bool)? = nil
-    @ScaledMetric(relativeTo: .caption2) private var numberSpace: CGFloat = 22
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 14) {
-                    ForEach(Array(model.pages.enumerated()), id: \.element.id) { index, page in
-                        let isSelected = page.id == model.selectedPageID
-                        Button {
-                            Task { if await beforeSelection?() ?? true { model.selectedPageID = page.id } }
-                        } label: {
-                            VStack(spacing: 5) {
-                                PageImageView(page: page, pixelSize: 200, accessibilityLabel: L10n.pageLabel(index + 1, of: model.pages.count))
-                                    .frame(height: 72)
-                                    .overlay {
-                                        if isSelected {
-                                            Rectangle().strokeBorder(Theme.accent, lineWidth: 2)
-                                        }
-                                    }
-                                Text(verbatim: "\(index + 1)")
-                                    .font(.caption2.monospacedDigit().weight(isSelected ? .bold : .regular))
-                                    .foregroundStyle(isSelected ? Theme.accent : .secondary)
-                                    .accessibilityHidden(true)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(L10n.pageLabel(index + 1, of: model.pages.count))
-                        .accessibilityValue(isSelected ? L10n.selectedPage : "")
-                        .accessibilityIdentifier("page-thumbnail-\(index + 1)")
-                        .accessibilityAddTraits(isSelected ? .isSelected : [])
-                        .id(page.id)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-            }
-            .frame(height: 88 + numberSpace)
-            .background(Theme.surface)
-            .onChange(of: model.selectedPageID) { _, id in
-                withAnimation { proxy.scrollTo(id, anchor: .center) }
-            }
-        }
-        .accessibilityLabel(L10n.pages)
-    }
-}
-
-#if os(iOS)
-/// Compact-width page reordering: the full list in edit mode.
-private struct PageOrganizer: View {
-    @Bindable var model: DocumentModel
-    let undoManager: UndoManager?
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            PageStrip(model: model, undoManager: undoManager)
-                .environment(\.editMode, .constant(.active))
-                .navigationTitle(L10n.pages)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(L10n.done) { dismiss() }
-                    }
-                }
-        }
-    }
-}
-#endif
-
 private struct NotebookPageFrames: PreferenceKey {
     static let defaultValue: [PageID: CGRect] = [:]
     static func reduce(value: inout [PageID: CGRect], nextValue: () -> [PageID: CGRect]) {
@@ -1756,15 +1577,26 @@ private struct PageViewer: View {
     var fingerDrawing = false
     var undoManager: UndoManager?
     var inkTool: MacMarkupTool = .pen
-    var inkColor = RGBAColor(red: 0, green: 0, blue: 0, alpha: 1)
-    var inkWidth: Double = 2
-    var eraserMode: InkEraserMode = .precision
+    /// The toolbar's settings as they stand: colour, width, pen, eraser and
+    /// lasso choices all come from here, so there is one place they are read.
+    var tools = EditorToolSettings()
     var usesStudioTools = false
-    var lassoMode: PageSelectionMode = .freehand
     var selectAllRequest = 0
+    var fitWidthRequest = 0
     var onLeaveSelection: () -> Void = {}
     var appendNotebookPage: ((PageID) -> Void)? = nil
     var canAppendNotebookPage = false
+    /// Find in document, when the editor has it. Its hits are drawn over the page.
+    var find: DocumentFind? = nil
+    /// The words selected on the page, when the editor lets them be.
+    var textSelection: PageTextSelectionModel? = nil
+
+    /// Whether a page pan should demand two fingers. Kept out of the body so
+    /// the rule is named once and the type-checker is not asked to infer it
+    /// inside an already-large expression. See `PageScrollTouchPolicy`.
+    private var pageNeedsTwoFingers: Bool {
+        PageScrollTouchPolicy.requiresTwoFingers(markingUp: isMarkingUp, tool: inkTool, fingerDrawing: fingerDrawing)
+    }
 
     /// Whether the rendered page includes the ink already saved on it.
     ///
@@ -1777,7 +1609,28 @@ private struct PageViewer: View {
         #if os(macOS)
         true
         #else
-        !isMarkingUp || inkTool == .lasso
+        !isMarkingUp || inkTool == .lasso || inkTool == .shape
+        #endif
+    }
+
+    /// The ink the freehand canvas should hold for a page.
+    ///
+    /// Normally all of it. With the eraser limited to handwriting or to
+    /// highlights, only that kind: PencilKit erases whatever is on its canvas,
+    /// so the way to protect a stroke from it is not to put the stroke there.
+    private func canvasObjects(on page: Page) -> [PageObject] {
+        let objects = model.selectedPageObjects.filter { $0.pageID == page.id }
+        guard inkTool == .eraser, tools.eraserTarget != .all else { return objects }
+        return tools.eraserTarget.erasable(in: objects)
+    }
+
+    /// iOS only: the ink the canvas was not given has to be drawn by the page
+    /// underneath instead, or it would vanish while the eraser was in hand.
+    private func pageDrawsProtectedInk(on page: Page) -> Bool {
+        #if os(iOS)
+        isMarkingUp && inkTool == .eraser && tools.eraserTarget != .all
+        #else
+        false
         #endif
     }
     @Environment(\.displayScale) private var displayScale
@@ -1792,6 +1645,10 @@ private struct PageViewer: View {
     @State private var jumpTarget: PageID?
     @State private var isSelectingVisiblePage = false
     @State private var hasPositionedInitialPage = false
+    /// The viewport's width when the visible page was last worked out, and a
+    /// counter that asks for the current page to be brought back to centre.
+    @State private var lastViewportWidth: CGFloat = 0
+    @State private var recenterRequest = 0
     private var isContinuous: Bool { model.item?.kind == .notebook }
 
     var body: some View {
@@ -1836,7 +1693,7 @@ private struct PageViewer: View {
                     .background { PagePinchZoom(zoom: $zoom) }
                     .background {
                         if isContinuous && UIDevice.current.userInterfaceIdiom == .pad {
-                            NotebookTouchScrolling(requiresTwoFingers: isMarkingUp)
+                            NotebookTouchScrolling(requiresTwoFingers: pageNeedsTwoFingers)
                         }
                     }
                     #endif
@@ -1873,6 +1730,22 @@ private struct PageViewer: View {
                     hasPositionedInitialPage = true
                 }
                 .background(Theme.canvas)
+                .onChange(of: recenterRequest) { _, _ in
+                    guard let id = model.selectedPageID else { return }
+                    reader.scrollTo(id, anchor: .center)
+                }
+                .onChange(of: find?.shownFocus) { _, _ in
+                    // The current hit is drawn; bring it into view.
+                    withAnimation { reader.scrollTo(DocumentFind.anchorID, anchor: .center) }
+                }
+                .onChange(of: fitWidthRequest) { _, _ in
+                    // Fit is the whole page in the window. This is the page
+                    // as wide as the window, however tall that leaves it.
+                    guard let page = model.selectedPage else { return }
+                    let fitted = fittedSize(page.geometry.pageSize, in: proxy.size)
+                    let inset: CGFloat = showsZoomButtons ? 32 : 12
+                    zoom = PageZoom.clamp(max(proxy.size.width - inset * 2, 50) / max(fitted.width, 1))
+                }
                 .onChange(of: proxy.size) { _, _ in
                     if textSession.isEditing {
                         withAnimation { reader.scrollTo("inline-text-anchor", anchor: .center) }
@@ -1916,6 +1789,20 @@ private struct PageViewer: View {
     }
 
     private func selectVisiblePage(_ frames: [PageID: CGRect], viewport: CGRect) {
+        // The window changed width: Document Utilities opened or closed, the
+        // device turned, the window was resized. Every page refits, so the
+        // same scroll offset now shows a different page — and "most visible"
+        // would quietly change the current page to a neighbour. Nobody
+        // scrolled; hold the current page and bring it back to centre.
+        if abs(viewport.width - lastViewportWidth) > 0.5 {
+            let hadWidth = lastViewportWidth > 0
+            lastViewportWidth = viewport.width
+            if hadWidth, isContinuous, hasPositionedInitialPage, let id = model.selectedPageID {
+                jumpTarget = id
+                recenterRequest &+= 1
+            }
+            return
+        }
         guard isContinuous, hasPositionedInitialPage, !textSession.isSelected, !isSelectingVisiblePage,
               !model.isChangingNotebookPage else { return }
         if let target = jumpTarget {
@@ -1957,8 +1844,10 @@ private struct PageViewer: View {
             ?? CGSize(width: fitted.width * zoom, height: fitted.height * zoom)
         return PageImageView(page: page, pixelSize: max(size.width, size.height) * displayScale,
                       accessibilityLabel: L10n.pageLabel(index + 1, of: model.pages.count),
-                      includesInk: !active || pageShowsInk,
-                      excludingObjectIDs: (textSession.page?.id == page.id ? textSession.excludedIDs : []).union(active ? lassoHiddenIDs : []))
+                      includesInk: !active || pageShowsInk || pageDrawsProtectedInk(on: page),
+                      excludingObjectIDs: (textSession.page?.id == page.id ? textSession.excludedIDs : [])
+                          .union(active ? lassoHiddenIDs : [])
+                          .union(active && pageDrawsProtectedInk(on: page) ? Set(canvasObjects(on: page).map(\.id)) : []))
             .accessibilityIdentifier(active ? "document-page-image" : "notebook-preview-\(page.id)")
             .accessibilityValue(active ? L10n.strokeCount(model.selectedPageObjects.filter {
                 guard $0.pageID == page.id else { return false }
@@ -1966,6 +1855,39 @@ private struct PageViewer: View {
                 return false
             }.count) : "")
             .frame(width: size.width, height: size.height)
+            // What find found on this page. It takes no touches.
+            .overlay {
+                if let find, find.isPresented {
+                    let pageSize = page.geometry.pageSize
+                    FindHighlightsOverlay(find: find, page: page,
+                        sourceToView: page.geometry.sourceToPage.concatenating(
+                            CGAffineTransform(scaleX: size.width / pageSize.width, y: size.height / pageSize.height)))
+                }
+            }
+            // Selecting the page's own words. Only while reading: a drawing
+            // tool owns the page, and so does a text box being typed in or
+            // placed. Beneath the layers that move marks, so those keep
+            // their touches.
+            .overlay {
+                if active, !isMarkingUp, !textSession.isSelected, !textSession.isPlacing, let textSelection {
+                    let pageSize = page.geometry.pageSize
+                    TextSelectionOverlay(selection: textSelection, model: model, page: page,
+                        sourceToView: page.geometry.sourceToPage.concatenating(
+                            CGAffineTransform(scaleX: size.width / pageSize.width, y: size.height / pageSize.height)),
+                        undoManager: undoManager, claimsCopyShortcut: find?.isTyping != true)
+                }
+            }
+            // The page's own links. Over the text selection, so a tap on a
+            // link follows it; under the marks, which keep their touches.
+            .overlay {
+                if active, !isMarkingUp, !textSession.isSelected, !textSession.isPlacing {
+                    let pageSize = page.geometry.pageSize
+                    PageLinksOverlay(model: model, page: page,
+                        sourceToView: page.geometry.sourceToPage.concatenating(
+                            CGAffineTransform(scaleX: size.width / pageSize.width, y: size.height / pageSize.height)),
+                        showPage: { activate($0, fromScroll: false) })
+                }
+            }
             // Text boxes and placed images can be picked up and
             // moved. Stood down while the ink canvas is up, which
             // owns the whole page then.
@@ -1999,7 +1921,8 @@ private struct PageViewer: View {
                     PageSelectionOverlay(model: model, page: page, sourceToView: mapping,
                         visible: proxy.frame(in: .global).offsetBy(dx: -pageFrame.minX, dy: -pageFrame.minY)
                             .intersection(CGRect(origin: .zero, size: size)),
-                        mode: lassoMode, selectAllRequest: selectAllRequest, enablesTwoFingerNavigation: isContinuous, undoManager: undoManager,
+                        mode: tools.lassoMode, selectAllRequest: selectAllRequest, enablesTwoFingerNavigation: isContinuous,
+                        allowed: tools.lassoContent, undoManager: undoManager,
                         hiddenIDs: $lassoHiddenIDs) { object in
                             onLeaveSelection()
                             switch object.payload {
@@ -2010,32 +1933,46 @@ private struct PageViewer: View {
                         }
                 }
             }
+            .overlay {
+                if active && isMarkingUp && inkTool == .shape {
+                    let pageSize = page.geometry.pageSize
+                    ShapeDrawOverlay(
+                        model: model, page: page,
+                        sourceToView: page.geometry.sourceToPage.concatenating(
+                            CGAffineTransform(scaleX: size.width / pageSize.width, y: size.height / pageSize.height)),
+                        kind: tools.shapeKind, color: tools.shapeColor, width: tools.shapeWidth,
+                        locksAspect: tools.shapeLocksAspect, undoManager: undoManager)
+                }
+            }
             #if os(macOS)
             .overlay {
-                if active && isMarkingUp && inkTool != .lasso {
+                if active && isMarkingUp && inkTool != .lasso && inkTool != .shape {
                     let pageSize = page.geometry.pageSize
                     MacInkCanvas(
                         model: model, page: page,
                         sourceToView: page.geometry.sourceToPage.concatenating(
                             CGAffineTransform(scaleX: size.width / pageSize.width,
                                               y: size.height / pageSize.height)),
-                        tool: inkTool, color: inkColor, width: inkWidth, eraserMode: eraserMode,
+                        tool: inkTool, color: tools.color(for: inkTool), width: tools.width(for: inkTool),
+                        eraserMode: tools.eraserMode, style: tools.drawingStyle(for: inkTool),
                         undoManager: undoManager)
                 }
             }
             #endif
             #if os(iOS)
             .overlay {
-                if active && isMarkingUp && inkTool != .lasso {
+                if active && isMarkingUp && inkTool != .lasso && inkTool != .shape {
                     let pageSize = page.geometry.pageSize
                     // Only this page's objects: right after a page switch the
                     // previous page's are still loaded.
-                    InkCanvas(pageID: page.id, objects: model.selectedPageObjects.filter { $0.pageID == page.id },
+                    InkCanvas(pageID: page.id, objects: canvasObjects(on: page),
                               sourceToView: page.geometry.sourceToPage.concatenating(
                                   CGAffineTransform(scaleX: size.width / pageSize.width, y: size.height / pageSize.height)),
                               fingerDrawing: fingerDrawing, documentUndoManager: undoManager,
                               studioTool: usesStudioTools ? inkTool : nil, enablesTwoFingerNavigation: isContinuous,
-                              studioColor: inkColor, studioWidth: inkWidth, eraserMode: eraserMode) { saving, deleting in
+                              studioColor: tools.color(for: inkTool), studioWidth: tools.width(for: inkTool),
+                              eraserMode: tools.eraserMode, style: tools.drawingStyle(for: inkTool),
+                              zKeyFloor: model.selectedPageObjects.filter { $0.pageID == page.id }.map(\.zKey).max()) { saving, deleting in
                         Task { await model.changeInk(on: page.id, saving: saving, deleting: deleting, undoManager: undoManager) }
                     }
                 }

@@ -206,7 +206,7 @@ struct ShapeAnnotationSheet: View {
     }
 }
 
-private extension ShapeAnnotation {
+extension ShapeAnnotation {
     var title: String {
         switch self {
         case .rectangle: L10n.shapeRectangle
@@ -216,6 +216,12 @@ private extension ShapeAnnotation {
         case .checkmark: L10n.stampCheckmark
         case .cross: L10n.stampCross
         case .star: L10n.stampStar
+        case .roundedRectangle: L10n.shapeRoundedRectangle
+        case .triangle: L10n.shapeTriangle
+        case .diamond: L10n.shapeDiamond
+        case .pentagon: L10n.shapePentagon
+        case .hexagon: L10n.shapeHexagon
+        case .speechBubble: L10n.shapeSpeechBubble
         }
     }
     var symbol: String {
@@ -227,6 +233,12 @@ private extension ShapeAnnotation {
         case .checkmark: "checkmark"
         case .cross: "xmark"
         case .star: "star"
+        case .roundedRectangle: "app"
+        case .triangle: "triangle"
+        case .diamond: "diamond"
+        case .pentagon: "pentagon"
+        case .hexagon: "hexagon"
+        case .speechBubble: "bubble.left"
         }
     }
 }

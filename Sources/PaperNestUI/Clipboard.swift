@@ -58,6 +58,18 @@ enum Clipboard {
         #endif
     }
 
+    /// Puts plain text on the clipboard, replacing what was there.
+    @MainActor
+    static func write(text: String) {
+        #if canImport(AppKit)
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setString(text, forType: .string)
+        #elseif canImport(UIKit)
+        UIPasteboard.general.string = text
+        #endif
+    }
+
     /// Screenshots and copied images often arrive as TIFF; the library
     /// stores PNG instead.
     static func convertToPNG(_ data: Data) -> Data? {

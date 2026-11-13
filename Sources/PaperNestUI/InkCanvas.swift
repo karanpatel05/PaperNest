@@ -25,6 +25,14 @@ struct InkCanvas: UIViewRepresentable {
     var studioColor: RGBAColor = .black
     var studioWidth: Double = 2
     var eraserMode: InkEraserMode = .precision
+    /// Which pen is in hand and how its strokes are shaped and saved.
+    var style = InkDrawingStyle()
+    /// The highest paint-order key on the page, counting objects this canvas
+    /// was not given. With the eraser limited to one kind of ink the canvas
+    /// holds only that kind, and a piece left by a partial erase is a new
+    /// object: it has to be keyed above *everything*, or it could be handed a
+    /// key some other object on the page already has.
+    var zKeyFloor: String?
     let onChange: (_ saving: [PageObject], _ deleting: [PageObject]) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -59,6 +67,8 @@ struct InkCanvas: UIViewRepresentable {
     func updateUIView(_ canvas: InkCanvasView, context: Context) {
         let coordinator = context.coordinator
         coordinator.onChange = onChange
+        coordinator.style = style
+        coordinator.zKeyFloor = zKeyFloor
         canvas.paletteUndoManager.document = documentUndoManager
         canvas.drawingPolicy = fingerDrawing ? .anyInput : .pencilOnly
         if let studioTool {
@@ -66,15 +76,34 @@ struct InkCanvas: UIViewRepresentable {
             let width = studioWidth * InkConversion.uniformScale(sourceToView)
             switch studioTool {
             case .pen, .highlighter:
-                setTool(PKInkingTool(studioTool == .pen ? .pen : .marker,
-                                    color: InkConversion.color(studioColor), width: width), on: canvas)
+                let ink = studioTool == .pen ? Self.inkType(for: style.preset, usesPressure: style.usesPressure) : .marker
+                setTool(PKInkingTool(ink, color: InkConversion.color(studioColor), width: width), on: canvas)
             case .eraser: setTool(Self.eraser(mode: eraserMode, size: studioWidth), on: canvas)
             case .lasso: setTool(PKLassoTool(), on: canvas)
+            // Dragged out on its own layer; this canvas is down while Shapes
+            // is armed.
+            case .shape: break
             }
         }
         coordinator.show(pageID: pageID, objects: objects, sourceToView: sourceToView)
         canvas.accessibilityLabel = L10n.markup
         canvas.accessibilityValue = L10n.strokeCount(objects.filter { if case .ink = $0.payload { true } else { false } }.count)
+    }
+
+    /// The PencilKit ink that draws a preset.
+    ///
+    /// Only inks whose strokes survive being stored are used. A stored stroke
+    /// is a line with a width at each point, so an ink that is really a
+    /// texture — pencil graphite, crayon, watercolour — would look one way
+    /// while it was being drawn and another the moment the page redrew it.
+    /// Monoline is one width whatever the hand does; pen follows pressure;
+    /// the fountain pen follows the angle of travel.
+    static func inkType(for preset: PenPreset, usesPressure: Bool) -> PKInkingTool.InkType {
+        switch preset {
+        case .ballpoint, .marker: .monoline
+        case .fountain: .fountainPen
+        case .gel, .pencil, .brush: usesPressure ? .pen : .monoline
+        }
     }
 
     /// Size is a relative preference (8...64), mapped into the supported
@@ -101,6 +130,16 @@ struct InkCanvas: UIViewRepresentable {
         weak var canvas: InkCanvasView?
         let toolPicker = PKToolPicker()
         var onChange: ((_ saving: [PageObject], _ deleting: [PageObject]) -> Void)?
+        var style = InkDrawingStyle()
+        var zKeyFloor: String? {
+            didSet { if let zKeyFloor, zKeyFloor > (topZKey ?? "") { topZKey = zKeyFloor } }
+        }
+        /// When the tip last left the page. A stroke that rested before it
+        /// lifted is asking to be straightened, and the rest can only be
+        /// measured against the lift.
+        private var toolLifted: Date?
+
+        func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) { toolLifted = Date() }
 
         private var pageID: PageID?
         private var conversion = InkConversion(sourceToView: .identity)
@@ -154,7 +193,7 @@ struct InkCanvas: UIViewRepresentable {
             shown = Dictionary(objects.map { ($0.id, $0.payload) }, uniquingKeysWith: { a, _ in a })
             modelState = shown
             pending = []
-            topZKey = objects.map(\.zKey).max()
+            topZKey = (objects.map(\.zKey) + [zKeyFloor].compactMap { $0 }).max()
             isLoading = true
             canvas.drawing = PKDrawing(strokes: strokes)
             isLoading = false
@@ -175,16 +214,45 @@ struct InkCanvas: UIViewRepresentable {
                 families[stroke.randomSeed, default: []].append(stroke)
             }
             let present = Set(order)
+            var redrawn: [UInt32: PKStroke] = [:]
             for seed in order {
                 let strokes = families[seed] ?? []
-                let shape = strokes.map(StrokeShape.init)
+                var shape = strokes.map(StrokeShape.init)
                 if let entry = known[seed], entry.shape == shape { continue }
                 let previous = known[seed]?.objects ?? []
-                let inks = strokes.flatMap { conversion.inkStrokes(from: $0) }
+                var inks = strokes.flatMap { conversion.inkStrokes(from: $0) }
+                if previous.isEmpty {
+                    // A stroke just drawn. It takes the tip of the tool that
+                    // drew it, and may be asking to become a clean shape.
+                    for index in inks.indices where inks[index].tool == .highlighter { inks[index].cap = style.cap }
+                    if strokes.count == 1, inks.count == 1, let snapped = snapped(strokes[0], as: inks[0]) {
+                        inks = [snapped]
+                        let replacement = conversion.pkStroke(from: snapped, seed: seed)
+                        redrawn[seed] = replacement
+                        shape = [StrokeShape(replacement)]
+                    }
+                } else if case .ink(let original)? = previous.first?.payload {
+                    // Moved or partly erased: the pieces keep the tip the
+                    // stroke was drawn with, whatever is in hand now.
+                    for index in inks.indices { inks[index].cap = original.cap }
+                }
                 let updated = objects(for: inks, reusing: previous, pageID: pageID)
                 deleting += previous.filter { old in !updated.contains { $0.id == old.id } }
                 saving += updated
                 known[seed] = (updated, shape)
+            }
+            if !redrawn.isEmpty {
+                // Show the canvas what was saved, or the rough stroke would
+                // stay on screen until the page was next redrawn. `known`
+                // already holds the new shapes, so the change this causes is
+                // read as no change at all.
+                var drawing = canvasView.drawing
+                for index in drawing.strokes.indices {
+                    if let replacement = redrawn[drawing.strokes[index].randomSeed] { drawing.strokes[index] = replacement }
+                }
+                isLoading = true
+                canvasView.drawing = drawing
+                isLoading = false
             }
             for (seed, entry) in known where !present.contains(seed) {
                 deleting += entry.objects
@@ -195,6 +263,37 @@ struct InkCanvas: UIViewRepresentable {
             for object in saving { shown[object.id] = object.payload }
             pending.append(shown)
             onChange?(saving, deleting)
+        }
+
+        /// The clean stroke a just-drawn one should be saved as, if any.
+        ///
+        /// A straight-line highlighter always straightens. Anything else is
+        /// only recognised when the tip rested before lifting, and only when
+        /// the lift was actually seen: guessing the lift time would straighten
+        /// handwriting that never asked for it.
+        private func snapped(_ stroke: PKStroke, as ink: InkStroke) -> InkStroke? {
+            let path = stroke.path
+            guard !path.isEmpty else { return nil }
+            let samples = path.map { point -> PenSample in
+                let location = point.location.applying(stroke.transform)
+                return PenSample(x: location.x, y: location.y, time: point.timeOffset)
+            }
+            let points = samples.map { CGPoint(x: $0.x, y: $0.y) }
+            var shape: SnappedShape?
+            if style.straightens, ink.tool == .highlighter {
+                shape = StrokeSnapping.line(points)
+            } else if style.snapsOnHold, let toolLifted {
+                let lift = toolLifted.timeIntervalSince(path.creationDate)
+                if StrokeSnapping.dwell(samples, endTime: lift, radius: 5) >= StrokeSnapping.holdDuration {
+                    shape = StrokeSnapping.recognize(points)
+                }
+            }
+            guard let shape else { return nil }
+            let toSource = conversion.viewToSource
+            return InkStroke(tool: ink.tool, color: ink.color, width: ink.width, points: shape.outline.map {
+                let source = $0.applying(toSource)
+                return InkPoint(x: source.x, y: source.y)
+            }, cap: ink.cap)
         }
 
         private func objects(for inks: [InkStroke], reusing old: [PageObject], pageID: PageID) -> [PageObject] {

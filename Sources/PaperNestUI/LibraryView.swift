@@ -298,7 +298,8 @@ struct LibraryView: View {
                 Button {
                     if !selection.insert(summary.id).inserted { selection.remove(summary.id) }
                 } label: {
-                    ItemCell(summary: summary, showsDeletionDate: false, layout: layout, isSelected: selection.contains(summary.id))
+                    ItemCell(summary: summary, showsDeletionDate: false, layout: layout, isSelected: selection.contains(summary.id),
+                             cloud: cloudState(summary))
                         .overlay(alignment: .topTrailing) {
                             Image(systemName: selection.contains(summary.id) ? "checkmark.circle.fill" : "circle")
                                 .font(.title2)
@@ -314,12 +315,12 @@ struct LibraryView: View {
                 ItemCell(summary: summary, showsDeletionDate: true, layout: layout)
             } else if summary.file != nil {
                 Button { filePreview = FilePreviewRequest(summary: summary) } label: {
-                    ItemCell(summary: summary, showsDeletionDate: false, layout: layout)
+                    ItemCell(summary: summary, showsDeletionDate: false, layout: layout, cloud: cloudState(summary))
                 }
                 .buttonStyle(.plain)
             } else {
                 NavigationLink(value: summary.id) {
-                    ItemCell(summary: summary, showsDeletionDate: false, layout: layout)
+                    ItemCell(summary: summary, showsDeletionDate: false, layout: layout, cloud: cloudState(summary))
                 }
                 .buttonStyle(.plain)
             }
@@ -347,6 +348,12 @@ struct LibraryView: View {
     }
 
     /// The same actions for the context menu and the ⋯ button.
+    private func cloudState(_ summary: LibraryStore.ItemSummary) -> ItemCell.CloudState {
+        guard let sync = model.session.sync else { return .local }
+        if sync.downloading.contains(summary.id) { return .downloading }
+        return sync.cloudOnlyItems.contains(summary.id) ? .cloudOnly : .local
+    }
+
     @ViewBuilder
     private func itemActions(for summary: LibraryStore.ItemSummary) -> some View {
         if model.scope == .recentlyDeleted {
@@ -381,6 +388,14 @@ struct LibraryView: View {
             Button(L10n.splitPages) { split(summary) }
                 .disabled(summary.pageCount < 2 || isComposing)
             ColorLabelMenu { color in Task { await model.setColorLabel(color, for: [summary.id]) } }
+            // Offline management, offered only while sync is really running.
+            if let sync = model.session.sync, sync.isEnabled, sync.availability == .ready {
+                if sync.cloudOnlyItems.contains(summary.id) {
+                    Button(L10n.syncItemDownload) { Task { await sync.download(summary.id) } }
+                } else if summary.coverPage?.content.assetID != nil || summary.file != nil {
+                    Button(L10n.syncItemRemoveDownload) { Task { await sync.removeDownloads(summary.id) } }
+                }
+            }
             if let file = summary.file {
                 Button(L10n.fileShowDetails) { fileDetails = FileDetailsRequest(summary: summary) }
                 if FileKind.isArchive(file.uti) {
@@ -624,6 +639,9 @@ struct ItemCell: View {
     var reservesMenuSpace = true
     /// Gray on the white library; white on the gray iPhone home.
     var tileBackground = Theme.preview
+    /// Whether what this document shows is on this device.
+    enum CloudState { case local, cloudOnly, downloading }
+    var cloud: CloudState = .local
 
     var body: some View {
         Group {
@@ -665,7 +683,8 @@ struct ItemCell: View {
         .accessibilityLabel(L10n.itemAccessibilityLabel(
             name: summary.item.name,
             pages: summary.file.map { FileKind.size($0.byteCount) } ?? L10n.pageCount(summary.pageCount)))
-        .accessibilityValue(summary.item.colorLabel?.title ?? "")
+        .accessibilityValue([summary.item.colorLabel?.title, cloud == .local ? nil : L10n.syncItemCloudOnly]
+            .compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(showsDeletionDate ? [] : .isButton)
     }
 
@@ -699,6 +718,7 @@ struct ItemCell: View {
                     Image(systemName: "circle.fill").font(.caption2).foregroundStyle(color.tint)
                         .accessibilityLabel(color.title)
                 }
+                if cloud != .local { DocumentCloudBadge(isDownloading: cloud == .downloading) }
             }
             Text(verbatim: "\(secondaryText) · \(summary.file.map { FileKind.size($0.byteCount) } ?? L10n.pageCount(summary.pageCount))")
                 .font(.caption).foregroundStyle(.secondary).lineLimit(2)
