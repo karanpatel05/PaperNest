@@ -929,6 +929,23 @@ extension L10n {
     static var nightModeDetail: String { tr("display.nightMode.detail") }
 }
 
+// Bookmarks (Claude, 2026-11-13).
+extension L10n {
+    static var bookmarkAdd: String { tr("bookmark.add") }
+    static var bookmarkRemove: String { tr("bookmark.remove") }
+    static var bookmarkList: String { tr("bookmark.list") }
+    static var bookmarkTitle: String { tr("bookmark.title") }
+    static var bookmarkEmpty: String { tr("bookmark.empty") }
+    static var bookmarkEmptyDetail: String { tr("bookmark.empty.detail") }
+    static var bookmarkRenameTitle: String { tr("bookmark.rename.title") }
+    static var bookmarkRenameMessage: String { tr("bookmark.rename.message") }
+    static func bookmarkPage(_ number: Int) -> String { tr("bookmark.page", number) }
+    static func bookmarkActions(_ name: String) -> String { tr("bookmark.actions", name) }
+    static var bookmarkMarked: String { tr("bookmark.marked") }
+    static var bookmarkFailed: String { tr("bookmark.failed") }
+    static var bookmarkLocalOnly: String { tr("bookmark.localOnly") }
+}
+
 // iCloud sync (Claude, 2026-11-13).
 extension L10n {
     static var syncStatusSavedLocally: String { tr("sync.status.savedLocally") }

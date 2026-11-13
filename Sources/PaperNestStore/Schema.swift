@@ -262,5 +262,17 @@ enum Schema {
         // M2: what iCloud sync remembers, and the triggers that queue every
         // change in the transaction that made it. See `SyncSchema`.
         Migration(version: 10, sql: SyncSchema.sql),
+        // The reader's bookmarks: one per page, gone with the page. A new
+        // table and nothing rebuilt, so every sync trigger v10 made is left
+        // exactly where it was. Not synced — see `Bookmarks.swift`.
+        Migration(version: 11, sql: """
+        CREATE TABLE bookmarks (
+            id TEXT PRIMARY KEY NOT NULL,
+            page_id TEXT NOT NULL UNIQUE REFERENCES pages(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            modified_at REAL NOT NULL
+        );
+        """),
     ]
 }

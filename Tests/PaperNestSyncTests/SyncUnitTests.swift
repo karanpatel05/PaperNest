@@ -113,7 +113,7 @@ private func makeDocument(_ store: LibraryStore, pages: Int = 2) async throws ->
             _ = try await makeDocument(store)
         }
         let reopened = try LibraryStore(directory: library.url)
-        #expect(try await reopened.schemaVersion() == 10)
+        #expect(try await reopened.schemaVersion() == Schema.latestVersion)
         #expect(try await reopened.syncIsEnabled() == false)
         #expect(try await reopened.items(in: .all).count == 1)
     }

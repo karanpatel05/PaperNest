@@ -1,3 +1,159 @@
+## 2026-11-13 — Reader features R3: the reader's own bookmarks, schema v11 (Claude, owner's queue)
+
+Third in this session's part of the owner's "most features of Adobe PDF reader" queue, and the last piece of R3
+(links and Go to Page landed on 2026-11-12).
+
+**What changed in the app.** The document's title menu has **Add Bookmark** — **Remove Bookmark** when the page
+being read is already marked — and **Bookmarks…**. A marked page shows a red ribbon at its top corner. The list
+shows every bookmark in page order, each called by its page ("Page 3") until it is given a name; tapping one goes
+to its page and closes the list; each row's ⋯ menu renames or removes it (swipe to remove on iOS as well); and the
+bookmark button in the list's bar marks or unmarks the page being read without leaving the list. An empty list
+says so and says what to do. On a Mac and on an iPad's keyboard, Page > Add Bookmark is ⌘D, as in Preview and
+Safari.
+
+**What a bookmark is.** It belongs to the **page**, not to a page number: reorder the pages and it follows; delete
+the page and it is hidden, undo and it is back; delete the page or the document for good and it goes with it. A
+page has at most one. It is the reader's own place-mark, not part of the document: it is not drawn into exports
+or prints, and **marking a page is not an edit** — it does not move the page's revision or the document's modified
+date, so no thumbnail is re-rendered, no text is recognised again and the document does not jump to the top of
+Recent. It is not on the undo stack either.
+
+**Schema v11.** One new table and nothing rebuilt:
+`bookmarks(id, page_id UNIQUE REFERENCES pages ON DELETE CASCADE, name, created_at, modified_at)`. The document a
+bookmark is in is read from its page, never stored, so a page that moves between documents cannot leave a stale
+copy behind. Because no synced table is rebuilt, `SyncSchema.triggerSQL` did not need to be run again; a test
+compares every trigger before and after the migration.
+
+**Bookmarks do not sync — decided, and written down** in `docs/ARCHITECTURE.md` → "Sync". No trigger queues a
+bookmark and it has no record type; a test pins that, with sync on, adding, renaming and removing one leaves the
+outbox exactly as it was. The reasons: every record type needs its own triggers, mapping, merge rule and
+multi-device scenarios, and the five that exist have not yet exchanged a byte with a real iCloud container; and
+the table is shaped so that adding it later needs no rebuild. With sync on, the Bookmarks list says in a line at
+its foot that bookmarks stay on this device.
+
+**How it is built.** `Sources/PaperNestCore/Bookmark.swift`; `Sources/PaperNestStore/Bookmarks.swift`
+(`bookmarks(of:)`, `addBookmark(on:name:)`, `renameBookmark(_:to:)`, `removeBookmark(_:)`, each committed before
+it returns); `Sources/PaperNestUI/Reader/ReaderBookmarks.swift` (the model, which reads the list back from the
+store after every change, the list, the menu items and the ribbon). Shared files: `Schema.swift` (v11),
+`StoreError.swift` (`bookmarkNotFound`), `DocumentView.swift` (one `@State`, `.documentBookmarks`, one focused
+value, the menu items, the ribbon overlay), `PaperNestCommands.swift`, one block (`Bookmarks`) in
+`Localization.swift` and the three strings files, and one hard-coded `10` in
+`Tests/PaperNestSyncTests/SyncUnitTests.swift`, now `Schema.latestVersion`.
+
+**Results.** The slice was verified twice, because the ground moved under it. First alone on `dd405ea` (Night
+mode). While those runs were going another session committed the Home redesign as `6bf87ca`, so the commit this
+slice would make was no longer the tree that had been tested; everything was run again alone on `6bf87ca`. **The
+first column is the tree this commit holds.**
+
+| Check | On `6bf87ca` + this slice — what is committed | Earlier, on `dd405ea` + this slice |
+|---|---|---|
+| `./scripts/test.sh` | **Passed: 982 tests** (311 + 49 + 191 + 163 + 158 + 110), 0 failures, 0 warnings — `/tmp/papernest-bookmarks-final-unit.log` | 982 passed, three times as the slice changed |
+| `BookmarkTests` (new, 16, store), `ReaderBookmarksTests` (new, 9, model) | **Passed** | Passed |
+| `PaperNestSyncTests` (49: `SyncSchemaTests` and the multi-device scenarios) on schema v11 | **Passed** — in the count above | Passed |
+| `./scripts/build-mac-app.sh` | **Built**, 0 warnings | Built |
+| `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build` | **BUILD SUCCEEDED**, 0 warnings | Succeeded |
+| `BookmarksUITests` (new, 3), iPad Pro 13-inch (M5), iOS 26.5 | **3/3** — `/tmp/papernest-bookmarks-final-ipad.log` | 3/3, twice |
+| `BookmarksUITests`, PaperNest iPhone Duo, iOS 27.1 | **2/3, then 3/3.** `testABookmarkIsStillThereAfterRelaunch`, the first test after the simulator booted, failed at launch: the editor was not on screen after 30 s (`/tmp/papernest-bookmarks-final-iphone.log`). The suite run again by itself: 3/3 (`…-final-iphone-2.log`). One pass after one failure | 2/3 with the third failing at launch (editor not on screen after 30 s, load average 200), 1/1 alone, then 3/3 |
+| `DocumentFindUITests` 3, `TextSelectionUITests` 2, `PageLinksUITests` 2, `DocumentPrintUITests` 2, `NightModeUITests` 3 — iPad | **12/12** — same log | 11/12 — find 2/3, see "A tap lost" below — then find 3/3 |
+| The same five suites — iPhone | **12/12** — `/tmp/papernest-bookmarks-final-iphone.log` | 12/12 |
+
+Both rounds were run in a clean worktree (`~/Library/Caches/PaperNest/verify-reader-queue`) holding `HEAD` plus
+only this slice, one device at a time, `-parallel-testing-enabled NO`. The UI runs called the last two lines of
+`scripts/ui-test-ios.sh` directly and skipped its seeding, for the reason given in the Night mode entry below.
+Logs of the first round: `/tmp/papernest-bookmarks-clean-*.log`.
+
+**What the tests prove.** `BookmarkTests` (16), against a real `LibraryStore`:
+
+- A marked page is listed, and the list is in the order of the pages however they were marked.
+- A bookmark is on disk when the call returns: a second connection to the same library reads it straight away.
+- Marking a marked page keeps the bookmark it has. Renaming tidies the name to one line, clips it at 120
+  characters and allows an empty one. Removing is not an error the second time; renaming one that is gone is.
+- A bookmark follows its page through a reorder.
+- **Marking is not editing:** the page and the document compare equal, revision and dates included, before and
+  after a bookmark is added, renamed and removed.
+- A bookmark is listed only for its own document. A page that does not exist, a deleted page and a page of a
+  document in Recently Deleted cannot be marked.
+- A deleted page's bookmark is hidden and comes back when the deletion is undone; purging the page, or deleting
+  the document for good, takes the row with it (counted in the table, not just in the list).
+- A duplicated document starts with no bookmarks.
+- A schema v10 library, built by running migrations 1–10 by hand, opens at v11 with its document, pages, favourite
+  and label intact and can be bookmarked; and **every trigger that was there before the migration is there after**.
+- With sync on, adding, renaming and removing a bookmark leaves the outbox exactly as it was.
+
+**Proved able to fail.** Listing without regard to deleted pages, in the order bookmarks were made, failed three
+of these tests in four places; then it was put back.
+
+`ReaderBookmarksTests` (9), on the model the screens use: marking the page being read puts it in the list and in
+the library; marking it again takes it away; an unnamed bookmark is called by its page's number **as the pages
+stand now** ("Page 1" becomes "Page 3" when its page is moved there); a named one keeps its name and still says
+its page; a saved change moves the session's change token so other windows reload; marking a page another window
+has just deleted reports a failure and shows nothing false; a deleted page's bookmark leaves the list and
+returns on undo.
+
+`BookmarksUITests` (3) drive the running app and read the library on disk between steps:
+
+- With nothing marked, **Bookmarks…** opens a list that says "No Bookmarks" and what to do. **Add Bookmark** on
+  page 1 puts the ribbon on the page and one row in the library; the same on page 3 makes two, in page order;
+  page 2, between them, shows no ribbon.
+- The list shows "Page 1" and "Page 3". The second row's ⋯ menu renames it "Totals": the library has the name,
+  the row says "Totals" and still says "Page 3" beneath. Tapping it closes the list and the reader is on page 3,
+  ribbon showing.
+- The title menu now offers **Remove Bookmark**; choosing it takes the ribbon and the row away. The last row is
+  removed from the list's own menu and the list says it is empty again. The bookmark button in the list's bar
+  marks the page being read and changes to its "remove" form.
+- After all of that **no page's revision has moved**.
+- A bookmark is still there after the app is terminated and launched again: ribbon on the page, row in the list.
+- In French and Spanish the two menu items, the list's title and the empty message are named and on screen, and
+  a page can be marked from the list.
+
+**A tap lost, and one change of mine because of it.** In the first iPad run on this slice (on `dd405ea`)
+`DocumentFindUITests.testFindCountsHitsStepsAcrossPagesAndCloses` failed: the find button was tapped 0.8 s after
+the editor's toolbar appeared and no find bar came up in the next 5 s, with the load average near 400. It is the
+same shape as the Spanish print-menu failure in the Print entry below — a tap on the navigation bar in the first
+second of a document's life that leaves nothing on screen — and that one happened before bookmarks existed. **I
+did not find the cause.** I did find something of mine that could only make it likelier: the bookmarks model
+published its list every time it read it from the store, changed or not, and the title menu is drawn from that
+list, so the navigation bar was rebuilt once more just after every document opened. The model now publishes only
+a list that differs. Since then the find suite has passed 3/3 on each device, twice. **That is one suspect
+removed and a clean re-run, not a diagnosis:** whether the bar really drops a tap while it is being rebuilt, and
+whether a person could ever be quick enough to meet it, is not known.
+
+**Why these tests take 165 seconds each on the iPhone.** On that simulator (iOS 27.1) a tap on any item of the
+title menu makes XCUITest wait 60 seconds, once per launch — "App animations complete notification not received,
+will attempt to continue" — before it goes on. Print's test and `PageLinksUITests`' Go to Page test show the same
+wait in their logs; the iPad shows none. It is the title menu under test automation on that simulator, it was
+there before bookmarks, and it is not something a person waits through. Not investigated further.
+
+**Not verified, plainly.**
+
+- **The Mac was looked at once, offscreen, and never used.** A throwaway test in the clean worktree drew the
+  bookmarks list into a picture (`docs/screenshots/bookmarks-2026-11-13/mac-list-offscreen.png`; the technique
+  another session recorded for when screen access is declined). It showed the rows and the empty message as they
+  should be, and **one defect**: a Mac draws a `Menu` as a bordered pull-down with an arrow, far too much button
+  for a ⋯ on every row. It is borderless on the Mac now. An offscreen picture has no window toolbar, so the list's
+  Done and bookmark buttons were not seen; and Page > Add Bookmark (⌘D), Page > Bookmarks…, the ribbon and a
+  click on anything have not been run by anyone.
+- **⌘D was never pressed**, on a Mac or on an iPad keyboard. The iPhone simulator's log was searched during a run for the app's `MenuBuilder`
+  category and for "shortcut" or "conflict": 184 UIKit lines from the app in the two minutes searched, none of
+  them that. So UIKit logged no clash for ⌘D or ⌘P at launch on iOS 27.1; the iPad's log was not read.
+- **Two windows on one document** — a bookmark made in one appearing in the other — rests on the unit test of
+  the change token; it was not watched happen.
+- The "bookmarks stay on this device" line at the foot of the list appears only with iCloud sync on, which no
+  build here has. It compiles; it has never been on screen.
+- A notebook's continuous pages: the ribbon and "go to" were only exercised on a three-page PDF, one page at a
+  time. Rotated and cropped pages, and the ribbon in Night mode, were not looked at.
+- Swipe-to-remove on a row was not exercised (the ⋯ menu was). VoiceOver, the largest Dynamic Type sizes and a
+  physical device were not tried. French and Spanish: the menu items, the list's title, the empty message and a
+  row — not the rename alert.
+- Long lists: nothing measured a document with hundreds of bookmarks.
+
+**Limits by design — say these rather than discover them.**
+
+- **Bookmarks do not sync**, and are not in a library backup (that exports documents, not the database).
+- One bookmark to a page. A duplicated, merged or split document's copies start with none.
+- Adding and removing a bookmark is not on the undo stack.
+- A PDF's own outline is still "Contents"; these are the reader's marks and are never written into a file.
+
 ## 2026-11-13 — Home and scanner redesign (Claude, owner's brief and two reference boards in session)
 
 What was built and every call made where the brief was silent: top entry of `docs/CLEAN_NATIVE_DESIGN.md`.

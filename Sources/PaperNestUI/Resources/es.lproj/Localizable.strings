@@ -824,6 +824,21 @@
 "display.nightMode" = "Modo nocturno";
 "display.nightMode.detail" = "Muestra las páginas en claro sobre fondo oscuro. El documento y lo que se exporte o imprima de él no cambian.";
 
+/* Bookmarks (Claude, 2026-11-13) */
+"bookmark.add" = "Añadir marcador";
+"bookmark.remove" = "Eliminar marcador";
+"bookmark.list" = "Marcadores…";
+"bookmark.title" = "Marcadores";
+"bookmark.empty" = "Sin marcadores";
+"bookmark.empty.detail" = "Añade un marcador a la página que estás leyendo para volver a ella más tarde.";
+"bookmark.rename.title" = "Renombrar marcador";
+"bookmark.rename.message" = "Deja el nombre vacío para mostrar el número de página.";
+"bookmark.page" = "Página %lld";
+"bookmark.actions" = "Acciones para %@";
+"bookmark.marked" = "Página con marcador";
+"bookmark.failed" = "No se pudo guardar el marcador.";
+"bookmark.localOnly" = "Los marcadores se quedan en este dispositivo. No se sincronizan con iCloud.";
+
 /* iCloud sync (Claude, 2026-11-13) */
 "sync.status.savedLocally" = "Guardado en este dispositivo";
 "sync.status.waiting" = "Pendiente de sincronizar";

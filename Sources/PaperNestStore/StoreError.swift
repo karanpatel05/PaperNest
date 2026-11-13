@@ -8,6 +8,8 @@ public enum StoreError: Error, Equatable, Sendable {
     case itemNotFound
     case folderNotFound
     case pageNotFound
+    /// The bookmark is gone, or its page is: there is nothing to rename.
+    case bookmarkNotFound
     case assetMissing(String)
     case assetChecksumMismatch(String)
     case invalidComment

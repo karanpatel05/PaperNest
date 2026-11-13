@@ -824,6 +824,21 @@
 "display.nightMode" = "Mode nuit";
 "display.nightMode.detail" = "Affiche les pages en clair sur fond sombre. Le document et ce qui en est exporté ou imprimé restent inchangés.";
 
+/* Bookmarks (Claude, 2026-11-13) */
+"bookmark.add" = "Ajouter un signet";
+"bookmark.remove" = "Supprimer le signet";
+"bookmark.list" = "Signets…";
+"bookmark.title" = "Signets";
+"bookmark.empty" = "Aucun signet";
+"bookmark.empty.detail" = "Ajoutez un signet à la page que vous lisez pour y revenir plus tard.";
+"bookmark.rename.title" = "Renommer le signet";
+"bookmark.rename.message" = "Laissez le nom vide pour afficher le numéro de page.";
+"bookmark.page" = "Page %lld";
+"bookmark.actions" = "Actions pour %@";
+"bookmark.marked" = "Page avec signet";
+"bookmark.failed" = "Le signet n’a pas pu être enregistré.";
+"bookmark.localOnly" = "Les signets restent sur cet appareil. Ils ne sont pas synchronisés avec iCloud.";
+
 /* iCloud sync (Claude, 2026-11-13) */
 "sync.status.savedLocally" = "Enregistré sur cet appareil";
 "sync.status.waiting" = "En attente de synchronisation";

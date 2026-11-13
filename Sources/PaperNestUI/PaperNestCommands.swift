@@ -5,6 +5,7 @@ public struct PaperNestCommands: Commands {
     @FocusedValue(\.libraryModel) private var library
     @FocusedValue(\.documentCommands) private var document
     @FocusedValue(\.documentPrinter) private var printer
+    @FocusedValue(\.readerBookmarks) private var bookmarks
 
     public init() {}
 
@@ -55,6 +56,20 @@ public struct PaperNestCommands: Commands {
                 .disabled(document?.model.pages.isEmpty ?? true)
             Button(L10n.goToPage) { document?.showGoToPage() }
                 .disabled((document?.model.pages.count ?? 0) < 2)
+            // ⌘D, as in Preview and Safari. Marks the page being read, or
+            // takes its mark away.
+            Button(bookmarks?.isBookmarked(document?.model.selectedPageID) == true
+                   ? L10n.bookmarkRemove : L10n.bookmarkAdd) {
+                let bookmarks = bookmarks
+                run { await bookmarks?.toggle(on: $0.model.selectedPageID) }
+            }
+            .keyboardShortcut("d", modifiers: .command)
+            .disabled(bookmarks == nil || document?.model.selectedPage == nil)
+            Button(L10n.bookmarkList) {
+                let bookmarks = bookmarks
+                run { _ in bookmarks?.isShowingList = true }
+            }
+            .disabled(bookmarks == nil || (document?.model.pages.isEmpty ?? true))
             Button(L10n.textBox) { document?.showTextBox() }
                 .disabled(document?.model.selectedPage == nil)
             Button(L10n.insertImage) { document?.showInsertImage() }

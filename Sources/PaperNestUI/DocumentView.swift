@@ -89,6 +89,8 @@ struct DocumentView: View {
     @State private var printer = DocumentPrinter()
     /// Night mode: pages shown light on dark. A preference, not part of the document.
     @AppStorage(NightMode.storageKey) private var isNightMode = false
+    /// The reader's bookmarks in this document.
+    @State private var bookmarks = ReaderBookmarks()
 
     init(itemID: ItemID, session: LibrarySession, retainedState: DocumentEditorState? = nil,
          workspaceHeader: AnyView? = nil) {
@@ -458,8 +460,12 @@ struct DocumentView: View {
         .modifier(PasswordPrompt(model: importModel))
         .documentPrinting(printer)
         .environment(\.pageNightMode, isNightMode)
+        .documentBookmarks(bookmarks, model: model) { id in
+            Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
+        }
         .focusedSceneValue(\.documentCommands, commandContext)
         .focusedSceneValue(\.documentPrinter, printer)
+        .focusedSceneValue(\.readerBookmarks, bookmarks)
     }
 
     private var isToolBusy: Bool {
@@ -590,6 +596,7 @@ struct DocumentView: View {
             Label(L10n.printMenu, systemImage: "printer")
         }
         .disabled(model.pages.isEmpty)
+        BookmarkMenuItems(bookmarks: bookmarks, model: model, finishThen: finishThen)
     }
 
     private func showGoToPage() {
@@ -2004,6 +2011,8 @@ private struct PageViewer: View {
                     .accessibilityLabel(L10n.pageLabel(index + 1, of: model.pages.count))
                 }
             }
+            // The reader's mark on a bookmarked page. It takes no touches.
+            .overlay(alignment: .topTrailing) { PageBookmarkRibbon(pageID: page.id) }
             // Night mode turns the page and everything drawn on it, live
             // ink and typing included. Last, so nothing is left out.
             .nightFilter(isNight)

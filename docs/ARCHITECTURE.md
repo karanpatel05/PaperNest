@@ -70,7 +70,7 @@ Migrations, in order: **v2** adds `pages.deleted_at` (soft delete until next lau
 
 SQLite cannot alter a CHECK constraint, so v5, v6 and v7 rebuild their tables. Those migrations run with foreign keys disabled and are checked with `PRAGMA foreign_key_check` before they commit, which is SQLite's documented procedure: with foreign keys enforced, `DROP TABLE items` performs an implicit delete that **cascades into `pages`** and empties the library. Each migration runs in its own transaction with its `user_version` bump, so an interrupted one leaves the previous, consistent version in place.
 
-Sync took **v10**; the next migration is v11. Shape annotations and embedded PDF text needed none: shapes save as ordinary ink, and `search_index` is derived, rebuildable and has an unconstrained `field`. See `Sources/PaperNestStore/Schema.swift`.
+Sync took **v10**. **v11** adds `bookmarks`, the reader's own place-marks: one row per marked page (`page_id` is unique and `ON DELETE CASCADE`), a name and two dates. It adds a table and rebuilds none, so the sync triggers are left where they were; `BookmarkTests` checks that. The next migration is v12. Shape annotations and embedded PDF text needed none: shapes save as ordinary ink, and `search_index` is derived, rebuildable and has an unconstrained `field`. See `Sources/PaperNestStore/Schema.swift`.
 
 ### Ordering
 
@@ -158,6 +158,17 @@ The backend is behind a protocol (`SyncBackend`), and the tests replace only tha
   but live here goes to Recently Deleted here. An original leaves iCloud 30 days after its last local use.
 - **Accounts.** The account's record name is stored with the library. A different account stops sync until the
   person chooses; choosing to sync forgets everything the old account confirmed and uploads as new.
+- **Bookmarks are not synced (decided 2026-11-13).** A bookmark (`bookmarks`, schema v11) is written to this
+  device's library only: no trigger queues it and it has no record type, and `BookmarkTests` pins that — with sync
+  on, adding, renaming and removing one leaves the outbox exactly as it was. Two reasons. Each record type needs
+  its own triggers, record mapping, merge rule and multi-device scenarios, and the five that exist have not yet
+  exchanged a byte with a real iCloud container; a sixth should not be stacked on an engine still waiting for its
+  first real run. And nothing is lost by waiting: the table was shaped for it — UUID ids that can be record names,
+  a `modified_at`, the page referred to by id, one bookmark to a page so two devices marking the same page
+  converge on one — so adding it later is triggers on a table that needs no rebuild, plus a `Bookmark` record
+  whose parent is its page. Until then a bookmark made on the iPad is not on the Mac, and with sync on the
+  Bookmarks list says so in a line at its foot. A page another device deletes still takes its bookmark here,
+  through the foreign key, as it takes its ink.
 
 Known limits are listed in TEST_MATRIX under the 2026-11-13 entry.
 
