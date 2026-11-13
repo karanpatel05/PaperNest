@@ -4,6 +4,7 @@ import SwiftUI
 public struct PaperNestCommands: Commands {
     @FocusedValue(\.libraryModel) private var library
     @FocusedValue(\.documentCommands) private var document
+    @FocusedValue(\.documentPrinter) private var printer
 
     public init() {}
 
@@ -25,6 +26,17 @@ public struct PaperNestCommands: Commands {
             Button(L10n.export) { document?.showExport() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(document?.model.pages.isEmpty ?? true)
+        }
+
+        // File > Print…, where every Mac app keeps it, and ⌘P on an iPad's
+        // keyboard. SwiftUI puts nothing there by itself.
+        CommandGroup(replacing: .printItem) {
+            Button(L10n.printMenu) {
+                let printer = printer
+                run { printer?.print($0.model.itemID, in: $0.model.session.environment) }
+            }
+            .keyboardShortcut("p", modifiers: .command)
+            .disabled(printer == nil || (document?.model.pages.isEmpty ?? true))
         }
 
         CommandMenu(L10n.menuPage) {

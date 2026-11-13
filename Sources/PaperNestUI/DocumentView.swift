@@ -85,6 +85,8 @@ struct DocumentView: View {
     @State private var textSelection = PageTextSelectionModel()
     @State private var isShowingGoToPage = false
     @State private var goToPageText = ""
+    /// Print: makes the PDF and shows the system's print panel.
+    @State private var printer = DocumentPrinter()
 
     init(itemID: ItemID, session: LibrarySession, retainedState: DocumentEditorState? = nil,
          workspaceHeader: AnyView? = nil) {
@@ -452,7 +454,9 @@ struct DocumentView: View {
             Text(error.message)
         }
         .modifier(PasswordPrompt(model: importModel))
+        .documentPrinting(printer)
         .focusedSceneValue(\.documentCommands, commandContext)
+        .focusedSceneValue(\.documentPrinter, printer)
     }
 
     private var isToolBusy: Bool {
@@ -579,6 +583,10 @@ struct DocumentView: View {
             Label(L10n.goToPage, systemImage: "arrow.right.doc.on.clipboard")
         }
         .disabled(model.pages.count < 2)
+        Button { finishThen { printer.print(model.itemID, in: model.session.environment) } } label: {
+            Label(L10n.printMenu, systemImage: "printer")
+        }
+        .disabled(model.pages.isEmpty)
     }
 
     private func showGoToPage() {

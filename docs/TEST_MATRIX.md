@@ -1,3 +1,94 @@
+## 2026-11-13 — Reader features R4: Print (Claude, owner's queue)
+
+Next in the owner's "most features of Adobe PDF reader" queue (`docs/FEATURE_EXPANSION.md`, rows R1–R7). This
+entry is **Print** only; read aloud, the other half of R4, is not built.
+
+**What changed in the app.** **Print…** in the document's title menu, and in the menu bar's File menu with ⌘P
+(the same command gives ⌘P on an iPad's keyboard). It makes the document into one PDF exactly as Export does —
+ink, typed text and placed pictures on the pages, private comments left off, each page at its own size — and hands
+that to the system's print panel, which owns everything from there: the printer, copies, range, paper, preview.
+Nothing is stored and the library is not touched; the temporary PDF is removed when the panel closes.
+
+**How it is built.** `Sources/PaperNestUI/Reader/DocumentPrint.swift`: `DocumentPrinter` reads the document's pages
+from the store at the moment Print is chosen, calls the existing `Exporter` (`paperSize: .original`, no invisible
+text layer, so it never meets the Pro gate), then shows `UIPrintInteractionController` on iOS or
+`PDFDocument.printOperation` as a sheet on the Mac. A document that takes longer than 0.4 s to prepare shows a
+"Preparing to print…" card with Cancel. The menu-bar command reaches the same `DocumentPrinter` through its own
+focused value (`documentPrinter`) rather than a new field on `DocumentCommandContext`, because `RootView.swift`
+was claimed by the Home redesign while this was written; it also means ⌘P pressed twice finds the first print
+still busy and does nothing. `DocumentView.swift` gained eight lines: one `@State`, two modifiers and the menu item. `Apps/Mac/PaperNest.entitlements` gained `com.apple.security.print`: a sandboxed Mac app may not open the print panel without it.
+
+**Results.**
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh`, on the commit alone (clean worktree of `HEAD` + this slice) | **Passed: 944 tests** (289 + 49 + 175 + 163 + 158 + 110), 0 failures, 0 compiler warnings — `/tmp/papernest-print-clean-unit.log` |
+| `DocumentPrintTests` (new, 10) | **Passed** |
+| `./scripts/build-mac-app.sh`, clean worktree | **Built**, 0 warnings |
+| `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`, clean worktree | **BUILD SUCCEEDED**, 0 warnings |
+| `DocumentPrintUITests` (new, 2), iPad Pro 13-inch (M5), iOS 26.5 | **2/2**, clean worktree, final test file — `/tmp/papernest-print-clean-ipad-2.log`. Before it: 2/2 in the shared tree, then 1/2 in the clean worktree (see below) |
+| `DocumentPrintUITests`, PaperNest iPhone Duo, iOS 27.1 | **2/2**, clean worktree — `/tmp/papernest-print-clean-iphone.log`; again with the final test file, 2/2 — `/tmp/papernest-print-clean-iphone-2.log` |
+| `DocumentFindUITests` 3, `TextSelectionUITests` 2, `PageLinksUITests` 2 — iPad Pro 13-inch | **7/7**, clean worktree — `/tmp/papernest-print-clean-ipad.log` (and 7/7 in the shared tree before it, `/tmp/papernest-print-ipad-2.log`) |
+| The same three suites — PaperNest iPhone Duo | **7/7**, clean worktree — same log |
+
+**Why a clean worktree.** The shared working tree also held the Home redesign and my own Night mode, both
+uncommitted, and for part of the morning its test target did not compile at all (another session's probe file,
+since removed). So this slice was laid alone on `HEAD` in a detached worktree
+(`~/Library/Caches/PaperNest/verify-reader-queue`) and everything in the table marked "clean worktree" was run
+there: those results are for exactly the tree this commit holds. UI runs were one device at a time,
+`-parallel-testing-enabled NO`.
+
+**What the tests prove.** `DocumentPrintTests` stands in for the print panel and reads the file it was handed:
+the whole document arrives as one PDF under the document's name; a pen stroke is on the printed page (pixels
+probed) and typed text is real text in it; a private comment is not in it; the pages are the ones saved *now*
+(a deleted page is not printed); the temporary file exists while the panel is up and is gone afterwards, folder
+included; a second Print while one is under way does nothing, and Print works again once it is over; cancelling
+while the document is being made ready shows no panel, reports no failure and leaves no file; a document with no
+pages shows no panel and no error; a document whose original cannot be read says so instead of printing.
+`DocumentPrintUITests` chooses Print… from the title menu and waits for the real system panel: it shows
+**Pages 1-3** and a preview cell **Page 1 of 3** for a three-page document; closing it leaves the editor on page 1
+with its controls answering; Print works a second time; and the item is in the title menu as *Imprimer…* and
+*Imprimir…*. Screenshots, both devices: `docs/screenshots/print-2026-11-13/`.
+
+**One defect of mine found by these runs.** The first UI test looked for the panel by a button labelled "Print".
+On iPadOS 26.5 that button is labelled "print" and the way out is "Close", not "Cancel", so the test failed on a
+panel that was plainly on screen. It now finds the panel by its bar ("Options" on both versions) and accepts
+either way out. A test defect; the app did not change.
+
+**And one thing seen once and not explained.** On the iPad, in the clean worktree, the Spanish half of
+`testPrintIsInTheTitleMenuInFrenchAndSpanish` failed: the title was tapped 1.4 s after the editor's toolbar
+appeared and no menu was up afterwards (`/tmp/papernest-print-clean-ipad.log`). The French half of the same run,
+the iPhone run and the earlier iPad run had all passed. The test now waits for the page itself before touching
+the title, as `PageLinksUITests` always has, and passes. **Whether the menu never opened or opened and closed as
+the document finished loading was not determined**, and it is the title menu's behaviour, not Print's: Rename,
+Export and Go to Page hang from the same menu.
+
+**Not verified, plainly.**
+
+- **Nothing was printed.** No simulator has a printer, so the panel's own Print button stays disabled and no job
+  was ever sent. What is proven is that the panel receives the right document. Save to Files and Share from
+  inside the panel were not tried either.
+- **The Mac was never seen.** It builds. File > Print…, ⌘P and the print sheet (`NSPrintOperation.runModal`) have
+  not been run by anyone: Mac screen control has been declined twice in this project and was not asked for again.
+- **The sandboxed Mac build was never run**, so the new entitlement is there by Apple's documentation, not by
+  observation. And `Apps/Mac/PaperNest.iCloud.entitlements`, the file a build with iCloud on is signed with,
+  **does not have it**: that file was modified in the working tree by someone else while this was written, so it
+  was left alone. Until it gains the same key, a Mac build with iCloud on cannot print.
+- ⌘P on an iPad hardware keyboard was not pressed. The iPhone simulator's log was searched for `MenuBuilder`
+  during one run and showed nothing; that is not proof of no clash, because it was not established that the
+  search would have shown one.
+- The "Preparing to print…" card was never on screen: every document used here was ready in under 0.4 s. Its
+  Cancel is covered by a unit test of the printer, not by a tap.
+- Long documents: nothing measured how long a few hundred pages take to prepare, or the memory it needs.
+- A notebook's template pages, rotated or cropped pages and scans were not printed in these tests; they go
+  through the same `Exporter` paths the export tests already cover.
+- No physical device, VoiceOver or Dynamic Type pass. French and Spanish: the menu item only — the panel is
+  Apple's.
+
+**Limits by design.** Print always prints the saved document; text still being typed is finished first, as for
+Export. Private comments are never printed. There is no "print current page" of PaperNest's own: the system
+panel's Range does that. Print needs no Pro.
+
 ## 2026-11-13 — iCloud sync (M2): engine, CloudKit adapter, status UI (Claude, owner's request)
 
 Owner's brief in session: real two-way iCloud sync across iPhone, iPad and Mac. Design and file map:

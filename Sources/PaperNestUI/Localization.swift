@@ -915,6 +915,13 @@ extension L10n {
     static var goToPageGo: String { tr("goToPage.go") }
 }
 
+// Print (Claude, 2026-11-13).
+extension L10n {
+    static var printMenu: String { tr("print.menu") }
+    static var printPreparing: String { tr("print.preparing") }
+    static var printFailed: String { tr("print.failed") }
+}
+
 // iCloud sync (Claude, 2026-11-13).
 extension L10n {
     static var syncStatusSavedLocally: String { tr("sync.status.savedLocally") }

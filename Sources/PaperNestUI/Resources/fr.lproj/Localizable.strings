@@ -814,6 +814,11 @@
 "goToPage.field" = "Numéro de page";
 "goToPage.go" = "Aller";
 
+/* Print (Claude, 2026-11-13) */
+"print.menu" = "Imprimer…";
+"print.preparing" = "Préparation de l’impression…";
+"print.failed" = "Ce document n’a pas pu être imprimé.";
+
 /* iCloud sync (Claude, 2026-11-13) */
 "sync.status.savedLocally" = "Enregistré sur cet appareil";
 "sync.status.waiting" = "En attente de synchronisation";
