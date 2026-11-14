@@ -29,16 +29,18 @@ final class AppUITests: XCTestCase {
         }
     }
 
-    /// Tools now live in Home; retain the existing workflow tests' intent.
-    private func homeTools(_ app: XCUIApplication) -> XCUIElement {
-        let tools = app.buttons["home-tools-all"]
-        if !tools.exists {
+    /// Home's New Note, going Home first when a test is somewhere else. It is
+    /// how these workflow tests make a notebook now that Home has no Tools
+    /// button (owner, 2026-11-13).
+    private func homeNewNote(_ app: XCUIApplication) -> XCUIElement {
+        let newNote = app.buttons["home-new-note"]
+        if !newNote.exists {
             if app.buttons["home-tab"].isHittable { app.buttons["home-tab"].tap() }
             else if app.descendants(matching: .any)["sidebar-home"].firstMatch.isHittable { app.descendants(matching: .any)["sidebar-home"].firstMatch.tap() }
         }
-        XCTAssertTrue(tools.waitForExistence(timeout: 15))
-        for _ in 0..<8 where !tools.isHittable { app.swipeUp() }
-        return tools
+        XCTAssertTrue(newNote.waitForExistence(timeout: 15))
+        for _ in 0..<8 where !newNote.isHittable { app.swipeDown() }
+        return newNote
     }
 
     func testDashboardCanReturnToTheSameSidebarScope() throws {
@@ -109,8 +111,7 @@ final class AppUITests: XCTestCase {
         shot.name = "premium-home-largest-text"
         shot.lifetime = .keepAlways
         add(shot)
-        homeTools(app).tap()
-            app.buttons["tool-notebook"].tap()
+        homeNewNote(app).tap()
         XCTAssertTrue(app.textFields["notebook-name"].waitForExistence(timeout: 5))
         app.terminate()
     }
@@ -119,7 +120,7 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         for language in ["en", "fr", "es"] {
             let app = launch([], language: language)
-            let note = homeTools(app)
+            let note = homeNewNote(app)
             XCTAssertTrue(note.waitForExistence(timeout: 15))
             XCTAssertFalse(app.buttons["library-import"].exists)
             XCTAssertTrue(app.buttons["home-new-folder"].exists)
@@ -130,7 +131,6 @@ final class AppUITests: XCTestCase {
             shot.lifetime = .keepAlways
             add(shot)
             note.tap()
-            app.buttons["tool-notebook"].tap()
             XCTAssertTrue(app.textFields["notebook-name"].waitForExistence(timeout: 5))
             app.textFields["notebook-name"].tap()
             app.textFields["notebook-name"].typeText("Dashboard \(language)")
@@ -551,6 +551,9 @@ final class AppUITests: XCTestCase {
                 app.buttons["home-files"].tap()
                 XCTAssertTrue(app.staticTexts[all].waitForExistence(timeout: 15))
                 app.staticTexts[all].tap()
+            } else {
+                // The wide layouts open on Home too; See All is the way into the library.
+                showAllDocuments(app)
             }
             XCTAssertTrue(app.buttons["library-select"].waitForExistence(timeout: 10))
             app.buttons["library-select"].tap()
@@ -645,18 +648,20 @@ final class AppUITests: XCTestCase {
     func testToolsScreenPicksTwoDocumentsAndMergesThem() throws {
         continueAfterFailure = false
         let library = "/tmp/papernest-tools-screen-library"
-        var app = launch([], libraryPath: library)
-        showAllDocuments(app)
-        let tools = homeTools(app)
-        XCTAssertTrue(tools.waitForExistence(timeout: 15))
-        tools.tap()
+        // Home has no Tools button any more (owner, 2026-11-13). The screen is
+        // still in the app, so this opens it by its debug hook.
+        var app = launch(["-PaperNestDebugShowTools", "YES"], libraryPath: library)
 
-        let merge = app.buttons["tool-merge"]
-        XCTAssertTrue(merge.waitForExistence(timeout: 5))
+        // Counted from launch now, not from a tap on a screen already loaded.
+        XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 20), "the Tools screen did not open")
         // Importing from Photos is offered here; the picker itself is the
         // system's and is not driven by this test.
         XCTAssertTrue(app.descendants(matching: .any)["tool-photos"].firstMatch.exists,
                       "the Tools screen should offer Photos")
+        // The document tools are a second, lazily built grid below the first.
+        let merge = app.buttons["tool-merge"]
+        for _ in 0..<6 where !(merge.exists && merge.isHittable) { app.swipeUp() }
+        XCTAssertTrue(merge.waitForExistence(timeout: 5))
         merge.tap()
         let continueButton = app.buttons["pick-continue"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 5))
@@ -936,10 +941,8 @@ final class AppUITests: XCTestCase {
         let library = "/tmp/papernest-notebook-ui-\(UUID().uuidString)"
         var app = launch([], libraryPath: library)
         showAllDocuments(app)
-        XCTAssertTrue(homeTools(app).waitForExistence(timeout: 15))
-        homeTools(app).tap()
-        XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 5))
-        app.buttons["tool-notebook"].tap()
+        XCTAssertTrue(homeNewNote(app).waitForExistence(timeout: 15))
+        homeNewNote(app).tap()
         let create = app.buttons["notebook-create"]
         XCTAssertTrue(create.waitForExistence(timeout: 5))
         XCTAssertFalse(create.isEnabled)
@@ -965,10 +968,8 @@ final class AppUITests: XCTestCase {
             let library = "/tmp/papernest-pages-ui-\(UUID().uuidString)"
             let title = "Notebook \(language)"
             var app = launch([], libraryPath: library, language: language)
-            XCTAssertTrue(homeTools(app).waitForExistence(timeout: 15))
-            homeTools(app).tap()
-            XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 5))
-            app.buttons["tool-notebook"].tap()
+            XCTAssertTrue(homeNewNote(app).waitForExistence(timeout: 15))
+            homeNewNote(app).tap()
             let name = app.textFields["notebook-name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             name.tap()
@@ -1017,9 +1018,8 @@ final class AppUITests: XCTestCase {
             let library = "/tmp/papernest-comments-ui-\(UUID().uuidString)"
             let title = "Comments \(language)"
             var app = launch([], libraryPath: library, language: language)
-            XCTAssertTrue(homeTools(app).waitForExistence(timeout: 15))
-            homeTools(app).tap()
-            app.buttons["tool-notebook"].tap()
+            XCTAssertTrue(homeNewNote(app).waitForExistence(timeout: 15))
+            homeNewNote(app).tap()
             let name = app.textFields["notebook-name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             name.tap()
@@ -1094,9 +1094,8 @@ final class AppUITests: XCTestCase {
             let library = "/tmp/papernest-shapes-ui-\(UUID().uuidString)"
             let title = "Shapes \(language)"
             var app = launch([], libraryPath: library, language: language)
-            XCTAssertTrue(homeTools(app).waitForExistence(timeout: 15))
-            homeTools(app).tap()
-            app.buttons["tool-notebook"].tap()
+            XCTAssertTrue(homeNewNote(app).waitForExistence(timeout: 15))
+            homeNewNote(app).tap()
             let name = app.textFields["notebook-name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             name.tap()
@@ -1212,9 +1211,8 @@ final class AppUITests: XCTestCase {
             let library = "/tmp/papernest-stamps-ui-\(UUID().uuidString)"
             let title = "Stamps \(language)"
             var app = launch([], libraryPath: library, language: language)
-            XCTAssertTrue(homeTools(app).waitForExistence(timeout: 15))
-            homeTools(app).tap()
-            app.buttons["tool-notebook"].tap()
+            XCTAssertTrue(homeNewNote(app).waitForExistence(timeout: 15))
+            homeNewNote(app).tap()
             let name = app.textFields["notebook-name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             name.tap()
@@ -1568,8 +1566,7 @@ final class AppUITests: XCTestCase {
         for language in ["en", "fr", "es"] {
             let app = launch([], libraryPath: "/tmp/papernest-note-bar-\(UUID().uuidString)", language: language)
             XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15))
-            homeTools(app).tap()
-            app.buttons["tool-notebook"].tap()
+            homeNewNote(app).tap()
             let name = app.textFields["notebook-name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             name.tap()
@@ -1792,9 +1789,8 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         let library = "/tmp/papernest-studio-ui-\(UUID().uuidString)"
         var app = launch([], libraryPath: library)
-        XCTAssertTrue(homeTools(app).waitForExistence(timeout: 15))
-        homeTools(app).tap()
-        app.buttons["tool-notebook"].tap()
+        XCTAssertTrue(homeNewNote(app).waitForExistence(timeout: 15))
+        homeNewNote(app).tap()
         let name = app.textFields["notebook-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
         name.tap(); name.typeText("Studio test")
@@ -1921,9 +1917,8 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         let app = launch([], libraryPath: "/tmp/papernest-note-camera-\(UUID().uuidString)")
         defer { app.terminate() }
-        XCTAssertTrue(homeTools(app).waitForExistence(timeout: 15))
-        homeTools(app).tap()
-        app.buttons["tool-notebook"].tap()
+        XCTAssertTrue(homeNewNote(app).waitForExistence(timeout: 15))
+        homeNewNote(app).tap()
         let name = app.textFields["notebook-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
         name.tap(); name.typeText("Camera note")
@@ -2821,8 +2816,7 @@ extension AppUITests {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
         for language in ["en", "fr", "es"] {
             let app = launch([], libraryPath: "/tmp/papernest-pdf-sidebar-\(UUID().uuidString)", language: language)
-            homeTools(app).tap()
-            app.buttons["tool-notebook"].tap()
+            homeNewNote(app).tap()
             let name = app.textFields["notebook-name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             name.tap(); name.typeText("PDF tools")

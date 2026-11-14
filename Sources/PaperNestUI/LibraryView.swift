@@ -59,6 +59,8 @@ struct LibraryView: View {
             .safeAreaInset(edge: .bottom) {
                 if isSelecting { selectionBar }
             }
+            .onChange(of: isSelecting) { _, selecting in model.isSelectingItems = selecting }
+            .onDisappear { model.isSelectingItems = false }
             .onChange(of: model.scope) { _, _ in endSelection() }
             .onChange(of: model.contentKind) { _, _ in endSelection() }
             .onChange(of: model.searchText) { _, _ in endSelection() }

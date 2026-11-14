@@ -121,18 +121,6 @@ struct DashboardView: View {
             // sync in the sidebar instead.
             CloudSyncStatusView(session: model.session, style: .compact)
         }
-        Button { model.isShowingTools = true } label: {
-            Image(systemName: "square.grid.2x2")
-                .font(.title3)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(L10n.toolsTitle)
-        .accessibilityIdentifier("home-tools-all")
-        #if os(macOS)
-        .help(L10n.toolsTitle)
-        #endif
         Button { showProfile = true } label: {
             Image(systemName: "person.crop.circle")
                 .font(.title)

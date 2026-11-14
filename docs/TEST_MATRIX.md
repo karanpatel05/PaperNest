@@ -1,3 +1,37 @@
+## 2026-11-13 — Home loses its Tools button; the phone's bar steps aside for selection (Claude, owner in session)
+
+Owner, after seeing the redesign: "remove tools from top left corner i do not want at all". The grid button in
+Home's header is gone on iPhone, iPad and Mac. `ToolsSheet` and its `-PaperNestDebugShowTools` hook stay in the
+code, unreachable from the interface; what that costs is in the design entry (`docs/CLEAN_NATIVE_DESIGN.md`):
+**importing pictures from the Photos library as documents has no other way in.**
+
+Checking it turned up something older. **On iPhone the library's selection bar — the count, Select All and the
+actions menu with Duplicate, Merge, Move, Export as ZIP and Delete — was drawn underneath the bottom bar and
+could not be tapped.** Seen in the Simulator before the fix. The bottom bar now hides while the library is
+selecting (`LibraryModel.isSelectingItems`) and returns on Done. **It is older than the redesign:** `dd405ea`, the
+commit before it, was built and run on the same Simulator at 19:06 and hides the bar the same way.
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh`, 18:59 | **Passed: 985 tests** (314 + 49 + 191 + 163 + 158 + 110), 0 failures, 0 compiler warnings. The tree held this change and nothing else of anyone's but two modified entitlements files. |
+| `./scripts/swift.sh build` (macOS) | Clean, 0 warnings. **The Mac was not looked at**; the change there is one button fewer. |
+| **iPhone 17 / iOS 26.5**, four runs 18:10–18:58, 23 tests | **22 passed, 1 failed.** Passed: `HomeToolsUITests` (4, which now assert no Tools button), `testHomeHasOneSetOfQuickActionsAndFourPhoneTabs`, `testHomeNewNoteCreatesAndOpensANotebook`, `testHomeRecentOpensADocumentAndSeeAllShowsTheGrid`, `testAFolderMadeInTheSidebarHoldsAMovedDocument`, `testSidebarNavigationKeepsWorkingAfterGoingBack`, `testPremiumHomeAtLargestTextSize`, `testPremiumDashboardActionsAndLocalizedLayout`, `testNotebookCreationOpensAndSurvivesRelaunch`, `testNoteImageMenuOffersCameraPhotosAndFiles`, `testStudioPenSavesAndReopensWithFloatingHistory`, `testPDFToolsSidebarAndPhoneMenuRouting`, `testSymbolStampsSpanishLifecycle`, `testNotebookPagesAddCancelUndoRedoAndReopenInAllLanguages`, `testPageCommentsEditCancelDeleteUndoAndReopenInAllLanguages`, `testShapesPlaceCancelUndoRedoAndReopenInAllLanguages`, `testDocumentToolsLocalizedSelectionOrderAndCancellation`, `testToolsScreenPicksTwoDocumentsAndMergesThem`. Failed: `testNotebookToolsAreSideBySide`, at "Empty notes must keep Add Page and Undo available" — the same message this file records at baseline `0edf804`; it reaches that through the new route. |
+| **iPad Air 11-inch (M4) / iOS 26.5**, three runs 18:30–19:02, 13 tests | **13 passed.** `HomeToolsUITests` (5), `testHomeHasOneSetOfQuickActionsAndFourPhoneTabs`, `testHomeNewNoteCreatesAndOpensANotebook`, `testHomeSidebarSelectionFollowsNavigation`, `testNotebookCreationOpensAndSurvivesRelaunch`, `testPremiumHomeAtLargestTextSize`, `testStudioPenSavesAndReopensWithFloatingHistory`, `testToolsScreenPicksTwoDocumentsAndMergesThem`, `testDocumentToolsLocalizedSelectionOrderAndCancellation`. |
+| Selection on iPhone | `testDocumentToolsLocalizedSelectionOrderAndCancellation` failed at 18:46 with the bar hidden (its taps landed on the bottom bar and left the screen), and passed at 18:54 with the fix, in en, fr and es. Its own French screenshot shows "Sélection : 2", "Tout désélectionner" and "Plus" along the bottom with the bar gone. |
+
+**Tests changed, and why.** Thirteen `AppUITests` reached New Notebook through the Tools button; they now use
+Home's New Note (`homeNewNote`). `testToolsScreenPicksTwoDocumentsAndMergesThem` opens the Tools screen by its
+debug hook, waits from launch rather than from a tap, and scrolls to Merge, which sits in a second lazily built
+grid. `testDocumentToolsLocalizedSelectionOrderAndCancellation` goes to the library through See All on iPad: the
+wide layouts open on Home, and the test had been asking for the library's Select button without going there.
+
+**Seen and not fixed.** On iPhone the library's large title ("All Documents") is drawn over the search field
+until the list is scrolled, with an empty band under it. `dd405ea` does the same, so it is not from the Home
+work; `docs/screenshots/sidebar-regression-premium-library-en-iphone.png` (2026-11-02) shows it correct, so it
+came in between. It is the library screen's navigation bar. Cause not looked for.
+
+**Not run, not seen.** The other UI tests. The Mac. A camera. Importing from Photos, which now has no way in.
+
 ## 2026-11-13 — Reader features R3: the reader's own bookmarks, schema v11 (Claude, owner's queue)
 
 Third in this session's part of the owner's "most features of Adobe PDF reader" queue, and the last piece of R3

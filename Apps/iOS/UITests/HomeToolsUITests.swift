@@ -1,7 +1,7 @@
 import XCTest
 
-/// Home after the owner's redesign of 2026-11-13: one row of quick actions,
-/// recent documents, and the Tools hub behind a button in the header.
+/// Home after the owner's redesign of 2026-11-13: one row of quick actions
+/// and recent documents. It has no Tools button; the owner had it removed.
 @MainActor final class HomeToolsUITests: XCTestCase {
     func testHomeHasOneBrandAndProfileRemainsReachable() {
         let app = XCUIApplication()
@@ -69,16 +69,9 @@ import XCTest
             let shot = XCTAttachment(screenshot: app.screenshot())
             shot.name = "home-tools-\(language)"; shot.lifetime = .keepAlways; add(shot)
 
-            let tools = app.buttons["home-tools-all"]
-            XCTAssertTrue(tools.waitForExistence(timeout: 5))
-            XCTAssertTrue(tools.isHittable)
-            XCTAssertFalse(tools.label.isEmpty)
-            tools.tap()
-            XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 15))
-            XCTAssertTrue(app.buttons["tool-import"].exists)
-            XCTAssertTrue(app.descendants(matching: .any)["tool-photos"].firstMatch.exists)
-            app.buttons["tools-done"].tap()
-            XCTAssertTrue(tools.waitForExistence(timeout: 5))
+            // The owner removed Tools from Home; nothing there opens the hub.
+            XCTAssertFalse(app.buttons["home-tools-all"].exists)
+            XCTAssertTrue(app.buttons["home-profile"].exists)
             app.terminate()
         }
     }

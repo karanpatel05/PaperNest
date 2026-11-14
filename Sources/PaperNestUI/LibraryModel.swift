@@ -50,6 +50,10 @@ public final class LibraryModel {
     var isShowingScanner = false
     var isShowingSettings = false
     var isShowingTools = false
+    /// The library is in selection mode. The phone's bottom bar steps aside
+    /// for it: the selection bar sits at the same edge and was drawn
+    /// underneath, where its Select All and actions menu could not be reached.
+    var isSelectingItems = false
     /// The newest documents, for the iPhone home's Recent row.
     private(set) var dashboardItems: [LibraryStore.ItemSummary] = []
     /// Bytes of the originals behind the documents Home lists, from the store.

@@ -13,7 +13,8 @@ The owner gave a written brief and two reference boards in session ("Paper NEST 
 
 **Calls made here, not by the owner — change them if they are wrong.**
 
-- **Tools and Profile sit where the pictures draw a bell.** There are no notifications to show. The Tools hub was reachable only from Home's old tool grid, so it became a header button (`home-tools-all`) instead of vanishing.
+- **Profile sits where the pictures draw a bell; there is no Tools button.** There are no notifications to show, so the bell's place holds Profile. A Tools button stood beside it for part of 2026-11-13, added here so the Tools hub kept a way in; **the owner had it removed the same day ("remove tools … i do not want at all")**, so Home opens nothing called Tools. `ToolsSheet` and its `-PaperNestDebugShowTools` hook are still in the code, unreachable from the interface. What that costs: New Notebook, Scan and Import File are on Home or in the bar; Merge, Extract, Split and Export as ZIP are in the library's selection and item menus; **importing pictures from the Photos library as documents has no other way in** (the scanner's ⋯ menu brings photos in as pages of a scan, and Import File reads image files).
+- **The phone's bottom bar hides while the library is selecting.** The library's selection bar sits at the same edge and was being drawn underneath it, where Select All and the actions menu could not be tapped. The bar comes back on Done.
 - **Home has no search field.** The pictures have none; search stays in Notes, All Documents and every folder.
 - **The product is still "PaperNest".** The pictures letter it "Paper NEST". `Brand.displayName` and the real `BrandMark` are unchanged; renaming the product is not a layout decision.
 - **The sidebar row says "All Documents"**, not "Documents", because that is the title of the screen it opens.

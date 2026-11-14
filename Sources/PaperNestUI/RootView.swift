@@ -239,7 +239,9 @@ public struct RootView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if showsHome && model.homeDocument == nil && model.path.isEmpty { compactNavigation }
+            // Hidden while the library is selecting, so its own selection bar
+            // has the bottom edge to itself.
+            if showsHome && model.homeDocument == nil && model.path.isEmpty && !model.isSelectingItems { compactNavigation }
         }
         .modifier(LibraryPresentations(model: model, showHome: showHomeAfterScan))
         .focusedSceneValue(\.libraryModel, model)
