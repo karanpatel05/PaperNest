@@ -144,6 +144,11 @@ public enum SyntheticDocuments {
 public enum PixelProbe {
     public struct RGB: Equatable, CustomStringConvertible {
         public var r, g, b: UInt8
+        public init(r: UInt8, g: UInt8, b: UInt8) {
+            self.r = r
+            self.g = g
+            self.b = b
+        }
         public var description: String { "rgb(\(r),\(g),\(b))" }
         public var isWhite: Bool { r > 230 && g > 230 && b > 230 }
         public var isRed: Bool { r > 180 && g < 80 && b < 80 }
@@ -656,4 +661,62 @@ extension SyntheticDocuments {
     }
 
     public enum FixtureError: Error { case couldNotWrite }
+}
+
+extension SyntheticDocuments {
+    /// Where `markedUpPDF` puts its marks, in PDF user space (y up, on a
+    /// 612 × 792 media box).
+    public enum MarkedUp {
+        /// A red square, shown and printed.
+        public static let shownAndPrinted = CGRect(x: 100, y: 560, width: 80, height: 80)
+        /// A blue square that is shown but not printed: its print flag is off.
+        public static let shownOnly = CGRect(x: 300, y: 560, width: 80, height: 80)
+        /// A green square whose author hid it.
+        public static let hidden = CGRect(x: 100, y: 360, width: 80, height: 80)
+        /// A link, which is not a mark.
+        public static let link = CGRect(x: 300, y: 360, width: 80, height: 80)
+    }
+
+    /// A page whose only marks are **annotations**, the way a PDF arrives from
+    /// another app that drew boxes or stamps on it. The page's own content is
+    /// blank, so whatever shows came from an annotation. `MarkedUp` says where
+    /// each one is.
+    ///
+    /// `rotation` is the page's `/Rotate`; `cropBox` sets a crop box inside
+    /// the media box, as a scanner or Acrobat's crop tool leaves one.
+    public static func markedUpPDF(rotation: Int = 0, cropBox: CGRect? = nil) -> Data {
+        let blank = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let ctx = CGContext(consumer: CGDataConsumer(data: blank as CFMutableData)!, mediaBox: &box, nil)!
+        ctx.beginPDFPage(nil)
+        ctx.endPDFPage()
+        ctx.closePDF()
+        let document = PDFDocument(data: blank as Data)!
+        let page = document.page(at: 0)!
+        if let cropBox { page.setBounds(cropBox, for: .cropBox) }
+        page.rotation = rotation
+
+        func square(_ bounds: CGRect, red: CGFloat, green: CGFloat, blue: CGFloat) -> PDFAnnotation {
+            let annotation = PDFAnnotation(bounds: bounds, forType: .square, withProperties: nil)
+            #if canImport(AppKit)
+            let color = NSColor(srgbRed: red, green: green, blue: blue, alpha: 1)
+            #else
+            let color = UIColor(red: red, green: green, blue: blue, alpha: 1)
+            #endif
+            annotation.color = color
+            annotation.interiorColor = color
+            return annotation
+        }
+        page.addAnnotation(square(MarkedUp.shownAndPrinted, red: 1, green: 0, blue: 0))
+        let shownOnly = square(MarkedUp.shownOnly, red: 0, green: 0, blue: 1)
+        shownOnly.shouldPrint = false
+        page.addAnnotation(shownOnly)
+        let hidden = square(MarkedUp.hidden, red: 0, green: 0.8, blue: 0)
+        hidden.shouldDisplay = false
+        page.addAnnotation(hidden)
+        let link = PDFAnnotation(bounds: MarkedUp.link, forType: .link, withProperties: nil)
+        link.url = URL(string: "https://example.com/terms")
+        page.addAnnotation(link)
+        return document.dataRepresentation()!
+    }
 }

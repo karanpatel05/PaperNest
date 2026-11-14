@@ -36,7 +36,10 @@ extension PageRenderer {
             .concatenating(CGAffineTransform(scaleX: 1 / upright.width, y: 1 / upright.height))
         let crop = page.transform.crop
 
-        return pdfPage.annotations.compactMap { annotation in
+        // Under the app's PDFKit lock: listing a page's annotations builds
+        // every one of them, form fields included, and that is the work that
+        // must not run on several threads at once (`PDFKitAnnotationLock`).
+        return PDFKitAnnotationLock.run { pdfPage.annotations.compactMap { annotation in
             guard annotation.type == "Link" else { return nil }
             let target: PageLink.Target
             if let url = annotation.url ?? (annotation.action as? PDFActionURL)?.url {
@@ -55,6 +58,6 @@ extension PageRenderer {
                   unit.midY >= crop.y, unit.midY <= crop.y + crop.height else { return nil }
             return PageLink(box: .exact(x: unit.minX, y: unit.minY, width: unit.width, height: unit.height),
                             target: target)
-        }
+        } }
     }
 }

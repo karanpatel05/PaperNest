@@ -66,7 +66,11 @@ public enum PDFForm {
     /// concurrent `filled` calls in a task group never returned, not one of
     /// them, while the same eight on plain threads finished in 0.07s. Why the
     /// pool cannot recover is inside CoreText and is not claimed here.
-    private static let pdfKit = NSLock()
+    ///
+    /// It is the app's one PDFKit annotation lock, shared with page drawing and the
+    /// link reader: a lock of this file's own would still let them into
+    /// PDFKit at the same time as a fill.
+    private static let pdfKit = PDFKitAnnotationLock.shared
 
     /// Every field of the document's form, in page order.
     ///

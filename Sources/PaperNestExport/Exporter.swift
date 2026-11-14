@@ -357,7 +357,8 @@ public struct Exporter: Sendable {
     private func pdfSource(for page: Page, layout: PaperLayout, quality: RasterQuality) async throws -> PageRenderer.PreparedSource {
         let pageScale = layout.contentRect.width / page.geometry.pageSize.width
         let pixelsPerPoint = quality.maxDPI / 72 * pageScale
-        let source = try await renderer.prepareSource(for: page, pixelsPerPoint: pixelsPerPoint)
+        // A redrawn page is paper: its annotations follow the author's print flags.
+        let source = try await renderer.prepareSource(for: page, pixelsPerPoint: pixelsPerPoint, annotations: .paper)
         guard case .image(let image, let covering) = source, let jpegQuality = quality.jpegQuality else { return source }
         let maxPixels = Int((max(covering.width, covering.height) * pixelsPerPoint).rounded(.up))
         let limited = try Self.downsample(image, maxPixelSize: maxPixels)
@@ -391,7 +392,7 @@ public struct Exporter: Sendable {
         let rastered: PageRenderer.PreparedSource
         do {
             rastered = try await renderer.prepareSource(for: page, pixelsPerPoint: pixelsPerPoint,
-                                                        rasterizingPDFPages: true)
+                                                        rasterizingPDFPages: true, annotations: .paper)
         } catch let cancellation as CancellationError {
             throw cancellation
         } catch {

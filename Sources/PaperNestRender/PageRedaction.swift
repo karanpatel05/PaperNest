@@ -10,6 +10,10 @@ public enum RedactionError: Error, Equatable, Sendable {
     /// would report a redaction that did not happen.
     case noRectangles
     case encodingFailed
+    /// The page comes from a PDF whose author switched copying or printing
+    /// off. A redacted page is a new picture with no limits on it, so
+    /// redacting would hand out the contents the author held back.
+    case restrictedByAuthor
 }
 
 /// Removing content from a page rather than covering it.

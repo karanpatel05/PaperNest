@@ -206,8 +206,10 @@ public struct PageRenderer: Sendable {
         /// just the crop for rasterized PDF pages.
         case image(CGImage, covering: CGRect)
         /// Vector PDF page. `CGPDFDocument` is created per preparation, so it
-        /// is never shared across concurrent draws.
-        case pdf(CGPDFDocument, pageNumber: Int)
+        /// is never shared across concurrent draws. `annotations` are the
+        /// marks the page keeps outside its content (a form's answers,
+        /// another app's boxes), nil when it keeps none.
+        case pdf(CGPDFDocument, pageNumber: Int, annotations: PageAnnotations?)
         case template(PageTemplate)
     }
 
@@ -226,9 +228,13 @@ public struct PageRenderer: Sendable {
             let data = try await cache.pdfData(assetID, store: store)
             guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider),
                   index + 1 <= document.numberOfPages else { throw RenderError.sourceDamaged }
+            // Read as a reader sees the paper, form answers included, so the
+            // words recognised agree with the page on screen.
             return try Self.rasterizePDFPage(document, pageNumber: index + 1, sourceSize: page.sourceSize,
                                              region: CGRect(origin: .zero, size: page.sourceSize),
-                                             pixelsPerPoint: pixelsPerPoint)
+                                             pixelsPerPoint: pixelsPerPoint,
+                                             annotations: PageAnnotations.load(from: data, document: document,
+                                                                               pageNumber: index + 1, use: .screen))
         }
     }
 
@@ -240,8 +246,13 @@ public struct PageRenderer: Sendable {
     /// about it needs pixel processing. Only compression asks for this, and
     /// only for a page with no text to lose: rasterizing is how a scanned PDF's
     /// size can change at all, since vector content is copied as it stands.
+    ///
+    /// `annotations` says which of a PDF page's annotations are drawn with
+    /// it: `.screen` for showing the page, `.paper` for a page that is being
+    /// printed or redrawn into an exported file (`PageAnnotations.Use`).
     public func prepareSource(for page: Page, pixelsPerPoint: CGFloat,
-                              rasterizingPDFPages: Bool = false) async throws -> PreparedSource {
+                              rasterizingPDFPages: Bool = false,
+                              annotations use: PageAnnotations.Use = .screen) async throws -> PreparedSource {
         switch page.content {
         case .template(let template):
             return .template(template)
@@ -253,12 +264,14 @@ public struct PageRenderer: Sendable {
             let data = try await cache.pdfData(assetID, store: store)
             guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider),
                   index + 1 <= document.numberOfPages else { throw RenderError.sourceDamaged }
+            let marks = PageAnnotations.load(from: data, document: document, pageNumber: index + 1, use: use)
             guard page.transform.needsPixelProcessing || rasterizingPDFPages else {
-                return .pdf(document, pageNumber: index + 1)
+                return .pdf(document, pageNumber: index + 1, annotations: marks)
             }
             let region = page.geometry.cropRect
             let raster = try Self.rasterizePDFPage(document, pageNumber: index + 1, sourceSize: page.sourceSize,
-                                                   region: region, pixelsPerPoint: pixelsPerPoint)
+                                                   region: region, pixelsPerPoint: pixelsPerPoint,
+                                                   annotations: marks)
             return .image(ImageAdjustments.apply(page.transform, to: raster), covering: region)
         }
     }
@@ -282,8 +295,12 @@ public struct PageRenderer: Sendable {
             guard let provider = CGDataProvider(data: data as CFData),
                   let document = CGPDFDocument(provider),
                   index + 1 <= document.numberOfPages else { throw RenderError.sourceDamaged }
+            // With the page's marks: what is redacted is the page as the
+            // reader saw it, and an answer outside the rectangles survives.
             return try Self.rasterizePDFPage(document, pageNumber: index + 1, sourceSize: page.sourceSize,
-                                             region: whole, pixelsPerPoint: pixelsPerPoint)
+                                             region: whole, pixelsPerPoint: pixelsPerPoint,
+                                             annotations: PageAnnotations.load(from: data, document: document,
+                                                                               pageNumber: index + 1, use: .screen))
         case .template(let template):
             let width = max(1, Int((whole.width * pixelsPerPoint).rounded()))
             let height = max(1, Int((whole.height * pixelsPerPoint).rounded()))
@@ -301,8 +318,10 @@ public struct PageRenderer: Sendable {
     ///
     /// Public so compression can reduce a PDF kept as a loose file, which has
     /// no `Page` and no store to go through, without a second rasterizer.
+    /// `annotations` are drawn over the content when given.
     public static func rasterizePDFPage(_ document: CGPDFDocument, pageNumber: Int, sourceSize: CGSize,
-                                 region: CGRect, pixelsPerPoint: CGFloat) throws -> CGImage {
+                                 region: CGRect, pixelsPerPoint: CGFloat,
+                                 annotations: PageAnnotations? = nil) throws -> CGImage {
         let width = max(1, Int((region.width * pixelsPerPoint).rounded()))
         let height = max(1, Int((region.height * pixelsPerPoint).rounded()))
         guard width * height <= maxPixelCount else { throw RenderError.outputTooLarge }
@@ -313,7 +332,7 @@ public struct PageRenderer: Sendable {
             let sy = CGFloat(height) / region.height
             // Source space (y-down) → bitmap (y-up), with `region` filling it.
             ctx.concatenate(CGAffineTransform(a: sx, b: 0, c: 0, d: -sy, tx: -region.minX * sx, ty: CGFloat(height) + region.minY * sy))
-            drawPDFContent(document, pageNumber: pageNumber, sourceSize: sourceSize, in: ctx)
+            drawPDFContent(document, pageNumber: pageNumber, sourceSize: sourceSize, annotations: annotations, in: ctx)
         }
     }
 
@@ -342,8 +361,9 @@ public struct PageRenderer: Sendable {
             ctx.interpolationQuality = .high
             ctx.draw(image, in: covering)
             ctx.restoreGState()
-        case .pdf(let document, let pageNumber):
-            drawPDFContent(document, pageNumber: pageNumber, sourceSize: page.sourceSize, in: ctx)
+        case .pdf(let document, let pageNumber, let annotations):
+            drawPDFContent(document, pageNumber: pageNumber, sourceSize: page.sourceSize,
+                           annotations: annotations, in: ctx)
         case .template(let template):
             drawTemplate(template, size: page.sourceSize, in: ctx)
         }
@@ -524,8 +544,10 @@ public struct PageRenderer: Sendable {
         ctx.strokePath()
     }
 
-    /// Draws a PDF page as vectors into a context currently in source space.
-    static func drawPDFContent(_ document: CGPDFDocument, pageNumber: Int, sourceSize: CGSize, in ctx: CGContext) {
+    /// Draws a PDF page as vectors into a context currently in source space,
+    /// then the marks it keeps in annotations, which `drawPDFPage` leaves out.
+    static func drawPDFContent(_ document: CGPDFDocument, pageNumber: Int, sourceSize: CGSize,
+                               annotations: PageAnnotations? = nil, in ctx: CGContext) {
         guard let pdfPage = document.page(at: pageNumber) else { return }
         let box = pdfPage.getBoxRect(.cropBox)
         let rotation = Int(pdfPage.rotationAngle)
@@ -537,6 +559,9 @@ public struct PageRenderer: Sendable {
         ctx.concatenate(PageGeometry.pdfToSource(box: box, rotationDegrees: rotation))
         ctx.clip(to: box)
         ctx.drawPDFPage(pdfPage)
+        // Same user space, same clip: a mark outside the crop box is cut off
+        // just as content there is.
+        annotations?.draw(in: ctx)
         ctx.restoreGState()
     }
 

@@ -40,6 +40,12 @@ public struct PageRedactor: Sendable {
 
     public func redact(_ page: Page, rectangles: [NormalizedRect],
                        dpi: CGFloat = PageRedaction.defaultDPI) async throws -> RedactionOutcome {
+        // The redacted page is a new picture with no author's limits on it,
+        // and every later export would treat it as free. Checked before
+        // anything is drawn or written, so a refusal leaves the page as it was.
+        guard try await !renderer.permissions(for: [page]).isRestricted else {
+            throw RedactionError.restrictedByAuthor
+        }
         let redacted = try await PageRedaction.redactedPNG(for: page, rectangles: rectangles,
                                                            renderer: renderer, dpi: dpi)
         let previous = page.content.assetID

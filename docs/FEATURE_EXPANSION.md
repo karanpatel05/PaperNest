@@ -104,7 +104,7 @@ ink and OCR already use.
 | R4 | Print; read aloud | **Print: done 2026-11-13** — iPhone and iPad Simulator, as far as the system print panel; nothing was sent to a printer; Mac built, not seen. Read aloud planned | **Print…** in the title menu and File > Print… (⌘P). Prints what Export would write: ink and typed text on the pages, private comments left off, each page at its own size. The system's panel owns the printer, copies, range and paper |
 | R5 | Night mode; two-page view | **Night mode: done 2026-11-13** — iPhone and iPad Simulator; Mac built, not seen. Two-page view planned | A switch in Display settings. Display only: paper dark, print light, ink a lighter shade of its own colour, highlights still bands of their own colour; live ink and typing turn too. Nothing stored, exported or printed changes. Photographs are turned like everything else |
 | R6 | Notes placed at a spot on the page and carried in the exported PDF | Planned | Today's comments are private and per page |
-| R7 | Screens for Compress and Redact | Planned | Both engines exist and are tested; neither is reachable (rows 26 and 35) |
+| R7 | Screens for Compress and Redact | Planned | Both engines exist and are tested; neither is reachable (rows 26 and 35). Both keep an author's limits already: the Redact engine refuses a page from a restricted PDF (2026-11-14), compression goes through Export or refuses an encrypted file |
 
 **Not in this list, deliberately.** Editing a PDF's existing text is still the open build-or-license decision
 (inventory row 25). Office conversion was dropped by the owner on 2026-10-28. Certificate signatures, comparing two

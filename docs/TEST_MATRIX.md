@@ -1,3 +1,128 @@
+## 2026-11-14 — Form answers and other PDF annotations are drawn on the page (Claude, owner in session)
+
+Owner, after the USCIS entry below named what was left: **"Fix everything as per your understanding"**. This
+entry is the part of "everything" that could be fixed and checked here; the end of it lists what was not.
+
+**What was wrong.** PaperNest draws a PDF page with Core Graphics' `drawPDFPage`, which draws the page's
+**content** and nothing else. A PDF keeps several things a reader sees in **annotations** instead: the answer typed
+into a form field, a checkbox's tick, a box, stamp or highlight another app drew. None of them was on the page in
+PaperNest, in its thumbnail, or on any page PaperNest had to redraw for an export or a print. So a form filled in
+Fill PDF Form opened again with empty boxes, and drawing one line on a filled-in form lost its answers from the
+export and from the print. It was true of every PDF, long before the USCIS forms made it easy to meet.
+
+**What changed.**
+
+- **`PageAnnotations`** (`Sources/PaperNestRender/PageAnnotations.swift`, new) draws a PDF page's annotations
+  over its content, through PDFKit — which is what Preview draws with — in the same space and under the same clip.
+  It is used everywhere a PDF page is drawn: the page, thumbnails, a page drawn as pixels because of a filter, the
+  picture text recognition reads, the picture redaction paints over, and pages an export or a print redraws.
+- **What is drawn.** Links and pop-ups never (a link is somewhere to tap; the reader finds links itself), nor
+  anything its author hid. On screen, everything else. On paper — Print, or a page an export had to redraw — only
+  what the author also marked for printing, as Acrobat prints. A redrawn page carries a field's answer as part of
+  the page: there it is no longer a field anyone can change, but it is no longer lost.
+- **A page with no annotations costs nothing new**: whether it lists any is read from the page dictionary through
+  Core Graphics, and PDFKit is never opened for it.
+- **One lock for PDFKit's annotation work across the app** (`PDFKitAnnotationLock`), shared by page drawing,
+  `PDFForm` (which had a lock of its own) and the link reader (which had none). See *Proved able to fail*.
+- **PDFKit turns an annotation by the page's `/Rotate` as it draws it**, and PaperNest has already turned the
+  page, so on a turned page every mark came out turned twice. Its transform is undone first.
+- **Redaction refuses a page from a restricted PDF** (`RedactionError.restrictedByAuthor`), before anything is
+  drawn or written: a redacted page is a new picture with no limits on it, which would have handed out what the
+  author held back. Compressing was checked and needed nothing: a library document is compressed through
+  `Exporter.export`, which keeps the limits, and a loose PDF file that is encrypted is refused.
+- **Compressing a scanned page** draws its annotations meant for paper into the new picture, which carries none of
+  its own.
+
+No schema change, no new strings, no screen changed. Files: `PageAnnotations.swift` (new), `PageRenderer.swift`,
+`PageLinkReader.swift`, `PageRedaction.swift`, `PageRedactor.swift`, `Exporter.swift`, `Compression.swift`,
+`PDFForm.swift` (its lock is now the shared one).
+
+**Results.** Verified alone, in a clean worktree holding `HEAD` (`6dd5da5`) plus only this change.
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh` | **Passed: 1,027 tests** (320 + 49 + 191 + 180 + 177 + 110), 0 failures, 0 compiler warnings — `/tmp/papernest-annots-unit.log` |
+| New: `PDFAnnotationRenderTests` 11, `AnnotationExportTests` 4 | **Passed** (red first: all 15 failed before the fix) |
+| `./scripts/build-mac-app.sh` | **Built**, 0 warnings |
+| `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build` | **BUILD SUCCEEDED**, 0 warnings |
+| `PDFAnnotationsUITests` (new, 3) — read the simulator's screen | iPad Pro 13-inch (M5), iOS 26.5: **3/3** (`/tmp/papernest-annots-ipad-2.log`; the first two also in the run below). PaperNest iPhone Duo, iOS 27.1: **3/3** |
+| The reader set, because every page picture goes through this: `RestrictedPDFUITests` 2, `DocumentFindUITests` 3, `TextSelectionUITests` 2, `PageLinksUITests` 2, `NightModeUITests` 3, `BookmarksUITests` 3, `DocumentPrintUITests` 2 | iPad **17/17** (`/tmp/papernest-annots-ipad.log`, 19/19 with the two annotation tests). iPhone **17/17** (`/tmp/papernest-annots-iphone.log`, 20/20 with the three), the load average about 35 from other work while it ran |
+
+**What the tests prove.** `PDFAnnotationRenderTests` (11, on the renderer) and `AnnotationExportTests` (4), on
+synthetic fixtures — `markedUpPDF` (new: a blank page whose only marks are annotations — a red box shown and
+printed, a blue one shown but not printed, a green one hidden, a link) and the existing `acroFormPDF`:
+
+- Marks kept in annotations are on the page, and in its thumbnail; the hidden one and the link are not.
+- On a page turned 90°, 180° and 270° by its file, and on one whose crop box does not start at the media box's
+  corner, each mark is where PDFKit itself puts it (compared with PDFKit's own drawing of the same file, within 2%).
+- A crop made in PaperNest carries the marks with the page and cuts off the ones outside it; a page with a filter,
+  drawn as pixels, keeps them.
+- A filled-in field shows its answer; an empty one shows nothing. The picture text recognition reads shows the
+  answer too (a choice: otherwise recognised words would disagree with the page on screen).
+- Sixteen pictures of a form drawn at once all come back, each with the answer.
+- Redacting one answer paints it out and keeps the answer beside it. A page from a PDF whose author forbade copying
+  is not redacted and is left unchanged.
+- A page drawn on and exported has the answer **in its content** — read back with Core Graphics alone, which draws
+  no annotations — and no field left on top to draw it twice. A restricted form drawn on and made ready for the
+  print panel has its answer in the page and is still closed to copying. A form filled with `PDFForm.filled` and
+  imported shows the answer. A redrawn page has the mark meant for paper, not the one meant only for the screen,
+  and not the hidden one.
+
+`PDFAnnotationsUITests` (3), on the simulator's screen pixels — the proof that PDFKit's drawing lands the right
+way up in an iOS context, which the Mac unit tests cannot give:
+
+- A form with two answers shows both in their boxes and nothing in the empty third.
+- The annotation-only page shows the red box top left and the blue one top right, nothing for the hidden box or
+  the link; the page thumbnail shows both boxes.
+- **End to end, the case people met:** a form whose author switched copying off, filled in PaperNest's own Fill
+  PDF Form sheet, saved as a copy, the app quit and the copy opened again: the typed answer is in its box on the
+  page. Before this change that copy opened with an empty box.
+
+Screenshots: `docs/screenshots/pdf-annotations-2026-11-14/` (the filled copy reopened, and the annotation-only
+page, on iPad and iPhone).
+
+**Proved able to fail.** Before the fix all fifteen new unit tests failed (`/tmp/papernest-annots-red.log`), each
+on its own assertion, the redaction refusal included. Then, with the fix in:
+
+- **The lock taken out**: the run that draws sixteen pictures at once **never finished**. A sample of the stuck
+  process showed nine threads waiting in `xpc_connection_send_message_with_reply_sync`, under CoreText's font
+  lookup, under `-[PDFAnnotation getFontFromAppearanceString:]`, under `PageAnnotations.load` — the deadlock
+  `PDFForm` had recorded for eight concurrent fills, reached now by drawing pages. Swift Testing's one-minute time
+  limit did not end it; the run was killed after ten minutes. Lock put back.
+- **Redrawn pages given the screen's marks instead of paper's**: `aRebuiltPageKeepsTheMarksMeantForPaper` failed
+  ("a mark not meant for paper was printed"). Put back.
+- PDFKit's transform not undone: the three turned-page cases failed, the marks turned twice. That is how the
+  defect was found.
+
+**The three real USCIS forms** (I-130, N-400, I-765; the blank files the owner let us download, in a scratch folder
+outside the repository), through the app's own code by a throwaway test in the worktree, deleted, never committed:
+
+| | I-130 | N-400 | I-765 |
+|---|---|---|---|
+| Dark pixels in the first fillable field, page 1 at 2×: blank form / filled in PaperNest (`PDFForm.filled`) / PDFKit's own drawing of the filled file | 36 / 872 / 854 | 36 / 882 / 864 | 0 / 920 / 900 |
+| Filled copy with a line drawn on page 1, made ready for print, page 1 read back with Core Graphics alone | 872 — the answer is in the page | 882 | 920 |
+| That print file | copying off, printing on, 12 pages | copying off, printing on, 14 pages | copying off, printing on, 7 pages |
+| Page 1 at 2×, `renderImage`, warm, mean of 5 | 16.6 ms | 15.6 ms | 14.5 ms |
+| Of which, roughly: the content alone through Core Graphics / building the annotations | 3.9 / 3.7 ms | 3.5 / 3.9 ms | 3.5 / 3.3 ms |
+
+Looked at, not only counted: the I-765's page 1 with its family-name box filled shows the answer in the box, as
+PDFKit draws it. **The barcode at the foot of each page now shows too** — it is a form field with an appearance —
+but it is the barcode the blank form was made with. Acrobat redraws it from the answers with the form's scripts;
+neither PDFKit nor PaperNest runs them, so the barcode does not encode what was typed.
+
+**Not verified, plainly.**
+
+- **Whether USCIS accepts a form filled in PaperNest is still not known**, and a filled form was still not opened in
+  Adobe Reader (none on this Mac). The barcode above is one concrete reason it might not be.
+- **The Mac**: built, not used. The renderer the Mac shows pages with is the one the unit tests run on macOS.
+- A redrawn page flattens: a field's answer is drawn into it and the field is gone from that page, and a link on it
+  stops working. That was already so for links, and fields were gone before too, without their answers.
+- An annotation set to print but hidden from view (a print-only watermark) is left off paper as well.
+- Fill PDF Form was driven in the running app on a synthetic restricted form, not on a USCIS form. Import through
+  the file picker was not driven. Only copying and printing are tracked as an author's limits; a
+  file whose author forbade form filling or commenting is still treated as allowing them.
+- Cost was measured on three forms on this Mac, not on an iPhone.
+
 ## 2026-11-13 — USCIS forms would not open: PDFs with copying switched off are imported and keep their limits (Claude, owner in session)
 
 Owner: **"i cannot open forms from USCIS website"**, in PaperNest; what happened was "It refuses to import". Asked

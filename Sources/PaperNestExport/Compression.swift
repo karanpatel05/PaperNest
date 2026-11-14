@@ -240,7 +240,7 @@ extension Exporter {
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index) else { throw ExportError.writeFailed }
             if !Self.carriesText(document, at: index),
-               let reduced = Self.reEncodedPage(readable, pageNumber: index + 1, page: page,
+               let reduced = Self.reEncodedPage(readable, data: data, pageNumber: index + 1, page: page,
                                                 preset: preset, keeping: &rebuilt) {
                 output.insert(reduced, at: output.pageCount)
                 reEncodedAnyPage = true
@@ -276,7 +276,11 @@ extension Exporter {
     /// page at 300 dpi is past the 100M-pixel cap), cannot be encoded, or —
     /// the common case — comes out no smaller than the page it would replace.
     /// Light is 300 dpi, which upsamples most scans, so it usually declines.
-    private static func reEncodedPage(_ readable: CGPDFDocument, pageNumber: Int, page: PDFPage,
+    ///
+    /// The picture is drawn with the page's annotations that are meant for
+    /// paper: the new page carries none of its own, so a box or stamp left on
+    /// a scan would otherwise be gone from it.
+    private static func reEncodedPage(_ readable: CGPDFDocument, data: Data, pageNumber: Int, page: PDFPage,
                                       preset: CompressionPreset,
                                       keeping rebuilt: inout [PDFDocument]) -> PDFPage? {
         // The size has to be the *upright* crop box, not PDFKit's media box.
@@ -292,7 +296,9 @@ extension Exporter {
         let region = CGRect(origin: .zero, size: upright)
         guard let raster = try? PageRenderer.rasterizePDFPage(
                   readable, pageNumber: pageNumber, sourceSize: upright,
-                  region: region, pixelsPerPoint: quality.maxDPI / 72),
+                  region: region, pixelsPerPoint: quality.maxDPI / 72,
+                  annotations: PageAnnotations.load(from: data, document: readable,
+                                                    pageNumber: pageNumber, use: .paper)),
               let jpeg = Self.encode(raster, type: .jpeg, quality: quality.jpegQuality ?? 0.85, dpi: nil),
               let source = CGDataProvider(data: jpeg as CFData),
               let image = CGImage(jpegDataProviderSource: source, decode: nil,
