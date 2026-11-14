@@ -18,6 +18,8 @@ struct PageSelectionOverlay: View {
     @Binding var hiddenIDs: Set<PageObjectID>
     let onOpen: (PageObject) -> Void
     @Environment(\.displayScale) private var displayScale
+    /// Night mode turns everything drawn over the page, this overlay included.
+    @Environment(\.pageNightMode) private var isNight
     @State private var selectedIDs: Set<PageObjectID> = []
     @State private var selectionContour: PageSelectionContour?
     @State private var points: [CGPoint] = []
@@ -101,7 +103,11 @@ struct PageSelectionOverlay: View {
                    let bounds = PageSelectionGeometry.bounds(of: selected) {
                     let frame = InlineTextLayout.toolbarFrame(box: bounds.applying(sourceToView), visible: visible,
                                                               size: CGSize(width: 260, height: 52))
-                    selectionToolbar.frame(width: frame.width, height: frame.height)
+                    selectionToolbar
+                        // Controls stay as they are at night; the page's filter is
+                        // its own opposite, so applying it again here undoes it.
+                        .nightFilter(isNight)
+                        .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)
                 }
             }

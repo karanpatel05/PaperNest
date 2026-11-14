@@ -220,6 +220,60 @@ import PaperNestStore
         snap(app, "form-at-night")
     }
 
+    /// Controls drawn over the page are controls, not page: night mode leaves
+    /// them in their day colours. The bar that comes up over selected words
+    /// was darkened with the page until 2026-11-14 (seen on a Mac).
+    func testTheSelectedTextsActionBarKeepsItsDayColoursAtNight() async throws {
+        let (app, _, _) = try await openPDF(SyntheticDocuments.textPDF(pages: ["Statement"]), name: "Statement")
+        defer { app.terminate() }
+        let page = app.images["document-page-image"]
+        setNightMode(app, true)
+        waitForPaper(app, dark: true, at: Self.plainPaper)
+        let selection = app.descendants(matching: .any).matching(identifier: "text-selection").firstMatch
+        XCTAssertTrue(selection.waitForExistence(timeout: 10))
+
+        // "Statement" is drawn from x 72, its baseline 140 points down.
+        page.coordinate(withNormalizedOffset: CGVector(dx: 110.0 / 612, dy: 134.0 / 792)).press(forDuration: 0.9)
+        let copy = app.buttons["text-selection-copy"]
+        XCTAssertTrue(copy.waitForExistence(timeout: 5), "no action bar for the selected word")
+
+        let bar = pixels(app, in: copy.frame)
+        XCTAssertGreaterThan(bar.count { min($0.r, $0.g, $0.b) > 200 }, bar.pixels.count / 2,
+                             "the action bar is not light at night: \(bar.average)")
+        snap(app, "selection-bar-at-night")
+    }
+
+    /// The lasso's selection bar, likewise.
+    func testTheLassoSelectionBarKeepsItsDayColoursAtNight() async throws {
+        let directory = URL(fileURLWithPath: "/tmp/papernest-reader-gaps-\(UUID())")
+        let store = try LibraryStore(directory: directory)
+        let item = try await store.createItem(kind: .notebook, name: "Sketches", pages: [
+            .init(sourceSize: CGSize(width: 600, height: 800), content: .template(.blank)),
+        ], assets: [])
+        let pageID = try await store.pages(of: item.id)[0].id
+        try await store.placeText("Lasso me", on: pageID, frame: CGRect(x: 100, y: 200, width: 200, height: 40),
+                                  fontSize: 18, color: .black, alignment: .leading)
+        let app = launch(directory, item: "Sketches")
+        defer { app.terminate() }
+        setNightMode(app, true)
+        waitForPaper(app, dark: true, at: Self.plainPaper, pageSize: CGSize(width: 600, height: 800))
+
+        // A notebook opens with the lasso in hand; its panel selects everything.
+        let lasso = app.buttons["studio-tool-lasso"]
+        XCTAssertTrue(lasso.waitForExistence(timeout: 10))
+        lasso.tap()
+        let selectAll = app.buttons["studio-lasso-select-all"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
+        selectAll.tap()
+        let toolbar = app.descendants(matching: .any).matching(identifier: "selection-toolbar").firstMatch
+        XCTAssertTrue(toolbar.waitForExistence(timeout: 5), "no selection bar after Select All")
+
+        let bar = pixels(app, in: toolbar.frame.insetBy(dx: 6, dy: 6))
+        XCTAssertGreaterThan(bar.count { min($0.r, $0.g, $0.b) > 200 }, bar.pixels.count / 2,
+                             "the lasso's selection bar is not light at night: \(bar.average)")
+        snap(app, "lasso-bar-at-night")
+    }
+
     // MARK: - Bookmarks
 
     /// ⌘D from a hardware keyboard marks the page and unmarks it. A phone

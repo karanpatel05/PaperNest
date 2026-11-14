@@ -1,3 +1,80 @@
+## 2026-11-14 (afternoon) — The reader features seen on a Mac at last, and two more night-mode bars fixed (Claude, owner in session)
+
+Owner: **"yes i give sreen access for mac"**, then **"Ask again"** when the first request came back declined. The Mac
+was the one platform none of night mode, bookmarks, find, text selection or links had been seen on. Done with the
+dev app (`./scripts/build-mac-app.sh`) built from a clean worktree of `f02e424`, on a throwaway library seeded with
+`Samples/multilingual-letter.pdf` (three pages of text) plus two hand-written PDFs: one with an internal and a web
+link, one with a filled form field. Background control only: the app was driven through accessibility and the
+menu bar, and what it saved was read back from the library on disk.
+
+**Seen working on the Mac** (screenshots in `docs/screenshots/reader-mac-2026-11-14/`):
+
+- **Night mode.** The switch in Display settings (the popover scrolls on a short window) turns the page dark with
+  light print; the toolbars, the sidebar and Document Utilities stay as they are. A pen stroke drawn at night shows
+  light and was **saved black**; a highlight shows as a dim amber band and was **saved amber**; a text box typed at
+  night shows light words, its formatting bar keeps **day colours with a black swatch** (the `f02e424` fix, now seen
+  on the Mac), and the note was **saved black**. A filled form's answer ("Jane Sample") shows light on the dark page.
+- **Bookmarks.** Page > Add Bookmark shows the red ribbon (red at night too) and saves one row. Page > Go to Page… took
+  "3". Page > Bookmarks… lists Page 1; its Add Bookmark button marked page 3 and **the list updated in place** (Page 1,
+  Page 3, the button turning into Remove Bookmark); clicking the Page 1 row went to page 1 and closed the list.
+- **Find.** Page > Find… opens the bar; "statement" gave **1 of 1**, lit orange on the dark page.
+- **Selecting text.** A pointer drag selected "Synthetic sample —"; **Copy put exactly that on the clipboard**, dash
+  included (read back with `pbpaste`). Highlight from a selection saved highlighter strokes (see the defect below
+  for how many).
+- **Links.** Both links are on the page to accessibility ("Go to page 3" and the web one). The web link raised
+  "Open this link?" **showing its full address**, with Open, Copy Link and Cancel; **Copy Link copied
+  `https://example.com/`**. The internal link turned to page 3. Open was not pressed, to keep a browser off the
+  owner's screen.
+- Everything drawn and typed was still there after quitting and reopening the app.
+
+**Two defects found on the Mac and fixed — the same kind as `f02e424`.** Night mode darkens everything drawn over
+the page, and two more bars of controls are drawn there:
+
+1. **The bar over selected text** (Copy, Highlight, Underline, Strikethrough) went dark at night
+   (`mac-night-selection-bar-before-fix.jpg`).
+2. **The lasso's selection bar** ("1 selected", edit, more, deselect) went dark too.
+
+Fix: one `.nightFilter(isNight)` on each, in `TextSelectionOverlay.swift` and `PageSelectionOverlay.swift`; the
+filter is its own opposite, so the bar gets its day colours back while the page and what is selected on it still
+turn. `DocumentView.swift` untouched. Seen fixed on the Mac (`mac-night-selection-bar-after-fix.jpg`,
+`mac-night-lasso-bar-after-fix.jpg`). Two new tests in `ReaderNightAndBookmarksUITests` read each bar off the screen
+at night. **Proved able to fail:** without the fix both fail on the iPhone 17 simulator — selection bar averaging
+rgb(32,31,41), lasso bar rgb(8,8,9) (`/tmp/pn-bars-before4.log`). With it:
+
+| Suites (night mode, the reader-gaps suite, text selection) | Result |
+|---|---|
+| iPhone 17, iOS 27.0 | **10/10 + ⌘D skipped** by design, no restarts (`/tmp/pn-bars-after-B6966C5F-*.log`) |
+| iPad Pro 13-inch (M5), iOS 27.0 | **11/11**, no restarts (`/tmp/pn-bars-after-6528AE8B-*.log`) |
+
+Unit suite on that tree **1,029 tests, 0 failures, 0 warnings**; Mac build clean.
+
+**A third defect found on the Mac, and left to the session that already has it.** On a page with several lines,
+the character boxes behind find, selection and highlight-from-selection **drift one character per line**:
+`PDFPage.characterBounds(at:)` does not count the line breaks that `PDFPage.string` puts between lines, while the
+reader indexed it with positions in `string`. Seen on the Mac as: highlighting "Total: $1,234.56" (line 3) saved
+**two** strokes, because the selection began at line 2's final "." whose box sat at line 3's start. Measured with
+PDFKit on that page: `characterBounds(at: 26)` ("Q") returns the "u"'s box; `characterIndex(at:)` on line 3's "T"
+returns 62, which is "." in the string; `page.selection(for:)` over a string range gives the right box. The
+read-aloud session found the same thing independently and **has an uncommitted fix in
+`Sources/PaperNestRender/PageTextReader.swift`** (boxes from `selection(for:)`); that file was not touched here,
+and the Mac reproduction was sent to it. The unit tests that pixel-check boxes only ever used one-line pages, which
+is why they did not catch it — a multi-line case belongs with that fix.
+
+**Not verified on the Mac, plainly.**
+
+- **Whether the Page menu's bookmark item turns into "Remove Bookmark"** on a bookmarked page. Read through
+  accessibility it still said "Add Bookmark" after the page was marked; SwiftUI may refresh menu-bar titles only
+  when the menu is opened, which background control cannot do, so this is unknown rather than a defect. Full-screen
+  control was asked for once to open the menu and went unanswered.
+- **Renaming or removing a bookmark from its row's ⋯ menu** — a pop-up menu, which background control will not
+  open. Same full-screen request.
+- **⌘D, ⌘F and ⌘G pressed on a Mac keyboard**: a background app ignores ⌘-keystrokes, so the menu items were used.
+- Pressing Open on a web link; VoiceOver; a second window on the same document.
+- On an **iPad Air 13-inch (iOS 26.5)** simulator, the new selection-bar test could not find the Night Mode switch
+  in Display settings, twice (`/tmp/pn-bars-before2.log`, `-before3.log`), so it never reached the bar. The same
+  test found it on the iPhone 17 and the iPad Pro. Not investigated: it may be that device's popover layout, and
+  it may be a real gap for someone on that iPad.
+
 ## 2026-11-14 — Night mode and bookmarks re-checked on today's code, and four of their gaps closed (Claude, owner in session)
 
 Owner: **"finish night mode and bookmarks"**, then **"Try again"**. Both were already built and committed on

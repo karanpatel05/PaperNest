@@ -24,6 +24,8 @@ struct TextSelectionOverlay: View {
     var claimsCopyShortcut = true
 
     @Environment(LibrarySession.self) private var session
+    /// Night mode turns everything drawn over the page, this overlay included.
+    @Environment(\.pageNightMode) private var isNight
     @State private var barSize = CGSize(width: 260, height: 44)
     @State private var didCopy = false
     #if os(macOS)
@@ -60,6 +62,10 @@ struct TextSelectionOverlay: View {
                 }
                 if !boxes.isEmpty, !selection.isDragging {
                     actions
+                        // Controls, not page: the page's night filter is its own
+                        // opposite, so the same filter again gives the bar back its
+                        // day colours. See `InlineTextOverlay` for the same rule.
+                        .nightFilter(isNight)
                         .onGeometryChange(for: CGSize.self) { $0.size } action: { barSize = $0 }
                         .position(barCentre(over: boxes, in: proxy.size))
                 }
