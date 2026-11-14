@@ -119,13 +119,17 @@ is why they did not catch it — a multi-line case belongs with that fix.
 
 **Not verified on the Mac, plainly.**
 
-- **Whether the Page menu's bookmark item turns into "Remove Bookmark"** on a bookmarked page. Read through
-  accessibility it still said "Add Bookmark" after the page was marked; SwiftUI may refresh menu-bar titles only
-  when the menu is opened, which background control cannot do, so this is unknown rather than a defect. Full-screen
-  control was asked for once to open the menu and went unanswered.
-- **Renaming or removing a bookmark from its row's ⋯ menu** — a pop-up menu, which background control will not
-  open. Same full-screen request.
-- **⌘D, ⌘F and ⌘G pressed on a Mac keyboard**: a background app ignores ⌘-keystrokes, so the menu items were used.
+- **Settled later the same day, with full-screen control (owner: "Approve and check").** With the Page menu really
+  open, a bookmarked page reads **Remove Bookmark ⌘D** and an unmarked one **Add Bookmark ⌘D**; the "Add Bookmark"
+  read through accessibility earlier was stale, not a bug. **⌘D pressed on the Mac keyboard** removed page 1's
+  bookmark (ribbon gone, row gone from the library) and a second ⌘D put it back (a new row). In the Bookmarks list,
+  a row's ⋯ menu opens with **Rename… and Remove Bookmark**; **Remove worked** — the row left the library and the
+  ribbon went — though its effect landed only on the next input event, which looks like how simulated clicks end a
+  Mac menu rather than the app. **Rename is not settled:** in three tries (a click, the keyboard, and an explicit
+  press-and-release followed by bringing the app forward) no rename prompt appeared, and nothing was logged. Whether
+  the prompt is broken on the Mac or the simulated clicks never delivered the choice is unknown; a person choosing
+  Rename… on a Mac would settle it. Rename itself is covered on iOS by `BookmarksUITests`.
+- **⌘F and ⌘G pressed on a Mac keyboard** (⌘D was, see above).
 - Pressing Open on a web link; VoiceOver; a second window on the same document.
 - **Settled the same afternoon: the iPad Air 13-inch (iOS 26.5) failure was the tests, not the app.** There,
   the selection-bar test — and the original `NightModeUITests` test too (`/tmp/pn-ipadair-night2.log`) — could not
