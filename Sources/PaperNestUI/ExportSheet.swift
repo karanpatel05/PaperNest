@@ -9,13 +9,13 @@ struct ExportLoader: View {
     let currentPageID: PageID?
     @Environment(LibrarySession.self) private var session
     @Environment(\.dismiss) private var dismiss
-    @State private var loaded: (PaperNestCore.LibraryItem, [Page])?
+    @State private var loaded: (PaperNestCore.LibraryItem, [Page], DocumentPermissions)?
     @State private var failed = false
 
     var body: some View {
         Group {
-            if let (item, pages) = loaded {
-                ExportSheet(itemName: item.name, pages: pages, currentPageID: currentPageID)
+            if let (item, pages, permissions) = loaded {
+                ExportSheet(itemName: item.name, pages: pages, currentPageID: currentPageID, permissions: permissions)
             } else if failed {
                 VStack(spacing: 12) {
                     Text(L10n.exportFailed)
@@ -30,7 +30,11 @@ struct ExportLoader: View {
             guard let store = session.environment?.store else { return }
             do {
                 guard let item = try await store.item(itemID) else { failed = true; return }
-                loaded = (item, try await store.pages(of: itemID))
+                let pages = try await store.pages(of: itemID)
+                // What the sheet offers. The exporter decides again, from the
+                // same originals, when the export is made.
+                let permissions = (try? await session.environment?.renderer.permissions(for: pages)) ?? .unknown
+                loaded = (item, pages, permissions)
             } catch {
                 failed = true
             }
@@ -47,6 +51,9 @@ struct ExportSheet: View {
     let itemName: String
     let pages: [Page]
     let currentPageID: PageID?
+    /// What the authors of these pages allow. A document whose author
+    /// switched copying off can only leave as a PDF.
+    var permissions = DocumentPermissions.unrestricted
 
     @Environment(LibrarySession.self) private var session
     @Environment(\.dismiss) private var dismiss
@@ -135,7 +142,7 @@ struct ExportSheet: View {
             Section {
                 // Three tiles at a time, so six formats do not squeeze each
                 // other into unreadable slivers on a phone.
-                ForEach(Array(Self.offeredFormats.chunked(into: 3).enumerated()), id: \.offset) { _, row in
+                ForEach(Array(Self.formats(offeredFor: permissions).chunked(into: 3).enumerated()), id: \.offset) { _, row in
                     tileRow {
                         ForEach(row, id: \.format) { tile in
                             ChoiceTile(title: tile.title, systemImage: tile.systemImage,
@@ -159,6 +166,13 @@ struct ExportSheet: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("export-words-only-note")
+                }
+                // Why five formats are missing, said where they would be.
+                if !permissions.allowsCopying {
+                    Text(L10n.restrictedExportNote)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("export-restricted-note")
                 }
             }
             passwordSection
@@ -279,6 +293,15 @@ struct ExportSheet: View {
     ///
     /// The titles are the formats' own names, so they are not translated and
     /// go through `Text(verbatim:)` inside the tile.
+    /// The formats offered for a document with these limits. Where copying
+    /// is switched off only a PDF is: it is the one format that can carry the
+    /// author's limits out with the pages, and offering the others would be
+    /// offering something the exporter refuses.
+    nonisolated static func formats(offeredFor permissions: DocumentPermissions)
+        -> [(format: ExportFormat, title: String, systemImage: String, iconColor: Color?)] {
+        permissions.allowsCopying ? offeredFormats : offeredFormats.filter { $0.format == .pdf }
+    }
+
     nonisolated static let offeredFormats: [(format: ExportFormat, title: String, systemImage: String, iconColor: Color?)] = [
         (.pdf, "PDF", "doc.richtext", .red),
         (.jpeg, "JPEG", "photo", nil),
@@ -332,6 +355,8 @@ struct ExportSheet: View {
         case .passwordNotRepresentable: L10n.exportPasswordNotRepresentable
         case .passwordNotSupported: L10n.exportPasswordNotSupported
         case .emptyPassword: L10n.exportPasswordEmpty
+        case .copyingNotAllowed: L10n.restrictedExportRefused
+        case .printingNotAllowed: L10n.restrictedPrintRefused
         case .noPages, .writeFailed, .archiveTooLarge: L10n.exportFailed
         }
     }

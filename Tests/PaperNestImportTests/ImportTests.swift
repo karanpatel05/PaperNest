@@ -80,13 +80,9 @@ final class TestLibrary: @unchecked Sendable {
         #expect(stored.range(of: Data("s3cret".utf8)) == nil)
     }
 
-    @Test func pdfsWithAuthorRestrictionsAreDeclined() async throws {
-        let lib = try TestLibrary()
-        await #expect(throws: ImportError.restrictedPDF(filename: "Restricted.pdf")) {
-            try await lib.importer.importItem(.data(SyntheticDocuments.restrictedPDF(), name: "Restricted.pdf"))
-        }
-        #expect(try await lib.store.items(in: .all).isEmpty)
-    }
+    // What happens to a PDF whose author restricted copying or printing is in
+    // `RestrictedPDFImportTests`: since 2026-11-13 such a file is imported and
+    // keeps its limits, where it used to be declined here.
 
     @Test func damagedEmptyAndUnsupportedFilesAreRejectedWithoutSideEffects() async throws {
         let lib = try TestLibrary()

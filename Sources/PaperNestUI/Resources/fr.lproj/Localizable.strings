@@ -148,7 +148,7 @@
 "error.import.empty" = "Le fichier est vide.";
 "error.import.incorrectPassword" = "Le mot de passe est incorrect.";
 "error.import.protectedUnsupported" = "Ce PDF protégé par mot de passe ne peut pas être importé.";
-"error.import.restricted" = "L’auteur de ce PDF a restreint la copie ou l’impression ; il ne peut donc pas être importé.";
+"error.import.restricted" = "Ce PDF est protégé par un mot de passe et son auteur a restreint la copie ou l’impression. Il ne peut donc pas être importé.";
 "error.import.tooLarge" = "Cette image est trop grande pour être importée.";
 "password.title" = "« %@ » est protégé par un mot de passe";
 "password.message" = "Saisissez le mot de passe pour l’ouvrir. %@ conserve une copie déverrouillée dans votre bibliothèque et n’enregistre pas le mot de passe.";
@@ -841,6 +841,12 @@
 "bookmark.marked" = "Page avec signet";
 "bookmark.failed" = "Le signet n’a pas pu être enregistré.";
 "bookmark.localOnly" = "Les signets restent sur cet appareil. Ils ne sont pas synchronisés avec iCloud.";
+
+/* Restricted PDFs (Claude, 2026-11-13) */
+"restricted.copy.refused" = "L’auteur de ce PDF n’autorise pas la copie de son texte.";
+"restricted.export.note" = "L’auteur de ce PDF n’autorise pas la copie de son contenu. Il ne peut être exporté qu’en PDF, et la copie conserve cette protection.";
+"restricted.export.refused" = "L’auteur de ce PDF n’autorise pas la copie de son contenu, il ne peut donc pas être exporté dans ce format.";
+"restricted.print.refused" = "L’auteur de ce PDF n’autorise pas son impression.";
 
 /* iCloud sync (Claude, 2026-11-13) */
 "sync.status.savedLocally" = "Enregistré sur cet appareil";

@@ -1,5 +1,7 @@
 import Foundation
 import PDFKit
+import PaperNestCore
+import PaperNestRender
 
 public enum FormError: Error, Equatable, Sendable {
     /// The PDF has no document-level `/AcroForm`. Most PDFs PaperNest itself
@@ -155,6 +157,17 @@ public enum PDFForm {
             }
         }
         guard let written = document.dataRepresentation() else { throw FormError.writeFailed }
+        // A filled copy of a form whose author switched copying or printing
+        // off has to be as closed as the form. PDFKit keeps a document's
+        // encryption when it writes one it opened (measured on a USCIS form:
+        // still encrypted, copying still off), and this is here so that the
+        // day it stops, filling a form fails instead of quietly producing an
+        // open copy of a closed file.
+        if let before = PageRenderer.permissions(ofPDF: data), before.isRestricted {
+            guard let after = PageRenderer.permissions(ofPDF: written),
+                  before.allowsCopying || !after.allowsCopying,
+                  before.allowsPrinting || !after.allowsPrinting else { throw FormError.writeFailed }
+        }
         return written
     }
 

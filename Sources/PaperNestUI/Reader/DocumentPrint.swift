@@ -45,6 +45,8 @@ final class DocumentPrinter {
     private(set) var phase: Phase = .idle
     /// Set when the document could not be made ready or the panel refused it.
     var isShowingFailure = false
+    /// What to say about it. Different when the PDF's author is the reason.
+    private(set) var failureMessage = L10n.printFailed
 
     private let panel: Panel
     private let temporaryRoot: URL?
@@ -84,7 +86,12 @@ final class DocumentPrinter {
                 try await panel(job)
             } catch is CancellationError {
                 // Stopped by the reader. Not a failure, and nothing to say.
+            } catch ExportError.printingNotAllowed {
+                // Nothing went wrong: the PDF's author switched printing off.
+                failureMessage = L10n.restrictedPrintRefused
+                isShowingFailure = true
             } catch {
+                failureMessage = L10n.printFailed
                 isShowingFailure = true
             }
         }
@@ -105,7 +112,7 @@ final class DocumentPrinter {
         guard let item = try await store.item(itemID) else { throw ExportError.noPages }
         let pages = try await store.pages(of: itemID)
         guard !pages.isEmpty else { return nil }
-        let output = try await exporter.export(itemName: item.name, pages: pages, options: options)
+        let output = try await exporter.export(itemName: item.name, pages: pages, options: options, purpose: .printing)
         guard let file = output.files.first else {
             output.removeTemporaryFiles()
             throw ExportError.writeFailed
@@ -242,7 +249,7 @@ private struct DocumentPrintPresentation: ViewModifier {
             .alert(L10n.genericErrorTitle, isPresented: $printer.isShowingFailure) {
                 Button(L10n.ok, role: .cancel) {}
             } message: {
-                Text(L10n.printFailed)
+                Text(printer.failureMessage)
             }
     }
 }

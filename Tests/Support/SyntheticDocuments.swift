@@ -205,14 +205,49 @@ extension UIImage {
 #endif
 
 extension SyntheticDocuments {
-    /// A PDF that opens without a password but whose author forbids copying.
-    public static func restrictedPDF() -> Data {
+    /// A real form (`acroFormPDF`) whose author switched copying off, the way
+    /// a government form arrives: it opens for anyone, can be filled in and
+    /// printed, and its contents may not be copied out.
+    public static func restrictedAcroFormPDF(fields: [FormFieldSpec] = [FormFieldSpec(name: "customer")]) -> Data {
+        let open = acroFormPDF(fields: fields)
+        guard let document = PDFDocument(data: open) else { return open }
+        let allowed = PDFAccessPermissions.allowsLowQualityPrinting.rawValue
+            | PDFAccessPermissions.allowsHighQualityPrinting.rawValue
+            | PDFAccessPermissions.allowsFormFieldEntry.rawValue
+            | PDFAccessPermissions.allowsContentAccessibility.rawValue
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("restricted-form-\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard document.write(to: url, withOptions: [.ownerPasswordOption: "owner-only",
+                                                    .accessPermissionsOption: NSNumber(value: allowed)]),
+              let written = try? Data(contentsOf: url) else { return open }
+        return written
+    }
+
+    /// A PDF whose author limited what may be done with it, the way a
+    /// government form is: an owner password nobody is given, and copying or
+    /// printing switched off. Without `userPassword` it opens for anyone.
+    ///
+    /// Each string is a page, drawn like `textPDF`'s; an empty string is a
+    /// blank page. The default is one blank page with copying off.
+    public static func restrictedPDF(pages: [String] = [""], allowsCopying: Bool = false,
+                                     allowsPrinting: Bool = true, userPassword: String? = nil) -> Data {
         let data = NSMutableData()
-        var box = CGRect(x: 0, y: 0, width: 612, height: 792)
-        let info: [CFString: Any] = [kCGPDFContextOwnerPassword: "owner-only", kCGPDFContextAllowsCopying: false]
+        let size = CGSize(width: 612, height: 792)
+        var box = CGRect(origin: .zero, size: size)
+        var info: [CFString: Any] = [kCGPDFContextOwnerPassword: "owner-only",
+                                     kCGPDFContextAllowsCopying: allowsCopying,
+                                     kCGPDFContextAllowsPrinting: allowsPrinting]
+        if let userPassword { info[kCGPDFContextUserPassword] = userPassword }
         let ctx = CGContext(consumer: CGDataConsumer(data: data as CFMutableData)!, mediaBox: &box, info as CFDictionary)!
-        ctx.beginPDFPage(nil)
-        ctx.endPDFPage()
+        for text in pages {
+            ctx.beginPDFPage(nil)
+            if !text.isEmpty {
+                ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+                ctx.fill(CGRect(x: markerInset, y: size.height - markerInset - markerSize, width: markerSize, height: markerSize))
+                drawText(text, in: ctx, at: CGPoint(x: 72, y: size.height - 140), size: 18)
+            }
+            ctx.endPDFPage()
+        }
         ctx.closePDF()
         return data as Data
     }

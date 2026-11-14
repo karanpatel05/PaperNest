@@ -1,3 +1,126 @@
+## 2026-11-13 — USCIS forms would not open: PDFs with copying switched off are imported and keep their limits (Claude, owner in session)
+
+Owner: **"i cannot open forms from USCIS website"**, in PaperNest; what happened was "It refuses to import". Asked
+how such PDFs should be treated instead, the owner chose **"Open them, keep the limits"**.
+
+**Cause, measured on the real files.** With the owner's leave three blank forms were downloaded from uscis.gov —
+I-130, N-400 and I-765 — into a scratch folder outside the repository (they are not in it and no test uses them).
+Each one is a PDF 1.7 file encrypted under an **owner password only**: it opens for anyone, with **copying
+switched off and printing and form filling left on**. `PDFInspector.open` declined any PDF whose author had
+restricted copying or printing, by a rule in `PRODUCT_SPEC.md`, so every USCIS form was turned away. Nothing was
+broken; the rule was wrong for the files people actually have. (The three are also XFA forms with an ordinary
+form inside. Apple's PDF code draws the ordinary form, so they show as forms and not as a "Please wait…" page.)
+
+**What changed.**
+
+- **Import.** A PDF that opens without a password is stored exactly as it arrived, whatever its author switched
+  off. Still declined: a file that needs a password *and* is restricted, because the unlocked copy the library
+  keeps would not carry the limits.
+- **The limits are read, never stored.** `DocumentPermissions` (copying, printing) comes from the stored originals
+  through `PageRenderer.permissions(for:)` every time it is needed. No schema change. A page carries its author's
+  limits into any document it is merged, split or duplicated into, because it carries its original.
+- **They are kept in one place: `Exporter.export`**, which the export sheet, Print, bulk export, the library
+  backup and the form workspace all go through.
+  - Copying off: TXT, Word, JPEG, PNG and HEIC are refused before anything is written. A PDF is allowed.
+  - That PDF is the original file itself when nothing was changed. When it has to be rebuilt — something drawn on
+    a page, some pages left out, other paper, a password — it is written **with the same limits under an owner
+    password made up for the occasion and never kept** (`AuthorProtection`), by both writers.
+  - Printing off: the document is not made ready for the print panel.
+  - The finished file is **opened and checked** before it is handed over. An export that came out freer than its
+    sources fails rather than ships.
+  - A password the person exporting asks for opens the file as a reader, not as its owner.
+- **Screens.** Copy in the text-selection bar is disabled for such a document (Highlight, Underline and
+  Strikethrough are not: marking is not copying). The export sheet offers only PDF and says why underneath. Print
+  says "The author of this PDF doesn't allow printing it" instead of a generic failure. Filling a form fails
+  closed if the filled copy would come out freer than the form.
+
+**Why the rebuild needed its own work.** Measured on the I-765 with a scratch program before any code was
+written: its pages copied into a fresh `PDFDocument` and written plainly came out **unencrypted, copying
+allowed**. That is exactly what PaperNest's export does to pages nobody has touched whenever it also has to draw
+one, so accepting these files without changing the exporter would have made PaperNest a tool for removing the
+restriction — which is what the old rule was trying to prevent, by the bluntest means available. With
+`PDFDocumentWriteOption.accessPermissionsOption` and an owner password the same write comes out encrypted,
+opening freely, copying off.
+
+**Results.** Verified alone, in a clean worktree holding `HEAD` plus only this change — twice, because another
+session committed its rework of the export sheet (`ddbe1e2`) under these hunks while the first round was running.
+**The first column is the tree this commit holds.**
+
+| Check | On `ddbe1e2` + this change — what is committed | Earlier, on `722cdfd` + this change |
+|---|---|---|
+| `./scripts/test.sh` | **Passed: 1,012 tests** (320 + 49 + 191 + 169 + 173 + 110), 0 failures, 0 warnings — `/tmp/papernest-restricted-final-unit.log` | 1,012 passed |
+| New: `RestrictedPDFImportTests` 7, `RestrictedPDFExportTests` 15, `RestrictedPDFTests` 6 | **Passed** | Passed |
+| `./scripts/build-mac-app.sh` | **Built**, 0 warnings | Built |
+| `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build` | **BUILD SUCCEEDED**, 0 warnings | Succeeded, 0 warnings |
+| `RestrictedPDFUITests` (new, 2) | iPad Pro 13-inch (M5), iOS 26.5: **2/2**. PaperNest iPhone Duo, iOS 27.1: **2/2** | iPad 2/2, iPhone 2/2 |
+| `TextSelectionUITests` 2, `DocumentPrintUITests` 2 — the screens this touches | iPad **4/4**; iPhone **4/4** — `/tmp/papernest-restricted-final-ipad.log`, `…-final-iphone.log` | iPad 4/4, iPhone 4/4 |
+| `DocumentFindUITests` 3, `PageLinksUITests` 2, `BookmarksUITests` 3, `NightModeUITests` 3 | **Not run again** on this base: `ddbe1e2` changed the export sheet's footer and nothing these suites reach | iPad 11/11. iPhone **9/11, then the two suites that failed 6/6 on their own**: a find test did not get its editor on screen in 30 s, and a Night Mode switch did not take a tap, with the load average over 150 from another session's simulator run (`/tmp/papernest-restricted-clean-iphone.log`, then `…-clean-iphone-2.log`) |
+| **The three real USCIS forms through the app's own code** (a throwaway test in the worktree, deleted, never committed; run on the earlier base — nothing in `ddbe1e2` touches the importer, renderer or exporter) | — | **All three:** imported with the right page count (12, 14, 7); limits read as copying off, printing on; the stored original identical to the download; page 1 drawn; 1,800–2,700 characters of text read from page 1; a whole export identical to the download; 450, 440 and 161 form fields found, 268, 189 and 103 of them fillable text; text export refused; drawn on and made ready for printing, all pages present and still copying off; one field filled, the value read back, the filled copy still copying off and imported as a document |
+
+UI runs called `xcodegen` and `xcodebuild test` directly, without the script's seeding step (see the Night mode
+entry below for why); one device at a time, `-parallel-testing-enabled NO`.
+
+**What the tests prove.** On synthetic fixtures (`SyntheticDocuments.restrictedPDF`, `restrictedAcroFormPDF`):
+
+- A file with copying off, and one with printing off, is imported byte for byte and its pages draw. A file that
+  is locked as well as restricted is still declined and leaves nothing behind.
+- The limits read back are the file's; pages from several files are bound by every author at once; a picture
+  has none.
+- Untouched, the export is the file that came in. Each of TXT, Word, JPEG, PNG and HEIC is refused with nothing
+  written. Drawn on, cut to some pages, laid on A4, or given a password, the exported PDF opens the same way the
+  original did and still has copying off; four guesses at its owner password do not open it as owner; the pen
+  stroke is on it and an untouched page kept its words.
+- A file that only forbids printing keeps "no printing" through a rebuild, can still be exported as text, and is
+  refused for the print panel. A form that allows printing reaches the print panel still closed to copying.
+- An open document mixed with a restricted one is exported closed. A backup archive holds the restricted
+  document as the original and the ordinary one open. An ordinary PDF is exported exactly as before.
+- A restricted form's fields are read, a filled copy is as closed as the form, and the filled copy is accepted
+  back as a document that still refuses a text export.
+- Screens: only PDF is offered where copying is off (and where the limits could not be read); each refusal has
+  its own wording; an open document knows its author's limits; Print shows no panel and says why when printing
+  is off.
+- `RestrictedPDFUITests`, in the running app: the restricted file **opens**; a word can be selected; Copy is there
+  and disabled while Highlight works and saves one stroke; the export sheet has the PDF tile and none of the
+  other five, with the reason under it, on screen, in English, French and Spanish.
+
+Screenshots: `docs/screenshots/restricted-pdf-2026-11-13/` (a selected word with Copy unavailable; the export sheet
+with PDF alone and the reason, in English and in French).
+
+**Proved able to fail.** With the PDFKit write put back to a plain one, every export test that rebuilds a
+PDF failed with `writeFailed` — the check on the finished file refusing to hand it over. With that check switched off as well,
+they failed on their own assertions: not encrypted, copying allowed, owner password guessed. Both were put back.
+
+**A separate thing these files showed, not fixed here.** A value typed into a form field is **not drawn on the
+page inside PaperNest**. Measured on the I-765 with its family-name field filled: Apple's PDFKit draws the typed
+name in the box; PaperNest's own picture of the same page has nothing there (0 dark samples where the name
+sits), because the page is drawn with `CGContext.drawPDFPage`, which draws page content and not form fields. The
+value is in the file — it reads back, and it is in what is exported and printed — but someone who fills a form in
+Fill PDF Form and opens the saved copy sees empty boxes. That is true of every form, not only these, and it was
+true before today; it only became easy to meet now that government forms open. It is its own piece of work.
+
+**Not verified, plainly.**
+
+- **No form was filled in the running app.** Fill PDF Form was exercised through the engine on the real files
+  (fields read, one filled, the copy imported), not by typing into the form sheet on a simulator. Fill PDF Form is
+  a Pro feature.
+- **A filled form was not opened in Adobe Reader, and nothing was submitted to USCIS.** PDFKit dropped the XFA
+  part when it wrote the filled copy (measured: the copy has none), which should make Adobe show the ordinary
+  form and its values; "should" is not "seen". USCIS's own instructions ask for Adobe Reader. **Whether USCIS
+  accepts a form filled in PaperNest is not known.** The forms carry a barcode at the foot of each page that
+  PaperNest does not draw either.
+- **Import through the app's file picker was not driven**: the UI test puts the restricted file into the library
+  directly. The importer itself is covered by the unit tests and by the three real forms.
+- The Mac was built, not used. Printing a restricted form was taken as far as the file handed to the print panel;
+  whether the system's panel then withholds its own "Save as PDF" for such a file was not looked at.
+- Only copying and printing are tracked. A file whose author also switched off commenting or form filling is
+  treated as allowing them, and a rebuilt export always allows filling, commenting and accessibility and never
+  document assembly.
+- Redact and Compress have engines and no screens. Both rewrite a page into a new original, which would have no
+  limits; whoever builds those screens has to refuse a restricted document or carry its limits. Compress already
+  refuses an encrypted file. Recorded in `ARCHITECTURE.md`.
+- French and Spanish strings are unreviewed by a native speaker, like the rest. No VoiceOver, Dynamic Type or
+  physical-device pass.
+
 ## 2026-11-13 — Export: Save, Copy and Share act in one tap; no Export button (Claude, owner in session)
 
 Owner: "In export feature Share button does not work directly … remove export button". Reproduced on iPhone 17

@@ -22,15 +22,24 @@ public struct Exporter: Sendable {
 
     /// Exports `pages` in the given order. Cancelling the calling task stops
     /// at the next page and removes everything written so far.
+    ///
+    /// **An author's limits are kept here, for every caller.** Pages from a
+    /// PDF whose author switched copying off can leave only as a PDF that is
+    /// just as closed, and pages whose author switched printing off are not
+    /// made ready for a printer. Everything that lets content out of the app
+    /// — the export sheet, printing, bulk export, the library backup, the
+    /// form workspace — comes through this function, which is why the rule
+    /// lives here and nowhere else.
     public func export(
         itemName: String,
         pages: [Page],
         options: ExportOptions,
         password: String? = nil,
+        purpose: ExportPurpose = .file,
         progress: @Sendable (ExportProgress) -> Void = { _ in }
     ) async throws -> ExportOutput {
         try await export(itemName: itemName, pages: pages, options: options,
-                         rasterQuality: nil, password: password, progress: progress)
+                         rasterQuality: nil, password: password, purpose: purpose, progress: progress)
     }
 
     /// The same export, with the raster resolution and quality chosen
@@ -43,9 +52,17 @@ public struct Exporter: Sendable {
         options: ExportOptions,
         rasterQuality: RasterQuality?,
         password: String? = nil,
+        purpose: ExportPurpose = .file,
         progress: @Sendable (ExportProgress) -> Void = { _ in }
     ) async throws -> ExportOutput {
         guard !pages.isEmpty else { throw ExportError.noPages }
+        // What the authors of these pages allow. Read from the originals, and
+        // an original that cannot be read fails the export: not knowing is
+        // not permission.
+        let permissions = try await renderer.permissions(for: pages)
+        if purpose == .printing, !permissions.allowsPrinting { throw ExportError.printingNotAllowed }
+        if !permissions.allowsCopying, options.format != .pdf { throw ExportError.copyingNotAllowed }
+        let protection = AuthorProtection(permissions)
         // All refused before a directory exists, so a refusal writes nothing.
         if let password {
             guard options.format == .pdf else { throw ExportError.passwordNotSupported }
@@ -68,10 +85,18 @@ public struct Exporter: Sendable {
             let files: [URL] = switch options.format {
             case .pdf: [try await writePDF(pages, title: itemName, to: directory.appendingPathComponent("\(base).pdf"),
                                            options: options, rasterQuality: rasterQuality,
-                                           password: password, progress: progress)]
+                                           password: password, protection: protection, progress: progress)]
             case .jpeg, .png, .heic: try await writeImages(pages, base: base, in: directory, options: options, progress: progress)
             case .txt: [try await writeText(pages, to: directory.appendingPathComponent("\(base).txt"), progress: progress)]
             case .docx: [try await writeDocx(pages, to: directory.appendingPathComponent("\(base).docx"), progress: progress)]
+            }
+            // Checked, not trusted: three different writers can produce this
+            // file, and one that dropped the author's limits must fail the
+            // export rather than hand the file over.
+            if let protection, options.format == .pdf {
+                guard let written = files.first, protection.holds(in: written, userPassword: password) else {
+                    throw ExportError.writeFailed
+                }
             }
             return ExportOutput(directory: directory, files: files)
         } catch {
@@ -127,10 +152,15 @@ public struct Exporter: Sendable {
     /// a new case appearing in the export sheet's picker.
     private func writePDF(_ pages: [Page], title: String, to url: URL, options: ExportOptions,
                           rasterQuality: RasterQuality? = nil, password: String? = nil,
+                          protection: AuthorProtection? = nil,
                           progress: @Sendable (ExportProgress) -> Void) async throws -> URL {
         var defaultBox = CGRect(x: 0, y: 0, width: 612, height: 792)
         var info: [CFString: Any] = [kCGPDFContextCreator: Brand.pdfCreator, kCGPDFContextTitle: title]
-        if let password {
+        if let protection {
+            // The author's limits, under an owner password nobody holds. A
+            // password the exporter asked for only opens the file.
+            protection.apply(to: &info, userPassword: password)
+        } else if let password {
             // Both, deliberately. A document opens with *either* password, so
             // leaving the owner password empty would open it with an empty one
             // and the user password would protect nothing.
@@ -264,7 +294,7 @@ public struct Exporter: Sendable {
            let data = sourceData[asset] {
             try data.write(to: url, options: .atomic)
         } else if !untouched.isEmpty {
-            try Self.replaceWithSourcePages(untouched, in: url, password: password)
+            try Self.replaceWithSourcePages(untouched, in: url, password: password, protection: protection)
         }
         // The copies are read lazily from the documents they came from, which
         // must therefore outlive the write. Scope alone is not a guarantee

@@ -22,7 +22,7 @@ Launch markets are the United States and Canada. English, French and Spanish shi
 - Supported types are PDF, JPEG and PNG. The type is detected from the file's bytes, not its extension.
 - PDFs stay vector PDFs. Pages are never rasterized on import, so text stays selectable.
 - **Password-protected PDFs:** the user is asked for the password, and a wrong password can be retried. After unlocking, the library keeps an unlocked copy and the password is never stored. The prompt tells the user this.
-- **PDFs with author restrictions** (copying or printing disabled) are declined with an explanation. Export would otherwise remove the author's restrictions.
+- **PDFs with author restrictions** (copying or printing disabled, under an owner password nobody is given) are imported and **keep their limits** — changed 2026-11-13 at the owner's decision, after every USCIS form turned out to be one. Such a file can be read, searched, marked up, filled in and, where its author allows, printed. Where copying is off its text cannot be copied out and it can be exported only as a PDF that is just as closed; where printing is off it is not printed. One case is still declined: a file that needs a password to open *and* is restricted, because the unlocked copy the library keeps could not carry the limits.
 - Damaged, truncated, empty, unreadable and unsupported files are rejected with a per-file reason. In a batch import the other files still import.
 - Duplicate content is stored once, but each import creates its own item.
 - Images are stored upright by applying their EXIF orientation. When an image carries no trustworthy resolution (phone cameras write 72 dpi), its page is sized so the long edge is 11 in.

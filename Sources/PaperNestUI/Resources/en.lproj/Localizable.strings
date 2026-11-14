@@ -148,7 +148,7 @@
 "error.import.empty" = "The file is empty.";
 "error.import.incorrectPassword" = "The password is incorrect.";
 "error.import.protectedUnsupported" = "This password-protected PDF can’t be imported.";
-"error.import.restricted" = "The author of this PDF restricted copying or printing, so it can’t be imported.";
+"error.import.restricted" = "This PDF needs a password and its author restricted copying or printing, so it can’t be imported.";
 "error.import.tooLarge" = "This image is too large to import.";
 "password.title" = "“%@” Is Password-Protected";
 "password.message" = "Enter the password to open it. %@ keeps an unlocked copy in your library and doesn’t store the password.";
@@ -841,6 +841,12 @@
 "bookmark.marked" = "Bookmarked page";
 "bookmark.failed" = "The bookmark couldn’t be saved.";
 "bookmark.localOnly" = "Bookmarks stay on this device. They are not synced with iCloud.";
+
+/* Restricted PDFs (Claude, 2026-11-13) */
+"restricted.copy.refused" = "The author of this PDF doesn’t allow copying its text.";
+"restricted.export.note" = "The author of this PDF doesn’t allow copying its contents. It can be exported only as a PDF, and the copy keeps that protection.";
+"restricted.export.refused" = "The author of this PDF doesn’t allow copying its contents, so it can’t be exported in this format.";
+"restricted.print.refused" = "The author of this PDF doesn’t allow printing it.";
 
 /* iCloud sync (Claude, 2026-11-13) */
 "sync.status.savedLocally" = "Saved on this device";

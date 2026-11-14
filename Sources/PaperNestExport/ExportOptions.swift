@@ -170,9 +170,23 @@ public struct ExportOutput: Sendable {
     }
 }
 
+/// What an export is for. The author of a PDF can allow one and not the other.
+public enum ExportPurpose: Sendable {
+    /// A file to keep, share or copy.
+    case file
+    /// The PDF handed to the system's print panel.
+    case printing
+}
+
 public enum ExportError: Error, Equatable, Sendable {
     case noPages
     case writeFailed
+    /// A page comes from a PDF whose author does not allow copying, and the
+    /// format asked for would hand its words or pictures out unprotected.
+    /// Only a PDF can keep the author's limits, so only a PDF is written.
+    case copyingNotAllowed
+    /// A page comes from a PDF whose author does not allow printing.
+    case printingNotAllowed
     case archiveTooLarge
     /// A text export where no page has any text. Writing a file holding
     /// nothing but page separators would look like a successful export of an

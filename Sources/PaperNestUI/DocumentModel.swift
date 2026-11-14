@@ -15,6 +15,9 @@ final class DocumentModel {
     let session: LibrarySession
     private(set) var item: LibraryItem?
     private(set) var pages: [Page] = []
+    /// What the authors of this document's PDFs allow. Read from the stored
+    /// originals whenever the pages are; never saved.
+    private(set) var permissions = DocumentPermissions.unrestricted
     private(set) var hasLoaded = false
     var selectedPageID: PageID?
     var presentedError: PresentedError?
@@ -84,6 +87,10 @@ final class DocumentModel {
             if selectedPageID == nil || !pages.contains(where: { $0.id == selectedPageID }) {
                 selectedPageID = pages.first?.id
             }
+            // Read again with the pages: a merge can bring in a page whose
+            // author allows less. Unreadable means nothing is allowed.
+            let limits = (try? await session.environment?.renderer.permissions(for: pages)) ?? .unknown
+            if limits != permissions { permissions = limits }
             hasLoaded = true
         } catch {
             presentedError = .saveFailed()

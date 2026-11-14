@@ -949,6 +949,14 @@ extension L10n {
     static var bookmarkLocalOnly: String { tr("bookmark.localOnly") }
 }
 
+// Restricted PDFs (Claude, 2026-11-13).
+extension L10n {
+    static var restrictedCopyRefused: String { tr("restricted.copy.refused") }
+    static var restrictedExportNote: String { tr("restricted.export.note") }
+    static var restrictedExportRefused: String { tr("restricted.export.refused") }
+    static var restrictedPrintRefused: String { tr("restricted.print.refused") }
+}
+
 // iCloud sync (Claude, 2026-11-13).
 extension L10n {
     static var syncStatusSavedLocally: String { tr("sync.status.savedLocally") }

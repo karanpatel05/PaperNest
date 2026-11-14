@@ -96,7 +96,7 @@ extension Exporter {
     /// That throws rather than shipping the blank placeholder, which would be
     /// a page of content quietly replaced by nothing.
     static func replaceWithSourcePages(_ sourcePages: [Int: PDFPage], in url: URL,
-                                       password: String? = nil) throws {
+                                       password: String? = nil, protection: AuthorProtection? = nil) throws {
         guard let drawn = PDFDocument(url: url) else { throw ExportError.writeFailed }
         // This is the file the context just wrote, so when a password was used
         // it is encrypted and locked. Every page that did not pass through is
@@ -131,7 +131,13 @@ extension Exporter {
         // The password has to be re-applied here. This write replaces the file
         // the context encrypted, so without it the export arrives unprotected
         // while the caller believes it is protected.
-        let wrote = if let password {
+        //
+        // An author's limits have to be re-applied here for the same reason,
+        // and it matters more: these are pages copied out of a restricted
+        // file, and written plainly they come out with no limits at all.
+        let wrote = if let protection {
+            output.write(to: staged, withOptions: protection.writeOptions(userPassword: password))
+        } else if let password {
             output.write(to: staged, withOptions: [.userPasswordOption: password,
                                                    .ownerPasswordOption: password])
         } else {

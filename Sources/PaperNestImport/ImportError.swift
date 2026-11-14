@@ -15,8 +15,12 @@ public enum ImportError: Error, Equatable, Sendable {
     /// The PDF opened with the password but could not be stored in a form
     /// that opens without it. Nothing was imported.
     case protectedPDFUnsupported(filename: String)
-    /// The PDF's author restricted copying or printing. Importing would let
-    /// export remove those restrictions, so such files are declined.
+    /// The PDF needs a password **and** its author restricted copying or
+    /// printing. The library keeps a copy that opens without the password,
+    /// and that copy could not carry the author's limits, so it is declined.
+    ///
+    /// A restricted PDF that opens *without* a password is imported: its
+    /// limits stay in the stored original and are kept on the way out.
     case restrictedPDF(filename: String)
     /// Dimensions beyond what the app can safely decode.
     case tooLarge(filename: String)

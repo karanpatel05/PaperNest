@@ -171,7 +171,13 @@ enum PDFInspector {
         guard document.isUnlocked else {
             return try unlockedCopy(of: data, pageCount: document.numberOfPages, password: password, filename: filename)
         }
-        guard document.allowsCopying, document.allowsPrinting else { throw ImportError.restrictedPDF(filename: filename) }
+        // A PDF that opens without a password is kept exactly as it is, even
+        // when its author switched copying or printing off — every USCIS form
+        // does. Its limits are in these bytes; they are read back from the
+        // stored original (`PageRenderer.permissions`) and kept by everything
+        // that lets content out of the app (`Exporter`). Declining the file,
+        // as this did until 2026-11-13, protected the author by making their
+        // form impossible to read.
         return try facts(for: document, stored: data, filename: filename)
     }
 
@@ -185,6 +191,10 @@ enum PDFInspector {
         guard let kitDocument = PDFDocument(data: data), kitDocument.unlock(withPassword: password) else {
             throw ImportError.incorrectPassword(filename: filename)
         }
+        // Still declined when it is restricted as well as locked. What is
+        // stored below is a rebuilt copy that opens without the password, and
+        // a rebuilt copy carries none of the author's limits: there would be
+        // nothing left in the library to read them from.
         guard kitDocument.allowsCopying, kitDocument.allowsPrinting else { throw ImportError.restrictedPDF(filename: filename) }
         let copy = PDFDocument()
         for index in 0..<kitDocument.pageCount {

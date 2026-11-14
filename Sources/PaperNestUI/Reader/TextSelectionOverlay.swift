@@ -159,6 +159,12 @@ struct TextSelectionOverlay: View {
                     .padding(.horizontal, 8).frame(minHeight: 36).contentShape(Rectangle())
             }
             .keyboardShortcut(claimsCopyShortcut ? KeyboardShortcut("c", modifiers: .command) : nil)
+            // Where the PDF's author switched copying off, the words can be
+            // selected and marked but not taken out.
+            .disabled(!model.permissions.allowsCopying)
+            .opacity(model.permissions.allowsCopying ? 1 : 0.4)
+            .help(model.permissions.allowsCopying ? L10n.exportCopy : L10n.restrictedCopyRefused)
+            .accessibilityHint(model.permissions.allowsCopying ? "" : L10n.restrictedCopyRefused)
             .accessibilityIdentifier("text-selection-copy")
             Divider().frame(height: 22)
             markButton(.highlight, symbol: "highlighter", name: L10n.annotationHighlight)
@@ -183,6 +189,7 @@ struct TextSelectionOverlay: View {
     }
 
     private func copy() {
+        guard model.permissions.allowsCopying else { return }
         Clipboard.write(text: selection.text)
         didCopy = true
         Task {

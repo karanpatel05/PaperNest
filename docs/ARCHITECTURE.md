@@ -107,7 +107,16 @@ Display, thumbnails and every export path draw through `PageRenderer.draw(_:sour
 
 PDF handling:
 - Locked PDFs are opened with PDFKit `unlock`, and the pages are copied into a new unencrypted `PDFDocument`. PDFKit's own `dataRepresentation()` stays encrypted, which was verified on macOS 26. The result is checked before it's accepted.
-- PDFs that restrict copying or printing are declined.
+- A PDF that opens without a password is stored exactly as it arrived, **including one whose author switched copying or printing off** (every USCIS form). Until 2026-11-13 these were declined. A file that is locked *and* restricted still is: the unlocked copy above could not carry the limits.
+
+**An author's limits** (`DocumentPermissions`: copying, printing) are never stored. `PageRenderer.permissions(for:)` reads them from the stored originals each time, so they cannot drift from the file and they follow a page into any document it is merged, split or duplicated into. They are **kept in one place, `Exporter.export`**, which every way out of the app goes through — the export sheet, Print, bulk export, the library backup, the form workspace:
+
+- copying off and a format other than PDF: refused (`ExportError.copyingNotAllowed`) before anything is written;
+- printing off and the export is for the print panel: refused (`ExportError.printingNotAllowed`);
+- a PDF that has to be *rebuilt* (something drawn on it, pages left out, other paper, a password) is written with the same limits under an owner password made up for the occasion and never kept (`AuthorProtection`), by both writers — `CGPDFContext` and the PDFKit pass that copies untouched pages in. Measured: without this a USCIS form's pages come out unencrypted with copying allowed;
+- the finished file is **opened and checked** before it is handed over, and an export that came out freer than its sources fails.
+
+A password the person exporting asks for opens such a file as a reader, never as its owner. The one exit that is not an export, Copy on selected text, asks the open document's `permissions`. **Anything new that lets page content out must go through `Exporter.export` or ask the same question** — the Redact and Compress screens that are still to be built above all: both rewrite a page into a new original, and a new original has no limits.
 
 Image handling:
 - ImageIO accepts truncated files, so JPEG (end-of-image after the last scan) and PNG (`IEND`) completeness are checked structurally.
