@@ -1,3 +1,23 @@
+## 2026-11-14 — Print allowed in the Mac's iCloud signing file (Claude, owner in session)
+
+Owner: **"Yes, add it"**, asked whether to add the print entitlement to `Apps/Mac/PaperNest.iCloud.entitlements`
+myself. A sandboxed Mac app may not open the print panel without `com.apple.security.print`. The development file
+`Apps/Mac/PaperNest.entitlements` has had it since Print (`2ce8567`), but a build with iCloud switched on is signed
+with the iCloud file, which did not have it: Print would have failed there and nowhere a test could see.
+
+That file also holds someone else's uncommitted edits (the iCloud keys taken out). They are left in the working tree
+as they were, with the print key added beside them; **the commit holds only the two print lines**, on top of the
+file as it is in `HEAD`.
+
+| Check | Result |
+|---|---|
+| `plutil -lint`, the committed file and the working copy | **OK** both |
+| Each compared with what it was | Only `com.apple.security.print` → `true` added |
+| A copy of the development Mac app signed ad hoc with the committed file, entitlements read back with `codesign -d --entitlements` | **`com.apple.security.print` = true** is in the signature |
+
+**Not verified:** a build with iCloud switched on was not made — it needs a provisioning profile for a container
+that does not exist yet (see the iCloud rows further down) — and nothing was printed from a Mac.
+
 ## 2026-11-14 — Annotations, follow-up: pictures follow the print flags; the exporter's PDFKit work checked under load (Claude)
 
 Two things the entry below claimed or left open, checked after it was committed (`78d7e77`).
