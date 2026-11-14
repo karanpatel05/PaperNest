@@ -26,6 +26,7 @@ The owner gave a written brief and two reference boards in session ("Paper NEST 
 
 **Scanner, iPhone and iPad.** Dark in both appearances (`ScannerChrome`). Capture: Cancel and title, flash, a ⋯ menu (Import Photos, System scanner), a mode picker, the kept pages as a thumbnail with a count, the shutter, Auto/Manual. Review: stacked on a phone; on iPad the pages down the left, the page in the middle, the tools down the right and Save at the bottom.
 
+- **Every capture asks before it is kept, on iPhone as on iPad** (owner, in session: "on iphone when scanned it automatically keeps it, just like ipad i should ask"). A capture is staged and shown with **Keep Scan** and **Delete**; it joins the queue only on Keep, and the camera rests while the question is up. Before this the phone added each capture to the queue at once and only the iPad asked.
 - **Modes: Document and Photo only.** Document finds, outlines and crops to the page's edges. Photo keeps the whole frame and turns Auto off. **ID Card and Book are not shown**: neither exists, and the brief says to show only modes that do something.
 - **Tools: Enhance, Crop, Rotate, Filter, Move earlier, Move later, Duplicate, Reset, Delete.** **Clean, OCR and Merge Pages are not in the scanner**: there is no clean-up filter, and recognition and merging happen on the saved document, where they already are. No button was added for something that does nothing.
 - Save still goes through the import-location sheet and the durable import; the scanner never reports a page saved before it is.

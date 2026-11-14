@@ -53,7 +53,9 @@ struct ScannerWorkspaceView: View {
             camera.onPhoto = { data in
                 guard captureReview.pending == nil, !completed, !native, !reviewing, !photoPickerPresented else { return }
                 guard let data else { busy = false; failed = true; return }
-                if UIDevice.current.userInterfaceIdiom == .pad { stopCamera(); torch = false }
+                // Every capture is shown for a decision before it joins the
+                // queue, so the camera rests until the answer.
+                stopCamera(); torch = false
                 let generation = captureGeneration
                 Task { await appendCapture(data, generation: generation) }
             }
@@ -63,8 +65,7 @@ struct ScannerWorkspaceView: View {
                     guard let data = try? Data(contentsOf: URL(fileURLWithPath: String(path))), UIImage(data: data) != nil else { return nil }
                     return ScannerPage(original: data)
                 }
-                if UIDevice.current.userInterfaceIdiom == .pad,
-                   UserDefaults.standard.bool(forKey: "PaperNestDebugScannerPendingCapture"),
+                if UserDefaults.standard.bool(forKey: "PaperNestDebugScannerPendingCapture"),
                    let pending = pages.popLast() {
                     _ = captureReview.stage(pending)
                     return
@@ -582,13 +583,9 @@ struct ScannerWorkspaceView: View {
             if canRunCamera && scenePhase == .active { camera.start() }
             return
         }
-        let page = ScannerPage(original: data, corners: corners)
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            _ = captureReview.stage(page)
-        } else {
-            pages.append(page)
-            selected = pages.count - 1
-        }
+        // On iPhone as on iPad, a capture is not kept until the person says
+        // so: it is staged, shown, and joins the queue only on Keep.
+        _ = captureReview.stage(ScannerPage(original: data, corners: corners))
         busy = false
     }
 

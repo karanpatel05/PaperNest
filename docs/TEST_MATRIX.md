@@ -1,3 +1,25 @@
+## 2026-11-13 — The scanner asks before keeping a capture on iPhone too (Claude, owner in session)
+
+Owner: "on iphone when scanned it automatically keeps it, just like ipad i should ask". A capture on iPhone is now
+staged and shown with Keep Scan and Delete, exactly as on iPad, and joins the queue only on Keep. Three device
+checks in `ScannerWorkspaceView` are gone; nothing else changed.
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh`, 19:56 | **Passed: 985 tests** (314 + 49 + 191 + 163 + 158 + 110), 0 failures, 0 compiler warnings. The change is in an iOS-only file, so this run says only that nothing else moved. |
+| iOS Simulator build (inside `xcodebuild test`) | 0 compiler warnings. |
+| **iPhone 17 / iOS 26.5**, `ScannerWorkspaceUITests`, 19:50 | **4 passed, 0 failed**: `testCaptureIsKeptOrDeletedBeforeQueueing` (was iPad-only, as `testIPadKeepsOrDeletesCaptureBeforeQueueing`), `testPhotoModeKeepsTheWholeFrameAndTurnsAutoOff`, `testReviewEditsSaveAndReopen`, `testSavingAScanOpensExportAndClosingItReturnsHome`. |
+| **iPad Air 11-inch (M4) / iOS 26.5**, the same four, 19:53 | **4 passed, 0 failed.** The Photo-mode test now runs here as well. |
+| Looked at | The Keep-or-Delete screen on iPhone in French: title, hint, the page with its zoom controls, and the two buttons stacked because the French labels do not fit side by side. |
+
+**What the tests show.** With a capture waiting, Save is not offered and the queue button is absent; Delete leaves
+the queue as it was and Keep adds one; leaving the app and returning keeps the undecided capture; a second capture
+through the shutter is staged the same way. In Photo mode the photo is also staged, and after Keep its corners
+read `0, 0` and `100, 100`.
+
+**Not run, not seen.** A camera, as before: the fixture bytes go through the same path a still takes, but the
+automatic shutter leading into this screen has never fired on a device. Nothing else was re-run.
+
 ## 2026-11-13 — Home loses its Tools button; the phone's bar steps aside for selection (Claude, owner in session)
 
 Owner, after seeing the redesign: "remove tools from top left corner i do not want at all". The grid button in

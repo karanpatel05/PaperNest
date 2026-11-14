@@ -157,7 +157,6 @@ import UIKit
     /// cropping to detected edges, and it has no automatic shutter. The shutter
     /// takes the test's fixture bytes through the same path a camera still takes.
     func testPhotoModeKeepsTheWholeFrameAndTurnsAutoOff() throws {
-        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("iPad stages each capture first; the mode logic is shared") }
         continueAfterFailure = false
         let fixture = URL(fileURLWithPath: "/tmp/papernest-scanner-photo-\(UUID().uuidString).png")
         let format = UIGraphicsImageRendererFormat()
@@ -174,8 +173,16 @@ import UIKit
                                "-PaperNestDebugScannerImages", fixture.path, "-PaperNestDebugScannerPendingCapture", "YES"]
         app.launch()
         defer { app.terminate() }
-        XCTAssertTrue(app.buttons["scanner.add-page"].waitForExistence(timeout: 25))
-        app.buttons["scanner.add-page"].tap()
+        // The fixture arrives as a capture waiting for its answer. Keeping it
+        // leaves one page in the queue and the camera screen in front.
+        let keepButton = app.buttons["scanner.capture-keep"]
+        func keepPendingCapture() {
+            XCTAssertTrue(keepButton.waitForExistence(timeout: 25))
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: keepButton)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
+            keepButton.tap()
+        }
+        keepPendingCapture()
 
         let document = app.buttons["scanner.kind.document"]
         let photo = app.buttons["scanner.kind.photo"]
@@ -197,6 +204,11 @@ import UIKit
         let review = app.buttons["scanner.review"]
         XCTAssertEqual(review.value as? String, "1")
         app.buttons["scanner.shutter"].tap()
+        // The photo is shown for Keep or Delete like any capture, and is not
+        // in the queue until it is kept.
+        XCTAssertTrue(keepButton.waitForExistence(timeout: 20))
+        XCTAssertFalse(review.exists, "an undecided capture is not in the queue")
+        keepPendingCapture()
         wait(for: [expectation(for: NSPredicate(format: "value == %@", "2"), evaluatedWith: review)], timeout: 20)
         review.tap()
         XCTAssertTrue(app.buttons["scanner.page.1"].waitForExistence(timeout: 10))
@@ -209,8 +221,9 @@ import UIKit
         XCTAssertEqual(bottomRight.value as? String, "100, 100", "a photo keeps its whole frame")
     }
 
-    func testIPadKeepsOrDeletesCaptureBeforeQueueing() throws {
-        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad capture decisions") }
+    /// Every capture waits for Keep or Delete before it joins the queue, on
+    /// iPhone as on iPad (owner, 2026-11-13).
+    func testCaptureIsKeptOrDeletedBeforeQueueing() throws {
         continueAfterFailure = false
         let fixture = URL(fileURLWithPath: "/tmp/papernest-capture-decision-\(UUID()).png")
         let format = UIGraphicsImageRendererFormat(); format.scale = 1
