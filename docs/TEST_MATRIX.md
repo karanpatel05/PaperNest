@@ -70,10 +70,16 @@ is why they did not catch it — a multi-line case belongs with that fix.
   open. Same full-screen request.
 - **⌘D, ⌘F and ⌘G pressed on a Mac keyboard**: a background app ignores ⌘-keystrokes, so the menu items were used.
 - Pressing Open on a web link; VoiceOver; a second window on the same document.
-- On an **iPad Air 13-inch (iOS 26.5)** simulator, the new selection-bar test could not find the Night Mode switch
-  in Display settings, twice (`/tmp/pn-bars-before2.log`, `-before3.log`), so it never reached the bar. The same
-  test found it on the iPhone 17 and the iPad Pro. Not investigated: it may be that device's popover layout, and
-  it may be a real gap for someone on that iPad.
+- **Settled the same afternoon: the iPad Air 13-inch (iOS 26.5) failure was the tests, not the app.** There,
+  the selection-bar test — and the original `NightModeUITests` test too (`/tmp/pn-ipadair-night2.log`) — could not
+  find the Night Mode switch. A throwaway probe on that simulator waited three seconds after opening the document
+  and tapped Display: the popover opened with Night Mode in it, seen and present to accessibility
+  (`display-night-mode`). `EditorFirstTouchUITests` passes 3/3 there (`/tmp/pn-ipadair-firsttouch.log`), so the first
+  touch is not being swallowed. The tests' tap came the moment the document had opened, and on that model it came to
+  nothing. `ReaderNightAndBookmarksUITests` now taps Display again if the switch has not appeared after 3 s, and
+  passes **6/6** there (`/tmp/pn-ipadair-gaps.log`). `NightModeUITests` belongs to another session and still taps
+  once; it will fail the same way on that model until it does the same. **What a person sees on that iPad is fine;
+  why a very early tap does nothing there is not known.**
 
 ## 2026-11-14 — Night mode and bookmarks re-checked on today's code, and four of their gaps closed (Claude, owner in session)
 

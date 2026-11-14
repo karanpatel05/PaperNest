@@ -110,8 +110,12 @@ import PaperNestStore
     // MARK: - Switching night mode
 
     private func setNightMode(_ app: XCUIApplication, _ on: Bool, file: StaticString = #filePath, line: UInt = #line) {
-        app.buttons["studio-tool-settings"].tap()
         let night = app.switches["display-night-mode"]
+        app.buttons["studio-tool-settings"].tap()
+        // On an iPad Air 13-inch a tap made the moment the document has opened
+        // can come to nothing; a person taps again, and so does this. The
+        // first-touch suite is what guards against a swallowed tap.
+        if !night.waitForExistence(timeout: 3) { app.buttons["studio-tool-settings"].tap() }
         XCTAssertTrue(night.waitForExistence(timeout: 5), "Display settings has no Night Mode switch",
                       file: file, line: line)
         let scroll = app.scrollViews["display-settings-scroll"]
