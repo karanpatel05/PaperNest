@@ -193,22 +193,28 @@ struct PageThumbnailGallery: View {
     @Bindable var model: DocumentModel
     let actions: PageGalleryActions
 
+    /// The thumbnail scrolled to. Bound to the strip's own scroll position,
+    /// so bringing the current page into view moves the strip sideways and
+    /// never the panel around it — a `ScrollViewReader` scrolls every
+    /// enclosing scroll view, and opened the panel scrolled past Pages.
+    @State private var scrolledID: PageID?
+
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                // Lazy: a long PDF renders the thumbnails that are in view,
-                // not all of them the moment the panel opens.
-                LazyHStack(alignment: .top, spacing: 10) {
-                    ForEach(Array(model.pages.enumerated()), id: \.element.id) { index, page in
-                        card(page, index: index).id(page.id)
-                    }
+        ScrollView(.horizontal, showsIndicators: false) {
+            // Lazy: a long PDF renders the thumbnails that are in view,
+            // not all of them the moment the panel opens.
+            LazyHStack(alignment: .top, spacing: 10) {
+                ForEach(Array(model.pages.enumerated()), id: \.element.id) { index, page in
+                    card(page, index: index).id(page.id)
                 }
-                .padding(.horizontal, 2).padding(.vertical, 4)
             }
-            .onChange(of: model.selectedPageID, initial: true) { _, id in
-                guard let id else { return }
-                withAnimation { proxy.scrollTo(id, anchor: .center) }
-            }
+            .scrollTargetLayout()
+            .padding(.horizontal, 2).padding(.vertical, 4)
+        }
+        .scrollPosition(id: $scrolledID, anchor: .center)
+        .onChange(of: model.selectedPageID, initial: true) { _, id in
+            guard let id else { return }
+            withAnimation { scrolledID = id }
         }
         .accessibilityLabel(L10n.pages)
     }
@@ -300,8 +306,19 @@ struct ToolGridLayout: Layout {
         #endif
     }()
 
+    /// The width the grid lays out in. SwiftUI may ask for an ideal size
+    /// with no width at all, or with an infinite one — a Mac inspector
+    /// column measures its content that way — and an infinite width turned
+    /// into a column count traps. Both mean "as wide as you like", answered
+    /// with the panel's usual inner width.
+    static func usableWidth(_ proposed: CGFloat?) -> CGFloat {
+        guard let proposed, proposed.isFinite, proposed > 0 else { return 272 }
+        return proposed
+    }
+
     func columns(for width: CGFloat) -> Int {
-        max(2, Int((width + spacing) / (minimumWidth + spacing)))
+        let width = Self.usableWidth(width)
+        return max(2, Int((width + spacing) / (minimumWidth + spacing)))
     }
 
     private func rows(_ subviews: Subviews, width: CGFloat) -> (column: CGFloat, rows: [(height: CGFloat, items: [LayoutSubview])]) {
@@ -316,7 +333,7 @@ struct ToolGridLayout: Layout {
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 300
+        let width = Self.usableWidth(proposal.width)
         let all = rows(subviews, width: width).rows
         let height = all.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(all.count - 1, 0))
         return CGSize(width: width, height: height)

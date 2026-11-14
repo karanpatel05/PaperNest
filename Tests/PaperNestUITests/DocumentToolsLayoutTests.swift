@@ -22,6 +22,18 @@ import Testing
     }
     #endif
 
+    /// A Mac inspector column asks its content for an ideal size at infinite
+    /// width. That crashed the Mac editor the moment a document opened.
+    @Test func anUnboundedWidthIsAnsweredWithoutTrapping() {
+        let grid = ToolGridLayout()
+        #expect(grid.columns(for: .infinity) == grid.columns(for: 272))
+        #expect(grid.columns(for: .nan) == grid.columns(for: 272))
+        #expect(grid.columns(for: 0) == grid.columns(for: 272))
+        #expect(ToolGridLayout.usableWidth(nil) == 272)
+        #expect(ToolGridLayout.usableWidth(.infinity) == 272)
+        #expect(ToolGridLayout.usableWidth(300) == 300)
+    }
+
     @Test func neverFewerThanTwoAcross() {
         #expect(ToolGridLayout().columns(for: 40) == 2)
     }

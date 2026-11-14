@@ -1,3 +1,24 @@
+## 2026-11-14 (evening) — Document Tools on the Mac, seen on screen; a crash fixed (Claude)
+
+Owner granted screen access to the dev Mac app. Throwaway library, the sample `multilingual-letter` PDF.
+
+- **Crash, mine, fixed.** Opening any document crashed the Mac editor: `ToolGridLayout.columns(for:)` turned an
+  infinite width into an `Int` ("Double value cannot be converted to Int because it is either infinite or NaN").
+  A Mac inspector column asks its content for an ideal size at infinite width; iPhone and iPad never do, so every
+  simulator run passed. It shipped in `1e7fdda` and `a7c79e5`. Fix: `ToolGridLayout.usableWidth(_:)` answers nil,
+  infinite, NaN or zero with the panel's inner width; `anUnboundedWidthIsAnsweredWithoutTrapping` covers it.
+  Found from the crash report, then confirmed fixed by reopening the same document.
+- **Panel opened scrolled past Pages**, also mine: the thumbnail strip's `ScrollViewReader.scrollTo` scrolled every
+  enclosing scroll view. Now bound to the strip's own `scrollPosition`, so only the strip moves.
+- **Seen working on the Mac, after both fixes:** Document Tools as the right column with real thumbnails and Pages
+  (3); four tools across in each section; pinned Export / Save; the stacked-layers toggle hiding the panel and the
+  page widening, then showing it again; ⌥⌘0 hiding it; Next Page twice to 3 / 3 with thumbnail 3 selected; zoom in
+  to 200% from the floating bar.
+- **Not checked on the Mac:** hover appearance, dragging a thumbnail to reorder, dark mode, the Compress and Convert
+  sheets, resizing the column.
+- Unit suite green. The commit's tree (HEAD plus only these hunks; the Reader features session's two-page hunks left
+  in the working tree) was compiled on its own before committing.
+
 ## 2026-11-14 — Document Tools "Option 6" (Claude, owner's request)
 
 Owner supplied the Option 6 mockup and brief. Built by regrouping the Document Utilities panel of 2026-11-12, not a
