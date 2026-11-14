@@ -101,24 +101,9 @@ import PaperNestStore
     /// phone. The same route `AppUITests.revealEditorTool` takes.
     private func openFillForm(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let tool = app.buttons["editor-fill-form"]
-        if !tool.isHittable {
-            if isPad {
-                let list = app.scrollViews["pdf-tools-list"]
-                if !list.exists { app.buttons["editor-panels"].tap() }
-                XCTAssertTrue(list.waitForExistence(timeout: 5), file: file, line: line)
-                for _ in 0..<10 where !tool.isHittable { list.swipeUp() }
-                for _ in 0..<10 where !tool.isHittable { list.swipeDown() }
-            } else if app.scrollViews["notebook-tool-bar"].exists {
-                let bar = app.scrollViews["notebook-tool-bar"], more = app.buttons["studio-more-tools"]
-                for _ in 0..<10 where !more.isHittable { bar.swipeLeft() }
-                more.tap()
-                let menu = app.collectionViews.containing(.button, identifier: "editor-shapes").firstMatch
-                XCTAssertTrue(menu.waitForExistence(timeout: 5), file: file, line: line)
-                for _ in 0..<10 where !tool.exists && menu.exists { menu.swipeUp() }
-            } else {
-                app.buttons["editor-more"].tap()
-            }
-        }
+        // Document Tools on every device; the toolbar's More menu was removed
+        // on 2026-11-14 (Claude, owner's request) and held the same actions.
+        app.revealInDocumentTools(tool, file: file, line: line)
         XCTAssertTrue(tool.waitForExistence(timeout: 5), "Fill PDF Form cannot be reached", file: file, line: line)
         tool.tap()
     }

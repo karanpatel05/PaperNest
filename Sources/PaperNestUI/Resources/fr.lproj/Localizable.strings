@@ -776,9 +776,9 @@
 "insert.organize" = "Organiser les pages";
 
 /* Document Utilities sidebar and viewport bar (Claude, 2026-11-12) */
-"utilities.title" = "Utilitaires du document";
+"utilities.title" = "Outils du document";
 "utilities.subtitle" = "Pages et outils PDF";
-"utilities.close" = "Fermer les utilitaires du document";
+"utilities.close" = "Fermer les outils du document";
 "utilities.pages" = "Pages (%d)";
 "utilities.expanded" = "Développée";
 "utilities.collapsed" = "Réduite";
@@ -918,3 +918,46 @@
 "scanner.kind.photo" = "Photo";
 "scanner.pages" = "Pages";
 "scanner.tools" = "Outils de page";
+
+/* Read aloud (Claude, 2026-11-14) */
+"readAloud.menu" = "Lire à voix haute";
+"readAloud.stop" = "Arrêter la lecture";
+"readAloud.pause" = "Pause";
+"readAloud.resume" = "Reprendre";
+"readAloud.speed" = "Vitesse de lecture";
+"readAloud.noText" = "Il n’y a pas de texte à lire de cette page jusqu’à la fin. Reconnaître le texte, dans Utilitaires du document, lit les pages numérisées.";
+"readAloud.status" = "Lecture de la page %1$lld sur %2$lld";
+
+/* Document Tools, Option 6 (Claude, 2026-11-14) */
+"tools2.editPDF" = "Modifier le PDF";
+"tools2.annotate" = "Annoter";
+"tools2.insert" = "Insérer";
+"tools2.process" = "Traiter";
+"tools2.exportSave" = "Exporter / Enregistrer";
+"tools2.organize" = "Organiser";
+"tools2.highlightText" = "Surligner le texte";
+"tools2.underlineText" = "Souligner le texte";
+"tools2.strikeText" = "Barrer le texte";
+"tools2.draw" = "Dessiner";
+"tools2.replacePage" = "Remplacer la page";
+"tools2.split" = "Diviser";
+"tools2.compress" = "Compresser";
+"tools2.convert" = "Convertir en Word";
+"tools2.fillForm" = "Remplir le formulaire";
+"tools2.splitDone.title" = "Divisé en pages";
+"tools2.splitDone.message" = "%d nouveaux documents sont dans votre bibliothèque, un par page. Ce document n’a pas changé.";
+"compress.title" = "Compresser le PDF";
+"compress.level" = "Niveau";
+"compress.light" = "Légère";
+"compress.strong" = "Forte";
+"compress.smallest" = "Maximale";
+"compress.current" = "Ce document pèse %@.";
+"compress.rule" = "Seules les pages numérisées sans texte sont réduites. Les pages qui contiennent du texte le conservent et restent telles quelles. Votre document n’est pas modifié : vous obtenez une copie à enregistrer ou à partager.";
+"compress.action" = "Compresser";
+"compress.result" = "%1$@ → %2$@ (%3$@ de moins)";
+"compress.noGain" = "Ce document ne peut pas être réduit à ce niveau. La copie a la taille de l’original.";
+"pageNav.previous" = "Page précédente";
+"pageNav.next" = "Page suivante";
+"pageNav.counter" = "%1$d / %2$d";
+"drawer.expand" = "Agrandir";
+"drawer.collapse" = "Réduire";

@@ -5,7 +5,11 @@ import SwiftUI
 /// A preference about the panel, not about any document.
 enum DocumentUtilitiesStorage {
     static let pagesExpanded = "documentUtilities.pagesExpanded"
-    static let toolsExpanded = "documentUtilities.toolsExpanded"
+    static let editExpanded = "documentUtilities.editExpanded"
+    static let annotateExpanded = "documentUtilities.annotateExpanded"
+    static let insertExpanded = "documentUtilities.insertExpanded"
+    static let processExpanded = "documentUtilities.processExpanded"
+    static let all = [pagesExpanded, editExpanded, annotateExpanded, insertExpanded, processExpanded]
 
     /// A launch pointed at a throwaway library — every UI test, every dev run
     /// — starts with both sections open, whatever an earlier launch left
@@ -20,8 +24,7 @@ enum DocumentUtilitiesStorage {
     @MainActor static let freshStartForThrowawayLibrary: Void = {
         let defaults = UserDefaults.standard
         guard EditorToolSettingsStore.standardStorage(defaults) == nil else { return }
-        defaults.removeObject(forKey: pagesExpanded)
-        defaults.removeObject(forKey: toolsExpanded)
+        for key in all { defaults.removeObject(forKey: key) }
         NightMode.resetForThrowawayLibrary(defaults)
     }()
 }
@@ -45,16 +48,15 @@ struct PageGalleryActions {
 /// It replaces a page strip on one side of the editor and a tools list on the
 /// other, each with its own switch. There is one panel now and one way to
 /// show it, so what is open beside the page is a single question.
-struct DocumentUtilitiesSidebar<AddPage: View, GridTools: View, RowTools: View>: View {
+struct DocumentUtilitiesSidebar<PagesRow: View, Sections: View, Footer: View>: View {
     @Bindable var model: DocumentModel
     let canClose: Bool
     let close: () -> Void
     let pageActions: PageGalleryActions
-    @ViewBuilder let addPage: () -> AddPage
-    @ViewBuilder let gridTools: () -> GridTools
-    @ViewBuilder let rowTools: () -> RowTools
+    @ViewBuilder let pagesRow: () -> PagesRow
+    @ViewBuilder let sections: () -> Sections
+    @ViewBuilder let footer: () -> Footer
     @AppStorage(DocumentUtilitiesStorage.pagesExpanded) private var pagesExpanded = true
-    @AppStorage(DocumentUtilitiesStorage.toolsExpanded) private var toolsExpanded = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -79,29 +81,69 @@ struct DocumentUtilitiesSidebar<AddPage: View, GridTools: View, RowTools: View>:
             }
             .padding(.leading, 14).padding(.trailing, 4).padding(.vertical, 6)
             ScrollView {
-                VStack(spacing: 12) {
-                    UtilitiesSection(title: L10n.documentUtilitiesPages(model.pages.count), systemImage: "doc",
+                VStack(spacing: 10) {
+                    UtilitiesSection(title: L10n.documentUtilitiesPages(model.pages.count), systemImage: "doc.on.doc",
                                      isExpanded: $pagesExpanded, id: "utilities-section-pages") {
                         PageThumbnailGallery(model: model, actions: pageActions)
-                        addPage()
-                    }
-                    UtilitiesSection(title: L10n.pdfTools, systemImage: "square.3.layers.3d",
-                                     isExpanded: $toolsExpanded, id: "utilities-section-tools") {
-                        TwoColumnLayout(spacing: 8) { gridTools() }
-                            .buttonStyle(UtilityTileStyle())
+                        HStack(spacing: 6) { pagesRow() }
+                            .buttonStyle(UtilityTileStyle(compact: true))
                             .labelStyle(UtilityTileLabelStyle())
-                        VStack(spacing: 6) { rowTools() }
-                            .buttonStyle(UtilityRowStyle())
-                            .labelStyle(.titleAndIcon)
                     }
+                    sections()
                 }
                 .padding(12)
             }
             .accessibilityIdentifier("pdf-tools-list")
+            footer()
+                .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 12)
         }
         .foregroundStyle(EditorChrome.navy)
         .tint(EditorChrome.purple)
         .background(EditorChrome.secondaryBackground)
+    }
+}
+
+/// A folding card of tools, laid out as many to a row as fit. Remembers
+/// whether it was open, under its own key.
+struct ToolGridSection<Content: View>: View {
+    let title: String
+    let systemImage: String
+    let id: String
+    @ViewBuilder let content: () -> Content
+    @AppStorage private var isExpanded: Bool
+
+    init(title: String, systemImage: String, storageKey: String, id: String, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.systemImage = systemImage
+        self.id = id
+        self.content = content
+        _isExpanded = AppStorage(wrappedValue: true, storageKey)
+    }
+
+    var body: some View {
+        UtilitiesSection(title: title, systemImage: systemImage, isExpanded: $isExpanded, id: id) {
+            ToolGridLayout { content() }
+                .buttonStyle(UtilityTileStyle())
+                .labelStyle(UtilityTileLabelStyle())
+        }
+    }
+}
+
+/// The pinned Export / Save action at the foot of the panel.
+struct UtilitiesExportButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label { Text(L10n.toolsExportSave) } icon: { Image(systemName: "square.and.arrow.up") }
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .foregroundStyle(Color.white)
+                .background(EditorChrome.selection, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("utilities-export")
     }
 }
 
@@ -151,7 +193,9 @@ struct PageThumbnailGallery: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 10) {
+                // Lazy: a long PDF renders the thumbnails that are in view,
+                // not all of them the moment the panel opens.
+                LazyHStack(alignment: .top, spacing: 10) {
                     ForEach(Array(model.pages.enumerated()), id: \.element.id) { index, page in
                         card(page, index: index).id(page.id)
                     }
@@ -224,35 +268,50 @@ struct PageThumbnailGallery: View {
     }
 }
 
-/// Lays its children out two to a row, each half the width, every row as
-/// tall as its taller tile. Not lazy on purpose: every tool is in the
-/// hierarchy whether or not it has been scrolled to, so it can be found.
-struct TwoColumnLayout: Layout {
+/// Lays its children out as many to a row as keep each at least
+/// `minimumWidth` wide — two in an iPad column, three on a phone, more on a
+/// wide Mac panel — every row as tall as its tallest tile. Not lazy on
+/// purpose: every tool is in the hierarchy whether or not it has been
+/// scrolled to, so VoiceOver, the keyboard and tests can all find it.
+struct ToolGridLayout: Layout {
     var spacing: CGFloat = 8
+    var minimumWidth: CGFloat = {
+        #if os(macOS)
+        76
+        #else
+        96
+        #endif
+    }()
 
-    private func rows(_ subviews: Subviews, width: CGFloat) -> [(height: CGFloat, items: [LayoutSubview])] {
-        let column = max((width - spacing) / 2, 0)
-        return stride(from: 0, to: subviews.count, by: 2).map { start in
-            let items = Array(subviews[start..<min(start + 2, subviews.count)])
+    private func columns(for width: CGFloat) -> Int {
+        max(2, Int((width + spacing) / (minimumWidth + spacing)))
+    }
+
+    private func rows(_ subviews: Subviews, width: CGFloat) -> (column: CGFloat, rows: [(height: CGFloat, items: [LayoutSubview])]) {
+        let count = columns(for: width)
+        let column = max((width - spacing * CGFloat(count - 1)) / CGFloat(count), 0)
+        let rows = stride(from: 0, to: subviews.count, by: count).map { start in
+            let items = Array(subviews[start..<min(start + count, subviews.count)])
             let height = items.map { $0.sizeThatFits(ProposedViewSize(width: column, height: nil)).height }.max() ?? 0
             return (height, items)
         }
+        return (column, rows)
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? 300
-        let all = rows(subviews, width: width)
+        let all = rows(subviews, width: width).rows
         let height = all.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(all.count - 1, 0))
         return CGSize(width: width, height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let column = max((bounds.width - spacing) / 2, 0)
+        let laid = rows(subviews, width: bounds.width)
         var y = bounds.minY
-        for row in rows(subviews, width: bounds.width) {
+        for row in laid.rows {
             for (offset, item) in row.items.enumerated() {
-                item.place(at: CGPoint(x: bounds.minX + CGFloat(offset) * (column + spacing), y: y),
-                           proposal: ProposedViewSize(width: column, height: row.height))
+                item.place(at: CGPoint(x: bounds.minX + CGFloat(offset) * (laid.column + spacing), y: y),
+                           proposal: ProposedViewSize(width: laid.column, height: row.height))
             }
             y += row.height + spacing
         }
@@ -270,12 +329,22 @@ struct UtilityTileLabelStyle: LabelStyle {
 }
 
 struct UtilityTileStyle: ButtonStyle {
+    /// The Pages row's four actions, a little shorter than a tool tile.
+    var compact = false
     @Environment(\.isEnabled) private var isEnabled
+
+    private var height: CGFloat {
+        #if os(macOS)
+        compact ? 50 : 58
+        #else
+        compact ? 56 : 68
+        #endif
+    }
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .padding(.horizontal, 6).padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 68)
+            .padding(.horizontal, 4).padding(.vertical, 7)
+            .frame(maxWidth: .infinity, minHeight: height)
             .foregroundStyle(EditorChrome.navy)
             .background(configuration.isPressed ? EditorChrome.lavender : EditorChrome.secondaryBackground,
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -372,33 +441,63 @@ struct UtilitiesToggleButton: View {
     }
 }
 
-/// Document Utilities on a phone: the same panel, rising from the bottom.
+/// Document Tools on a phone: the same panel, rising from the bottom.
 ///
 /// Drawn inside the editor rather than as a system sheet, because half of
 /// what is in it opens a sheet or a picker of its own, and a sheet cannot
-/// present from underneath another one.
+/// present from underneath another one. It behaves like one all the same:
+/// a handle, two heights, and a swipe down to put it away.
 struct UtilitiesDrawer<Content: View>: View {
     let close: () -> Void
     @ViewBuilder let content: () -> Content
+    @State private var isExpanded = false
+    @State private var drag: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private func settle(_ change: () -> Void) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) { change() }
+    }
 
     var body: some View {
         GeometryReader { proxy in
+            let height = isExpanded ? proxy.size.height * 0.92 : min(proxy.size.height * 0.6, 560)
             ZStack(alignment: .bottom) {
                 Color.black.opacity(0.28)
                     .ignoresSafeArea()
                     .onTapGesture(perform: close)
                     .accessibilityHidden(true)
                 VStack(spacing: 0) {
-                    Capsule().fill(EditorChrome.border).frame(width: 40, height: 5).padding(.top, 8).padding(.bottom, 2)
-                        .accessibilityHidden(true)
+                    // The handle is the drag target, so a drag never fights
+                    // the scrolling list of tools below it.
+                    Capsule().fill(EditorChrome.border).frame(width: 40, height: 5)
+                        .frame(maxWidth: .infinity, minHeight: 22)
+                        .contentShape(Rectangle())
+                        .gesture(DragGesture(minimumDistance: 4)
+                            .onChanged { drag = $0.translation.height }
+                            .onEnded { value in
+                                let moved = value.translation.height
+                                settle {
+                                    drag = 0
+                                    if moved > 90 { if isExpanded { isExpanded = false } else { close() } }
+                                    else if moved < -60 { isExpanded = true }
+                                }
+                            })
+                        .onTapGesture { settle { isExpanded.toggle() } }
+                        .accessibilityElement()
+                        .accessibilityLabel(isExpanded ? L10n.drawerCollapse : L10n.drawerExpand)
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { settle { isExpanded.toggle() } }
+                        .accessibilityIdentifier("utilities-drawer-handle")
                     content()
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: min(proxy.size.height * 0.72, 620))
+                .frame(height: max(height - min(drag, 0), 200))
+                .offset(y: max(drag, 0))
                 .background(EditorChrome.secondaryBackground)
                 .clipShape(UnevenRoundedRectangle(topLeadingRadius: 22, topTrailingRadius: 22, style: .continuous))
                 .shadow(color: .black.opacity(0.2), radius: 16, y: -4)
                 .accessibilityAddTraits(.isModal)
+                .accessibilityAction(.escape) { close() }
             }
         }
         // Down to the bottom edge of the screen, like any drawer: stopping at

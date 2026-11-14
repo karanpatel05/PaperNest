@@ -156,11 +156,12 @@ import PaperNestStore
         XCTAssertTrue(app.buttons["studio-tool-highlighter"].isHittable, "Highlighter is not reachable on a freshly opened page")
         // Undo, redo and More are within reach without scrolling anything:
         // on a phone that means the lower palette and the pinned end of the bar.
-        for identifier in ["notebook-undo", "notebook-redo", "studio-more-tools"] {
+        XCTAssertFalse(app.buttons["studio-more-tools"].exists, "no More menu: its tools are in Document Tools")
+        for identifier in ["notebook-undo", "notebook-redo"] {
             XCTAssertEqual(app.buttons.matching(identifier: identifier).count, 1, "\(identifier) appears once")
         }
         if !isPad {
-            XCTAssertTrue(app.buttons["studio-more-tools"].isHittable, "More is pinned where a phone can always reach it")
+            XCTAssertTrue(app.buttons["editor-panels"].isHittable, "Document Tools' toggle is always within reach")
             XCTAssertTrue(app.windows.firstMatch.frame.contains(app.buttons["notebook-undo"].frame), "Undo is on screen")
         }
         if !isPad {

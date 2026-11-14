@@ -89,6 +89,15 @@ extension PageRenderer {
     /// `PageGeometry.pdfToSource` is the one mapping from there to upright
     /// source space, the same one the renderer draws the page through, so a
     /// box lands on the glyph it belongs to.
+    ///
+    /// Each box is taken from a **selection** of the character, not from
+    /// `characterBounds(at:)`. The two count differently: `string` has a line
+    /// break between lines that `characterBounds(at:)` does not count, so
+    /// indexing it with positions in `string` put every line's boxes one
+    /// character further along than the line before's (measured: line 2's "L"
+    /// came back with the "i"'s box, and by line 4 everything was three
+    /// characters off). A selection is indexed the way `string` is. It is no
+    /// slower: a 2,680-character form page took 3 ms.
     static func embeddedLines(of pdfPage: PDFPage) -> [PageTextLayout.Line] {
         guard let raw = pdfPage.string, !raw.isEmpty else { return [] }
         let box = pdfPage.bounds(for: .cropBox)
@@ -98,13 +107,14 @@ extension PageRenderer {
         // was rounded: a fraction of the upright page is a fraction of it.
         let toUnit = PageGeometry.pdfToSource(box: box, rotationDegrees: pdfPage.rotation)
             .concatenating(CGAffineTransform(scaleX: 1 / upright.width, y: 1 / upright.height))
-        let count = pdfPage.numberOfCharacters
+        let length = (raw as NSString).length
         return PageTextTokenizer.lines(of: raw).map { tokens in
             PageTextLayout.Line(fragments: tokens.map { token in
                 var bounds = CGRect.null
-                for index in token.range.location..<(token.range.location + token.range.length) where index < count {
-                    let character = pdfPage.characterBounds(at: index)
-                    if character.width > 0, character.height > 0 { bounds = bounds.union(character) }
+                for index in token.range.location..<(token.range.location + token.range.length) where index < length {
+                    let character = pdfPage.selection(for: NSRange(location: index, length: 1))?
+                        .bounds(for: pdfPage) ?? .null
+                    if !character.isNull, character.width > 0, character.height > 0 { bounds = bounds.union(character) }
                 }
                 // A character PDFKit cannot place keeps its turn in the text
                 // with an empty box, so every later hit still counts right.

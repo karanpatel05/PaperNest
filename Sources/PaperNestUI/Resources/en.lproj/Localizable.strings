@@ -776,9 +776,9 @@
 "insert.organize" = "Organize Pages";
 
 /* Document Utilities sidebar and viewport bar (Claude, 2026-11-12) */
-"utilities.title" = "Document Utilities";
+"utilities.title" = "Document Tools";
 "utilities.subtitle" = "Pages & PDF Tools";
-"utilities.close" = "Close Document Utilities";
+"utilities.close" = "Close Document Tools";
 "utilities.pages" = "Pages (%d)";
 "utilities.expanded" = "Expanded";
 "utilities.collapsed" = "Collapsed";
@@ -918,3 +918,46 @@
 "scanner.kind.photo" = "Photo";
 "scanner.pages" = "Pages";
 "scanner.tools" = "Page tools";
+
+/* Read aloud (Claude, 2026-11-14) */
+"readAloud.menu" = "Read Aloud";
+"readAloud.stop" = "Stop Reading";
+"readAloud.pause" = "Pause";
+"readAloud.resume" = "Resume";
+"readAloud.speed" = "Reading Speed";
+"readAloud.noText" = "There’s no text to read from this page to the end. Recognize Text, in Document Utilities, reads scanned pages.";
+"readAloud.status" = "Reading page %1$lld of %2$lld";
+
+/* Document Tools, Option 6 (Claude, 2026-11-14) */
+"tools2.editPDF" = "Edit PDF";
+"tools2.annotate" = "Annotate";
+"tools2.insert" = "Insert";
+"tools2.process" = "Process";
+"tools2.exportSave" = "Export / Save";
+"tools2.organize" = "Organize";
+"tools2.highlightText" = "Highlight Text";
+"tools2.underlineText" = "Underline Text";
+"tools2.strikeText" = "Strike Through";
+"tools2.draw" = "Draw";
+"tools2.replacePage" = "Replace Page";
+"tools2.split" = "Split";
+"tools2.compress" = "Compress";
+"tools2.convert" = "Convert to Word";
+"tools2.fillForm" = "Fill Form";
+"tools2.splitDone.title" = "Split into Pages";
+"tools2.splitDone.message" = "%d new documents are in your library, one per page. This document is unchanged.";
+"compress.title" = "Compress PDF";
+"compress.level" = "Level";
+"compress.light" = "Light";
+"compress.strong" = "Strong";
+"compress.smallest" = "Smallest";
+"compress.current" = "This document is %@.";
+"compress.rule" = "Only scanned pages without text are made smaller. Pages with text keep their text, so they are left as they are. Your document is not changed; you get a copy to save or share.";
+"compress.action" = "Compress";
+"compress.result" = "%1$@ → %2$@ (%3$@ smaller)";
+"compress.noGain" = "This document cannot be made smaller at this level. The copy is the original size.";
+"pageNav.previous" = "Previous Page";
+"pageNav.next" = "Next Page";
+"pageNav.counter" = "%1$d / %2$d";
+"drawer.expand" = "Expand";
+"drawer.collapse" = "Make Smaller";

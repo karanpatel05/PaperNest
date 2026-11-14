@@ -10,31 +10,54 @@ enum PageZoom {
     }
 }
 
-struct PageZoomControls: View {
+/// The floating bar's zoom: out, the zoom in force, in, fit.
+///
+/// The percentage opens display settings, where the presets are; the fit
+/// button keeps the identifier and value the old one had, so anything that
+/// reads the zoom from it still can.
+struct ViewportZoomControls: View {
     @Binding var zoom: CGFloat
+    let showSettings: () -> Void
+
     var body: some View {
+        let percent = Double(zoom).formatted(.percent.precision(.fractionLength(0)))
         HStack(spacing: 0) {
             Button { zoom = PageZoom.step(zoom, direction: -1) } label: {
-                Image(systemName: "minus.magnifyingglass").frame(width: 44, height: 44)
+                Image(systemName: "minus").font(.system(size: 15, weight: .semibold))
+                    .frame(width: 40, height: 44).contentShape(Rectangle())
             }
             .accessibilityLabel(L10n.zoomOut).help(L10n.zoomOut)
             .accessibilityIdentifier("editor-zoom-out")
             .keyboardShortcut("-", modifiers: .command)
             .disabled(zoom <= PageZoom.steps[0])
-            Button { zoom = 1 } label: {
-                Image(systemName: "arrow.up.left.and.down.right.magnifyingglass").frame(width: 44, height: 44)
+            Button(action: showSettings) {
+                Text(verbatim: percent)
+                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .lineLimit(1).fixedSize()
+                    .padding(.horizontal, 10).frame(minWidth: 58, minHeight: 32)
+                    .background(EditorChrome.lavender, in: Capsule())
+                    .frame(minHeight: 44).contentShape(Rectangle())
             }
-            .accessibilityLabel(L10n.zoomToFit).help(L10n.zoomToFit)
-            .accessibilityValue(Double(zoom).formatted(.percent.precision(.fractionLength(0))))
-            .accessibilityIdentifier("editor-zoom-fit")
-            .keyboardShortcut("0", modifiers: .command)
+            .accessibilityLabel(L10n.displayZoom)
+            .accessibilityValue(percent)
+            .accessibilityHint(L10n.displaySettings)
+            .accessibilityIdentifier("editor-zoom-percent")
             Button { zoom = PageZoom.step(zoom, direction: 1) } label: {
-                Image(systemName: "plus.magnifyingglass").frame(width: 44, height: 44)
+                Image(systemName: "plus").font(.system(size: 15, weight: .semibold))
+                    .frame(width: 40, height: 44).contentShape(Rectangle())
             }
             .accessibilityLabel(L10n.zoomIn).help(L10n.zoomIn)
             .accessibilityIdentifier("editor-zoom-in")
             .keyboardShortcut("+", modifiers: .command)
             .disabled(zoom >= PageZoom.steps[PageZoom.steps.count - 1])
+            Button { zoom = 1 } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 15, weight: .medium))
+                    .frame(width: 40, height: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel(L10n.zoomToFit).help(L10n.zoomToFit)
+            .accessibilityValue(percent)
+            .accessibilityIdentifier("editor-zoom-fit")
+            .keyboardShortcut("0", modifiers: .command)
         }
     }
 }

@@ -1,4 +1,5 @@
 import PaperNestCore
+import PaperNestExport
 import PaperNestStore
 import PhotosUI
 import SwiftUI
@@ -69,6 +70,12 @@ struct DocumentView: View {
     @State private var isLoadingPhoto = false
     @State private var isShowingCrop = false
     @State private var annotationPage: Page?
+    /// Which mark the recognised-text sheet opens on.
+    @State private var annotationStyle: TextMarkupStyle = .highlight
+    @State private var isShowingCompress = false
+    /// Opens the export sheet with Word chosen.
+    @State private var exportFormat: ExportFormat?
+    @State private var splitCount: Int?
     @State private var managedMarkupPage: Page?
     @State private var notebookPageRequest: NotebookPageRequest?
     /// iPhone: the strip of filter previews above the tools.
@@ -87,6 +94,8 @@ struct DocumentView: View {
     @State private var goToPageText = ""
     /// Print: makes the PDF and shows the system's print panel.
     @State private var printer = DocumentPrinter()
+    /// Read aloud: says the document from the page being read, lighting each word.
+    @State private var readAloud = ReadAloud()
     /// Night mode: pages shown light on dark. A preference, not part of the document.
     @AppStorage(NightMode.storageKey) private var isNightMode = false
     /// The reader's bookmarks in this document.
@@ -221,6 +230,9 @@ struct DocumentView: View {
                         Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
                     }
                 }
+                if readAloud.isActive && !model.pages.isEmpty {
+                    ReadAloudBar(readAloud: readAloud, model: model)
+                }
                 if textSession.hasFailure && (model.selectedPageID != textSession.page?.id ||
                     !model.pages.contains(where: { $0.id == textSession.page?.id })) {
                     InlineTextRecoveryBar(session: textSession, undoManager: undoManager)
@@ -257,6 +269,9 @@ struct DocumentView: View {
         .navigationBarBackButtonHidden()
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { Task { await textSession.commitAndFlush(undoManager: undoManager) } }
+            // Without background audio the system silences the app anyway;
+            // paused, it carries on from the same word when the reader is back.
+            if phase == .background { readAloud.pause() }
         }
         .onAppear {
             editingGuard.owner = editingOwner
@@ -266,6 +281,7 @@ struct DocumentView: View {
             textSession.styleForNewBox = { settings.settings.text.apply(to: &$0) }
         }
         .onDisappear {
+            readAloud.stop()
             Task { await textSession.commitAndFlush(undoManager: undoManager) }
             if editingGuard.owner == editingOwner {
                 editingGuard.owner = nil
@@ -319,8 +335,13 @@ struct DocumentView: View {
         } message: { error in
             Text(error.message)
         }
+        .sheet(isPresented: $isShowingCompress) { CompressSheet(itemID: model.itemID) }
+        .alert(L10n.splitDoneTitle, isPresented: Binding(get: { splitCount != nil }, set: { if !$0 { splitCount = nil } })) {
+            Button(L10n.ok, role: .cancel) {}
+        } message: { Text(L10n.splitDoneMessage(splitCount ?? 0)) }
+        .onChange(of: isShowingExport) { _, showing in if !showing { exportFormat = nil } }
         .sheet(isPresented: $isShowingExport) {
-            ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID)
+            ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID, initialFormat: exportFormat)
         }
         .fileImporter(isPresented: $isShowingImagePicker,
                       allowedContentTypes: [.image], onCompletion: insertPickedImage)
@@ -377,7 +398,7 @@ struct DocumentView: View {
             PageCommentsSheet(model: model, pageID: page.id, undoManager: undoManager)
         }
         .sheet(item: $annotationPage) { page in
-            TextAnnotationSheet(model: model, pageID: page.id, undoManager: undoManager)
+            TextAnnotationSheet(model: model, pageID: page.id, undoManager: undoManager, initialStyle: annotationStyle)
         }
         .sheet(item: $managedMarkupPage) { page in
             MarkupManagerSheet(model: model, pageID: page.id, undoManager: undoManager)
@@ -461,12 +482,16 @@ struct DocumentView: View {
         .modifier(PasswordPrompt(model: importModel))
         .documentPrinting(printer)
         .environment(\.pageNightMode, isNightMode)
+        .environment(\.readAloud, readAloud)
+        // Reading follows the reader: turning the page restarts it there.
+        .onChange(of: model.selectedPageID) { _, id in readAloud.pageChanged(to: id) }
         .documentBookmarks(bookmarks, model: model) { id in
             Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
         }
         .focusedSceneValue(\.documentCommands, commandContext)
         .focusedSceneValue(\.documentPrinter, printer)
         .focusedSceneValue(\.readerBookmarks, bookmarks)
+        .focusedSceneValue(\.readAloud, readAloud)
     }
 
     private var isToolBusy: Bool {
@@ -597,6 +622,14 @@ struct DocumentView: View {
             Label(L10n.printMenu, systemImage: "printer")
         }
         .disabled(model.pages.isEmpty)
+        Button { finishThen { readAloud.toggle(reading: model) } } label: {
+            if readAloud.isActive {
+                Label(L10n.readAloudStop, systemImage: "stop.circle")
+            } else {
+                Label(L10n.readAloudMenu, systemImage: "speaker.wave.2")
+            }
+        }
+        .disabled(model.pages.isEmpty)
         BookmarkMenuItems(bookmarks: bookmarks, model: model, finishThen: finishThen)
     }
 
@@ -605,40 +638,6 @@ struct DocumentView: View {
         finishThen { isShowingGoToPage = true }
     }
 
-    /// The page-editing tools (the mockups' tool group): Markup (iPad), then
-    /// rotate, crop, filter.
-    @ViewBuilder
-    private var editingTools: some View {
-        #if os(iOS)
-        Toggle(isOn: $isMarkingUp) {
-            Label(L10n.markup, systemImage: "pencil.tip.crop.circle")
-        }
-        .toggleStyle(.button)
-        .disabled(model.selectedPage == nil)
-        .accessibilityIdentifier("editor-markup")
-        if isMarkingUp {
-            // The touch alternative to Apple Pencil (and how the Simulator draws).
-            Toggle(isOn: $isFingerDrawing) {
-                Label(L10n.drawWithFinger, systemImage: "hand.draw")
-            }
-            .toggleStyle(.button)
-            .accessibilityIdentifier("editor-finger-drawing")
-        }
-        #endif
-        #if os(macOS)
-        // The Mac has no PencilKit, so drawing is this app's own canvas; the
-        // toggle is the same idea as the iPad's.
-        Toggle(isOn: $isMarkingUp) {
-            Label(L10n.markup, systemImage: "pencil.tip.crop.circle")
-        }
-        .toggleStyle(.button)
-        .disabled(model.selectedPage == nil)
-        .accessibilityIdentifier("editor-markup")
-        #endif
-        rotateMenu
-        cropButton
-        filterMenu
-    }
 
     /// A real View boundary defers the toolbar's large generic value until
     /// SwiftUI evaluates its own body. A computed property or Group evaluates
@@ -658,7 +657,9 @@ struct DocumentView: View {
                            openPanel: $openToolPanel, context: toolbarContext) {
             EmptyView()
         } trailing: {
-            editorMoreMenu
+            // No More menu: everything it held is in Document Tools, behind
+            // the one toggle at the top right (owner, 2026-11-14).
+            EmptyView()
         }
     }
 
@@ -678,7 +679,7 @@ struct DocumentView: View {
             finishText: { await textSession.finish(undoManager: undoManager) },
             armText: { armText() },
             selectAll: { lassoSelectAllRequest += 1 },
-            highlightText: model.selectedPage == nil || model.isRecognizing ? nil : { annotationPage = model.selectedPage },
+            highlightText: model.selectedPage == nil || model.isRecognizing ? nil : { annotationStyle = .highlight; annotationPage = model.selectedPage },
             image: imageToolActions,
             insertSticker: { insertSticker($0) },
             insert: insertToolActions)
@@ -801,7 +802,7 @@ struct DocumentView: View {
             || managedMarkupPage != nil || signaturePage != nil || notebookPageRequest != nil
             || isShowingCrop || isShowingFilePicker || isShowingPDFForm || isShowingPageOrganizer
             || isShowingExport || isShowingAdjustments || isShowingOutline || isShowingImagePicker
-            || isShowingPhotoPicker
+            || isShowingPhotoPicker || isShowingCompress
         #if os(iOS)
         presenting = presenting || cameraPurpose != nil || photoCameraPage != nil
         #endif
@@ -826,56 +827,123 @@ struct DocumentView: View {
         }.accessibilityIdentifier("editor-pages")
     }
 
-    /// The compact tools, two to a row.
-    @ViewBuilder
-    private var utilityGridTools: some View {
-        signatureButton
-        shapeButton
-        UtilityToggleTile(title: L10n.markup, systemImage: "pencil.tip.crop.circle", isOn: $isMarkingUp,
-                          id: "editor-markup")
-            .disabled(model.selectedPage == nil)
-        #if os(iOS)
-        UtilityToggleTile(title: L10n.drawWithFinger, systemImage: "hand.draw", isOn: $isFingerDrawing,
-                          id: "editor-finger-drawing")
-        #endif
-        cropButton
-        rotateMenu
-        filterMenu
-        stampButton
-        commentsButton
-        annotateTextButton
-    }
+    // MARK: Document Tools sections
 
-    /// The longer actions, a row each.
+    /// Under the page thumbnails: add, organise, turn, remove.
     @ViewBuilder
-    private var utilityRowTools: some View {
-        if !isNotebook { formButton }
-        manageMarkupButton
-        recognizeTextButton
-        addPagesItems
-        pagesOrganizerButton
-        deleteButton
-    }
-
-    private var utilitiesAddPage: some View {
+    private var utilitiesPagesRow: some View {
         addPagesMenu {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                Text(L10n.documentUtilitiesAddPage)
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.down").font(.caption.weight(.semibold))
-            }
-            .font(.subheadline.weight(.medium))
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .contentShape(Rectangle())
+            Label(L10n.documentUtilitiesAddPage, systemImage: "plus")
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.plain)
         .disabled(textSession.isSelected)
         .accessibilityLabel(L10n.addOrReplacePages)
         .accessibilityIdentifier("strip-add-pages")
+        Button { openInspectorTool(.pages) } label: {
+            Label(L10n.toolsOrganize, systemImage: "square.grid.2x2")
+        }
+        .accessibilityIdentifier("editor-pages")
+        Button { Task { await model.rotate(clockwise: true, undoManager: undoManager) } } label: {
+            Label(L10n.rotate, systemImage: "rotate.right")
+        }
+        .disabled(model.selectedPage == nil)
+        .accessibilityIdentifier("utilities-rotate-page")
+        deleteButton
+    }
+
+    @ViewBuilder
+    private var utilitiesSections: some View {
+        ToolGridSection(title: L10n.toolsEditPDF, systemImage: "slider.horizontal.below.square.filled.and.square",
+                        storageKey: DocumentUtilitiesStorage.editExpanded, id: "utilities-section-edit") {
+            cropButton
+            rotateMenu
+            filterMenu
+            Button { runSplit() } label: { Label(L10n.toolsSplit, systemImage: "square.split.2x1") }
+                .disabled(model.pages.count < 2 || isToolBusy)
+                .accessibilityIdentifier("utilities-split")
+            Menu { replacePageItems } label: {
+                Label(L10n.toolsReplacePage, systemImage: "arrow.triangle.2.circlepath.doc.on.clipboard")
+            }
+            .menuIndicator(.hidden)
+            .disabled(model.selectedPage == nil)
+            .accessibilityIdentifier("utilities-replace-page")
+        }
+        ToolGridSection(title: L10n.toolsAnnotate, systemImage: "highlighter",
+                        storageKey: DocumentUtilitiesStorage.annotateExpanded, id: "utilities-section-annotate") {
+            textMarkupButton(.highlight, title: L10n.toolsHighlightText, symbol: "highlighter", id: "editor-annotate")
+            textMarkupButton(.underline, title: L10n.toolsUnderlineText, symbol: "underline", id: "editor-annotate-underline")
+            textMarkupButton(.strikethrough, title: L10n.toolsStrikeText, symbol: "strikethrough", id: "editor-annotate-strikethrough")
+            commentsButton
+            UtilityToggleTile(title: L10n.toolsDraw, systemImage: "pencil.tip.crop.circle", isOn: $isMarkingUp,
+                              id: "editor-markup")
+                .disabled(model.selectedPage == nil)
+            #if os(iOS)
+            UtilityToggleTile(title: L10n.drawWithFinger, systemImage: "hand.draw", isOn: $isFingerDrawing,
+                              id: "editor-finger-drawing")
+            #endif
+            signatureButton
+            manageMarkupButton
+        }
+        ToolGridSection(title: L10n.toolsInsert, systemImage: "plus.rectangle.on.rectangle",
+                        storageKey: DocumentUtilitiesStorage.insertExpanded, id: "utilities-section-insert") {
+            Button { armText() } label: { Label(L10n.toolText, systemImage: "character.textbox") }
+                .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
+                .accessibilityIdentifier("utilities-insert-text")
+            Menu { insertImageItems } label: { Label(L10n.toolImage, systemImage: "photo") }
+                .menuIndicator(.hidden)
+                .disabled(model.selectedPage == nil || model.isChangingNotebookPage || isLoadingPhoto)
+                .accessibilityIdentifier("utilities-insert-image")
+            shapeButton
+            stampButton
+        }
+        ToolGridSection(title: L10n.toolsProcess, systemImage: "gearshape.2",
+                        storageKey: DocumentUtilitiesStorage.processExpanded, id: "utilities-section-process") {
+            recognizeTextButton
+            if !isNotebook {
+                Button { openInspectorTool(.form) } label: {
+                    Label(L10n.toolsFillForm, systemImage: "list.bullet.rectangle")
+                }.accessibilityIdentifier("editor-fill-form")
+            }
+            Button { finishThen { isShowingCompress = true } } label: {
+                Label(L10n.toolsCompress, systemImage: "arrow.down.right.and.arrow.up.left")
+            }
+            .disabled(model.pages.isEmpty)
+            .accessibilityIdentifier("utilities-compress")
+            Button { finishThen { exportFormat = .docx; isShowingExport = true } } label: {
+                Label(L10n.toolsConvert, systemImage: "doc.text")
+            }
+            .disabled(model.pages.isEmpty)
+            .accessibilityIdentifier("utilities-convert")
+        }
+    }
+
+    private func textMarkupButton(_ style: TextMarkupStyle, title: String, symbol: String, id: String) -> some View {
+        Button { annotationStyle = style; annotationPage = model.selectedPage } label: {
+            Label { Text(verbatim: title) } icon: { Image(systemName: symbol) }
+        }
+        .disabled(model.selectedPage == nil || model.isRecognizing)
+        .accessibilityIdentifier(id)
+    }
+
+    @ViewBuilder
+    private var insertImageItems: some View {
+        let actions = imageToolActions
+        if let camera = actions.camera {
+            Button(action: camera) { Label(L10n.takePhoto, systemImage: "camera") }
+                .disabled(!actions.cameraSupported)
+        }
+        Button(action: actions.photos) { Label(L10n.importPhotos, systemImage: "photo.on.rectangle") }
+        Button(action: actions.files) { Label(L10n.importFiles, systemImage: "folder") }
+    }
+
+    private func runSplit() {
+        finishThen {
+            pageToolBusy = true
+            Task {
+                defer { pageToolBusy = false }
+                if let count = await model.split() { splitCount = count }
+            }
+        }
     }
 
     /// What a thumbnail's menu does. Each action first makes that page the
@@ -903,43 +971,6 @@ struct DocumentView: View {
             rotate: { id, clockwise in onPage(id) { await model.rotate(clockwise: clockwise, undoManager: undoManager) } },
             delete: { id in onPage(id) { await model.deleteSelectedPage(undoManager: undoManager) } },
             export: { id in onPage(id) { isShowingExport = true } })
-    }
-
-    /// The phone's overflow menu. It is only ever built where there is no
-    /// tools inspector — iPad and Mac reach these same actions inside that
-    /// panel, which `panelsMenu` opens.
-    private var editorMoreMenu: some View {
-        Menu { editorMoreActions } label: {
-            if isNotebook {
-                NotebookToolFace(kind: .more).accessibilityLabel(L10n.more)
-            } else {
-                Label(L10n.more, systemImage: "ellipsis")
-                    .labelStyle(.iconOnly).font(.system(size: 20)).frame(width: 44, height: 44)
-            }
-        }
-        .accessibilityIdentifier("studio-more-tools")
-        .accessibilityLabel(L10n.more)
-        .help(L10n.more)
-        .disabled(textSession.isSelected)
-    }
-
-    // Shared actions retain the existing sheets, history and subscription checks.
-    @ViewBuilder
-    private var editorMoreActions: some View {
-        if !isNotebook { formButton }
-        signatureButton
-        shapeButton
-        Divider()
-        editingTools
-        stampButton
-        commentsButton
-        annotateTextButton
-        manageMarkupButton
-        recognizeTextButton
-        Divider()
-        addPagesItems
-        pagesOrganizerButton
-        deleteButton
     }
 
     private func openInspectorTool(_ tool: InspectorTool) {
@@ -1002,11 +1033,12 @@ struct DocumentView: View {
             DocumentUtilitiesSidebar(model: editor.model, canClose: !editor.isToolBusy,
                                      close: { editor.closeUtilities() },
                                      pageActions: editor.pageGalleryActions) {
-                editor.utilitiesAddPage
-            } gridTools: {
-                editor.utilityGridTools.disabled(editor.textSession.isSelected)
-            } rowTools: {
-                editor.utilityRowTools.disabled(editor.textSession.isSelected)
+                editor.utilitiesPagesRow
+            } sections: {
+                editor.utilitiesSections.disabled(editor.textSession.isSelected)
+            } footer: {
+                UtilitiesExportButton { editor.finishThen { editor.isShowingExport = true } }
+                    .disabled(editor.model.pages.isEmpty || editor.textSession.isSelected)
             }
         }
     }
@@ -1036,7 +1068,6 @@ struct DocumentView: View {
     /// a row of colour swatches; tools and their colours live in the toolbar
     /// above and its panels now.
     private var studioPalette: some View {
-        let percent = Double(zoom).formatted(.percent.precision(.fractionLength(0)))
         return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 // On a phone, undo and redo stay down here under the thumb.
@@ -1047,12 +1078,14 @@ struct DocumentView: View {
                                            beforeAction: { await textSession.finish(undoManager: undoManager) })
                         .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
                 }
-                PageZoomControls(zoom: $zoom)
-                Rectangle().fill(EditorChrome.border).frame(width: 1, height: 26).accessibilityHidden(true)
+                ViewportZoomControls(zoom: $zoom, showSettings: { isShowingDisplaySettings = true })
+                barDivider
+                pageStepper
+                barDivider
                 Button { isMarkingUp.toggle() } label: {
-                    Image(systemName: "hand.draw").font(.system(size: 19))
+                    Image(systemName: "hand.draw").font(.system(size: 18))
                         .foregroundStyle(isMarkingUp ? Color.white : EditorChrome.navy)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 38, height: 38)
                         .background { if isMarkingUp { Circle().fill(EditorChrome.selection) } }
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -1062,33 +1095,67 @@ struct DocumentView: View {
                 .accessibilityIdentifier("studio-drawing-toggle")
                 .help(L10n.displayDrawingMode)
                 Button { isShowingDisplaySettings = true } label: {
-                    Image(systemName: "slider.horizontal.3").font(.system(size: 18)).frame(width: 44, height: 44)
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 17)).frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel(L10n.displaySettings)
                 .accessibilityIdentifier("studio-tool-settings")
                 .help(L10n.displaySettings)
                 .popover(isPresented: $isShowingDisplaySettings, arrowEdge: .bottom) {
-                    DisplaySettingsPopover(zoom: $zoom, fingerDrawing: $isFingerDrawing, nightMode: $isNightMode,
+                    DisplaySettingsPopover(zoom: $zoom, fingerDrawing: $isFingerDrawing,
                                            fitWidth: isCompact ? nil : { fitWidthRequest += 1 },
                                            close: { isShowingDisplaySettings = false })
                         .presentationCompactAdaptation(.sheet)
                         .presentationDetents([.medium])
                 }
-                Text(verbatim: percent)
-                    .font(.subheadline.weight(.medium).monospacedDigit())
-                    .frame(minWidth: 52, minHeight: 32)
-                    .background(EditorChrome.lavender, in: Capsule())
-                    .accessibilityLabel(L10n.displayZoom)
-                    .accessibilityValue(percent)
-                    .accessibilityIdentifier("editor-zoom-percent")
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
         }
         .buttonStyle(.plain).foregroundStyle(EditorChrome.navy)
         .editorFloatingSurface(radius: 30)
-        .frame(maxWidth: 520)
+        .frame(maxWidth: 620)
         .padding(12)
+    }
+
+    private var barDivider: some View {
+        Rectangle().fill(EditorChrome.border).frame(width: 1, height: 24).accessibilityHidden(true)
+    }
+
+    /// Previous page, "3 / 12", next page. Goes through the same path as a
+    /// thumbnail tap, so a text box being edited is saved first.
+    private var pageStepper: some View {
+        let index = model.selectedIndex ?? 0
+        let count = model.pages.count
+        func go(_ delta: Int) {
+            let target = index + delta
+            guard model.pages.indices.contains(target) else { return }
+            let id = model.pages[target].id
+            Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
+        }
+        return HStack(spacing: 0) {
+            Button { go(-1) } label: {
+                Image(systemName: "chevron.left").font(.system(size: 15, weight: .semibold))
+                    .frame(width: 40, height: 44).contentShape(Rectangle())
+            }
+            .disabled(index == 0)
+            .accessibilityLabel(L10n.pagePrevious)
+            .accessibilityIdentifier("editor-page-previous")
+            .help(L10n.pagePrevious)
+            Text(verbatim: L10n.pageCounter(index + 1, max(count, 1)))
+                .font(.subheadline.weight(.medium).monospacedDigit())
+                .lineLimit(1).fixedSize()
+                .frame(minWidth: 44)
+                .accessibilityLabel(L10n.pageLabel(index + 1, of: max(count, 1)))
+                .accessibilityIdentifier("editor-page-counter")
+            Button { go(1) } label: {
+                Image(systemName: "chevron.right").font(.system(size: 15, weight: .semibold))
+                    .frame(width: 40, height: 44).contentShape(Rectangle())
+            }
+            .disabled(index >= count - 1)
+            .accessibilityLabel(L10n.pageNext)
+            .accessibilityIdentifier("editor-page-next")
+            .help(L10n.pageNext)
+        }
     }
 
     /// A labeled Export button, then everything else in ⋯.
@@ -1136,7 +1203,7 @@ struct DocumentView: View {
     }
 
     private var annotateTextButton: some View {
-        Button { annotationPage = model.selectedPage } label: {
+        Button { annotationStyle = .highlight; annotationPage = model.selectedPage } label: {
             Label(L10n.annotateText, systemImage: "highlighter")
         }
         .disabled(model.selectedPage == nil || model.isRecognizing)
@@ -1469,12 +1536,12 @@ struct DocumentView: View {
     }
 
     private func addPagesMenu(@ViewBuilder label: () -> some View) -> some View {
-        Menu { addPagesItems } label: { label() }
+        Menu { addOnlyItems } label: { label() }
             .accessibilityIdentifier("editor-add-pages")
     }
 
     @ViewBuilder
-    private var addPagesItems: some View {
+    private var addOnlyItems: some View {
         if model.item?.kind == .notebook {
             Button {
                 let template: PageTemplate
@@ -1500,7 +1567,19 @@ struct DocumentView: View {
         } label: {
             Label(L10n.addPages, systemImage: "doc.badge.plus")
         }
+    }
+
+    /// Everything that adds pages and everything that replaces one, for the
+    /// menus that offer both.
+    @ViewBuilder
+    private var addPagesItems: some View {
+        addOnlyItems
         if !isNotebook { Divider() }
+        replacePageItems
+    }
+
+    @ViewBuilder
+    private var replacePageItems: some View {
         #if os(iOS)
         Button {
             cameraPurpose = .replace
@@ -1647,6 +1726,7 @@ private struct PageViewer: View {
     }
     @Environment(\.displayScale) private var displayScale
     @Environment(\.pageNightMode) private var isNight
+    @Environment(\.readAloud) private var readAloud
     @State private var pinchBase: CGFloat?
     @State private var selectedMark: PageObjectID?
     @State private var pageFrame: CGRect = .zero
@@ -1750,6 +1830,11 @@ private struct PageViewer: View {
                 .onChange(of: find?.shownFocus) { _, _ in
                     // The current hit is drawn; bring it into view.
                     withAnimation { reader.scrollTo(DocumentFind.anchorID, anchor: .center) }
+                }
+                .onChange(of: readAloud?.shownLine) { _, _ in
+                    // The line being read moved: scroll only as far as it
+                    // takes to keep it on screen, so a page that fits stays put.
+                    withAnimation { reader.scrollTo(ReadAloud.anchorID) }
                 }
                 .onChange(of: fitWidthRequest) { _, _ in
                     // Fit is the whole page in the window. This is the page
@@ -1874,6 +1959,15 @@ private struct PageViewer: View {
                 if let find, find.isPresented {
                     let pageSize = page.geometry.pageSize
                     FindHighlightsOverlay(find: find, page: page,
+                        sourceToView: page.geometry.sourceToPage.concatenating(
+                            CGAffineTransform(scaleX: size.width / pageSize.width, y: size.height / pageSize.height)))
+                }
+            }
+            // The word being read aloud. It takes no touches.
+            .overlay {
+                if readAloud?.pageID == page.id {
+                    let pageSize = page.geometry.pageSize
+                    ReadAloudHighlight(page: page,
                         sourceToView: page.geometry.sourceToPage.concatenating(
                             CGAffineTransform(scaleX: size.width / pageSize.width, y: size.height / pageSize.height)))
                 }

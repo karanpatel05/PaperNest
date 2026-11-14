@@ -868,6 +868,25 @@ final class DocumentModel {
     }
 
     /// Copies a complete editable page in one transaction and one history step.
+    /// One new document per page, named after this one. This document is
+    /// left exactly as it is; the new ones go beside it in the library.
+    /// Returns how many were made, or nil when nothing was done.
+    func split() async -> Int? {
+        guard SubscriptionStore.shared.allows(.pageTools) else {
+            proPaywall = .pageTools
+            return nil
+        }
+        guard let store, pages.count > 1, let name = item?.name else { return nil }
+        do {
+            let made = try await store.splitItem(itemID) { page, _ in L10n.splitPageName(name, page) }
+            session.didChange()
+            return made.count
+        } catch {
+            presentedError = .saveFailed()
+            return nil
+        }
+    }
+
     func duplicateSelectedPage(undoManager: UndoManager?) async throws {
         await finishPendingHistory()
         guard let store, let selectedPageID else { throw StoreError.pageNotFound }

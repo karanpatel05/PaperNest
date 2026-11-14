@@ -29,7 +29,14 @@ import PaperNestStore
     /// Brings a control in the panel into reach by scrolling the panel.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let list = app.scrollViews["pdf-tools-list"]
-        for _ in 0..<10 where !(element.exists && element.isHittable) { list.swipeUp() }
+        // Short drags, down the list and then back up: a full swipe in a
+        // phone's short drawer can carry a section header straight past.
+        func nudge(_ dy: CGFloat) {
+            let middle = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            middle.press(forDuration: 0.05, thenDragTo: middle.withOffset(CGVector(dx: 0, dy: dy)))
+        }
+        for _ in 0..<14 where !(element.exists && element.isHittable) { nudge(-140) }
+        for _ in 0..<20 where !(element.exists && element.isHittable) { nudge(140) }
         XCTAssertTrue(element.exists && element.isHittable, "\(element) cannot be reached in the panel", file: file, line: line)
     }
 
@@ -92,13 +99,19 @@ import PaperNestStore
         snap(app, "31-utilities-pages-folded")
         pagesHeader.tap()
         XCTAssertTrue(app.buttons["page-thumbnail-1"].waitForExistence(timeout: 5))
-        let toolsHeader = app.buttons["utilities-section-tools"]
-        reveal(toolsHeader, in: app)
-        toolsHeader.tap()
+        // Option 6 sections, each folding on its own.
+        for section in ["utilities-section-edit", "utilities-section-annotate", "utilities-section-insert",
+                        "utilities-section-process"] {
+            reveal(app.buttons[section], in: app)
+        }
+        let annotateHeader = app.buttons["utilities-section-annotate"]
+        reveal(annotateHeader, in: app)
+        annotateHeader.tap()
         XCTAssertTrue(app.buttons["editor-signature"].waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["page-thumbnail-1"].exists, "folding the tools must not fold Pages")
-        toolsHeader.tap()
+        XCTAssertTrue(app.buttons["editor-crop"].exists, "folding Annotate must not fold Edit PDF")
+        annotateHeader.tap()
         XCTAssertTrue(app.buttons["editor-signature"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["utilities-export"].exists, "Export / Save is pinned below the sections")
 
         // The panel's own close button is the same switch.
         app.buttons["pdf-tools-close"].tap()
@@ -109,6 +122,8 @@ import PaperNestStore
         // Deleting a page from the panel deletes a real page.
         toggle.tap()
         XCTAssertTrue(panel.waitForExistence(timeout: 5))
+        let pagesHeaderAgain = app.buttons["utilities-section-pages"]
+        for _ in 0..<6 where !pagesHeaderAgain.isHittable { app.scrollViews["pdf-tools-list"].swipeDown() }
         let delete = app.buttons["editor-delete-page"]
         reveal(delete, in: app)
         delete.tap()
@@ -122,7 +137,7 @@ import PaperNestStore
     func testTheLowerBarZoomsAndHasNoSecondLasso() async throws {
         let (app, _, _) = try await open(pages: 1)
         defer { app.terminate() }
-        let percent = app.staticTexts["editor-zoom-percent"]
+        let percent = app.buttons["editor-zoom-percent"]
         XCTAssertTrue(percent.waitForExistence(timeout: 10))
         XCTAssertEqual(percent.value as? String, "100%")
         // The Lasso tool is armed when a notebook opens. It appears once, in
@@ -140,7 +155,7 @@ import PaperNestStore
         for _ in 0..<20 where (percent.value as? String) != "100%" { usleep(100_000) }
         XCTAssertEqual(percent.value as? String, "100%")
 
-        app.buttons["studio-tool-settings"].tap()
+        percent.tap()
         let twoHundred = app.buttons["display-zoom-200"]
         XCTAssertTrue(twoHundred.waitForExistence(timeout: 5))
         snap(app, "32-display-settings")
@@ -151,5 +166,96 @@ import PaperNestStore
         app.closeToolSettings()
         XCTAssertEqual(percent.value as? String, "100%")
         snap(app, "33-lower-bar")
+    }
+
+    /// Previous, "n / N", next — and it moves the real selection.
+    func testThePageStepperMovesBetweenPages() async throws {
+        let (app, _, _) = try await open(pages: 3)
+        defer { app.terminate() }
+        let counter = app.staticTexts["editor-page-counter"]
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertEqual(counter.label, "Page 1 of 3")
+        XCTAssertFalse(app.buttons["editor-page-previous"].isEnabled, "nothing before the first page")
+        app.buttons["editor-page-next"].tap()
+        for _ in 0..<30 where counter.label != "Page 2 of 3" { usleep(100_000) }
+        XCTAssertEqual(counter.label, "Page 2 of 3")
+        XCTAssertEqual(app.images["document-page-image"].label, "Page 2 of 3", "the page shown follows")
+        app.buttons["editor-page-next"].tap()
+        for _ in 0..<30 where counter.label != "Page 3 of 3" { usleep(100_000) }
+        XCTAssertFalse(app.buttons["editor-page-next"].isEnabled, "nothing after the last page")
+        app.buttons["editor-page-previous"].tap()
+        for _ in 0..<30 where counter.label != "Page 2 of 3" { usleep(100_000) }
+        XCTAssertEqual(counter.label, "Page 2 of 3")
+    }
+
+    /// Process: Convert opens the real export sheet with Word chosen, Compress
+    /// makes and measures a copy, Split makes one document per page.
+    func testProcessToolsDoRealWork() async throws {
+        let (app, store, _) = try await open(pages: 3)
+        defer { app.terminate() }
+        let panel = app.scrollViews["pdf-tools-list"]
+        if !panel.exists { app.buttons["editor-panels"].tap() }
+        XCTAssertTrue(panel.waitForExistence(timeout: 5))
+
+        let convert = app.buttons["utilities-convert"]
+        reveal(convert, in: app)
+        convert.tap()
+        let word = app.buttons["export-format-docx"]
+        XCTAssertTrue(word.waitForExistence(timeout: 10), "the export sheet did not open")
+        XCTAssertTrue(word.isSelected, "Convert opens export with Word chosen")
+        snap(app, "34-convert")
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssertTrue(word.waitForNonExistence(timeout: 5))
+
+        if !panel.exists { app.buttons["editor-panels"].tap() }
+        let compress = app.buttons["utilities-compress"]
+        reveal(compress, in: app)
+        compress.tap()
+        let start = app.buttons["compress-start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10), "the compress sheet did not open")
+        start.tap()
+        let result = app.descendants(matching: .any)["compress-result"].firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 30), "compressing produced no result")
+        XCTAssertTrue(app.buttons["compress-save"].exists && app.buttons["compress-share"].exists)
+        snap(app, "35-compress")
+        app.buttons["compress-close"].tap()
+        XCTAssertTrue(start.waitForNonExistence(timeout: 5))
+
+        let before = try await store.items(in: .all).count
+        if !panel.exists { app.buttons["editor-panels"].tap() }
+        let split = app.buttons["utilities-split"]
+        reveal(split, in: app)
+        split.tap()
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 15), "no confirmation after splitting")
+        XCTAssertTrue(alert.staticTexts.allElementsBoundByIndex.contains { $0.label.contains("3 new documents") },
+                      "the message says how many were made")
+        alert.buttons.firstMatch.tap()
+        let after = try await store.items(in: .all).count
+        XCTAssertEqual(after, before + 3, "one new document per page; this one is kept")
+    }
+
+    /// On a phone the panel is a drawer: the handle makes it taller, and a
+    /// swipe down puts it away.
+    func testThePhoneDrawerGrowsAndSwipesAway() async throws {
+        guard !isPad else { throw XCTSkip("iPad shows a column, not a drawer") }
+        let (app, _, _) = try await open(pages: 2)
+        defer { app.terminate() }
+        let panel = app.scrollViews["pdf-tools-list"]
+        app.buttons["editor-panels"].tap()
+        XCTAssertTrue(panel.waitForExistence(timeout: 5))
+        let handle = app.descendants(matching: .any)["utilities-drawer-handle"].firstMatch
+        XCTAssertTrue(handle.exists)
+        let shortTop = handle.frame.minY
+        handle.tap()
+        for _ in 0..<20 where handle.frame.minY >= shortTop - 50 { usleep(100_000) }
+        XCTAssertLessThan(handle.frame.minY, shortTop - 50, "tapping the handle makes the drawer taller")
+        snap(app, "36-drawer-tall")
+        handle.tap()
+        for _ in 0..<20 where abs(handle.frame.minY - shortTop) > 4 { usleep(100_000) }
+        let from = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: 260)))
+        XCTAssertTrue(panel.waitForNonExistence(timeout: 5), "a swipe down closes the drawer")
+        XCTAssertEqual(app.buttons["editor-panels"].value as? String, "Not selected")
     }
 }

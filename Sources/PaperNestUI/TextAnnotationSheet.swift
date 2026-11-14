@@ -12,7 +12,14 @@ struct TextAnnotationSheet: View {
     @State private var page: Page?
     @State private var recognition: PageRecognition?
     @State private var selection: Set<Int> = []
-    @State private var style: TextMarkupStyle = .highlight
+    @State private var style: TextMarkupStyle
+
+    init(model: DocumentModel, pageID: PageID, undoManager: UndoManager?, initialStyle: TextMarkupStyle = .highlight) {
+        self.model = model
+        self.pageID = pageID
+        self.undoManager = undoManager
+        _style = State(initialValue: initialStyle)
+    }
     @State private var chosenColor: RGBAColor?
     @State private var isLoading = true
     @State private var isSaving = false

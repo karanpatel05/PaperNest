@@ -776,9 +776,9 @@
 "insert.organize" = "Organizar páginas";
 
 /* Document Utilities sidebar and viewport bar (Claude, 2026-11-12) */
-"utilities.title" = "Utilidades del documento";
+"utilities.title" = "Herramientas del documento";
 "utilities.subtitle" = "Páginas y herramientas PDF";
-"utilities.close" = "Cerrar las utilidades del documento";
+"utilities.close" = "Cerrar las herramientas del documento";
 "utilities.pages" = "Páginas (%d)";
 "utilities.expanded" = "Desplegada";
 "utilities.collapsed" = "Contraída";
@@ -918,3 +918,46 @@
 "scanner.kind.photo" = "Foto";
 "scanner.pages" = "Páginas";
 "scanner.tools" = "Herramientas de página";
+
+/* Read aloud (Claude, 2026-11-14) */
+"readAloud.menu" = "Leer en voz alta";
+"readAloud.stop" = "Detener la lectura";
+"readAloud.pause" = "Pausa";
+"readAloud.resume" = "Reanudar";
+"readAloud.speed" = "Velocidad de lectura";
+"readAloud.noText" = "No hay texto que leer desde esta página hasta el final. Reconocer texto, en Utilidades del documento, lee las páginas escaneadas.";
+"readAloud.status" = "Leyendo la página %1$lld de %2$lld";
+
+/* Document Tools, Option 6 (Claude, 2026-11-14) */
+"tools2.editPDF" = "Editar PDF";
+"tools2.annotate" = "Anotar";
+"tools2.insert" = "Insertar";
+"tools2.process" = "Procesar";
+"tools2.exportSave" = "Exportar / Guardar";
+"tools2.organize" = "Organizar";
+"tools2.highlightText" = "Resaltar texto";
+"tools2.underlineText" = "Subrayar texto";
+"tools2.strikeText" = "Tachar texto";
+"tools2.draw" = "Dibujar";
+"tools2.replacePage" = "Reemplazar página";
+"tools2.split" = "Dividir";
+"tools2.compress" = "Comprimir";
+"tools2.convert" = "Convertir a Word";
+"tools2.fillForm" = "Rellenar formulario";
+"tools2.splitDone.title" = "Dividido en páginas";
+"tools2.splitDone.message" = "%d documentos nuevos están en tu biblioteca, uno por página. Este documento no ha cambiado.";
+"compress.title" = "Comprimir PDF";
+"compress.level" = "Nivel";
+"compress.light" = "Ligera";
+"compress.strong" = "Fuerte";
+"compress.smallest" = "Máxima";
+"compress.current" = "Este documento ocupa %@.";
+"compress.rule" = "Solo se reducen las páginas escaneadas sin texto. Las páginas con texto lo conservan y se dejan como están. Tu documento no cambia: obtienes una copia para guardar o compartir.";
+"compress.action" = "Comprimir";
+"compress.result" = "%1$@ → %2$@ (%3$@ menos)";
+"compress.noGain" = "Este documento no se puede reducir a este nivel. La copia tiene el tamaño original.";
+"pageNav.previous" = "Página anterior";
+"pageNav.next" = "Página siguiente";
+"pageNav.counter" = "%1$d / %2$d";
+"drawer.expand" = "Ampliar";
+"drawer.collapse" = "Reducir";

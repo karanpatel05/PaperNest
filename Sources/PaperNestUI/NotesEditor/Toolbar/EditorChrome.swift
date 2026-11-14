@@ -5,19 +5,24 @@ import SwiftUI
 /// something is chosen. Light and dark are both spelled out, because a
 /// translucent white panel over a dark canvas is grey, not dark.
 enum EditorChrome {
-    static let purple = Theme.adaptive(0x7438F5, 0xB79CFF)
-    static let deepPurple = Theme.adaptive(0x5521CB, 0x8E63F7)
-    static let navy = Theme.adaptive(0x172347, 0xF2EDFF)
-    static let lavender = Theme.adaptive(0xF2EDFF, 0x30284A)
-    static let surface = Theme.adaptive(0xFFFFFF, 0x231E35)
-    static let secondaryBackground = Theme.adaptive(0xF8F9FD, 0x1A1627)
-    static let border = Theme.adaptive(0xE7E5F0, 0x443C5E)
-    static let secondaryText = Theme.adaptive(0x6B7190, 0xB5AFD0)
+    // Light values are the earlier approved ones. Dark values are the owner's
+    // Option 6 palette (2026-11-14): #151222 background, #241F37 panels,
+    // #302A46 raised surfaces, #49405F borders, white and #BFB9D1 text. On
+    // the dark panels the accent is the lavender #B99AFF, because #7438F5 on
+    // #241F37 is too low in contrast to read as text or a thin line.
+    static let purple = Theme.adaptive(0x7438F5, 0xB99AFF)
+    static let deepPurple = Theme.adaptive(0x5521CB, 0x7438F5)
+    static let navy = Theme.adaptive(0x172347, 0xFFFFFF)
+    static let lavender = Theme.adaptive(0xF2EDFF, 0x302A46)
+    static let surface = Theme.adaptive(0xFFFFFF, 0x241F37)
+    static let secondaryBackground = Theme.adaptive(0xF8F9FD, 0x151222)
+    static let border = Theme.adaptive(0xE7E5F0, 0x49405F)
+    static let secondaryText = Theme.adaptive(0x6B7190, 0xBFB9D1)
 
     /// A chosen tool. The label on it is always white, so both stops stay
     /// dark enough for white in either appearance.
     static let selection = LinearGradient(
-        colors: [Theme.adaptive(0x8750FF, 0x8A5BFF), Theme.adaptive(0x5521CB, 0x5B2BD0)],
+        colors: [Theme.adaptive(0x8750FF, 0x7438F5), Theme.adaptive(0x5521CB, 0x5521CB)],
         startPoint: .top, endPoint: .bottom)
 
     static let toolbarRadius: CGFloat = 22

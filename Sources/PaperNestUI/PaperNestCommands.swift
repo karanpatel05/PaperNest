@@ -6,6 +6,7 @@ public struct PaperNestCommands: Commands {
     @FocusedValue(\.documentCommands) private var document
     @FocusedValue(\.documentPrinter) private var printer
     @FocusedValue(\.readerBookmarks) private var bookmarks
+    @FocusedValue(\.readAloud) private var readAloud
 
     public init() {}
 
@@ -70,6 +71,13 @@ public struct PaperNestCommands: Commands {
                 run { _ in bookmarks?.isShowingList = true }
             }
             .disabled(bookmarks == nil || (document?.model.pages.isEmpty ?? true))
+            // No shortcut: the system has its own Edit > Speech, and this
+            // project has been bitten by clashing keys before.
+            Button(readAloud?.isActive == true ? L10n.readAloudStop : L10n.readAloudMenu) {
+                let readAloud = readAloud
+                run { readAloud?.toggle(reading: $0.model) }
+            }
+            .disabled(readAloud == nil || (document?.model.pages.isEmpty ?? true))
             Button(L10n.textBox) { document?.showTextBox() }
                 .disabled(document?.model.selectedPage == nil)
             Button(L10n.insertImage) { document?.showInsertImage() }

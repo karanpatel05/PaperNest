@@ -7,6 +7,9 @@ import UniformTypeIdentifiers
 struct ExportLoader: View {
     let itemID: ItemID
     let currentPageID: PageID?
+    /// Opens with this format chosen — "Convert" in Document Tools opens
+    /// here with Word selected. Every gate still applies when it exports.
+    var initialFormat: ExportFormat? = nil
     @Environment(LibrarySession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @State private var loaded: (PaperNestCore.LibraryItem, [Page], DocumentPermissions)?
@@ -15,7 +18,8 @@ struct ExportLoader: View {
     var body: some View {
         Group {
             if let (item, pages, permissions) = loaded {
-                ExportSheet(itemName: item.name, pages: pages, currentPageID: currentPageID, permissions: permissions)
+                ExportSheet(itemName: item.name, pages: pages, currentPageID: currentPageID, permissions: permissions,
+                            initialFormat: initialFormat)
             } else if failed {
                 VStack(spacing: 12) {
                     Text(L10n.exportFailed)
@@ -54,6 +58,7 @@ struct ExportSheet: View {
     /// What the authors of these pages allow. A document whose author
     /// switched copying off can only leave as a PDF.
     var permissions = DocumentPermissions.unrestricted
+    var initialFormat: ExportFormat? = nil
 
     @Environment(LibrarySession.self) private var session
     @Environment(\.dismiss) private var dismiss
@@ -135,6 +140,16 @@ struct ExportSheet: View {
     }
 
     private var form: some View {
+        formContent.onAppear {
+            // Once: choosing another format afterwards must stick.
+            if let initialFormat, !appliedInitialFormat { options.format = initialFormat }
+            appliedInitialFormat = true
+        }
+    }
+
+    @State private var appliedInitialFormat = false
+
+    private var formContent: some View {
         Form {
             Section {
                 documentRow

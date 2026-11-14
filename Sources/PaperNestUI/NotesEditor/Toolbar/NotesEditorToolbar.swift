@@ -72,8 +72,7 @@ struct NotesEditorToolbar<Leading: View, Trailing: View>: View {
                             .padding(.leading, 8).padding(.trailing, 4).padding(.vertical, 5)
                     }
                     .accessibilityIdentifier("notebook-tool-bar")
-                    EditorToolbarDivider()
-                    trailing().padding(.trailing, 6)
+                    trailing()
                 }
                 .editorFloatingSurface()
                 .padding(.horizontal, 12).padding(.vertical, 9)

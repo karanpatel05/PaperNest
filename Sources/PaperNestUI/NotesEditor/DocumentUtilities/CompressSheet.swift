@@ -1,0 +1,180 @@
+import PaperNestCore
+import PaperNestExport
+import SwiftUI
+
+/// Makes a smaller copy of the document, measured, to save or share.
+///
+/// An export, not an edit: the library and the originals are untouched, so
+/// there is nothing to undo and nothing that could be lost. The sizes shown
+/// are the real files', before and after.
+///
+/// What it can and cannot shrink is the exporter's rule, stated here so the
+/// sheet can say it plainly: only pages with no text of their own are
+/// re-encoded, because rasterising a page with text would destroy the text.
+/// A document that cannot get smaller gets its original back and says so.
+struct CompressSheet: View {
+    let itemID: ItemID
+    @Environment(LibrarySession.self) private var session
+    @Environment(\.dismiss) private var dismiss
+    @State private var preset: CompressionPreset = .strong
+    @State private var loaded: (name: String, pages: [Page], bytes: Int64)?
+    @State private var phase: Phase = .choosing
+    @State private var task: Task<Void, Never>?
+    @State private var isSaving = false
+    @State private var shareRequest: ShareRequest?
+
+    enum Phase {
+        case choosing
+        case working(Double)
+        case done(CompressionResult)
+        case failed
+    }
+
+    private var result: CompressionResult? {
+        if case .done(let result) = phase { result } else { nil }
+    }
+
+    private func size(_ bytes: Int64) -> String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(L10n.compressTitle).font(.headline).accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button { task?.cancel(); dismiss() } label: {
+                    Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
+                        .frame(width: 30, height: 30).background(EditorChrome.lavender, in: Circle())
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel(L10n.done)
+                .accessibilityIdentifier("compress-close")
+            }
+            if let loaded {
+                PanelSection(title: L10n.compressLevel) {
+                    PanelSegmented(options: [
+                        .init(value: CompressionPreset.light, title: L10n.compressLight, id: "compress-light"),
+                        .init(value: CompressionPreset.strong, title: L10n.compressStrong, id: "compress-strong"),
+                        .init(value: CompressionPreset.smallest, title: L10n.compressSmallest, id: "compress-smallest"),
+                    ], selection: $preset)
+                    .disabled(isWorking)
+                    PanelNote(text: L10n.compressCurrentSize(size(loaded.bytes)))
+                    PanelNote(text: L10n.compressRule)
+                }
+                .onChange(of: preset) { _, _ in clearResult() }
+                status
+                actions(loaded)
+            } else if case .failed = phase {
+                PanelNote(text: L10n.exportFailed)
+            } else {
+                ProgressView().frame(maxWidth: .infinity, minHeight: 120)
+            }
+        }
+        .padding(18)
+        .foregroundStyle(EditorChrome.navy)
+        .tint(EditorChrome.purple)
+        .frame(minWidth: 320, idealWidth: 420, maxWidth: .infinity, alignment: .topLeading)
+        .background(EditorChrome.secondaryBackground)
+        .background(SystemSharePresenter(request: $shareRequest, finished: { _ in }))
+        .modifier(SaveExportedFiles(isPresented: $isSaving, output: result?.output, format: .pdf, onSaved: {}))
+        .task { await load() }
+        .onDisappear { task?.cancel(); result?.output.removeTemporaryFiles() }
+    }
+
+    private var isWorking: Bool { if case .working = phase { true } else { false } }
+
+    @ViewBuilder private var status: some View {
+        switch phase {
+        case .working(let fraction):
+            ProgressView(value: fraction).accessibilityIdentifier("compress-progress")
+        case .done(let result):
+            VStack(alignment: .leading, spacing: 4) {
+                if result.isSmaller {
+                    Text(L10n.compressResult(size(result.originalByteCount), size(result.compressedByteCount),
+                                             (result.savedFraction ?? 0).formatted(.percent.precision(.fractionLength(0)))))
+                        .font(.subheadline.weight(.semibold))
+                } else {
+                    Text(L10n.compressNoGain).font(.subheadline.weight(.semibold))
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("compress-result")
+        case .failed:
+            PanelNote(text: L10n.exportFailed)
+        case .choosing:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder private func actions(_ loaded: (name: String, pages: [Page], bytes: Int64)) -> some View {
+        if result == nil {
+            Button { start(loaded) } label: {
+                Label { Text(L10n.compressAction) } icon: { Image(systemName: "arrow.down.right.and.arrow.up.left") }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .foregroundStyle(Color.white)
+                    .background(EditorChrome.selection, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isWorking)
+            .accessibilityIdentifier("compress-start")
+        } else {
+            HStack(spacing: 10) {
+                secondary(L10n.exportSave, symbol: "square.and.arrow.down", id: "compress-save") { isSaving = true }
+                secondary(L10n.exportShare, symbol: "square.and.arrow.up", id: "compress-share") {
+                    if let files = result?.output.files { shareRequest = ShareRequest(files: files) }
+                }
+            }
+        }
+    }
+
+    private func secondary(_ title: String, symbol: String, id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label { Text(verbatim: title) } icon: { Image(systemName: symbol) }
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(id)
+    }
+
+    private func clearResult() {
+        result?.output.removeTemporaryFiles()
+        if case .done = phase { phase = .choosing }
+    }
+
+    private func load() async {
+        guard let store = session.environment?.store else { phase = .failed; return }
+        do {
+            guard let item = try await store.item(itemID) else { phase = .failed; return }
+            let pages = try await store.pages(of: itemID)
+            let bytes = try await store.originalByteCount(of: itemID)
+            loaded = (item.name, pages, bytes)
+        } catch { phase = .failed }
+    }
+
+    private func start(_ loaded: (name: String, pages: [Page], bytes: Int64)) {
+        guard let exporter = session.environment?.exporter else { phase = .failed; return }
+        let preset = preset
+        phase = .working(0)
+        task = Task {
+            do {
+                let result = try await exporter.compress(itemName: loaded.name, pages: loaded.pages,
+                                                         originalByteCount: loaded.bytes, preset: preset) { progress in
+                    let fraction = progress.totalPages > 0 ? Double(progress.completedPages) / Double(progress.totalPages) : 0
+                    Task { @MainActor in if case .working = phase { phase = .working(fraction) } }
+                }
+                if Task.isCancelled { result.output.removeTemporaryFiles(); return }
+                phase = .done(result)
+            } catch is CancellationError {
+                phase = .choosing
+            } catch {
+                phase = .failed
+            }
+        }
+    }
+}

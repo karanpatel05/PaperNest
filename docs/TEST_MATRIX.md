@@ -1,3 +1,60 @@
+## 2026-11-14 — Document Tools "Option 6" (Claude, owner's request)
+
+Owner supplied the Option 6 mockup and brief. Built by regrouping the Document Utilities panel of 2026-11-12, not a
+new container. **Not committed** — the read-aloud session holds an active claim on the same files (handoff).
+
+**What changed.**
+- Panel renamed **Document Tools**. Sections: **Pages** (real thumbnails, lazily rendered; Add Page / Organize /
+  Rotate / Delete underneath), **Edit PDF** (Crop, Rotate, Filter, Split, Replace Page), **Annotate** (Highlight /
+  Underline / Strike Through recognised text, Comments, Draw, Draw with Finger, Signature, Manage Markup),
+  **Insert** (Text, Image, Shape, Stamp), **Process** (Recognize Text, Fill Form on PDFs, Compress, Convert to Word).
+  Each section folds on its own and remembers it. **Export / Save** is pinned below the list.
+- Tiles lay out as many to a row as fit (minimum 96 pt on iOS, 76 on Mac): two in an iPad column, three on a phone.
+- **New, real functionality:** *Split* (`DocumentModel.split()`, Pro gate as in the library, confirms how many
+  documents were made); *Compress* (`CompressSheet`, new — the exporter's Light/Strong/Smallest presets, which had no
+  screen until now; shows the real before/after sizes and says so when nothing could shrink; Save or Share the copy;
+  the library is untouched); *Convert* opens the existing export sheet with Word chosen (`initialFormat`), every
+  gate still applying; the three text-markup tiles open the existing sheet on their style (`initialStyle`).
+- **Bottom bar:** − / 100% / + / fit | ‹ n / N › | drawing mode | display settings. The percentage opens display
+  settings. Previous/Next go through the same path as a thumbnail tap.
+- **Phone drawer:** two heights (tap or drag the handle) and swipe down to close; accessibility actions for both.
+- **Dark palette** (`EditorChrome` only, not `Theme`): the owner's #151222 / #241F37 / #302A46 / #49405F, white and
+  #BFB9D1 text; accent text and icons are the lavender #B99AFF on dark panels because #7438F5 there is too faint.
+
+**Results.** Unit suite green after one fix (a French colon). Mac build clean, 0 warnings. **Run on different
+simulators from earlier, in a separate build folder,** because the read-aloud session was testing on the iPhone Duo
+and iPad Pro 13 at the same time:
+
+| | iPhone 17, iOS 26.5 | iPad Pro 11-inch (M5), iOS 27.0 |
+|---|---|---|
+| `DocumentUtilitiesUITests` (5: one toggle; page stepper; Process does real work; lower bar; phone drawer) | 5/5 light | 4/4 (drawer test skips on iPad) |
+| same, dark appearance | one-toggle passed; drawer test failed at its first wait (see below) | one-toggle and Process passed |
+| `NotesToolbarUITests/testEveryToolChangesWhatIsSaved` | passed | **failed** — Pen settings scroll view "visible frame is empty" |
+| `EditorFirstTouchUITests` (3) | 3/3 | not run |
+
+`testProcessToolsDoRealWork` checks on disk: Convert opens export with Word selected; Compress produces a measured
+result with Save and Share; Split makes exactly one new document per page and keeps the original.
+
+**Failures, honestly.**
+- The toolbar test on the **11-inch** iPad fails opening the Pen panel. It passed on the 13-inch on 2026-11-12 and
+  today's work did not touch the toolbar or its panels — but **it was not baselined on this device**, so I cannot
+  say it predates today.
+- The dark-mode phone drawer test failed waiting for the panel right after the previous test relaunched the app; the
+  same test passed in light mode minutes earlier. This looks like the empty-accessibility-tree-after-relaunch flake
+  recorded on 2026-11-12, but that is a resemblance, not a finding.
+- My test helper first used full swipes, which in the phone's short drawer carried section headers straight past;
+  short drags fixed it. That was a test defect only.
+
+**Not verified.** The Mac (still never seen). VoiceOver. Fit to Width. Replace Page, Organize, the thumbnail menu,
+Insert Image and Stamp from the panel (present, not driven). The paywall path of Split and Convert (this build has
+no product IDs, so Pro is open). The 13-inch iPad and iPhone Duo (busy with the other session's tests).
+
+**Not built from the brief.** Merge from inside the editor (needs another document; the library's Tools has it).
+Resize page. Drag-and-drop thumbnail reordering (Organize does reordering). Page viewing modes. Signature/Comments on
+the top toolbar (left as is, per "maintain the existing toolbar"). The top toolbar's More (…) menu still repeats the
+panel's tools — the earlier brief's "no duplicate controls" is not yet met there; that is the owner's call. Sync
+status in the editor: the app sidebar already shows the real iCloud state ("Not set up in this build").
+
 ## 2026-11-14 (afternoon) — The reader features seen on a Mac at last, and two more night-mode bars fixed (Claude, owner in session)
 
 Owner: **"yes i give sreen access for mac"**, then **"Ask again"** when the first request came back declined. The Mac

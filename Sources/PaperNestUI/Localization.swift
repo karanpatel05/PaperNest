@@ -1029,3 +1029,50 @@ extension L10n {
     static var scannerPages: String { tr("scanner.pages") }
     static var scannerTools: String { tr("scanner.tools") }
 }
+
+// Read aloud (Claude, 2026-11-14).
+extension L10n {
+    static var readAloudMenu: String { tr("readAloud.menu") }
+    static var readAloudStop: String { tr("readAloud.stop") }
+    static var readAloudPause: String { tr("readAloud.pause") }
+    static var readAloudResume: String { tr("readAloud.resume") }
+    static var readAloudSpeed: String { tr("readAloud.speed") }
+    static var readAloudNoText: String { tr("readAloud.noText") }
+    static func readAloudStatus(_ number: Int, of total: Int) -> String { tr("readAloud.status", number, total) }
+}
+
+// Document Tools, Option 6 (Claude, 2026-11-14).
+extension L10n {
+    static var toolsEditPDF: String { tr("tools2.editPDF") }
+    static var toolsAnnotate: String { tr("tools2.annotate") }
+    static var toolsInsert: String { tr("tools2.insert") }
+    static var toolsProcess: String { tr("tools2.process") }
+    static var toolsExportSave: String { tr("tools2.exportSave") }
+    static var toolsOrganize: String { tr("tools2.organize") }
+    static var toolsHighlightText: String { tr("tools2.highlightText") }
+    static var toolsUnderlineText: String { tr("tools2.underlineText") }
+    static var toolsStrikeText: String { tr("tools2.strikeText") }
+    static var toolsDraw: String { tr("tools2.draw") }
+    static var toolsReplacePage: String { tr("tools2.replacePage") }
+    static var toolsSplit: String { tr("tools2.split") }
+    static var toolsCompress: String { tr("tools2.compress") }
+    static var toolsConvert: String { tr("tools2.convert") }
+    static var toolsFillForm: String { tr("tools2.fillForm") }
+    static var splitDoneTitle: String { tr("tools2.splitDone.title") }
+    static func splitDoneMessage(_ count: Int) -> String { tr("tools2.splitDone.message", count) }
+    static var compressTitle: String { tr("compress.title") }
+    static var compressLevel: String { tr("compress.level") }
+    static var compressLight: String { tr("compress.light") }
+    static var compressStrong: String { tr("compress.strong") }
+    static var compressSmallest: String { tr("compress.smallest") }
+    static func compressCurrentSize(_ size: String) -> String { tr("compress.current", size) }
+    static var compressRule: String { tr("compress.rule") }
+    static var compressAction: String { tr("compress.action") }
+    static func compressResult(_ before: String, _ after: String, _ saved: String) -> String { tr("compress.result", before, after, saved) }
+    static var compressNoGain: String { tr("compress.noGain") }
+    static var pagePrevious: String { tr("pageNav.previous") }
+    static var pageNext: String { tr("pageNav.next") }
+    static func pageCounter(_ page: Int, _ count: Int) -> String { tr("pageNav.counter", page, count) }
+    static var drawerExpand: String { tr("drawer.expand") }
+    static var drawerCollapse: String { tr("drawer.collapse") }
+}

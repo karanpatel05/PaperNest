@@ -1567,45 +1567,15 @@ final class AppUITests: XCTestCase {
         else { XCTAssertTrue(list.waitForNonExistence(timeout: 5)) }
     }
 
-    /// The control that reaches the editor's secondary tools: the merged
-    /// panels popover on iPad and Mac, the overflow menu on the phone.
+    /// The control that reaches the editor's secondary tools: Document Tools'
+    /// one toggle, on every device.
     private func toolsEntryPoint(_ app: XCUIApplication) -> XCUIElement {
-        UIDevice.current.userInterfaceIdiom == .pad
-            ? app.buttons["editor-panels"] : app.buttons["studio-more-tools"]
+        app.buttons["editor-panels"]
     }
 
-    /// Secondary notebook tools now live in More; history remains in the palette.
+    /// Secondary tools live in Document Tools; history remains in the palette.
     private func revealEditorTool(_ app: XCUIApplication, identifier: String) {
-        if app.buttons[identifier].isHittable { return }
-        let sidebar = app.scrollViews["pdf-tools-list"]
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            if !sidebar.exists { setToolsPanel(true, in: app) }
-            XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
-            for _ in 0..<10 where !app.buttons[identifier].isHittable { sidebar.swipeUp() }
-            if !app.buttons[identifier].isHittable {
-                for _ in 0..<10 where !app.buttons[identifier].isHittable { sidebar.swipeDown() }
-            }
-            return
-        }
-        let bar = app.scrollViews["notebook-tool-bar"]
-        if bar.exists {
-            let more = app.buttons["studio-more-tools"]
-            for _ in 0..<10 where !more.isHittable { bar.swipeLeft() }
-            XCTAssertTrue(more.isHittable)
-            more.tap()
-            // Native menus virtualize later rows at accessibility text sizes.
-            // Scroll the presented menu, not the editor underneath it.
-            let menu = app.collectionViews.containing(.button, identifier: "editor-shapes").firstMatch
-            XCTAssertTrue(menu.waitForExistence(timeout: 5))
-            if !app.buttons[identifier].waitForExistence(timeout: 2) {
-                for _ in 0..<10 where !app.buttons[identifier].exists {
-                    guard menu.exists else { break }
-                    menu.swipeUp()
-                }
-            }
-        } else {
-            app.buttons["editor-more"].tap()
-        }
+        app.revealInDocumentTools(app.buttons[identifier])
     }
 
     func testNotebookToolsAreSideBySide() throws {
@@ -2346,21 +2316,11 @@ extension AppUITests {
         app.buttons["inline-text-done"].tap()
         XCTAssertTrue(mark.waitForExistence(timeout: 10))
 
-        // Only the phone keeps an overflow button in the writing bar; iPad
-        // and Mac reach the same actions inside the tools inspector.
+        // No overflow menu in the writing bar on any device since 2026-11-14:
+        // its actions are all in Document Tools.
         let textTool = app.buttons["editor-text-box"]
-        if UIDevice.current.userInterfaceIdiom != .pad {
-            let bar = app.scrollViews["notebook-tool-bar"]
-            let more = app.buttons["studio-more-tools"]
-            for _ in 0..<5 where !more.isHittable { bar.swipeLeft() }
-            XCTAssertTrue(more.isHittable)
-            XCTAssertTrue(textTool.isHittable)
-            XCTAssertGreaterThan(more.frame.minX, textTool.frame.minX)
-            XCTAssertLessThanOrEqual(more.frame.minX - textTool.frame.maxX, 20, "More stays directly next to Text Box")
-            XCTAssertEqual(more.frame.midY, textTool.frame.midY, accuracy: 3)
-        } else {
-            XCTAssertTrue(textTool.isHittable)
-        }
+        XCTAssertFalse(app.buttons["studio-more-tools"].exists, "The toolbar has no More menu")
+        XCTAssertTrue(textTool.isHittable)
         revealEditorTool(app, identifier: "editor-crop")
         let crop = app.buttons["editor-crop"]
         XCTAssertTrue(crop.waitForExistence(timeout: 5)); crop.tap()

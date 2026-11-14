@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreText
 import Foundation
 import PDFKit
 import Testing
@@ -102,6 +103,59 @@ import PaperNestTestSupport
         let box = try firstHit("total", in: layout)
         let image = try await renderer.renderImage(pages[0], pixelsPerPoint: 3)
         expectInkExactlyUnder(unit(box), in: image)
+    }
+
+    /// Every line of a page, not only the first. PDFKit's `characterBounds(at:)`
+    /// does not count the line breaks its own `string` puts in, so read that
+    /// way each line's boxes sat one character further along than the line
+    /// before's — three characters off by the fourth line, with blank boxes
+    /// where the shift landed on a gap. Every test above used one line.
+    @Test func everyLineOfADigitalPDFIsBoxedWhereItIsDrawn() async throws {
+        let (url, store) = try #require(library())
+        defer { try? FileManager.default.removeItem(at: url) }
+        let text = (1...4).map { "Line \($0) of the city council" }.joined(separator: "\n")
+        let pages = try await importing(SyntheticDocuments.textPDF(pages: [text]), into: store)
+        let renderer = PageRenderer(store: store)
+
+        let layout = try await renderer.textLayout(for: pages[0])
+
+        #expect(layout.lines.count == 4)
+        let firstX = try #require(layout.lines.first?.fragments.first?.box.x)
+        for (index, line) in layout.lines.enumerated() {
+            #expect(line.fragments.allSatisfy { $0.box.width > 0 && $0.box.height > 0 },
+                    "line \(index + 1) has a character with no box")
+            let start = try #require(line.fragments.first).box.x
+            #expect(abs(start - firstX) < 0.002, "line \(index + 1) starts at \(start), line 1 at \(firstX)")
+        }
+        // And on the ink: the number on the last line.
+        let four = try firstHit("4", in: layout)
+        let image = try await renderer.renderImage(pages[0], pixelsPerPoint: 3)
+        expectInkExactlyUnder(unit(four), in: image)
+    }
+
+    /// The case found in the Mac app: dragging across a phrase on the third
+    /// line began at the second line's full stop, whose box had slid to where
+    /// the third line starts, and Highlight saved two strokes on two lines.
+    /// The drag here runs from the start of "Total" to the end of the line,
+    /// placed from where the fixture draws it, not from the boxes under test.
+    @Test func aDragAcrossTheThirdLineSelectsThatLineAndNothingAbove() async throws {
+        let (url, store) = try #require(library())
+        defer { try? FileManager.default.removeItem(at: url) }
+        let third = "Total: $1,234.56"
+        let text = ["Dear Ms. Quinn,", "Thank you for your order.", third].joined(separator: "\n")
+        let pages = try await importing(SyntheticDocuments.textPDF(pages: [text]), into: store)
+        let layout = try await PageRenderer(store: store).textLayout(for: pages[0])
+
+        // `textPDF` draws 18-point Helvetica from x 72, the first baseline 140
+        // points from the top and each next line 27 points lower.
+        let font = CTFontCreateWithName("Helvetica" as CFString, 18, nil)
+        let width = CTLineGetTypographicBounds(CTLineCreateWithAttributedString(NSAttributedString(
+            string: third, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font])), nil, nil, nil)
+        let y = (140.0 + 2 * 27 - 6) / 792
+        let range = try #require(layout.selection(from: CGPoint(x: 74.0 / 612, y: y),
+                                                  to: CGPoint(x: (72 + width - 2) / 612, y: y)))
+        #expect(layout.text(in: range) == third)
+        #expect(layout.boxes(in: range).count == 1, "the selection reached onto another line")
     }
 
     /// A hit inside a word covers its letters and not the rest of the word:
