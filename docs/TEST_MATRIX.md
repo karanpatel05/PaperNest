@@ -39,7 +39,8 @@ suite's iPhone result is on iOS 27.0, not 27.1.
   back from the library on disk. The page reads light on dark again once the box is placed.
 - **A filled form at night.** A field whose answer PDFKit draws (`acroFormPDF`, "MMMMMMMM") shows the answer dark on
   light by day and **light on dark at night**, read off the screen in the field's own box. This is the first check
-  of `78d7e77`'s annotation drawing together with night mode, and the first on iOS of that drawing at all.
+  of `78d7e77`'s annotation drawing together with night mode. (`PDFAnnotationsUITests`, from that commit, already
+  covers the drawing itself on iOS by day.)
 - **⌘D from a hardware keyboard (iPad).** It shows the ribbon and saves one bookmark; ⌘D again removes both.
   Skipped on the phone by design: a phone has no menu bar for the shortcut to live in. **While it ran, the app's
   whole log was streamed at debug level** (about 41,000 lines from the app, 210 of them UIKit's): **no**
@@ -65,14 +66,19 @@ Screenshots: `docs/screenshots/reader-gaps-2026-11-14/`.
    The Mac was also nearly out of memory at the time (15.4 of 16 GB of swap). Check `pgrep -fl "xcodebuild test"`
    for a run on your simulator before starting one.
 
-**One thing seen and not fixed.** While a text box is being typed in at night, **its formatting bar is turned
-too**: the bar goes dark and the colour swatch for black text shows **white**
-(`docs/screenshots/reader-gaps-2026-11-14/iphone-typing-at-night.png`). The text is saved black — the test reads it
-back — so nothing wrong is stored, but the swatch tells the reader the opposite of the colour they chose. The bar is
-drawn in the page's overlay, under the night filter, which is why. The night mode entry's own rule is that the
-toolbars stay as they are. Left alone because the fix is in the editor's page surface in `DocumentView.swift`, where
-a stopped session's read-aloud edits are still uncommitted; it needs the bar lifted out of the filtered layer, not a
-colour patch.
+**One night-mode defect found by these runs, and fixed.** While a text box was being typed in at night, **its
+formatting bar was turned too**: the bar went dark and the colour swatch for black text showed **white**
+(`docs/screenshots/reader-gaps-2026-11-14/iphone-typing-at-night-before-fix.png`). Nothing wrong was stored — the
+text was saved black — but the swatch told the reader the opposite of the colour they had chosen, and night mode's
+own rule is that controls stay as they are. The bar is drawn in the page's overlay, under the page's night filter.
+**Fix:** `InlineTextOverlay.swift` gives the bar the same filter again; the filter is its own opposite (invert,
+then turn the hue half way round — for SwiftUI's hue matrix that is exact), so the bar is back in its day colours
+while the words being typed still turn. Two lines; `DocumentView.swift` untouched.
+`testTextTypedAtNightIsSavedInItsOwnColour` now reads the swatch off the screen. **Proved able to fail:** on `HEAD`
+without the fix it failed on iPad with the swatch at rgb(255,255,255) (`/tmp/pn-swatch-before.log`). With the fix:
+iPad **7/7** and iPhone 17 **6/6 + ⌘D skipped** across `NightModeUITests` and the new suite
+(`/tmp/pn-swatch-after-*.log`); unit suite **1,029 tests, 0 failures, 0 warnings**; Mac build clean. Not looked at:
+the bar at night on a Mac, and the colour picker popover (it opens in its own window, outside the filter either way).
 
 **Still not verified, plainly.** **The Mac** — screen access has been declined before and was not asked for again;
 night mode and bookmarks there have only been built. A physical iPad or iPhone, Apple Pencil, VoiceOver and the

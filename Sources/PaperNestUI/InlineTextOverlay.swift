@@ -15,6 +15,8 @@ struct InlineTextOverlay: View {
     let zoom: CGFloat
     let undoManager: UndoManager?
     @State private var gestureFrame: CGRect?
+    /// Night mode turns everything drawn over the page, this overlay included.
+    @Environment(\.pageNightMode) private var isNight
 
     private var selectedBox: TextBox? { session.page?.id == page.id ? session.box : nil }
     private var marks: [PageObject] {
@@ -74,6 +76,12 @@ struct InlineTextOverlay: View {
                 let bar = InlineTextLayout.toolbarFrame(box: rect, visible: visible,
                     size: CGSize(width: 420, height: session.hasFailure ? 100 : 52))
                 InlineTextToolbar(session: session, sourceToView: sourceToView, undoManager: undoManager)
+                    // The bar is controls, not part of the page, and night mode
+                    // leaves controls as they are. It sits under the page's night
+                    // filter, which is its own opposite, so the same filter here
+                    // gives it back its day colours — without it the colour swatch
+                    // for black text showed white.
+                    .nightFilter(isNight)
                     .frame(width: max(1, bar.width), height: bar.height)
                     .position(x: bar.midX, y: bar.midY)
                 }

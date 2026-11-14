@@ -161,6 +161,14 @@ import PaperNestStore
         let typing = pixels(app, in: editor.frame)
         XCTAssertGreaterThan(typing.count { max($0.r, $0.g, $0.b) > 170 }, 30,
                              "the words being typed do not show light on the dark page")
+        // The formatting bar is controls, not page, so night mode leaves it
+        // alone: the swatch for black text is black. It once showed white.
+        let swatch = app.buttons["inline-text-color"]
+        XCTAssertTrue(swatch.exists)
+        let centre = pixels(app, in: swatch.frame.insetBy(dx: swatch.frame.width * 0.4,
+                                                          dy: swatch.frame.height * 0.4))
+        XCTAssertLessThan(centre.brightest, 90,
+                          "the colour swatch for black text is not black at night: \(centre.average)")
         snap(app, "typing-at-night")
         app.buttons["inline-text-done"].tap()
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
