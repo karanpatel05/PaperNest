@@ -18,6 +18,8 @@ final class DocumentModel {
     private(set) var hasLoaded = false
     var selectedPageID: PageID?
     var presentedError: PresentedError?
+    /// A Pro feature that was just refused. The document screen shows the paywall for it.
+    var proPaywall: ProFeature?
     private(set) var isChangingNotebookPage = false
     private var historyTask: Task<Void, Never>?
     private var pendingHistory = 0
@@ -39,8 +41,8 @@ final class DocumentModel {
     /// is useful before the last page is done, and a failure on one page does
     /// not discard the others.
     func recognizeText(on pageID: PageID? = nil) async {
-        guard SubscriptionStore.shared.allowsPremiumOperations else {
-            presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
+        guard SubscriptionStore.shared.allows(.textRecognition) else {
+            proPaywall = .textRecognition
             return
         }
         await finishPendingHistory()
@@ -288,7 +290,7 @@ final class DocumentModel {
 
     func addShape(to page: Page, kind: ShapeAnnotation, start: CGPoint, end: CGPoint,
                   color: RGBAColor, width: Double, undoManager: UndoManager?) async throws {
-        try SubscriptionStore.shared.requirePremiumOperation()
+        try SubscriptionStore.shared.require(.markup)
         await finishPendingHistory()
         guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
         let result = try await store.addShape(to: page, kind: kind, start: start, end: end, color: color, width: width)
@@ -302,7 +304,7 @@ final class DocumentModel {
     /// A placed signature is ordinary editable ink; all its strokes share one undo step.
     func placeSignature(_ signature: SavedSignature, on page: Page, target: NormalizedRect,
                         undoManager: UndoManager?) async throws {
-        try SubscriptionStore.shared.requirePremiumOperation()
+        try SubscriptionStore.shared.require(.signature)
         await finishPendingHistory()
         guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
         let result = try await store.placeSignature(signature, on: page, target: target)
@@ -753,7 +755,7 @@ final class DocumentModel {
 
     func addTextMarkup(_ snapshot: PageRecognition, lineIndices: Set<Int>, style: TextMarkupStyle, color: RGBAColor? = nil,
                        undoManager: UndoManager?) async throws {
-        try SubscriptionStore.shared.requirePremiumOperation()
+        try SubscriptionStore.shared.require(.markup)
         await finishPendingHistory()
         guard let store else { throw StoreError.pageNotFound }
         let result = try await store.addTextMarkup(snapshot, lineIndices: lineIndices, style: style, color: color)
@@ -860,7 +862,6 @@ final class DocumentModel {
 
     /// Copies a complete editable page in one transaction and one history step.
     func duplicateSelectedPage(undoManager: UndoManager?) async throws {
-        try SubscriptionStore.shared.requirePremiumOperation()
         await finishPendingHistory()
         guard let store, let selectedPageID else { throw StoreError.pageNotFound }
         isChangingNotebookPage = true

@@ -109,8 +109,8 @@ struct ShapeDrawOverlay: View {
             do {
                 try await model.addShape(to: page, kind: kind, start: a, end: b, color: color, width: width,
                                          undoManager: undoManager)
-            } catch is ProAccessError {
-                model.presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
+            } catch let error as ProAccessError {
+                model.proPaywall = error.feature
             } catch {
                 model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.shapeSaveFailed)
             }

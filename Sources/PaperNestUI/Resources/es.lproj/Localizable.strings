@@ -487,9 +487,14 @@
 "pro.proHeadline" = "Más espacio para tus ideas.";
 "pro.proSubtitle" = "Más posibilidades para tus documentos de cada día.";
 "pro.proNotebooks" = "Cuadernos ilimitados";
-"pro.proOCR" = "Reconocimiento de texto por lotes y PDF con búsqueda";
-"pro.proExport" = "Exportación de texto y documentos Word";
-"pro.proPDF" = "Herramientas PDF avanzadas";
+"pro.feature.recognition" = "Reconocimiento de texto y búsqueda en escaneos";
+"pro.feature.textExport" = "Exportación a PDF con búsqueda, texto y Word";
+"pro.feature.password" = "PDF protegidos con contraseña";
+"pro.feature.pageTools" = "Combinar, dividir y extraer páginas";
+"pro.feature.markup" = "Formas y marcas de texto";
+"pro.feature.signature" = "Firmar documentos";
+"pro.feature.forms" = "Rellenar y guardar formularios PDF";
+"pro.feature.locked" = "Incluido en PaperNest Pro: %@";
 "pro.proMonthly" = "Mensual";
 "pro.proYearly" = "Anual";
 "pro.proMonthPrice" = "%@ al mes";
@@ -528,7 +533,6 @@
 "pro.proLoading" = "Comprobando suscripción…";
 "pro.proRetry" = "Reintentar";
 "pro.close" = "Cerrar";
-"pro.required" = "Esta función requiere PaperNest Pro. Abre Perfil en Inicio para suscribirte.";
 
 /* Notes library */
 "notes.empty.title" = "Aún no hay cuadernos";

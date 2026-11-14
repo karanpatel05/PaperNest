@@ -168,7 +168,7 @@ public final class LibrarySession {
             _ = try? await EmbeddedTextIndexer(store: env.store).indexMissing()
             // The sweep reads in the same languages the reader chose; it
             // used to be built with the recognizer's own hard-coded default.
-            if SubscriptionStore.shared.allowsPremiumOperations {
+            if SubscriptionStore.shared.allows(.textRecognition) {
                 let recognizer = TextRecognizer(languages: RecognitionLanguagePreference.choice().using)
                 _ = try? await AutomaticTextRecognizer(store: env.store, renderer: env.renderer,
                                                        recognizer: recognizer).recognizeMissing()

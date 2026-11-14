@@ -14,7 +14,7 @@ struct DocumentPagesSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var busy = false
     @State private var failed = false
-    @State private var showPro = false
+    @State private var proFeature: ProFeature?
     @State private var extractRequest: DocumentToolsRequest?
     @State private var extractedName: String?
     @State private var extractedID: ItemID?
@@ -124,7 +124,7 @@ struct DocumentPagesSheet: View {
                minHeight: isEmbedded ? nil : 400, idealHeight: isEmbedded ? nil : 620)
         #endif
         .interactiveDismissDisabled(busy)
-        .sheet(isPresented: $showPro) { ProPaywallView(store: .shared) }
+        .proPaywall($proFeature)
         .sheet(item: $extractRequest, onDismiss: {
             guard let id = extractedID else { return }
             extractedID = nil
@@ -179,13 +179,13 @@ struct DocumentPagesSheet: View {
             do {
                 try await action()
                 if model.presentedError != nil { failed = true; model.presentedError = nil }
-            } catch ProAccessError.required { showPro = true }
+            } catch let error as ProAccessError { proFeature = error.feature }
             catch { failed = true }
         }
     }
 
     private func openExtraction() {
-        guard SubscriptionStore.shared.allowsPremiumOperations else { showPro = true; return }
+        guard SubscriptionStore.shared.allows(.pageTools) else { proFeature = .pageTools; return }
         perform {
             guard let store = model.session.environment?.store,
                   let source = try await store.items(in: .all).first(where: { $0.id == model.itemID }) else {

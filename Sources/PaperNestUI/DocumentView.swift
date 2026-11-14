@@ -313,6 +313,7 @@ struct DocumentView: View {
             isShowingOutline = UserDefaults.standard.bool(forKey: "PaperNestDebugShowOutline")
         }
         #endif
+        .proPaywall(Binding(get: { model.proPaywall }, set: { model.proPaywall = $0 }))
         .alert(model.presentedError?.title ?? "", isPresented: errorBinding, presenting: model.presentedError) { _ in
             Button(L10n.ok, role: .cancel) {}
         } message: { error in
@@ -715,7 +716,6 @@ struct DocumentView: View {
             addPage: isNotebook ? { template in
                 Task {
                     do { try await model.addNotebookPage(template, after: model.selectedPageID, undoManager: undoManager) }
-                    catch is ProAccessError { presentProRequired() }
                     catch { model.presentedError = .saveFailed() }
                 }
             } : nil,
@@ -727,15 +727,10 @@ struct DocumentView: View {
             duplicatePage: {
                 Task {
                     do { try await model.duplicateSelectedPage(undoManager: undoManager) }
-                    catch is ProAccessError { presentProRequired() }
                     catch { model.presentedError = .saveFailed() }
                 }
             },
             organizePages: { openInspectorTool(.pages) })
-    }
-
-    private func presentProRequired() {
-        model.presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
     }
 
     /// Places one of the app's own stickers on the selected page, as an image
@@ -902,7 +897,6 @@ struct DocumentView: View {
             duplicate: { id in
                 onPage(id) {
                     do { try await model.duplicateSelectedPage(undoManager: undoManager) }
-                    catch is ProAccessError { presentProRequired() }
                     catch { model.presentedError = .saveFailed() }
                 }
             },

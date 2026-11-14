@@ -830,6 +830,7 @@ struct LibraryPresentations: ViewModifier {
                 case .failure: model.reportPickerFailure()
                 }
             }
+            .proPaywall(Binding(get: { model.proPaywall }, set: { model.proPaywall = $0 }))
             .alert(model.presentedError?.title ?? "", isPresented: errorBinding, presenting: model.presentedError) { _ in
                 Button(L10n.ok, role: .cancel) {}
             } message: { error in

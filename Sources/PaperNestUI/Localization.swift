@@ -105,16 +105,20 @@ enum L10n {
     static var emptyNotesTitle: String { tr("notes.empty.title") }
     static var emptyNotesMessage: String { tr("notes.empty.message") }
     static var proClose: String { tr("pro.close") }
-    static var proRequired: String { tr("pro.required") }
     // Pro and Profile
     static var profile: String { tr("pro.profile") }
     static var proTitle: String { tr("pro.proTitle") }
     static var proHeadline: String { tr("pro.proHeadline") }
     static var proSubtitle: String { tr("pro.proSubtitle") }
     static var proNotebooks: String { tr("pro.proNotebooks") }
-    static var proOCR: String { tr("pro.proOCR") }
-    static var proExport: String { tr("pro.proExport") }
-    static var proPDF: String { tr("pro.proPDF") }
+    static var proFeatureRecognition: String { tr("pro.feature.recognition") }
+    static var proFeatureTextExport: String { tr("pro.feature.textExport") }
+    static var proFeaturePassword: String { tr("pro.feature.password") }
+    static var proFeaturePageTools: String { tr("pro.feature.pageTools") }
+    static var proFeatureMarkup: String { tr("pro.feature.markup") }
+    static var proFeatureSignature: String { tr("pro.feature.signature") }
+    static var proFeatureForms: String { tr("pro.feature.forms") }
+    static func proFeatureLocked(_ value0: String) -> String { tr("pro.feature.locked", value0) }
     static var proMonthly: String { tr("pro.proMonthly") }
     static var proYearly: String { tr("pro.proYearly") }
     static func proMonthPrice(_ value0: String) -> String { tr("pro.proMonthPrice", value0) }

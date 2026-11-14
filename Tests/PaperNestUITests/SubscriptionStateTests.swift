@@ -28,6 +28,27 @@ import PaperNestCore
         let configuration = SubscriptionConfiguration(productIDs: ["monthly", "annual"])
         #expect(!configuration.canPurchase)
     }
+    @Test @MainActor func nothingIsBlockedUntilProductsAreConfigured() throws {
+        let service = SubscriptionStore(configuration: .init(productIDs: []))
+        for feature in ProFeature.allCases {
+            #expect(service.allows(feature))
+            try service.require(feature)
+        }
+    }
+    @Test @MainActor func aFreeUserIsRefusedEveryProFeatureByName() {
+        let service = SubscriptionStore(configuration: .init(productIDs: ["configured-monthly"]))
+        #expect(!service.hasProAccess)
+        for feature in ProFeature.allCases {
+            #expect(!service.allows(feature))
+            do { try service.require(feature); Issue.record("\(feature) was allowed") }
+            catch let error as ProAccessError { #expect(error.feature == feature) }
+            catch { Issue.record("unexpected error \(error)") }
+        }
+    }
+    @Test func everyProFeatureHasItsOwnNameAndSymbol() {
+        #expect(Set(ProFeature.allCases.map(\.title)).count == ProFeature.allCases.count)
+        #expect(ProFeature.allCases.allSatisfy { !$0.title.isEmpty && !$0.symbol.isEmpty && !$0.title.hasPrefix("pro.") })
+    }
     @Test @MainActor func concurrentNotebookCreationRespectsFreeQuota() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: url) }

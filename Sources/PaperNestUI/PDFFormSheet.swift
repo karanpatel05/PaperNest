@@ -61,7 +61,7 @@ import SwiftUI
     }
 
     func saveCopy() async throws -> PaperNestCore.LibraryItem {
-        try SubscriptionStore.shared.requirePremiumOperation()
+        try SubscriptionStore.shared.require(.forms)
         guard !saving, let data, let env = library.environment,
               !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw FormError.writeFailed }
         saving = true
@@ -92,7 +92,7 @@ struct PDFFormSheet: View {
     @State private var draft: PDFFormSession
     let useTextBox: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var showPro = false
+    @State private var proFeature: ProFeature?
     @FocusState private var focusedField: String?
 
     init(model: DocumentModel, isEmbedded: Bool = false, onClose: (() -> Void)? = nil,
@@ -176,7 +176,7 @@ struct PDFFormSheet: View {
             .interactiveDismissDisabled(draft.saving)
         }
         .task { await draft.load() }
-        .sheet(isPresented: $showPro) { ProPaywallView(store: .shared) }
+        .proPaywall($proFeature)
     }
 
     private var closeButton: some View {
@@ -225,7 +225,7 @@ struct PDFFormSheet: View {
 
     private func save() async {
         guard await beforeAction?() ?? true else { return }
-        guard SubscriptionStore.shared.allowsPremiumOperations else { showPro = true; return }
+        guard SubscriptionStore.shared.allows(.forms) else { proFeature = .forms; return }
         do { draft.savedName = try await draft.saveCopy().name; draft.failed = false }
         catch { draft.failed = true }
     }

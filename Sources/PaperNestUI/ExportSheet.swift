@@ -58,7 +58,7 @@ struct ExportSheet: View {
     @State private var phase: Phase = .configuring
     @State private var exportTask: Task<Void, Never>?
     @State private var isShowingSaver = false
-    @State private var showPro = false
+    @State private var proFeature: ProFeature?
     /// Empty means no password, which is not the same as an empty one.
     @State private var password = ""
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -96,7 +96,7 @@ struct ExportSheet: View {
                 }
         }
         .modifier(lifecycle)
-        .sheet(isPresented: $showPro) { ProPaywallView(store: .shared) }
+        .proPaywall($proFeature)
         #else
         VStack(alignment: .leading, spacing: 0) {
             Text(L10n.exportTitle)
@@ -109,14 +109,14 @@ struct ExportSheet: View {
         // Sheets on macOS size to their content.
         .frame(minWidth: 460, idealWidth: 540, minHeight: 360, idealHeight: 620, maxHeight: 680)
         .modifier(lifecycle)
-        .sheet(isPresented: $showPro) { ProPaywallView(store: .shared) }
+        .proPaywall($proFeature)
         #endif
     }
 
     private var lifecycle: ExportLifecycle {
         ExportLifecycle(onAppear: {
             rangeEnd = pages.count
-            if !SubscriptionStore.shared.allowsPremiumOperations { options.includesRecognizedText = false }
+            if !SubscriptionStore.shared.allows(.textExport) { options.includesRecognizedText = false }
         }, onDisappear: {
             exportTask?.cancel()
             if case .ready(let output) = phase { output.removeTemporaryFiles() }
@@ -537,9 +537,10 @@ struct ExportSheet: View {
     }
 
     private func startExport() {
-        let premium = options.format == .txt || options.format == .docx
-            || (options.format == .pdf && (options.includesRecognizedText || !password.isEmpty))
-        if premium && !SubscriptionStore.shared.allowsPremiumOperations { showPro = true; return }
+        let needed: ProFeature? = if options.format == .txt || options.format == .docx
+            || (options.format == .pdf && options.includesRecognizedText) { .textExport }
+            else if options.format == .pdf && !password.isEmpty { .passwordExport } else { nil }
+        if let needed, !SubscriptionStore.shared.allows(needed) { proFeature = needed; return }
         guard let exporter = session.environment?.exporter else { return }
         let selection = selectedPages
         let options = options

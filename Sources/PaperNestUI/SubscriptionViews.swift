@@ -3,6 +3,8 @@ import SwiftUI
 
 struct ProPaywallView: View {
     @Bindable var store: SubscriptionStore
+    /// The feature whose refusal opened this screen, if one did.
+    var feature: ProFeature? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedID: String?
@@ -18,12 +20,15 @@ struct ProPaywallView: View {
                     VStack(spacing: 8) {
                         Text(L10n.proHeadline).font(.largeTitle.bold()).accessibilityAddTraits(.isHeader)
                         Text(L10n.proSubtitle).foregroundStyle(.secondary)
+                        if let feature {
+                            Label(L10n.proFeatureLocked(feature.title), systemImage: "lock.fill")
+                                .font(.callout.weight(.semibold)).foregroundStyle(Theme.accent)
+                                .padding(.top, 4).fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("pro-locked-feature").accessibilityValue(feature.rawValue)
+                        }
                     }.multilineTextAlignment(.center)
                     VStack(alignment: .leading, spacing: 16) {
-                        benefit(L10n.proNotebooks, "books.vertical")
-                        benefit(L10n.proOCR, "text.viewfinder")
-                        benefit(L10n.proExport, "doc.text")
-                        benefit(L10n.proPDF, "doc.on.doc")
+                        ForEach(ProFeature.allCases) { benefit($0.title, $0.symbol) }
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(20).modifier(PremiumCard())
                     if store.isLoading && store.products.isEmpty {
                         ProgressView(L10n.proLoading)

@@ -216,8 +216,8 @@ extension DocumentModel {
     func markText(on page: Page, boxes: [NormalizedRect], style: TextMarkupStyle,
                   undoManager: UndoManager?) async {
         // The same gate as marking up recognised lines: it is the same tool.
-        guard SubscriptionStore.shared.allowsPremiumOperations else {
-            presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
+        guard SubscriptionStore.shared.allows(.markup) else {
+            proPaywall = .markup
             return
         }
         guard let store = session.environment?.store else { return }

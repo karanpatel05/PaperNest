@@ -15,6 +15,7 @@ struct ShapeAnnotationSheet: View {
     @State private var width = 2.0
     @State private var saving = false
     @State private var failed = false
+    @State private var proFeature: ProFeature?
 
     init(model: DocumentModel, page: Page, undoManager: UndoManager?, stampsOnly: Bool = false) {
         self.model = model
@@ -118,6 +119,7 @@ struct ShapeAnnotationSheet: View {
                 }
             }
             .interactiveDismissDisabled(saving)
+            .proPaywall($proFeature)
             .alert(L10n.genericErrorTitle, isPresented: $failed) {
                 Button(L10n.ok) {}
             } message: { Text(stampsOnly ? L10n.stampSaveFailed : L10n.shapeSaveFailed) }
@@ -202,7 +204,8 @@ struct ShapeAnnotationSheet: View {
         do {
             try await model.addShape(to: page, kind: kind, start: start, end: end, color: color, width: width, undoManager: undoManager)
             dismiss()
-        } catch { failed = true }
+        } catch let error as ProAccessError { proFeature = error.feature }
+        catch { failed = true }
     }
 }
 

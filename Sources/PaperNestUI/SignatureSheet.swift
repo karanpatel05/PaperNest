@@ -58,7 +58,7 @@ import SwiftUI
         busy = true
         defer { busy = false }
         do {
-            try SubscriptionStore.shared.requirePremiumOperation()
+            try SubscriptionStore.shared.require(.signature)
             guard let store else { throw StoreError.pageNotFound }
             try await store.saveSignature(signature)
             signatures.append(signature)
@@ -129,7 +129,7 @@ struct SignatureSheet: View {
     let beforeAction: (() async -> Bool)?
     let undoManager: UndoManager?
     @State private var draft: SignatureDraft
-    @State private var showPro = false
+    @State private var proFeature: ProFeature?
     @GestureState private var isCapturing = false
     @FocusState private var nameFocused: Bool
     @Environment(\.dismiss) private var dismiss
@@ -221,7 +221,7 @@ struct SignatureSheet: View {
             }
             .task { await draft.load() }
         }
-        .sheet(isPresented: $showPro) { ProPaywallView(store: .shared) }
+        .proPaywall($proFeature)
         #if os(macOS)
         .frame(minWidth: isEmbedded ? nil : 460, idealWidth: isEmbedded ? nil : 560,
                minHeight: isEmbedded ? nil : 600, idealHeight: isEmbedded ? nil : 720)
@@ -235,7 +235,7 @@ struct SignatureSheet: View {
 
     private var placeButton: some View {
         Button(L10n.signaturePlace) {
-            guard SubscriptionStore.shared.allowsPremiumOperations else { showPro = true; return }
+            guard SubscriptionStore.shared.allows(.signature) else { proFeature = .signature; return }
             nameFocused = false
             Task {
                 guard await beforeAction?() ?? true else { return }
@@ -351,7 +351,7 @@ struct SignatureSheet: View {
                 .disabled(draft.strokes.isEmpty && draft.capturePoints.isEmpty)
                 .accessibilityIdentifier("signature-clear")
             Button(L10n.signatureSave) {
-                guard SubscriptionStore.shared.allowsPremiumOperations else { showPro = true; return }
+                guard SubscriptionStore.shared.allows(.signature) else { proFeature = .signature; return }
                 nameFocused = false
                 Task {
                     guard await beforeAction?() ?? true else { return }

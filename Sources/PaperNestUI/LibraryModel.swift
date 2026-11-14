@@ -42,6 +42,8 @@ public final class LibraryModel {
     var searchText = ""
     private(set) var isImporting = false
     var presentedError: PresentedError?
+    /// A Pro feature that was just refused. The library screen shows the paywall for it.
+    var proPaywall: ProFeature?
     /// PDFs waiting for a password, shown one at a time.
     private(set) var passwordQueue: [PendingPassword] = []
     var isShowingFileImporter = false
@@ -526,8 +528,8 @@ public final class LibraryModel {
             session.didChange()
             await reload()
             return true
-        } catch is ProAccessError {
-            presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
+        } catch let error as ProAccessError {
+            proPaywall = error.feature
             return false
         } catch {
             presentedError = .saveFailed()
@@ -537,8 +539,8 @@ public final class LibraryModel {
 
     /// One document per live page, named after the source. The source is kept.
     func split(_ summary: LibraryStore.ItemSummary) async -> Bool {
-        guard SubscriptionStore.shared.allowsPremiumOperations else {
-            presentedError = PresentedError(title: L10n.proTitle, message: L10n.proRequired)
+        guard SubscriptionStore.shared.allows(.pageTools) else {
+            proPaywall = .pageTools
             return false
         }
         guard let env = environment else { return false }

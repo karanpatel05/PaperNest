@@ -156,6 +156,8 @@ schemes:
       commandLineArguments:
         "-PaperNestLibraryPath /tmp/papernest-subscriptions-host": true
         "-PaperNestDebugSkipWelcome YES": true
+        # Turns the Free/Pro boundary on against the local test products above.
+        "-PaperNestDebugProProducts test.papernest.pro.monthly,test.papernest.pro.yearly": true
     test:
       config: Debug
       debugEnabled: true

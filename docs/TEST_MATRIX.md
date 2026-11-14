@@ -154,6 +154,29 @@ there before bookmarks, and it is not something a person waits through. Not inve
 - Adding and removing a bookmark is not on the undo stack.
 - A PDF's own outline is still "Contents"; these are the reader's marks and are never written into a file.
 
+## 2026-11-13 — Paywall names the refused feature; one list of what Pro unlocks (Claude, owner's request)
+
+Owner, in session: "I want to build subscription paywall so free users can't use paid features", approved the
+Free/Pro list, then "can you add paywall in app" and "leave ads for now". The boundary is in
+`docs/PRO_SUBSCRIPTIONS.md`.
+
+**What changed in the app.** Every Pro check now names its feature (`ProFeature`, eight cases) and a refusal opens
+the paywall saying "Included in PaperNest Pro: <feature>" — including the places that used to show a plain alert
+(Recognize Text, shapes, text markup, Split, duplicating notebooks past three). The paywall lists all eight
+features instead of four. Duplicating a page is no longer a Pro check. **With no product IDs in
+`Subscriptions.plist` nothing is blocked, exactly as before**; that file is still empty.
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh` | **Passed**: 985 tests (314 + 49 + 191 + 163 + 158 + 110), 0 failures. First run failed `frenchUsesFrenchTypography` on my new French string (plain space before a colon); fixed and re-run. Three new tests in `SubscriptionStateTests`. |
+| `./scripts/swift.sh build` (macOS) | **Passed**, no warnings. |
+| `./scripts/ui-test-ios.sh "" -only-testing:PaperNest-iOSUITests/SubscriptionUITests` (iPhone simulator, Xcode 27.2) | **Passed**, 3 of 3, on the second run. New `testAFreeUserGetsThePaywallNamingTheRefusedFeature`: with products configured, a TXT export is refused, the paywall shows `textExport`, closing it returns to the export sheet and nothing was exported. First run: `testProfilePaywallDismissalAndLocalization` failed because the longer list put Continue with Free more than five swipes down at the largest Spanish type; the test now scrolls further. |
+
+**Not verified.** The Mac app was not opened in a window. No iPad run. Only the export refusal was driven in the
+Simulator; the other seven refusals are covered by unit tests of the store and by reading the code, not by
+interaction. No purchase was made: the `PaperNest-Subscriptions` scheme run with test products, and the hosted
+StoreKit tests, were not run in this session. The rest of the iOS UI suite was not re-run.
+
 ## 2026-11-13 — Home and scanner redesign (Claude, owner's brief and two reference boards in session)
 
 What was built and every call made where the brief was silent: top entry of `docs/CLEAN_NATIVE_DESIGN.md`.

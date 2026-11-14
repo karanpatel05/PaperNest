@@ -17,6 +17,7 @@ struct TextAnnotationSheet: View {
     @State private var isLoading = true
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var proFeature: ProFeature?
 
     private var busy: Bool { isLoading || isSaving || model.isRecognizing }
 
@@ -69,6 +70,7 @@ struct TextAnnotationSheet: View {
                     } else {
                         Text(L10n.annotationNoText).foregroundStyle(.secondary)
                         Button(L10n.recognizeText) {
+                            guard SubscriptionStore.shared.allows(.textRecognition) else { proFeature = .textRecognition; return }
                             Task {
                                 await model.recognizeText(on: pageID)
                                 await load()
@@ -102,6 +104,7 @@ struct TextAnnotationSheet: View {
             }
             .interactiveDismissDisabled(isSaving || model.isRecognizing)
             .task { await load() }
+            .proPaywall($proFeature)
             .alert(L10n.genericErrorTitle, isPresented: Binding(
                 get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
             )) {
@@ -134,6 +137,8 @@ struct TextAnnotationSheet: View {
         do {
             try await model.addTextMarkup(recognition, lineIndices: selection, style: style, color: chosenColor, undoManager: undoManager)
             dismiss()
+        } catch let error as ProAccessError {
+            proFeature = error.feature
         } catch StoreError.recognitionChanged {
             await load()
             errorMessage = L10n.annotationChanged

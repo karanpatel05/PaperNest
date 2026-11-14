@@ -10,9 +10,21 @@ struct SubscriptionConfiguration: Sendable {
     var privacyURL: URL? = nil
     var termsURL: URL? = nil
     var supportURL: URL? = nil
-    var canPurchase: Bool { !productIDs.isEmpty && privacyURL != nil && termsURL != nil }
+    /// Set only by the debug launch argument below, for runs against Xcode's
+    /// local StoreKit test products, which have no published legal pages.
+    var isLocalTestStore = false
+    var canPurchase: Bool { !productIDs.isEmpty && (isLocalTestStore || (privacyURL != nil && termsURL != nil)) }
 
     static var bundled: Self {
+        #if DEBUG
+        // `-PaperNestDebugProProducts id1,id2` turns the Free/Pro boundary on
+        // in a development build. The products must exist in the StoreKit
+        // configuration the scheme runs with; nothing is simulated here.
+        if let ids = UserDefaults.standard.string(forKey: "PaperNestDebugProProducts")?
+            .split(separator: ",").map(String.init), !ids.isEmpty {
+            return Self(productIDs: ids, isLocalTestStore: true)
+        }
+        #endif
         let url = ResourceBundle.ui.url(forResource: "Subscriptions", withExtension: "plist")
         let values = url.flatMap { try? Data(contentsOf: $0) }.flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) } as? [String: Any] ?? [:]
         func link(_ key: String) -> URL? {
@@ -73,10 +85,15 @@ final class SubscriptionStore {
     var hasProAccess: Bool { state.hasAccess() }
     /// The existing pre-commercial build remains usable before product setup.
     /// Once IDs are supplied, only verified StoreKit access permits Pro work.
-    var allowsPremiumOperations: Bool { configuration.productIDs.isEmpty || hasProAccess }
+    var enforcesProBoundary: Bool { !configuration.productIDs.isEmpty }
 
-    func requirePremiumOperation() throws {
-        guard allowsPremiumOperations else { throw ProAccessError.required }
+    /// Every Pro check in the app goes through here. The feature is not used
+    /// to decide yet (one subscription unlocks them all), but naming it is
+    /// what lets the paywall say what was refused.
+    func allows(_ feature: ProFeature) -> Bool { !enforcesProBoundary || hasProAccess }
+
+    func require(_ feature: ProFeature) throws {
+        guard allows(feature) else { throw ProAccessError.required(feature) }
     }
 
 
@@ -91,9 +108,9 @@ final class SubscriptionStore {
             else { notebookWaiters.removeFirst().resume() }
         }
         try Task.checkCancellation()
-        if !allowsPremiumOperations && additional > 0 {
+        if !allows(.notebooks) && additional > 0 {
             let count = try await library.items(in: .all).filter { $0.item.kind == .notebook }.count
-            guard count + additional <= 3 else { throw ProAccessError.required }
+            guard count + additional <= ProFeature.freeNotebookAllowance else { throw ProAccessError.required(.notebooks) }
         }
         return try await operation()
     }
@@ -276,6 +293,7 @@ final class SubscriptionStore {
 }
 
 enum ProAccessError: LocalizedError {
-    case required
-    var errorDescription: String? { L10n.proRequired }
+    case required(ProFeature)
+    var feature: ProFeature { switch self { case .required(let feature): feature } }
+    var errorDescription: String? { L10n.proFeatureLocked(feature.title) }
 }
