@@ -1073,6 +1073,7 @@ extension L10n {
     static var pagePrevious: String { tr("pageNav.previous") }
     static var pageNext: String { tr("pageNav.next") }
     static func pageCounter(_ page: Int, _ count: Int) -> String { tr("pageNav.counter", page, count) }
+    static var documentUtilitiesToggleHelp: String { tr("utilities.toggleHelp") }
     static var drawerExpand: String { tr("drawer.expand") }
     static var drawerCollapse: String { tr("drawer.collapse") }
 }

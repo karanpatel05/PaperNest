@@ -962,6 +962,13 @@ struct DocumentView: View {
                 Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
             },
             move: { id, delta in onPage(id) { await model.moveSelected(by: delta, undoManager: undoManager) } },
+            reorder: { id, target in
+                guard let from = model.pages.firstIndex(where: { $0.id == id }), from != target else { return }
+                onPage(id) {
+                    // movePages counts the moved page in its destination, as a List does.
+                    await model.movePages(from: [from], to: target > from ? target + 1 : target, undoManager: undoManager)
+                }
+            },
             duplicate: { id in
                 onPage(id) {
                     do { try await model.duplicateSelectedPage(undoManager: undoManager) }

@@ -1575,6 +1575,13 @@ final class AppUITests: XCTestCase {
 
     /// Secondary tools live in Document Tools; history remains in the palette.
     private func revealEditorTool(_ app: XCUIApplication, identifier: String) {
+        // Adding a page is inside Document Tools' Add Page menu.
+        if identifier == "editor-add-notebook-page" {
+            app.revealInDocumentTools(app.buttons["strip-add-pages"])
+            app.buttons["strip-add-pages"].tap()
+            XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 5))
+            return
+        }
         app.revealInDocumentTools(app.buttons[identifier])
     }
 

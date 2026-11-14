@@ -258,4 +258,22 @@ import PaperNestStore
         XCTAssertTrue(panel.waitForNonExistence(timeout: 5), "a swipe down closes the drawer")
         XCTAssertEqual(app.buttons["editor-panels"].value as? String, "Not selected")
     }
+
+    /// A tool in the panel that opens a screen of its own actually opens it —
+    /// on a phone the drawer has to step aside for the sheet.
+    func testCropOpensFromDocumentTools() async throws {
+        let (app, _, _) = try await open(pages: 2)
+        defer { app.terminate() }
+        let panel = app.scrollViews["pdf-tools-list"]
+        if !panel.exists { app.buttons["editor-panels"].tap() }
+        XCTAssertTrue(panel.waitForExistence(timeout: 5))
+        let crop = app.buttons["editor-crop"]
+        reveal(crop, in: app)
+        XCTAssertTrue(crop.isEnabled)
+        crop.tap()
+        let area = app.descendants(matching: .any)["crop-area"].firstMatch
+        let opened = area.waitForExistence(timeout: 10)
+        snap(app, "37-crop-from-tools")
+        XCTAssertTrue(opened, "Crop in Document Tools did not open the crop screen")
+    }
 }

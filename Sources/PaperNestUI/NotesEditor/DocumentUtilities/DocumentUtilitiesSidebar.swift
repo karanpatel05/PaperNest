@@ -36,6 +36,8 @@ struct PageGalleryActions {
     var select: (PageID) -> Void
     /// Moves the page one place earlier (-1) or later (+1).
     var move: (PageID, Int) -> Void
+    /// Puts the page at this position (a dragged thumbnail, on a Mac).
+    var reorder: (PageID, Int) -> Void = { _, _ in }
     var duplicate: (PageID) -> Void
     var rotate: (PageID, _ clockwise: Bool) -> Void
     var delete: (PageID) -> Void
@@ -169,6 +171,7 @@ struct UtilitiesSection<Content: View>: View {
                         .rotationEffect(.degrees(isExpanded ? 0 : 180))
                 }
                 .padding(.horizontal, 12).frame(minHeight: 44).contentShape(Rectangle())
+                .hoverWash(radius: 16)
             }
             .buttonStyle(.plain)
             .accessibilityValue(isExpanded ? L10n.sectionExpanded : L10n.sectionCollapsed)
@@ -231,6 +234,18 @@ struct PageThumbnailGallery: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .hoverWash(radius: 9)
+        #if os(macOS)
+        // Drag one thumbnail onto another to put it there. Mac only: on iPad
+        // a long press already opens the menu below, and the same gesture
+        // cannot mean both. The menu's Move Earlier/Later works everywhere.
+        .draggable(page.id.rawValue)
+        .dropDestination(for: String.self) { dropped, _ in
+            guard let raw = dropped.first, raw != page.id.rawValue else { return false }
+            actions.reorder(PageID(rawValue: raw), index)
+            return true
+        }
+        #endif
         .contextMenu {
             Button { actions.move(page.id, -1) } label: {
                 Label { Text(L10n.scannerMoveEarlier) } icon: { Image(systemName: "arrow.left") }
@@ -277,13 +292,15 @@ struct ToolGridLayout: Layout {
     var spacing: CGFloat = 8
     var minimumWidth: CGFloat = {
         #if os(macOS)
-        76
+        // Four across in the default 320-point column, five when it is
+        // dragged wider — the denser grid the Mac mockup shows.
+        58
         #else
         96
         #endif
     }()
 
-    private func columns(for width: CGFloat) -> Int {
+    func columns(for width: CGFloat) -> Int {
         max(2, Int((width + spacing) / (minimumWidth + spacing)))
     }
 
@@ -321,11 +338,46 @@ struct ToolGridLayout: Layout {
 /// A compact tool: symbol above its name.
 struct UtilityTileLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
+        #if os(macOS)
+        // Denser on a Mac: a pointer does not need a finger-sized target, and
+        // the mockup fits four or five tools across the panel.
+        VStack(spacing: 4) {
+            configuration.icon.font(.system(size: 15)).frame(height: 18)
+            configuration.title.font(.caption2).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85)
+        }
+        #else
         VStack(spacing: 6) {
             configuration.icon.font(.system(size: 19)).frame(height: 24)
             configuration.title.font(.caption).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
         }
+        #endif
     }
+}
+
+/// A light wash under the pointer, on the platforms that have one.
+private struct HoverWash: ViewModifier {
+    var radius: CGFloat = 12
+    @State private var hovered = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(EditorChrome.purple.opacity(hovered && isEnabled ? 0.08 : 0))
+                    .allowsHitTesting(false)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(EditorChrome.purple.opacity(hovered && isEnabled ? 0.45 : 0), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+            .onHover { hovered = $0 }
+    }
+}
+
+extension View {
+    fileprivate func hoverWash(radius: CGFloat = 12) -> some View { modifier(HoverWash(radius: radius)) }
 }
 
 struct UtilityTileStyle: ButtonStyle {
@@ -335,22 +387,31 @@ struct UtilityTileStyle: ButtonStyle {
 
     private var height: CGFloat {
         #if os(macOS)
-        compact ? 50 : 58
+        compact ? 44 : 50
         #else
         compact ? 56 : 68
         #endif
     }
 
+    private var radius: CGFloat {
+        #if os(macOS)
+        9
+        #else
+        12
+        #endif
+    }
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .padding(.horizontal, 4).padding(.vertical, 7)
+            .padding(.horizontal, 3).padding(.vertical, 6)
             .frame(maxWidth: .infinity, minHeight: height)
             .foregroundStyle(EditorChrome.navy)
             .background(configuration.isPressed ? EditorChrome.lavender : EditorChrome.secondaryBackground,
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(EditorChrome.border, lineWidth: 0.75)
+                RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(EditorChrome.border, lineWidth: 0.75)
             }
+            .hoverWash(radius: radius)
             .opacity(isEnabled ? 1 : 0.45)
             .contentShape(Rectangle())
     }
@@ -379,6 +440,13 @@ struct UtilityRowStyle: ButtonStyle {
 
 /// A tool that is a mode — on or off — shown purple while it is on.
 struct UtilityToggleTile: View {
+    #if os(macOS)
+    private static let spacing: CGFloat = 4, iconSize: CGFloat = 15, height: CGFloat = 50
+    private static var titleFont: Font { .caption2 }
+    #else
+    private static let spacing: CGFloat = 6, iconSize: CGFloat = 19, height: CGFloat = 68
+    private static var titleFont: Font { .caption }
+    #endif
     let title: String
     let systemImage: String
     @Binding var isOn: Bool
@@ -387,12 +455,12 @@ struct UtilityToggleTile: View {
 
     var body: some View {
         Button { isOn.toggle() } label: {
-            VStack(spacing: 6) {
-                Image(systemName: systemImage).font(.system(size: 19)).frame(height: 24)
-                Text(verbatim: title).font(.caption).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
+            VStack(spacing: Self.spacing) {
+                Image(systemName: systemImage).font(.system(size: Self.iconSize)).frame(height: Self.iconSize + 4)
+                Text(verbatim: title).font(Self.titleFont).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
             }
-            .padding(.horizontal, 6).padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 68)
+            .padding(.horizontal, 3).padding(.vertical, 6)
+            .frame(maxWidth: .infinity, minHeight: Self.height)
             .foregroundStyle(isOn ? Color.white : EditorChrome.navy)
             .background {
                 let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -402,6 +470,7 @@ struct UtilityToggleTile: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(isOn ? Color.clear : EditorChrome.border, lineWidth: 0.75)
             }
+            .hoverWash()
             .opacity(isEnabled ? 1 : 0.45)
             .contentShape(Rectangle())
         }
@@ -437,7 +506,10 @@ struct UtilitiesToggleButton: View {
         .accessibilityLabel(L10n.documentUtilities)
         .accessibilityValue(isOn ? L10n.selectionOn : L10n.selectionOff)
         .accessibilityIdentifier("editor-panels")
-        .help(L10n.documentUtilities)
+        // ⌥⌘0, as Mac apps show and hide their inspector. ⌘0 is Zoom to Fit
+        // and ⌥⌘1…9 pick the drawing tools, so nothing here is taken twice.
+        .keyboardShortcut("0", modifiers: [.command, .option])
+        .help(L10n.documentUtilitiesToggleHelp)
     }
 }
 

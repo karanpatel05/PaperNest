@@ -959,5 +959,6 @@
 "pageNav.previous" = "Página anterior";
 "pageNav.next" = "Página siguiente";
 "pageNav.counter" = "%1$d / %2$d";
+"utilities.toggleHelp" = "Mostrar u ocultar las herramientas del documento (⌥⌘0)";
 "drawer.expand" = "Ampliar";
 "drawer.collapse" = "Reducir";
