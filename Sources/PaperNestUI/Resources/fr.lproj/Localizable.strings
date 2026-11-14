@@ -116,7 +116,6 @@
 "packaging.separate" = "Fichiers séparés";
 "export.progress" = "Exportation de la page %1$lld sur %2$lld…";
 "export.ready" = "Prêt : %@";
-"export.button" = "Exporter";
 "export.save" = "Enregistrer…";
 "export.share" = "Partager…";
 "export.vectorNote" = "Les pages PDF importées conservent leur texte sélectionnable. Les pages avec un filtre sont exportées en images.";

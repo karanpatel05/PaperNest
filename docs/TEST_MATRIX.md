@@ -1,3 +1,36 @@
+## 2026-11-13 — Export: Save, Copy and Share act in one tap; no Export button (Claude, owner in session)
+
+Owner: "In export feature Share button does not work directly … remove export button". Reproduced on iPhone 17
+first: choosing Share and pressing Export only showed "Ready: 48 KB" with a second "Share…", which did open the
+share sheet. Design and calls: top entry of `docs/CLEAN_NATIVE_DESIGN.md`. `ExportSheet.swift` also holds the
+restricted-PDF session's uncommitted lines; that session agreed to this edit, and the commit takes only these.
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh`, working tree, 21:08 | **Passed: 1012 tests** (320 + 49 + 191 + 169 + 173 + 110), 0 failures, 0 compiler warnings. The tree held the restricted-PDF session's uncommitted work and its tests. |
+| `./scripts/swift.sh build` (macOS) | Clean, 0 warnings. **The Mac sheet and its share menu were not seen** (no screen access). |
+| **This commit alone**, clean worktree, 21:15 | `./scripts/test.sh`: **passed, 985 tests** (314 + 49 + 191 + 163 + 158 + 110), 0 failures, 0 warnings. `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build`: succeeded, 0 compiler warnings. No UI test was run on the commit alone. |
+| **iPhone 17 / iOS 26.5**, 20:55 and 21:02 | **Passed:** `testExportShareOpensTheShareSheetInOneTap` (new), `testExportTilesSelectOneAtATimeAndCopyConfirms`, `testExportSaveOpensTheSaveDialogAndClosingItKeepsTheExport`, `SubscriptionUITests.testAFreeUserGetsThePaywallNamingTheRefusedFeature`, `ScannerWorkspaceUITests.testSavingAScanOpensExportAndClosingItReturnsHome`. `testReviewEditsSaveAndReopen` passed at 20:43 before the last two fixes, which do not touch its path. |
+| **iPad Air 11-inch (M4) / iOS 26.5**, 20:57 and 21:05 | **Passed:** the same five. |
+| What the new test shows | One tap on Share opens the system share sheet (a popover pointing at Share on both devices); a tap outside closes it and Share is usable again; Share again, then the share sheet's own Copy, closes the export sheet. The save test: on iPhone, closing the dialog keeps the export ("Ready" shown, no "Save…") and Save to Files opens the dialog again; on iPad, the dialog's Save closes the export sheet. |
+
+**Found by running it, and fixed.** The first version used full option tiles for the three buttons; on the iPad
+sheet they covered the Pages row, and `testExportTilesSelectOneAtATimeAndCopyConfirms` could not select Range.
+They are compact buttons now. The tests first looked for the share sheet's Copy as a button (it is a cell named
+`actionGroupCell`) and for the save dialog by "Save as" (it can open on its last folder view instead; its Save
+button is in both). One run executed 0 tests because the shell passed every `-only-testing` as one argument; it
+is not counted.
+
+**A correction to what was said in session.** The runtime warning "Attempting to export a document using a
+content type ("com.adobe.pdf") not included in its `writableContentTypes`" appears whenever a PDF is saved, with
+the save code exactly as it is at `HEAD`. A change to the save dialog was made and reverted on the belief that it
+caused this; it did not. The warning is older than this work and is not investigated here.
+
+**Not run, or failing for another reason.** `testSettingsShowsTheLibraryAndExportsABackup` fails on both devices
+before reaching Settings: it looks for `library-settings` on Home, which has none. It was last recorded passing in
+October. Not this change: the save code it uses is unchanged. `testDocumentToolsBulkExportMakesOneArchiveFromTheSelection`
+was not run. The Mac was not looked at.
+
 ## 2026-11-13 — The scanner asks before keeping a capture on iPhone too (Claude, owner in session)
 
 Owner: "on iphone when scanned it automatically keeps it, just like ipad i should ask". A capture on iPhone is now

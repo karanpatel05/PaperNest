@@ -369,7 +369,6 @@ enum L10n {
     static var packagingSeparate: String { tr("packaging.separate") }
     static func exportProgress(_ done: Int, _ total: Int) -> String { tr("export.progress", done, total) }
     static func exportReady(_ size: String) -> String { tr("export.ready", size) }
-    static var exportButton: String { tr("export.button") }
     static var exportSave: String { tr("export.save") }
     static var exportShare: String { tr("export.share") }
     static var exportVectorNote: String { tr("export.vectorNote") }

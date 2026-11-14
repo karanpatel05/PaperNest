@@ -312,7 +312,7 @@ final class AppUITests: XCTestCase {
     }
 
     /// Design pass 3: each tile in a Form row takes its own tap, and Copy
-    /// confirms once the export is on the clipboard.
+    /// exports and confirms in one tap (no Export button since 2026-11-13).
     func testExportTilesSelectOneAtATimeAndCopyConfirms() throws {
         continueAfterFailure = false
         let app = launch(["-PaperNestDebugOpenItem", "Crop target", "-PaperNestDebugShowExport", "YES"])
@@ -324,40 +324,87 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(jpeg.isSelected)
         XCTAssertFalse(pdf.isSelected)
         let all = app.buttons["export-pages-all"], range = app.buttons["export-pages-range"]
+        // The ways out sit in a bar along the bottom; on an iPad sheet the
+        // Pages row starts under it until the options are scrolled.
+        let bar = app.buttons["export-destination-save"]
+        if bar.exists, range.frame.maxY > bar.frame.minY { app.swipeUp() }
         range.tap()
         XCTAssertTrue(range.isSelected)
         XCTAssertFalse(all.isSelected)
         XCTAssertTrue(jpeg.isSelected, "a pages tap changed the format")
         all.tap()
 
-        app.swipeUp()
         let copy = app.buttons["export-destination-copy"]
         XCTAssertTrue(copy.waitForExistence(timeout: 5))
+        XCTAssertTrue(copy.isHittable, "the ways out stay on screen below the options")
+        XCTAssertFalse(app.buttons["export-start"].exists, "there is no separate Export button")
         copy.tap()
-        XCTAssertTrue(copy.isSelected)
-        XCTAssertFalse(app.buttons["export-destination-save"].isSelected)
-        app.buttons["export-start"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["export-copied"].waitForExistence(timeout: 20), "no copy confirmation")
     }
 
-    /// Design pass 3: with Save chosen, Export opens the system save dialog;
-    /// closing it keeps the exported file with Save and Share still offered.
+    /// Save to Files opens the system save dialog in one tap. On a phone,
+    /// closing the dialog keeps the export and the same button opens it
+    /// again; on an iPad, saving closes the export sheet.
     func testExportSaveOpensTheSaveDialogAndClosingItKeepsTheExport() throws {
         continueAfterFailure = false
         let app = launch(["-PaperNestDebugOpenItem", "Crop target", "-PaperNestDebugShowExport", "YES"])
-        let start = app.buttons["export-start"]
-        XCTAssertTrue(start.waitForExistence(timeout: 15), "export sheet did not open")
-        app.swipeUp()   // the destination tiles are below the fold
-        XCTAssertTrue(app.buttons["export-destination-save"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["export-destination-save"].isSelected)
-        start.tap()
-        XCTAssertTrue(app.staticTexts["Save as"].waitForExistence(timeout: 20), "save dialog did not open")
+        let save = app.buttons["export-destination-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 15), "export sheet did not open")
+        // The system dialog's own Save button: it opens on "Save as" or on
+        // whatever folder view it last showed, and Save is in both.
+        let dialogSave = app.buttons["Save"]
+        save.tap()
+        XCTAssertTrue(dialogSave.waitForExistence(timeout: 20), "save dialog did not open")
 
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            // On iPad the dialog's Cancel is not reliably reachable from a
+            // test, so this side checks the other path: saving closes the
+            // export sheet. The phone checks closing without saving.
+            dialogSave.tap()
+            XCTAssertTrue(save.waitForNonExistence(timeout: 20), "saving did not close the export sheet")
+            return
+        }
         // Drag the dialog down from its middle (not from its buttons).
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
-        XCTAssertTrue(app.buttons["Save…"].waitForExistence(timeout: 10), "no fallback after closing the save dialog")
-        XCTAssertTrue(app.descendants(matching: .any)["export-share"].exists)
+        XCTAssertTrue(dialogSave.waitForNonExistence(timeout: 10), "the save dialog did not close")
+        // The export is kept: the same button opens the dialog again, with no second step.
+        XCTAssertTrue(app.descendants(matching: .any)["export-ready"].exists)
+        XCTAssertFalse(app.buttons["Save…"].exists, "no second Save step")
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed, "the closed dialog left nothing to tap")
+        save.tap()
+        XCTAssertTrue(dialogSave.waitForExistence(timeout: 20), "Save to Files did not open the dialog again")
+    }
+
+    /// The owner's complaint (2026-11-13): Share did not share. One tap on
+    /// Share now exports and opens the system share sheet; closing it keeps
+    /// the export, and sharing through it closes the export sheet.
+    func testExportShareOpensTheShareSheetInOneTap() throws {
+        continueAfterFailure = false
+        let app = launch(["-PaperNestDebugOpenItem", "Crop target", "-PaperNestDebugShowExport", "YES"])
+        let share = app.buttons["export-destination-share"]
+        XCTAssertTrue(share.waitForExistence(timeout: 15), "export sheet did not open")
+        share.tap()
+        let sheet = app.otherElements["ActivityListView"]
+        XCTAssertTrue(sheet.waitForExistence(timeout: 20), "one tap on Share did not open the share sheet")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "export-share-sheet"; shot.lifetime = .keepAlways; add(shot)
+
+        // Closed without sharing: the export stays ready. The share sheet is
+        // a popover pointing at Share, so a tap well above it closes it.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 10), "the share sheet did not close")
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: share)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed, "the closed share sheet left nothing to tap")
+
+        // Shared, through the share sheet's own Copy: the export sheet is done.
+        share.tap()
+        XCTAssertTrue(sheet.waitForExistence(timeout: 20), "Share did not open the share sheet a second time")
+        let copy = app.cells.matching(NSPredicate(format: "identifier == %@ AND label == %@", "actionGroupCell", "Copy")).firstMatch
+        XCTAssertTrue(copy.waitForExistence(timeout: 10), "the share sheet offers no Copy")
+        copy.tap()
+        XCTAssertTrue(share.waitForNonExistence(timeout: 15), "sharing did not close the export sheet")
     }
 
     /// Design pass 4 (iPhone): the filter strip applies a filter, and the

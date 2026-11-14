@@ -95,7 +95,7 @@ import UIKit
         app.buttons["import-location-save"].tap()
         // A saved scan stays closed. Export opens for it by itself, and
         // closing Export goes back to Home.
-        let export = app.buttons["export-start"].firstMatch
+        let export = app.buttons["export-destination-share"].firstMatch
         XCTAssertTrue(export.waitForExistence(timeout: 30), "saving a scan must open its export screen")
         XCTAssertFalse(app.buttons["editor-back"].exists, "a saved scan must not open in the editor")
         let shot = XCTAttachment(screenshot: app.screenshot())
@@ -139,13 +139,13 @@ import UIKit
         finish.tap()
         XCTAssertTrue(app.buttons["import-location-save"].waitForExistence(timeout: 15))
         app.buttons["import-location-save"].tap()
-        XCTAssertTrue(app.buttons["export-start"].firstMatch.waitForExistence(timeout: 30),
+        XCTAssertTrue(app.buttons["export-destination-share"].firstMatch.waitForExistence(timeout: 30),
                       "saving a scan must open its export screen without being asked")
         XCTAssertFalse(app.buttons["editor-back"].exists, "a saved scan must not open in the editor")
         XCTAssertEqual(app.alerts.count, 0, "nothing stands between saving and the export screen")
         app.buttons["Cancel"].firstMatch.tap()
         XCTAssertTrue(app.buttons["home-see-all"].waitForExistence(timeout: 15), "closing Export returns to Home")
-        XCTAssertFalse(app.buttons["export-start"].exists)
+        XCTAssertFalse(app.buttons["export-destination-share"].exists)
         XCTAssertFalse(app.buttons["editor-back"].exists)
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Scan ")).firstMatch
             .waitForExistence(timeout: 15), "the saved scan is in Home's recent documents")

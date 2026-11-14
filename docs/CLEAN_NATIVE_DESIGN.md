@@ -1,3 +1,12 @@
+## Export: the ways out are the buttons — owner, 2026-11-13
+
+Owner: "In export feature Share button does not work directly on ipad and iphone and mac it should remove export button in pop up menu it has no use i guess". Share was not broken; it took three taps (choose the Share tile, press Export, press "Share…"). The Export button is gone. Save to Files (Mac: Save to Disk), Copy and Share sit in the bar along the bottom of the export sheet, and each one exports with the options above and hands the file over in the same tap. Share opens the system share sheet from code, pointing at the Share button (`SystemSharePresenter`), because a `ShareLink` cannot open after an export it has to wait for.
+
+- **After a share goes through, the sheet closes;** after a scan that lands on Home. Closing the share sheet or the save dialog without finishing keeps the export, and the same three buttons hand it over again without exporting twice. That is how the sheet already treated a closed save dialog.
+- **The bar uses compact buttons, not option tiles.** Tiles made it tall enough to cover the Pages row on an iPad sheet.
+- **Mac:** Cancel, Copy, Share, Save to Disk; Return saves, as it exported before.
+- **Not changed:** the bulk export sheet and the Settings backup keep their own Export → Share… steps.
+
 ## Home and scanner redesign — owner brief, 2026-11-13
 
 The owner gave a written brief and two reference boards in session ("Paper NEST — Home screen & scanner complete UI redesign"). It supersedes the Home and Scan lines of the 2026-11-07 entry below, the 2026-11-05 rule that the wide sidebar carries no brand, and the 2026-11-04 "content-first Home without quick cards". Built by Claude on the owner's direct instruction. What was run is in TEST_MATRIX.

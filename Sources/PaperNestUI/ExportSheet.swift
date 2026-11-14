@@ -39,10 +39,10 @@ struct ExportLoader: View {
 }
 
 /// Export, laid out as in the owner's mockup (`ipad-notebook-export.png`):
-/// the document, Format tiles, Pages tiles, format options, where the
-/// export goes, then one Export button. Choosing the destination first
-/// means one tap does the work: Save opens the save dialog, Copy puts the
-/// file on the clipboard, Share offers the share sheet.
+/// the document, Format tiles, Pages tiles and format options, with the
+/// three ways out along the bottom. There is no Export button (owner,
+/// 2026-11-13): one tap on a way out does the work. Save opens the save
+/// dialog, Copy puts the file on the clipboard, Share opens the share sheet.
 struct ExportSheet: View {
     let itemName: String
     let pages: [Page]
@@ -54,7 +54,8 @@ struct ExportSheet: View {
     @State private var pageChoice: PageChoice = .all
     @State private var rangeStart = 1
     @State private var rangeEnd = 1
-    @State private var destination: Destination = .save
+    /// The files being handed to the system's share UI, while it is up.
+    @State private var shareRequest: ShareRequest?
     @State private var phase: Phase = .configuring
     @State private var exportTask: Task<Void, Never>?
     @State private var isShowingSaver = false
@@ -65,8 +66,9 @@ struct ExportSheet: View {
 
     enum PageChoice: Hashable { case all, current, range }
 
-    /// No "More" tile (the mockup has one): the share sheet already is
-    /// "more". Claude's call, see CLEAN_NATIVE_DESIGN.md.
+    /// Where an export goes. Each is its own button: choosing one exports
+    /// and hands the file over at once (owner, 2026-11-13). No "More" (the
+    /// mockup has one): the share sheet already is "more".
     enum Destination: Hashable { case save, copy, share }
 
     enum Phase {
@@ -181,28 +183,6 @@ struct ExportSheet: View {
                 }
             }
             formatOptions
-            Section {
-                tileRow {
-                    #if os(iOS)
-                    ChoiceTile(title: L10n.exportToFiles, systemImage: "folder",
-                               isSelected: effectiveDestination == .save, identifier: "export-destination-save") { destination = .save }
-                    #else
-                    ChoiceTile(title: L10n.exportToDisk, systemImage: "square.and.arrow.down",
-                               isSelected: effectiveDestination == .save, identifier: "export-destination-save") { destination = .save }
-                    #endif
-                    ChoiceTile(title: L10n.exportCopy, systemImage: "doc.on.doc",
-                               isSelected: effectiveDestination == .copy, isEnabled: !producesArchive,
-                               identifier: "export-destination-copy") { destination = .copy }
-                    ChoiceTile(title: L10n.exportShareTile, systemImage: "square.and.arrow.up",
-                               isSelected: effectiveDestination == .share, identifier: "export-destination-share") { destination = .share }
-                }
-            } header: {
-                Text(L10n.exportDestination)
-            } footer: {
-                if producesArchive {
-                    Text(L10n.exportCopyUnavailable)
-                }
-            }
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
@@ -408,33 +388,25 @@ struct ExportSheet: View {
         }
     }
 
-    @ViewBuilder
+    /// What the sheet says, then the three ways out. Each action exports
+    /// with the options above and hands the file over in the same tap; there
+    /// is no separate Export button and no second Share or Save to press.
     private var footer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            status
+            if showsActions { actions }
+        }
+    }
+
+    @ViewBuilder
+    private var status: some View {
         switch phase {
         case .configuring:
-            VStack(alignment: .leading, spacing: 8) {
-                if !rangeIsValid {
-                    Text(L10n.exportInvalidRange).font(.caption).foregroundStyle(.red)
-                }
-                #if os(iOS)
-                Button { startExport() } label: {
-                    Text(L10n.exportButton).font(.headline).frame(maxWidth: .infinity, minHeight: 30)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!canExport)
-                .accessibilityIdentifier("export-start")
-                #else
-                HStack {
-                    Spacer()
-                    Button(L10n.cancel, role: .cancel) { dismiss() }
-                        .keyboardShortcut(.cancelAction)
-                    Button(L10n.exportButton) { startExport() }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(!canExport)
-                        .accessibilityIdentifier("export-start")
-                }
-                #endif
+            if !rangeIsValid {
+                Text(L10n.exportInvalidRange).font(.caption).foregroundStyle(.red)
+            }
+            if producesArchive {
+                Text(L10n.exportCopyUnavailable).font(.caption).foregroundStyle(.secondary)
             }
         case .exporting(let progress):
             HStack {
@@ -448,32 +420,11 @@ struct ExportSheet: View {
                 }
             }
         case .ready(let output):
-            // Also where a cancelled save dialog lands: the files are kept,
-            // so Save and Share still work without exporting again.
-            // Two rows so long French/Spanish labels fit on a phone.
-            VStack(alignment: .leading, spacing: 10) {
-                Text(L10n.exportReady(ByteCountFormatter.string(fromByteCount: output.totalByteCount, countStyle: .file)))
-                    .font(.callout)
-                HStack {
-                    Spacer()
-                    if destination == .share {
-                        ShareLink(items: output.files) {
-                            Label(L10n.exportShare, systemImage: "square.and.arrow.up")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("export-share")
-                        Button(L10n.exportSave) { isShowingSaver = true }
-                    } else {
-                        ShareLink(items: output.files) {
-                            Label(L10n.exportShare, systemImage: "square.and.arrow.up")
-                        }
-                        .accessibilityIdentifier("export-share")
-                        Button(L10n.exportSave) { isShowingSaver = true }
-                            .keyboardShortcut(.defaultAction)
-                    }
-                    Button(L10n.done) { dismiss() }
-                }
-            }
+            // Also where a closed save dialog or share sheet lands: the files
+            // are kept, so the same three buttons work without exporting again.
+            Text(L10n.exportReady(ByteCountFormatter.string(fromByteCount: output.totalByteCount, countStyle: .file)))
+                .font(.callout)
+                .accessibilityIdentifier("export-ready")
         case .copied:
             HStack {
                 Label(L10n.exportCopied, systemImage: "checkmark.circle.fill")
@@ -490,6 +441,104 @@ struct ExportSheet: View {
                 Button(L10n.done) { dismiss() }
             }
         }
+    }
+
+    /// The actions stay on screen while an export is made and handed over,
+    /// so the share sheet keeps the Share button to point at.
+    private var showsActions: Bool {
+        switch phase {
+        case .configuring, .exporting, .ready: true
+        case .copied, .failed: false
+        }
+    }
+
+    private var actionsEnabled: Bool {
+        switch phase {
+        case .configuring: canExport
+        case .ready: true
+        default: false
+        }
+    }
+
+    @ViewBuilder
+    private var actions: some View {
+        #if os(iOS)
+        HStack(spacing: 10) {
+            actionButton(L10n.exportToFiles, systemImage: "folder", enabled: actionsEnabled,
+                         identifier: "export-destination-save") { perform(.save) }
+            actionButton(L10n.exportCopy, systemImage: "doc.on.doc", enabled: actionsEnabled && !producesArchive,
+                         identifier: "export-destination-copy") { perform(.copy) }
+            actionButton(L10n.exportShareTile, systemImage: "square.and.arrow.up", enabled: actionsEnabled,
+                         identifier: "export-destination-share") { perform(.share) }
+                .background(SystemSharePresenter(request: $shareRequest, finished: shareFinished))
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L10n.exportDestination)
+        #else
+        HStack {
+            Spacer()
+            if case .configuring = phase {
+                Button(L10n.cancel, role: .cancel) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+            Button(L10n.exportCopy) { perform(.copy) }
+                .disabled(!actionsEnabled || producesArchive)
+                .accessibilityIdentifier("export-destination-copy")
+            Button(L10n.exportShareTile) { perform(.share) }
+                .disabled(!actionsEnabled)
+                .background(SystemSharePresenter(request: $shareRequest, finished: shareFinished))
+                .accessibilityIdentifier("export-destination-share")
+            // Return saves, as the Export button it replaces did.
+            Button(L10n.exportToDisk) { perform(.save) }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!actionsEnabled)
+                .accessibilityIdentifier("export-destination-save")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L10n.exportDestination)
+        #endif
+    }
+
+    #if os(iOS)
+    /// Icon over name, the height of the Export button it replaces.
+    private func actionButton(_ title: String, systemImage: String, enabled: Bool, identifier: String,
+                              action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: systemImage).font(.title3)
+                Text(title).font(.caption.weight(.semibold))
+                    .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.bordered)
+        .disabled(!enabled)
+        .accessibilityIdentifier(identifier)
+    }
+    #endif
+
+    /// Exports with the options above and hands the result over; once an
+    /// export is made, hands that one over again rather than redoing it.
+    private func perform(_ target: Destination) {
+        guard case .ready(let output) = phase else { startExport(to: target); return }
+        switch target {
+        case .save: isShowingSaver = true
+        case .share: shareRequest = ShareRequest(files: output.files)
+        case .copy:
+            do {
+                try Clipboard.write(files: output.files)
+                output.removeTemporaryFiles()
+                phase = .copied
+            } catch {
+                phase = .failed(L10n.exportFailed)
+            }
+        }
+    }
+
+    /// A share target has the files: the sheet's work is done. Closed without
+    /// one, the export stays ready for another try.
+    private func shareFinished(_ shared: Bool) {
+        if shared { dismiss() }
     }
 
     private var isBusyOrDone: Bool {
@@ -519,10 +568,6 @@ struct ExportSheet: View {
         options.format != .pdf && selectedPages.count > 1 && options.packaging == .zip
     }
 
-    private var effectiveDestination: Destination {
-        destination == .copy && producesArchive ? .save : destination
-    }
-
     /// Selected pages in document order.
     private var selectedPages: [Page] {
         switch pageChoice {
@@ -536,7 +581,7 @@ struct ExportSheet: View {
         }
     }
 
-    private func startExport() {
+    private func startExport(to target: Destination) {
         let needed: ProFeature? = if options.format == .txt || options.format == .docx
             || (options.format == .pdf && options.includesRecognizedText) { .textExport }
             else if options.format == .pdf && !password.isEmpty { .passwordExport } else { nil }
@@ -545,7 +590,6 @@ struct ExportSheet: View {
         let selection = selectedPages
         let options = options
         let name = itemName
-        let target = effectiveDestination
         let password = Self.passwordToUse(password)
         phase = .exporting(ExportProgress(completedPages: 0, totalPages: selection.count))
         exportTask = Task {
@@ -566,6 +610,7 @@ struct ExportSheet: View {
                     isShowingSaver = true
                 case .share:
                     phase = .ready(output)
+                    shareRequest = ShareRequest(files: output.files)
                 case .copy:
                     try Clipboard.write(files: output.files)
                     output.removeTemporaryFiles()

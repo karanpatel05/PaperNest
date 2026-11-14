@@ -67,8 +67,9 @@ import XCTest
         let txt = app.buttons["export-format-txt"]
         XCTAssertTrue(txt.waitForExistence(timeout: 20), "export sheet did not open")
         txt.tap()
-        let start = app.buttons["export-start"].firstMatch
-        for _ in 0..<5 where !start.isHittable { app.swipeUp() }
+        // Any of the ways out starts the export; Share is the one people tap.
+        let start = app.buttons["export-destination-share"].firstMatch
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
         start.tap()
         let locked = app.descendants(matching: .any)["pro-locked-feature"]
         XCTAssertTrue(locked.waitForExistence(timeout: 10), "a Pro export went ahead without a subscription")
@@ -77,7 +78,8 @@ import XCTest
         shot.name = "pro-paywall-locked-feature"; shot.lifetime = .keepAlways; add(shot)
         app.buttons["pro-close"].tap()
         XCTAssertTrue(txt.waitForExistence(timeout: 5), "closing the paywall lost the export sheet")
-        XCTAssertFalse(app.descendants(matching: .any)["export-share"].exists, "the refused export still ran")
+        XCTAssertFalse(app.descendants(matching: .any)["export-ready"].exists, "the refused export still ran")
+        XCTAssertFalse(app.otherElements["ActivityListView"].exists, "the refused export still reached the share sheet")
         app.terminate()
     }
 }
