@@ -131,6 +131,62 @@ import PaperNestTestSupport
         #expect(inked > 150, "the typed answer is not on the page: \(inked) dark pixels in its box")
     }
 
+    /// A picture exported from a page is paper too: the same marks as a PDF
+    /// export of it, so the two formats agree.
+    @Test func anImageExportKeepsTheMarksMeantForPaper() async throws {
+        let f = try ExportFixture()
+        let item = try await f.importer.importItem(.data(SyntheticDocuments.markedUpPDF(), name: "Marked.pdf"))
+        let output = try await f.exporter.export(itemName: item.name, pages: try await f.store.pages(of: item.id),
+                                                 options: ExportOptions(format: .png))
+        defer { output.removeTemporaryFiles() }
+        let picture = try #require(PixelProbe.decode(try Data(contentsOf: output.files[0])))
+
+        let red = fraction(SyntheticDocuments.MarkedUp.shownAndPrinted).insetBy(dx: 0.02, dy: 0.02)
+        let blue = fraction(SyntheticDocuments.MarkedUp.shownOnly).insetBy(dx: 0.02, dy: 0.02)
+        #expect(count(picture, in: red) { $0.isRed } > 500, "the mark meant for paper is missing from the picture")
+        #expect(count(picture, in: blue) { $0.b > 180 && $0.r < 80 } == 0, "a mark not meant for paper is in the picture")
+    }
+
+    /// Exports read and write a form through PDFKit — the copy of an untouched
+    /// page, the pass that writes it into the finished file — while the page
+    /// and its thumbnails are being drawn, which also builds the form's fields.
+    /// Printing a filled form while its pages render is the everyday case, and
+    /// every one of these has to finish.
+    @Test(.timeLimit(.minutes(1)))
+    func printingAFormWhileItsPicturesAreDrawnFinishes() async throws {
+        let f = try ExportFixture()
+        let item = try await f.importer.importItem(.data(SyntheticDocuments.restrictedAcroFormPDF(fields: [
+            SyntheticDocuments.FormFieldSpec(name: "customer", value: "MMMMMMMM"),
+            SyntheticDocuments.FormFieldSpec(name: "second", value: "WWWWWWWW"),
+        ]), name: "Form.pdf"))
+        let pages = try await f.store.pages(of: item.id)
+        let renderer = PageRenderer(store: f.store), exporter = f.exporter
+
+        let finished = try await withThrowingTaskGroup(of: Int.self) { group in
+            for index in 0..<16 {
+                group.addTask {
+                    _ = try await renderer.renderImage(pages[0], pixelsPerPoint: 1 + CGFloat(index % 4) * 0.25)
+                    return 1
+                }
+            }
+            for index in 0..<4 {
+                group.addTask {
+                    // A password makes the export copy the untouched page and
+                    // write it through PDFKit, rather than hand back the file.
+                    let output = try await exporter.export(itemName: "Form \(index)", pages: pages,
+                                                           options: ExportOptions(format: .pdf),
+                                                           password: "pw\(index)", purpose: .printing)
+                    output.removeTemporaryFiles()
+                    return 1
+                }
+            }
+            var total = 0
+            for try await one in group { total += one }
+            return total
+        }
+        #expect(finished == 20)
+    }
+
     /// A rebuilt page is paper, so it follows the author's print flags: a mark
     /// shown on screen but not meant for printing is left off, one meant for
     /// both is drawn in, a hidden one is in neither.

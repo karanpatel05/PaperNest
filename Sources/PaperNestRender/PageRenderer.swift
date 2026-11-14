@@ -49,13 +49,16 @@ public struct PageRenderer: Sendable {
     /// Renders `page` with `pixelsPerPoint` resolution onto white.
     /// `includingInk: false` is for the ink editor, which draws the strokes
     /// it is editing over the page itself.
+    /// `annotations` picks which of a PDF page's annotations are drawn:
+    /// `.screen` to show the page, `.paper` for a picture that leaves the app.
     public func renderImage(_ page: Page, pixelsPerPoint: CGFloat, includingInk: Bool = true,
-                            excludingObjectIDs: Set<PageObjectID> = []) async throws -> CGImage {
+                            excludingObjectIDs: Set<PageObjectID> = [],
+                            annotations use: PageAnnotations.Use = .screen) async throws -> CGImage {
         let size = page.geometry.pageSize
         let width = max(1, Int((size.width * pixelsPerPoint).rounded()))
         let height = max(1, Int((size.height * pixelsPerPoint).rounded()))
         guard width * height <= Self.maxPixelCount else { throw RenderError.outputTooLarge }
-        let source = try await prepareSource(for: page, pixelsPerPoint: pixelsPerPoint)
+        let source = try await prepareSource(for: page, pixelsPerPoint: pixelsPerPoint, annotations: use)
         let layers = try await layers(for: page, pixelsPerPoint: pixelsPerPoint, includingInk: includingInk,
                                       excludingObjectIDs: excludingObjectIDs)
         return try Self.bitmap(width: width, height: height) { ctx in

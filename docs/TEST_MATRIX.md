@@ -1,3 +1,33 @@
+## 2026-11-14 — Annotations, follow-up: pictures follow the print flags; the exporter's PDFKit work checked under load (Claude)
+
+Two things the entry below claimed or left open, checked after it was committed (`78d7e77`).
+
+- **A JPEG, PNG or HEIC picture of a page drew the screen's marks, not paper's.** The docs said every page that
+  leaves the app follows the author's print flags; picture exports went through `renderImage`, which draws for the
+  screen, so a mark the author kept off paper was in the picture and not in a PDF export of the same page. Now
+  `renderImage(… annotations:)` takes the rule and picture exports ask for `.paper`. New test
+  `anImageExportKeepsTheMarksMeantForPaper` **failed first** (20,636 blue pixels where none belong), then passed.
+- **Does printing a form while its pages are drawn hang?** Page drawing builds a form's fields under
+  `PDFKitAnnotationLock`; the exporter's copy of an untouched page and its PDFKit write do not take the lock. New
+  test `printingAFormWhileItsPicturesAreDrawnFinishes`: sixteen pictures of a filled, restricted form drawn while
+  four print exports of it, each with a password so the page is copied and written through PDFKit, run at once.
+  **Passed 7 of 7 runs, in about 0.1 s each.** So the exporter was left outside the lock, and `ARCHITECTURE.md` now
+  says which code takes it and which does not, and that this was measured, not explained. Nothing proves the
+  exporter can never meet the deadlock; seven runs found no sign of it.
+- **Saved page pictures**: none. `ThumbnailCache` keeps page pictures in memory only, so forms already in a
+  library show their answers the next time their pages are drawn; nothing needs clearing.
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh`, clean worktree of `78d7e77` + this change | **Passed: 1,029 tests** (320 + 49 + 191 + 180 + 179 + 110), 0 failures, 0 compiler warnings — `/tmp/papernest-annots2-unit.log` |
+| `anImageExportKeepsTheMarksMeantForPaper` (new) | Failed before the change, passed after |
+| `printingAFormWhileItsPicturesAreDrawnFinishes` (new) | **7/7** runs passed |
+| `./scripts/build-mac-app.sh` | **Built**, 0 warnings |
+| `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build` | **BUILD SUCCEEDED**, 0 warnings |
+
+No UI test was run for this follow-up: it changes what is in an exported JPEG, PNG or HEIC of a PDF page that has
+annotations, which the unit test reads, and nothing on screen.
+
 ## 2026-11-14 — Form answers and other PDF annotations are drawn on the page (Claude, owner in session)
 
 Owner, after the USCIS entry below named what was left: **"Fix everything as per your understanding"**. This

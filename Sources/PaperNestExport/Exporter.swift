@@ -451,8 +451,10 @@ public struct Exporter: Sendable {
         for (index, page) in pages.enumerated() {
             try Task.checkCancellation()
             // Rendered onto opaque white, so JPEG never turns dark ink on a
-            // transparent page into black-on-black.
-            let image = try await renderer.renderImage(page, pixelsPerPoint: pixelsPerPoint)
+            // transparent page into black-on-black. A picture that leaves the
+            // app is paper: the page's annotations follow the author's print
+            // flags, as they do in a PDF export of the same page.
+            let image = try await renderer.renderImage(page, pixelsPerPoint: pixelsPerPoint, annotations: .paper)
             guard let data = Self.encode(image, type: type, quality: options.jpegQuality, dpi: options.imageDPI) else {
                 throw ExportError.writeFailed
             }
