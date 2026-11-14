@@ -1,3 +1,85 @@
+## 2026-11-14 — Night mode and bookmarks re-checked on today's code, and four of their gaps closed (Claude, owner in session)
+
+Owner: **"finish night mode and bookmarks"**, then **"Try again"**. Both were already built and committed on
+2026-11-13 (`dd405ea`, `35b9a93`); an earlier report of mine in another session called them uncommitted drafts,
+which was out of date. So "finish" meant two things: prove they still work after the ten commits that landed on
+top of them — two of which change the very picture night mode recolours (`78d7e77` draws form answers and other
+annotations into the page; `e61ebf2` makes pictures follow the print flags) — and close the gaps in their
+"Not verified" lists most likely to hide a real defect.
+
+**Where it was run.** A clean worktree of `HEAD` (`81e5937`), not the main checkout: the main checkout carries a
+stopped session's unfinished read-aloud edits in `DocumentView.swift`, `PaperNestCommands.swift`, `Localization.swift`
+and the strings, and testing there would have tested a state nobody committed.
+
+**Results on `81e5937`.** Unit suite **1,029 tests, 0 failures, 0 warnings**; `./scripts/build-mac-app.sh` clean.
+
+| Suite | iPad Pro 13-inch (M5), iOS 26.5 | iPhone: PaperNest iPhone Duo (iOS 27.1) or iPhone 17 (iOS 27.0) |
+|---|---|---|
+| `NightModeUITests` (3) | 3/3 | 3/3 (Duo) |
+| `BookmarksUITests` (3) | 3/3 | 3/3 (iPhone 17) — see below |
+| `ReaderNightAndBookmarksUITests` (new, 4) | 4/4, final code | 3/3 + ⌘D skipped by design (iPhone 17), final code |
+| `DocumentFindUITests` (3) | 3/3 | 3/3 (Duo) |
+| `TextSelectionUITests` (2) | 2/2 | 2/2 (Duo) |
+| `PageLinksUITests` (2) | 2/2 | 2/2 (Duo) |
+
+Logs: iPad `/tmp/pn-verify-ipad-1.log` (all six suites) and `/tmp/pn-verify-ipad-2.log` (the new suite on its
+final code); iPhone Duo `/tmp/pn-verify-iphone-1.log` and `-2.log`; iPhone 17 `/tmp/pn-verify-iphone17-1.log`.
+**The iPhone column took three devices' worth of runs, and the reason matters.** On the Duo, the first run's
+Bookmarks, Find and Night Mode tests never got going — XCTest restarted its runner nine times — and the second run
+lost `testABookmarkIsStillThereAfterRelaunch` at launch; a third run had both its tests "crashed with signal kill".
+**The app did not crash once** (no crash report). Another session had started its own UI tests on the same Duo
+simulator, and two test runs on one simulator kill each other's runner. The Bookmarks suite and the new suite were
+then run on an idle iPhone 17 simulator (iOS 27.0), where every test passed with no restart. So the bookmark
+suite's iPhone result is on iOS 27.0, not 27.1.
+
+**What the new suite proves** (`Apps/iOS/UITests/ReaderNightAndBookmarksUITests.swift`):
+
+- **Typing at night.** With Night Mode on, a text box placed on a PDF page takes every letter ("Night note"), shows
+  light print inside the box while it is typed, and is **saved in the colour chosen, not its night shade** — read
+  back from the library on disk. The page reads light on dark again once the box is placed.
+- **A filled form at night.** A field whose answer PDFKit draws (`acroFormPDF`, "MMMMMMMM") shows the answer dark on
+  light by day and **light on dark at night**, read off the screen in the field's own box. This is the first check
+  of `78d7e77`'s annotation drawing together with night mode, and the first on iOS of that drawing at all.
+- **⌘D from a hardware keyboard (iPad).** It shows the ribbon and saves one bookmark; ⌘D again removes both.
+  Skipped on the phone by design: a phone has no menu bar for the shortcut to live in. **While it ran, the app's
+  whole log was streamed at debug level** (about 41,000 lines from the app, 210 of them UIKit's): **no**
+  `MenuBuilder` message and nothing about a conflicting shortcut. The 2026-11-13 entry could only say that of the
+  iPhone; now it is true of the iPad too, for this launch.
+- **A notebook's continuous pages, at night.** Go to page 2 and Add Bookmark: exactly one ribbon, on page 2, saved
+  against page 2's id. At night the ribbon reads as **red** on the dark page (sampled off the screen). From page 3,
+  the Bookmarks list's row leads back to page 2.
+
+Screenshots: `docs/screenshots/reader-gaps-2026-11-14/`.
+
+**Three things learned, for whoever tests the editor next.**
+
+1. **On a phone the bottom bar floats over the lower part of the page.** A patch of "plain paper" sampled at y 600
+   of 792 was the bar, which is light at night, and two of the new tests failed for it on the first iPhone run. They
+   sample at y 430 now (`plainPaper`).
+2. **Going to a page in a phone notebook centres it, so its top edge — and the ribbon — are out of sight above.**
+   Zooming out to bring it back made it worse (the ribbon went to y −91). Dragging in the margin beside the paper
+   scrolls it back into view. A reader who goes to a bookmark on a phone does not see its ribbon until they scroll
+   up; that is how notebook navigation behaves today, recorded here rather than changed.
+3. **Two test runs on one simulator kill each other.** Another session started its own UI tests on the same iPhone
+   simulator while mine ran; XCTest reported my two tests as "crashed with signal kill" and the app never crashed.
+   The Mac was also nearly out of memory at the time (15.4 of 16 GB of swap). Check `pgrep -fl "xcodebuild test"`
+   for a run on your simulator before starting one.
+
+**One thing seen and not fixed.** While a text box is being typed in at night, **its formatting bar is turned
+too**: the bar goes dark and the colour swatch for black text shows **white**
+(`docs/screenshots/reader-gaps-2026-11-14/iphone-typing-at-night.png`). The text is saved black — the test reads it
+back — so nothing wrong is stored, but the swatch tells the reader the opposite of the colour they chose. The bar is
+drawn in the page's overlay, under the night filter, which is why. The night mode entry's own rule is that the
+toolbars stay as they are. Left alone because the fix is in the editor's page surface in `DocumentView.swift`, where
+a stopped session's read-aloud edits are still uncommitted; it needs the bar lifted out of the filtered layer, not a
+colour patch.
+
+**Still not verified, plainly.** **The Mac** — screen access has been declined before and was not asked for again;
+night mode and bookmarks there have only been built. A physical iPad or iPhone, Apple Pencil, VoiceOver and the
+largest text sizes. Switching Night Mode *while* a text box is being typed in is not reachable in the app today:
+the bottom bar that holds Display settings stands down while a text box is being edited, on both phone and iPad.
+Rotated and cropped pages at night, swipe-to-remove a bookmark, and the rename alert in French and Spanish.
+
 ## 2026-11-14 — Print allowed in the Mac's iCloud signing file (Claude, owner in session)
 
 Owner: **"Yes, add it"**, asked whether to add the print entitlement to `Apps/Mac/PaperNest.iCloud.entitlements`
