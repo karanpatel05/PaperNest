@@ -40,10 +40,34 @@ import PaperNestStore
     /// Scrolls before asking whether it exists: the panel's grids are lazy, so
     /// a control below the fold is not in the hierarchy at all until the panel
     /// has been scrolled to it.
+    ///
+    /// Drags by window coordinates inside the panel's frame rather than asking
+    /// the scroll view to swipe itself: in the 11-inch iPad's popover XCUITest
+    /// reports the scroll view's visible frame as empty and refuses the swipe,
+    /// although the panel is on screen. The drag starts at the panel's left
+    /// margin, clear of every slider, and is slow and held so it does not coast.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let scroll = app.scrollViews["tool-panel-scroll"]
-        for _ in 0..<8 where !(element.exists && element.isHittable) { scroll.swipeUp() }
-        XCTAssertTrue(element.exists && element.isHittable, "\(element) cannot be reached in the panel", file: file, line: line)
+        let window = app.windows.firstMatch
+        func nudge() {
+            let frame = scroll.frame
+            guard !frame.isEmpty else { return }
+            let origin = window.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(dx: frame.minX + 6, dy: frame.maxY - 30))
+            let distance = min(220, frame.height * 0.6)
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -distance)),
+                        withVelocity: .slow, thenHoldForDuration: 0.15)
+        }
+        // Inside the panel's frame, not merely hittable: XCUITest calls a
+        // switch half below the popover's edge hittable, and the tap at its
+        // centre then lands outside the popover and dismisses it.
+        func inPanel() -> Bool {
+            guard element.exists, element.isHittable else { return false }
+            let panel = scroll.frame.insetBy(dx: 0, dy: 4)
+            return panel.isEmpty || (panel.minY <= element.frame.minY && element.frame.maxY <= panel.maxY)
+        }
+        for _ in 0..<12 where !inPanel() { nudge() }
+        XCTAssertTrue(inPanel(), "\(element) cannot be reached in the panel", file: file, line: line)
     }
 
     /// Brings a tool on the main toolbar into reach; on a phone the row scrolls.
