@@ -37,6 +37,21 @@ struct CompressSheet: View {
     private func size(_ bytes: Int64) -> String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }
 
     var body: some View {
+        #if os(macOS)
+        // A Mac sheet sizes itself to its content, and any wrapped text it had
+        // to measure for that looped forever ("AttributeGraph: cycle
+        // detected"), leaving the sheet on its spinner. Given a size of its
+        // own, with the content scrolling inside it, nothing has to be
+        // measured against the sheet and the text wraps freely.
+        ScrollView { content }
+            .frame(width: 460, height: 380)
+            .background(EditorChrome.secondaryBackground)
+        #else
+        content
+        #endif
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text(L10n.compressTitle).font(.headline).accessibilityAddTraits(.isHeader)
@@ -53,20 +68,15 @@ struct CompressSheet: View {
             }
             if let loaded {
                 PanelSection(title: L10n.compressLevel) {
-                    PanelSegmented(options: [
-                        .init(value: CompressionPreset.light, title: L10n.compressLight, id: "compress-light"),
-                        .init(value: CompressionPreset.strong, title: L10n.compressStrong, id: "compress-strong"),
-                        .init(value: CompressionPreset.smallest, title: L10n.compressSmallest, id: "compress-smallest"),
-                    ], selection: $preset)
-                    .disabled(isWorking)
-                    PanelNote(text: L10n.compressCurrentSize(size(loaded.bytes)))
-                    PanelNote(text: L10n.compressRule)
+                    levelPicker.disabled(isWorking)
+                    note(L10n.compressCurrentSize(size(loaded.bytes)))
+                    note(L10n.compressRule)
                 }
                 .onChange(of: preset) { _, _ in clearResult() }
                 status
                 actions(loaded)
             } else if case .failed = phase {
-                PanelNote(text: L10n.exportFailed)
+                note(L10n.exportFailed)
             } else {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 120)
             }
@@ -74,12 +84,54 @@ struct CompressSheet: View {
         .padding(18)
         .foregroundStyle(EditorChrome.navy)
         .tint(EditorChrome.purple)
+        #if os(iOS)
         .frame(minWidth: 320, idealWidth: 420, maxWidth: .infinity, alignment: .topLeading)
+        #endif
         .background(EditorChrome.secondaryBackground)
         .background(SystemSharePresenter(request: $shareRequest, finished: { _ in }))
         .modifier(SaveExportedFiles(isPresented: $isSaving, output: result?.output, format: .pdf, onSaved: {}))
         .task { await load() }
         .onDisappear { task?.cancel(); result?.output.removeTemporaryFiles() }
+    }
+
+    /// Light, Strong or Smallest.
+    ///
+    /// On a Mac this is the native segmented control. The shared
+    /// `PanelSegmented` picks between a row and a column by measuring which
+    /// fits, and inside a Mac sheet — which sizes itself to its content — that
+    /// measuring and the sheet's own looped ("AttributeGraph: cycle
+    /// detected", found by drawing the sheet in stages), so the sheet never
+    /// left its spinner. Three short words always fit a row here anyway.
+    @ViewBuilder private var levelPicker: some View {
+        #if os(macOS)
+        Picker(L10n.compressLevel, selection: $preset) {
+            Text(L10n.compressLight).tag(CompressionPreset.light)
+            Text(L10n.compressStrong).tag(CompressionPreset.strong)
+            Text(L10n.compressSmallest).tag(CompressionPreset.smallest)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityIdentifier("compress-level")
+        #else
+        PanelSegmented(options: [
+            .init(value: CompressionPreset.light, title: L10n.compressLight, id: "compress-light"),
+            .init(value: CompressionPreset.strong, title: L10n.compressStrong, id: "compress-strong"),
+            .init(value: CompressionPreset.smallest, title: L10n.compressSmallest, id: "compress-smallest"),
+        ], selection: $preset)
+        #endif
+    }
+
+    /// A quiet line of explanation. Not `PanelNote`: that one forces its text
+    /// to its full height, and inside a Mac sheet — which sizes itself to its
+    /// content — that and the sheet's height waited on each other and SwiftUI
+    /// looped ("AttributeGraph: cycle detected" millions of times), leaving
+    /// the sheet on its spinner for good. A plain wrapping line has no loop.
+    private func note(_ text: String) -> some View {
+        Text(verbatim: text)
+            .font(.caption)
+            .foregroundStyle(EditorChrome.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var isWorking: Bool { if case .working = phase { true } else { false } }
@@ -101,7 +153,7 @@ struct CompressSheet: View {
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("compress-result")
         case .failed:
-            PanelNote(text: L10n.exportFailed)
+            note(L10n.exportFailed)
         case .choosing:
             EmptyView()
         }

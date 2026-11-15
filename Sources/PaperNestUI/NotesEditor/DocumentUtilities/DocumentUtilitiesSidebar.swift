@@ -220,39 +220,49 @@ struct PageThumbnailGallery: View {
         .accessibilityLabel(L10n.pages)
     }
 
+    /// Tapping a thumbnail goes to its page. On a Mac it is also what you drag
+    /// to reorder — and a Mac `Button` keeps the mouse press for itself, so a
+    /// drag never starts on one. There the thumbnail is a tap target instead,
+    /// with the button trait and action kept for VoiceOver and the keyboard.
+    /// Mac only: on iPad a long press already opens the page menu, and the
+    /// same gesture cannot mean both. Move Earlier/Later works everywhere.
+    @ViewBuilder
+    private func pickable(_ face: some View, page: Page, index: Int) -> some View {
+        #if os(macOS)
+        face
+            .onTapGesture { actions.select(page.id) }
+            .draggable(page.id.rawValue)
+            .dropDestination(for: String.self) { dropped, _ in
+                guard let raw = dropped.first, raw != page.id.rawValue else { return false }
+                actions.reorder(PageID(rawValue: raw), index)
+                return true
+            }
+        #else
+        Button { actions.select(page.id) } label: { face }
+            .buttonStyle(.plain)
+        #endif
+    }
+
     private func card(_ page: Page, index: Int) -> some View {
         let selected = page.id == model.selectedPageID
         let count = model.pages.count
-        return Button { actions.select(page.id) } label: {
-            VStack(spacing: 5) {
-                PageImageView(page: page, pixelSize: 220, accessibilityLabel: L10n.pageLabel(index + 1, of: count))
-                    .frame(width: 62, height: 82)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .padding(4)
-                    .background(EditorChrome.secondaryBackground, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .strokeBorder(selected ? EditorChrome.purple : EditorChrome.border, lineWidth: selected ? 2 : 0.75)
-                    }
-                Text(verbatim: "\(index + 1)")
-                    .font(.caption2.monospacedDigit().weight(selected ? .bold : .regular))
-                    .foregroundStyle(selected ? EditorChrome.purple : EditorChrome.secondaryText)
-            }
-            .contentShape(Rectangle())
+        let face = VStack(spacing: 5) {
+            PageImageView(page: page, pixelSize: 220, accessibilityLabel: L10n.pageLabel(index + 1, of: count))
+                .frame(width: 62, height: 82)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .padding(4)
+                .background(EditorChrome.secondaryBackground, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(selected ? EditorChrome.purple : EditorChrome.border, lineWidth: selected ? 2 : 0.75)
+                }
+            Text(verbatim: "\(index + 1)")
+                .font(.caption2.monospacedDigit().weight(selected ? .bold : .regular))
+                .foregroundStyle(selected ? EditorChrome.purple : EditorChrome.secondaryText)
         }
-        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        return pickable(face, page: page, index: index)
         .hoverWash(radius: 9)
-        #if os(macOS)
-        // Drag one thumbnail onto another to put it there. Mac only: on iPad
-        // a long press already opens the menu below, and the same gesture
-        // cannot mean both. The menu's Move Earlier/Later works everywhere.
-        .draggable(page.id.rawValue)
-        .dropDestination(for: String.self) { dropped, _ in
-            guard let raw = dropped.first, raw != page.id.rawValue else { return false }
-            actions.reorder(PageID(rawValue: raw), index)
-            return true
-        }
-        #endif
         .contextMenu {
             Button { actions.move(page.id, -1) } label: {
                 Label { Text(L10n.scannerMoveEarlier) } icon: { Image(systemName: "arrow.left") }
@@ -620,7 +630,14 @@ struct DisplaySettingsPopover: View {
         }
         .foregroundStyle(EditorChrome.navy)
         .tint(EditorChrome.purple)
+        #if os(macOS)
+        // A Mac popover takes its content's smallest width. At that width the
+        // seven zoom choices stacked into a column and pushed Fit Page, Night
+        // Mode and Two Pages out of the popover. Wide enough for one row.
+        .frame(width: 540)
+        #else
         .frame(minWidth: 300, idealWidth: 360, maxWidth: .infinity)
+        #endif
         .background(EditorChrome.secondaryBackground)
     }
 

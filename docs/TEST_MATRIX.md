@@ -1,3 +1,30 @@
+## 2026-11-15 — Document Tools on the Mac: the rest seen, two more Mac bugs fixed (Claude)
+
+Dev Mac app, throwaway library, sample PDF, forced dark with `-AppleInterfaceStyle Dark`.
+
+- **Seen working:** dark appearance of the editor and Document Tools; clicking a thumbnail goes to its page (2 / 3);
+  **Compress** opens, Smallest chosen, Compress run, and it reports honestly that this text PDF cannot get smaller,
+  offering Save… and Share…; **Convert to Word** opens Export with Word selected; **Display settings** shows the zoom
+  row, Zoom to Fit, Fit to Width, Night Mode and Two Pages.
+- **Bug, mine, fixed — Compress never left its spinner on a Mac.** The app logged "AttributeGraph: cycle detected"
+  millions of times and stopped answering. Found by drawing the sheet in stages behind a temporary switch (header
+  only: 0 cycles; spinner only: 0; the button only: 0; the level row in its card: cycles), with a new debug flag
+  `-PaperNestDebugShowCompress YES` opening the sheet by itself. The shared `PanelSegmented` measures whether its
+  options fit in a row; inside a Mac sheet, which sizes itself to its content, that looped. The Mac now uses the
+  native segmented control there, and the sheet has a fixed size with its content scrolling. 0 cycles after.
+  Two wrong guesses first — a fixed width, then the notes — each disproved by the cycle count, not the picture.
+- **Bug, mine, fixed — Display settings on a Mac** was as narrow as its content, so the seven zoom choices stacked
+  into a column and pushed Fit Page, Night Mode and Two Pages out of the popover. Now 540 points wide on a Mac.
+- **Drag to reorder thumbnails on a Mac: still NOT confirmed.** A real-pointer drag (full-screen control, granted
+  once) did not reorder, and no drag started: on a Mac a `Button` keeps the mouse press. The thumbnail is now a tap
+  target with the drag on it (button trait and action kept; a click still selects, checked). A second real-pointer
+  try was not possible: the approval prompt timed out. The background drag tool cannot test it either way.
+- **Noticed, not mine, not changed:** Export with Word selected greys out Copy with "A ZIP archive can't be copied",
+  though a Word export is one file.
+- Unit suite green; iOS Simulator build clean; `testProcessToolsDoRealWork` and `testOneControlShowsAndHidesPagesAndToolsTogether`
+  pass on iPhone 17 (iOS 26.5) with the changed sheet.
+- Still not checked on a Mac: hover, resizing the column.
+
 ## 2026-11-14 — Reader features R5: Two-page view, and Night Mode's switch put back (Claude, owner's queue)
 
 The last item of the reader queue the owner approved ("Yes, go on"). Free: it is not in `ProFeature`.

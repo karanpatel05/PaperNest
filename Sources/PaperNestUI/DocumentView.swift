@@ -329,6 +329,7 @@ struct DocumentView: View {
         .task {
             isShowingExport = UserDefaults.standard.bool(forKey: "PaperNestDebugShowExport")
             isShowingCrop = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCrop")
+            isShowingCompress = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCompress")
             if UserDefaults.standard.bool(forKey: "PaperNestDebugShowMarkup") { isMarkingUp = true }
             isShowingOutline = UserDefaults.standard.bool(forKey: "PaperNestDebugShowOutline")
         }
