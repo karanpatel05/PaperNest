@@ -196,17 +196,3 @@ private final class NightImageCache: @unchecked Sendable {
         }
     }
 }
-
-// MARK: - The switch
-
-/// The Display popover's night mode row.
-struct NightModeSection: View {
-    @Binding var isOn: Bool
-
-    var body: some View {
-        PanelSection(title: L10n.displayReading) {
-            PanelToggleRow(title: L10n.nightMode, systemImage: "moon", isOn: $isOn,
-                           id: "display-night-mode", detail: L10n.nightModeDetail)
-        }
-    }
-}

@@ -962,3 +962,9 @@
 "utilities.toggleHelp" = "Show or Hide Document Tools (⌥⌘0)";
 "drawer.expand" = "Expand";
 "drawer.collapse" = "Make Smaller";
+
+/* Two-page view (Claude, 2026-11-14) */
+"display.twoPages" = "Two Pages";
+"display.twoPages.detail" = "Shows a document two pages side by side. A wide page is shown on its own.";
+"display.twoPages.cover" = "Cover Page Alone";
+"display.twoPages.cover.detail" = "Shows the first page on its own, so the pages after it pair as a printed book does.";

@@ -1,3 +1,239 @@
+## 2026-11-14 — Reader features R5: Two-page view, and Night Mode's switch put back (Claude, owner's queue)
+
+The last item of the reader queue the owner approved ("Yes, go on"). Free: it is not in `ProFeature`.
+
+**What changed in the app.** Display settings' Reading section has **Two Pages** and, under it while it is on,
+**Cover Page Alone** — on an iPad and a Mac, and only for documents: a phone has no room for two pages, and a notebook
+scrolls its pages in one column, so neither switch is offered there. On, the editor shows the spread that holds the
+page being read: two pages side by side, each fitted to its half of the width. A landscape page stands alone, and so
+does the page before it rather than being paired across it out of order. With the cover alone the first page stands
+alone and page 2 faces page 3, as a printed book does. The page beside the one being read is an ordinary page — its
+own find hits, bookmark ribbon and night mode — and a tap on it makes it the page being read; drawing, typing and
+selecting happen on the page being read only, as they always have. Going to a page brings its spread, and the
+floating bar's previous and next step a spread at a time, from either page of it, as Acrobat does. Like night
+mode it is a preference on this device: nothing about the document changes, and every throwaway library (each UI
+test and development run) starts one page at a time.
+
+**Night Mode had lost its switch.** `1e7fdda` (the "commit everything" commit, entry below) replaced the editor's
+floating bar and did not carry `nightMode: $isNightMode` into the Display settings call; the parameter is optional,
+so it compiled. Night mode still worked and nothing could turn it on. Measured on `a7c79e5` before the fix: all three
+`NightModeUITests` failed with "Display settings has no Night Mode switch" (`/tmp/pn-two2-head-night.log`). The
+argument is back, and the Reading section now holds Night Mode and the two-page switches together
+(`ReadingSection`, replacing `NightModeSection`). The session that dropped it confirmed it was not meant.
+
+**How it is built.** `PageSpreads` (`Sources/PaperNestCore/PageSpreads.swift`, new) pairs pages from their upright
+sizes. `TwoPageView` (`Sources/PaperNestUI/Reader/TwoPageView.swift`, new) holds the two preferences, the spread for
+the page being read, each page's share of the width and the Reading section. In `DocumentView.swift` the viewer draws
+a spread as an `HStack` of the existing page surface, which now takes the room it is to fit; with two-page view off,
+or in a notebook, the code path is the one there was. `DocumentUtilitiesSidebar.swift`: the popover's two bindings,
+the Reading section, the reset. Strings: block `Two-page view`, four keys in en/fr/es.
+
+**Results.** Verified in a clean worktree holding `a4a4281` plus only this change — the branch as committed. (It
+was moved twice while being verified, as another session committed `a7c79e5` and then `a4a4281` under it; each time
+it was rebuilt on the new commit and the runs started again.)
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh` | **Passed: 1,071 tests** (342 + 49 + 191 + 182 + 179 + 128), 0 failures, 0 compiler warnings — `/tmp/pn-two3-unit.log` |
+| New: `PageSpreadsTests` 8, `TwoPageViewTests` 5 | **Passed** |
+| `./scripts/build-mac-app.sh` | **Built**, 0 warnings |
+| `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build` | **BUILD SUCCEEDED**, 0 warnings |
+| `TwoPageViewUITests` (new, 2), iPad Pro 13-inch (M5), iOS 26.5 | 1/2, then **2/2**. The French and Spanish test's own check was wrong: it compared the switch's whole accessibility label, which is the row's title and then its description, with the title. It now checks that the label begins with it — `/tmp/pn-two4-ipad-two.log` |
+| `TwoPageViewUITests`, PaperNest iPhone Duo, iOS 27.1 | **2/2** — on a phone the switch is not offered, in English, French and Spanish (`/tmp/pn-two3-iphone-new.log`) |
+| `NightModeUITests` 3 | **Before**, on `a7c79e5`: **0/3**, each "Display settings has no Night Mode switch" (`/tmp/pn-two2-head-night.log`). **After**: iPad **3/3**, iPhone **3/3** |
+| `DocumentUtilitiesUITests` (the Display popover sits in its bar) | iPad **5/5**. iPhone **5/6**: `testOneControlShowsAndHidesPagesAndToolsTogether` failed twice, "utilities-section-annotate cannot be reached in the panel" (`/tmp/pn-two3-iphone-new.log`, `/tmp/pn-two4-iphone-du.log`). **Not mine**: on plain `a4a4281`, without this change, it fails the same way at the same line (`/tmp/pn-baseline-du.log`). Its owner says its scrolling helper was tuned on an iPhone 17 and may overshoot the Duo's drawer, and will fix the test |
+| `ReadAloudUITests` and the reader suites (find, selection, links, restricted, annotations, bookmarks, print) | iPad: read aloud **4/4**, the rest **17/17**. iPhone: read aloud **4/4** after one failure under load, the rest **17/17** (read aloud entry below) |
+
+**What the tests prove.** `PageSpreadsTests` (8): pages pair from the first; with the cover alone two faces three; a
+wide page stands alone and so does the page before it; a wide cover; a square page is not wide; no pages and one
+page; across 23 pages with landscape ones scattered, with and without the cover, every page is in exactly one spread
+of one or two, in order; the spread a page is in. `TwoPageViewTests` (5), on pages imported into a real library: the
+spread of the page being read, with and without the cover; a landscape page alone; previous and next step a spread
+from either page of one and stop at the ends, with and without the cover; each page's share of the width; a
+throwaway library starts one page at a time.
+
+`TwoPageViewUITests` (2): on an iPad, Two Pages puts pages 1 and 2 side by side — page 2 to the right, the same
+height, wholly on screen; a tap on page 2 makes it the page being read and keeps the spread; next, from page 2,
+brings 3 and 4 and is then unavailable, and previous brings 1 and 2 back; going to page 3 brings 3 and 4; Cover Page Alone makes page 3 face page 2 and leaves the cover alone; switched off, one page again and the
+cover option gone. On a phone the switch is not offered. In French and Spanish the switch is named, on screen and a
+full-width row on an iPad, and absent on a phone.
+
+Screenshots: `docs/screenshots/two-page-2026-11-14/`.
+
+**Not verified, plainly.**
+
+- **The Mac**: built, not used. The switches are offered there; the spread was not seen.
+- **On a portrait iPad with the library sidebar and Document Tools both open**, the middle column is narrow and two
+  pages in it are small (screenshot `ipad-spread-1-2.png`). Two pages suit landscape, or a closed panel.
+- **Zoomed in**, a spread is two pages at that zoom, side by side, scrolled together; that was not looked at, nor a
+  spread's pinch.
+- Right-to-left documents pair left to right.
+- A page turned in PaperNest counts by its turned size: a portrait page turned a quarter turn stands alone.
+- Links on the page beside the one being read are not tappable until it is tapped once (the link overlay is only on
+  the page being read). Selecting text works only on the page being read.
+
+## 2026-11-14 — Reader features R4: Read aloud (Claude, owner's queue)
+
+Owner: **"Yes, go on"** to read aloud and two-page view, the last two items of the reader queue. This entry is
+**read aloud** only. Neither feature is in `ProFeature`, so both are free; nothing was gated.
+
+**What changed in the app.** **Read Aloud** in the title menu (and in the Mac's Page menu, with no shortcut — the
+system has its own Edit > Speech, and this project has been bitten by clashing keys). It reads the document from
+the page being read to the end, in the system voice for each page's own language, and lights the word being said
+with find's colour for the current hit. A bar under the toolbar says which page it is on and has a speed button
+(1× → 1.25× → 1.5× → 0.75×, the numbers shown as they are in every language), Pause/Resume and Stop. It turns the
+page itself when it reaches the next page with words on it and passes over pages without (a scan nobody has
+recognised). If the reader turns the page while it is talking it starts again there; turned while paused, it waits
+for Resume and starts there. When the line being read leaves the screen — zoomed in, or on a phone's tall page —
+the page scrolls just far enough to keep it in view. A page with no text says so and says how to get some. It
+pauses when the app goes to the background and stops when the document closes; only one document talks at a time.
+
+**How it is built.**
+
+- `ReadAloudScript` (`Sources/PaperNestCore/ReadAloudScript.swift`, new) turns a page's `PageTextLayout` into what
+  is said, and maps what the synthesizer reports saying back to boxes on the page. **It does not use find's search
+  text**: that is folded (case, accents and spacing removed), while a synthesizer reports a range of UTF-16 units of
+  the very string it was given, so reusing it would light the wrong word on accented text. A word split across lines
+  by a hyphen is said whole ("docu-" / "ment"); a line ending in a full stop and the like is followed by a pause; any
+  other line runs on, so a sentence broken across lines is one sentence. Typed text boxes are read after the page's
+  own words, on their own.
+- `ReadAloud` (`Sources/PaperNestUI/Reader/ReadAloud.swift`, new) is the player; `SystemSpeech` wraps
+  `AVSpeechSynthesizer`, made only when something is first said and held for as long as the document is open. Its
+  delegate's calls are passed to the main queue, which keeps them in order, and each carries its utterance, so
+  anything about an utterance that was stopped or replaced is ignored. On iOS the audio session is spoken audio
+  (heard with the ring switch on silent; other audio ducks), held from the first word to Stop — not let go and
+  taken back at each page turn or change of speed — and set up and released on a serial queue off the main thread,
+  which the system warned about. A call or an alarm pauses reading. A synthesizer that was cut off mid-utterance is
+  let go and a fresh one takes the next utterance (see *Found while testing*).
+- Shared files: `DocumentView.swift` (one `@State`, the title-menu item, the bar in the top inset after find's, the
+  highlight overlay before `nightFilter`, scrolling to the line, pause on background, stop on close),
+  `PaperNestCommands.swift` (the Page menu item), `Localization.swift` and the strings (block `Read aloud`, seven
+  keys in en/fr/es).
+
+**How it reached the branch.** It did not go in as its own commit. At 15:30 another session committed everything in
+the working tree at the owner's word, as `1e7fdda` ("Document Tools in the Option 6 layout, and read aloud in
+progress"), and read aloud went in with it as it stood. Checked afterwards: every read-aloud file, and the text-box
+fix in the entry below, is byte for byte the version verified here, and every line it added to the shared files
+(`DocumentView.swift`, `Localization.swift`, the strings, `PaperNestCommands.swift`) is in that commit. The same
+commit dropped Night Mode's switch from Display settings (see the two-page entry above).
+
+**Results.** First in a clean worktree holding `81e5937` plus only this change; then the tree as it now stands on the
+branch, `a4a4281` plus the two-page work above.
+
+| Check | `81e5937` + read aloud | `a4a4281` + two-page view (the branch as committed) |
+|---|---|---|
+| `./scripts/test.sh` | **Passed: 1,054 tests**, 0 failures, 0 warnings — `/tmp/papernest-readaloud-unit4.log` | **1,071 passed**, 0 warnings — `/tmp/pn-two3-unit.log` (`1e7fdda` alone: 1,055 passed, `/tmp/pn-head-unit.log`) |
+| New: `ReadAloudScriptTests` 10 (11 cases), `ReadAloudTests` 14 | **Passed** | Passed |
+| `./scripts/build-mac-app.sh` | **Built**, 0 warnings | Built, 0 warnings |
+| `xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build` | **BUILD SUCCEEDED**, 0 warnings | Succeeded, 0 warnings |
+| `ReadAloudUITests` (new, 4), iPad Pro 13-inch (M5), iOS 26.5 | **4/4** — `/tmp/pn-final-ipad-ra.log`, no runner restarts | **4/4** — `/tmp/pn-two3-ipad-ra.log` |
+| `ReadAloudUITests`, PaperNest iPhone Duo, iOS 27.1 | **4/4** — `/tmp/pn-final2-iphone-ra.log`, no restarts | 3/4, then **4/4**: the main test failed once at its first step ("Timed out while evaluating UI query", one runner restart, the load jumping from 23 to 108–170 — `/tmp/pn-two3-iphone-ra.log`); run again, 4/4 (`/tmp/pn-two4-iphone-ra.log`) |
+| `DocumentFindUITests` 3, `TextSelectionUITests` 2, `PageLinksUITests` 2, `RestrictedPDFUITests` 2 | iPhone **9/9** (`/tmp/pn-final-iphone-text.log`); iPad: the run was taken over by another session's tests (below) | iPad **9/9**, iPhone **9/9** — `/tmp/pn-two3-ipad-reader.log`, `…-iphone-reader.log` |
+| `PDFAnnotationsUITests` 3, `NightModeUITests` 3, `BookmarksUITests` 3, `DocumentPrintUITests` 2 | iPad **11/11** earlier in the day, before the last two speech changes and the text-box fix (`/tmp/papernest-readaloud-ipad-5.log`, a bookmarks test failing once under a load average of 160 and passing 3/3 run alone); iPhone 14/14 across `/tmp/papernest-readaloud-iphone-2.log` and `-6.log` | `PDFAnnotationsUITests`, `BookmarksUITests`, `DocumentPrintUITests`: iPad **8/8**, iPhone **8/8** (same logs). `NightModeUITests`: iPad **3/3**, iPhone **3/3**, with its switch put back (`/tmp/pn-two3-ipad-new.log`, `…-iphone-new.log`) |
+
+**What the tests prove.** `ReadAloudScriptTests` (10 tests, 11 cases) and `ReadAloudTests` (14, the player driven by
+a fake voice):
+
+- Lines run on as one sentence and pause after a full stop; a hyphen-split word is said whole and lights on both
+  lines; a hyphenated name is left alone; a word a digital PDF gives as a fragment per character lights as one box;
+  an accented word — precomposed and decomposed — lights itself and the word after it lights the right box; a
+  ligature fragment lights as one; typed text comes after the page and apart; an empty page says nothing; starting
+  part-way through maps the synthesizer's ranges back to the same words.
+- It starts at the page being read and lights each word; turns to the next page with words, passing over one
+  without, and its own turn does not restart it; the reader turning the page starts it there, or waits for Resume
+  when paused; a finish reported after Stop does nothing; a new speed starts from the current word, and the replaced
+  utterance finishing late does not turn the page, so no page is skipped; pause, resume, and a speed change while
+  paused taking effect on resume; a call pauses; the end of the document stops; a document with no words says so;
+  starting another document stops this one; the speed button goes round; a French page is read in French; the
+  audio is held across page turns and speed changes and given back on Stop; a word with no box on the page leaves
+  the light on the word before rather than putting it out.
+
+**Proved able to fail.** With the hyphen join switched off, `aWordSplitAcrossLinesIsSaidWhole` failed; with the
+check that an event belongs to the utterance being said removed, `aNewSpeedStartsFromTheCurrentWordAndSkipsNoPage`
+failed (the replaced utterance turned the page). Both put back. A third guard — remembering a page turn it made
+itself — never failed when removed, because the player already records the new page before turning to it; it was
+taken out rather than kept as code nothing needs.
+
+**Found while testing, in the running app, and fixed.**
+
+1. **Changing speed sometimes silenced it on iOS 27.1.** A new speed stops the utterance and starts the rest of
+   the page at once. On the iPhone Simulator (iOS 27.1) the new utterance was sometimes never said:
+   `testTheSpeedButtonChangesSpeedAndReadingCarriesOn` failed **two runs in three** ("no word was lit after the
+   speed changed"), and never on iPadOS 26.5. Two changes: the audio session stays held between utterances (it
+   had been released and re-taken in between), and a synthesizer cut off mid-utterance is replaced by a fresh one
+   for the next. After both, the test passed **three runs in three** on the iPhone. That is evidence for the cause,
+   not proof of it.
+2. **Audio session work on the main thread**: the system logged that `setActive` there "can lead to UI
+   unresponsiveness". It now runs on a serial queue.
+3. **The Simulator's voice runs several times faster than real speech**: two short lines, page turn included,
+   were read in about a second and a half, before the UI test looked. The test's pages are long for that reason,
+   and it lets a pause settle for half a second, because a pause lands at the end of the word being said and the
+   next word's notice can already be on its way.
+
+**Runs that do not count.** This machine was shared all afternoon with other sessions running their own Simulator
+tests, with load averages from 30 up to 570. Three kinds of run were thrown out, and are listed so nobody mistakes
+them for results:
+
+- Two iPhone runs of the whole set overlapped another session's `xcodebuild test` on the same iPhone Duo Simulator:
+  the runner restarted again and again ("Restarting after unexpected exit, crash, or test timeout") and whole
+  suites, Read Aloud among them, were silently skipped.
+- One iPad run of the text suites was taken over outright: the other session installed its own test runner on the
+  same Simulator, and the failures in my log pointed into its worktree (`/tmp/pn-verify3/…`).
+- One iPhone run of the French and Spanish test failed at launch ("editor not shown after 30 s") as the load climbed
+  back towards 90. It had passed in three earlier runs and passed in the next.
+
+Since then every run waits for the load to fall below 25–30 and for no other `xcodebuild test` on that Simulator,
+and its log is checked for restarts and for paths from another worktree. One bookmarks test failed in an iPad run
+of the whole set with the load near 160 and passed 3/3 run alone.
+
+**Not verified, plainly.**
+
+- **Nobody listened to it.** Every UI run spoke at volume 0 (`-PaperNestDebugSpeechVolume 0`, development builds
+  only) so as not to talk through the Mac's speakers. Whether the voice reports its words at volume 0 was checked on
+  the Mac (eight of eight words at 0 and at 0.01), and on both Simulators the words went by. How it sounds — the
+  pauses between lines, the voice chosen for each language — was not judged by ear.
+- **The Mac**: built, not used. The Page menu item was not seen.
+- **No background audio**: the app does not declare it (an Info.plist and App Review matter for the owner), so
+  reading pauses when the app goes to the background and the lock screen has no controls.
+- Form answers drawn on a page (the annotation work above) are not in its text and are not read. Words a crop hides
+  are skipped. Right-to-left text, vertical text and tables were not tried; text is read in the order the page's
+  text layout gives it.
+- Voices: a language whose voice is not installed is read in the system's default voice; nothing offers to
+  download one. Speed changes restart from the start of the current word.
+- VoiceOver users have the system's own speech; how Read Aloud and VoiceOver behave together was not tried.
+
+## 2026-11-14 — Find, selection and read aloud lit the wrong letters on every line after the first (Claude)
+
+Found while building read aloud (entry above). On a digital PDF of several lines the reader lit no word at all for
+"2" of "Line 2". Measured on the fixture: **every line's character boxes sat one character further along than the
+line before's.** Line 2's "L" came back with the box of the "i", and by line 4 everything was three characters off,
+with blank boxes where the shift landed on a gap. Find's highlights, the text selection and read aloud's light all
+take their boxes from `PageRenderer.textLayout(for:)`, so all three were off on any page with more than one line —
+on real documents, nearly every page. Older than today: it came in with the text layout (`b2d52c0`).
+
+**Cause.** `PageTextReader.embeddedLines` asked `PDFPage.characterBounds(at:)` for each character by its position
+in `PDFPage.string`. The two do not count the same way: `string` has a line break between lines that
+`characterBounds(at:)` does not count. Measured with a scratch program on a three-line page: index 18 is the line
+break in `string`, and `characterBounds(at: 18)` is the box of the next line's "L". A one-character
+`selection(for:)` is indexed the way `string` is, and its bounds are right.
+
+**Fix.** Each character's box now comes from `selection(for:)`. Cost, measured on real form pages: 3 ms for the
+2,680 characters of the N-400's first page, 2 ms for the I-765's. One file: `Sources/PaperNestRender/PageTextReader.swift`.
+
+**Why no test caught it.** Every test of the text layout used a page of one line; so did the find and selection UI
+tests' words. New: `everyLineOfADigitalPDFIsBoxedWhereItIsDrawn` — four lines; every character has a box, every
+line starts under the first, and the number on the last line has ink under its box and none beside it. It
+**failed before the fix** (line 2 started at 0.1347 against line 1's 0.1199, and lines 2 and 3 had characters with
+no box) and passes after.
+
+**How it reached the branch.** With read aloud, in `1e7fdda` (entry above), byte for byte the version verified.
+**Results** are those of the read aloud entry: the two were verified together. Of what this touches: `PageTextReaderTests` 15/15 (the two new tests among them), `DocumentFindTests`,
+`PageTextSelectionModelTests`, `PageTextSelectionTests`, `WordBoxTests` pass; in the running app, on the branch as committed (`a4a4281` plus two-page view), `DocumentFindUITests`,
+`TextSelectionUITests`, `PageLinksUITests` and `RestrictedPDFUITests` pass 9/9 on the iPad and 9/9 on the iPhone.
+
+**Not verified.** Scanned pages are unaffected (their words come from recognition, with their own boxes) and were
+not re-checked. Right-to-left and vertical text were not tried.
+
 ## 2026-11-14 (evening) — Document Tools on the Mac, seen on screen; a crash fixed (Claude)
 
 Owner granted screen access to the dev Mac app. Throwaway library, the sample `multilingual-letter` PDF.

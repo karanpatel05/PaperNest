@@ -26,6 +26,7 @@ enum DocumentUtilitiesStorage {
         guard EditorToolSettingsStore.standardStorage(defaults) == nil else { return }
         for key in all { defaults.removeObject(forKey: key) }
         NightMode.resetForThrowawayLibrary(defaults)
+        TwoPageView.resetForThrowawayLibrary(defaults)
     }()
 }
 
@@ -601,6 +602,9 @@ struct DisplaySettingsPopover: View {
     @Binding var fingerDrawing: Bool
     /// Night mode, where the editor offers it.
     var nightMode: Binding<Bool>?
+    /// Two-page view and its cover option, where there is room for them.
+    var twoPages: Binding<Bool>?
+    var coverAlone: Binding<Bool>?
     /// Nil where fitting the width is what "fit" already does (a phone).
     var fitWidth: (() -> Void)?
     let close: () -> Void
@@ -647,7 +651,9 @@ struct DisplaySettingsPopover: View {
                     }
                 }
             }
-            if let nightMode { NightModeSection(isOn: nightMode) }
+            if nightMode != nil || twoPages != nil {
+                ReadingSection(nightMode: nightMode, twoPages: twoPages, coverAlone: coverAlone)
+            }
             #if os(iOS)
             PanelSection(title: L10n.markup) {
                 PanelToggleRow(title: L10n.drawWithFinger, systemImage: "hand.draw", isOn: $fingerDrawing,

@@ -98,6 +98,9 @@ struct DocumentView: View {
     @State private var readAloud = ReadAloud()
     /// Night mode: pages shown light on dark. A preference, not part of the document.
     @AppStorage(NightMode.storageKey) private var isNightMode = false
+    /// Two-page view: a document a spread at a time where there is room. A preference too.
+    @AppStorage(TwoPageView.storageKey) private var isTwoPages = false
+    @AppStorage(TwoPageView.coverKey) private var isCoverAlone = false
     /// The reader's bookmarks in this document.
     @State private var bookmarks = ReaderBookmarks()
 
@@ -207,7 +210,8 @@ struct DocumentView: View {
                                onLeaveSelection: { isMarkingUp = false },
                                appendNotebookPage: isNotebook ? { appendContinuation(after: $0) } : nil,
                                canAppendNotebookPage: !isToolBusy && !textSession.isSelected, find: find,
-                               textSelection: textSelection)
+                               textSelection: textSelection,
+                               twoPages: isTwoPages && !isNotebook, coverAlone: isCoverAlone)
                     }
                 }
             }
@@ -1109,7 +1113,11 @@ struct DocumentView: View {
                 .accessibilityIdentifier("studio-tool-settings")
                 .help(L10n.displaySettings)
                 .popover(isPresented: $isShowingDisplaySettings, arrowEdge: .bottom) {
-                    DisplaySettingsPopover(zoom: $zoom, fingerDrawing: $isFingerDrawing,
+                    DisplaySettingsPopover(zoom: $zoom, fingerDrawing: $isFingerDrawing, nightMode: $isNightMode,
+                                           // Two pages need the width: not on a phone, and a
+                                           // notebook scrolls its pages in one column.
+                                           twoPages: isCompact || isNotebook ? nil : $isTwoPages,
+                                           coverAlone: isCompact || isNotebook ? nil : $isCoverAlone,
                                            fitWidth: isCompact ? nil : { fitWidthRequest += 1 },
                                            close: { isShowingDisplaySettings = false })
                         .presentationCompactAdaptation(.sheet)
@@ -1133,10 +1141,17 @@ struct DocumentView: View {
     private var pageStepper: some View {
         let index = model.selectedIndex ?? 0
         let count = model.pages.count
-        func go(_ delta: Int) {
+        // In two-page view a step is a spread, as in Acrobat.
+        let bySpread = isTwoPages && !isCompact && !isNotebook
+        func target(_ delta: Int) -> PageID? {
+            if bySpread, let id = model.selectedPageID {
+                return TwoPageView.step(from: id, by: delta, in: model.pages, coverAlone: isCoverAlone)
+            }
             let target = index + delta
-            guard model.pages.indices.contains(target) else { return }
-            let id = model.pages[target].id
+            return model.pages.indices.contains(target) ? model.pages[target].id : nil
+        }
+        func go(_ delta: Int) {
+            guard let id = target(delta) else { return }
             Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
         }
         return HStack(spacing: 0) {
@@ -1144,7 +1159,7 @@ struct DocumentView: View {
                 Image(systemName: "chevron.left").font(.system(size: 15, weight: .semibold))
                     .frame(width: 40, height: 44).contentShape(Rectangle())
             }
-            .disabled(index == 0)
+            .disabled(target(-1) == nil)
             .accessibilityLabel(L10n.pagePrevious)
             .accessibilityIdentifier("editor-page-previous")
             .help(L10n.pagePrevious)
@@ -1158,7 +1173,7 @@ struct DocumentView: View {
                 Image(systemName: "chevron.right").font(.system(size: 15, weight: .semibold))
                     .frame(width: 40, height: 44).contentShape(Rectangle())
             }
-            .disabled(index >= count - 1)
+            .disabled(target(1) == nil)
             .accessibilityLabel(L10n.pageNext)
             .accessibilityIdentifier("editor-page-next")
             .help(L10n.pageNext)
@@ -1688,6 +1703,10 @@ private struct PageViewer: View {
     var find: DocumentFind? = nil
     /// The words selected on the page, when the editor lets them be.
     var textSelection: PageTextSelectionModel? = nil
+    /// Two-page view: the page being read and the one beside it, side by
+    /// side. Only where the editor asks for it (wide enough, a document).
+    var twoPages = false
+    var coverAlone = false
 
     /// Whether a page pan should demand two fingers. Kept out of the body so
     /// the rule is named once and the type-checker is not asked to infer it
@@ -1756,6 +1775,9 @@ private struct PageViewer: View {
             ScrollViewReader { reader in
                 ScrollView([.horizontal, .vertical]) {
                     LazyVStack(spacing: isContinuous ? 20 : 0) {
+                        if usesSpreads {
+                            spreadSurface(in: proxy)
+                        } else {
                         ForEach(isContinuous ? model.pages : model.selectedPage.map { [$0] } ?? []) { page in
                             pageSurface(page, in: proxy)
                                 .background {
@@ -1767,6 +1789,7 @@ private struct PageViewer: View {
                                 .frame(minWidth: proxy.size.width,
                                        minHeight: isContinuous && page.id != model.pages.last?.id ? nil : proxy.size.height)
                                 .id(page.id)
+                        }
                         }
                         if let page = model.pages.last, let appendNotebookPage, isContinuous {
                         Button { appendNotebookPage(page.id) } label: {
@@ -1939,10 +1962,41 @@ private struct PageViewer: View {
         }
     }
 
-    private func pageSurface(_ page: Page, in proxy: GeometryProxy) -> some View {
+    /// Two-page view applies: asked for, a document, and a spread to show.
+    private var usesSpreads: Bool { twoPages && !isContinuous && model.selectedPage != nil }
+
+    /// The spread holding the page being read: its pages side by side, each
+    /// fitted to its share of the width. Each is an ordinary page surface —
+    /// its own find hits, bookmark ribbon and night filter — and only the
+    /// page being read carries the ink canvas and selection; touching the
+    /// other makes it the page being read, as tapping a preview always has.
+    private func spreadSurface(in proxy: GeometryProxy) -> some View {
+        let spread = TwoPageView.spread(for: model.selectedPage, in: model.pages, coverAlone: coverAlone)
+        let room = TwoPageView.room(for: spread.count, in: proxy.size)
+        return HStack(alignment: .center, spacing: TwoPageView.gap) {
+            ForEach(spread) { page in
+                pageSurface(page, in: proxy, room: room)
+                    .background {
+                        GeometryReader { paper in
+                            Color.clear.preference(key: NotebookPageFrames.self,
+                                value: [page.id: paper.frame(in: .global)])
+                        }
+                    }
+                    .id(page.id)
+            }
+        }
+        .frame(minWidth: proxy.size.width, minHeight: proxy.size.height)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("document-spread")
+        .accessibilityValue(spread.compactMap { page in
+            model.pages.firstIndex { $0.id == page.id }.map { String($0 + 1) }
+        }.joined(separator: "-"))
+    }
+
+    private func pageSurface(_ page: Page, in proxy: GeometryProxy, room: CGSize? = nil) -> some View {
         let active = page.id == model.selectedPageID
         let index = model.pages.firstIndex(where: { $0.id == page.id }) ?? 0
-        let fitted = fittedSize(page.geometry.pageSize, in: proxy.size)
+        let fitted = fittedSize(page.geometry.pageSize, in: room ?? proxy.size)
         let held = textSession.page?.id == page.id ? textSession.canvasSize : nil
         let size = held.map { CGSize(width: $0.width * zoom / textSession.canvasZoom,
                                      height: $0.height * zoom / textSession.canvasZoom) }

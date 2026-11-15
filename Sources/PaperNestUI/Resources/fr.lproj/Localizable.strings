@@ -962,3 +962,9 @@
 "utilities.toggleHelp" = "Afficher ou masquer les outils du document (⌥⌘0)";
 "drawer.expand" = "Agrandir";
 "drawer.collapse" = "Réduire";
+
+/* Two-page view (Claude, 2026-11-14) */
+"display.twoPages" = "Deux pages";
+"display.twoPages.detail" = "Affiche un document deux pages côte à côte. Une page en largeur est affichée seule.";
+"display.twoPages.cover" = "Couverture seule";
+"display.twoPages.cover.detail" = "Affiche la première page seule, pour que les suivantes se répondent comme dans un livre imprimé.";

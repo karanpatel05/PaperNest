@@ -1077,3 +1077,11 @@ extension L10n {
     static var drawerExpand: String { tr("drawer.expand") }
     static var drawerCollapse: String { tr("drawer.collapse") }
 }
+
+// Two-page view (Claude, 2026-11-14).
+extension L10n {
+    static var twoPages: String { tr("display.twoPages") }
+    static var twoPagesDetail: String { tr("display.twoPages.detail") }
+    static var twoPagesCover: String { tr("display.twoPages.cover") }
+    static var twoPagesCoverDetail: String { tr("display.twoPages.cover.detail") }
+}
