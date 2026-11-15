@@ -6801,3 +6801,12 @@ Notes/PDF redesign remains a design preview pending owner review; no PDF reliabi
 - **Clicking a thumbnail: passed.** Clicking page 2 opened page 2 and the counter read 2/3. That click went in as an accessibility press, not a raw mouse click.
 - **Hover: seen only incidentally.** After the raw drags, page 3's thumbnail stayed lavender, so the hover wash does draw. It did not clear while the pointer was elsewhere, which looks like a leftover of the synthetic events and is not proven to be an app bug. A real-pointer check is still needed.
 - **Drag to reorder: NOT verified.** A background raw-input drag from page 1 onto page 3 changed nothing: the `pages` table still holds pdf_page_index 0, 1, 2 at revision 1. A SwiftUI `.draggable` session probably needs a real mouse drag. Full-screen control was requested three times this session and timed out each time.
+
+## Document Tools on the Mac, real-pointer checks — Claude, 2026-11-15 (follows the background checks above)
+
+- The owner approved full-screen control, so the same throwaway library and `multilingual-letter` were driven with the real pointer.
+- On arrival an Export sheet was open (not opened by this session) and was cancelled. The page shown had moved to 3/3.
+- **Drag to reorder: passed.** The tool's `left_click_drag` from page 1's thumbnail onto page 3's moved page 1 to the end. The `pages` table now orders pdf_page_index 1, 2, 0, and the moved page went to revision 2, so the change is saved. In the editor the first thumbnail now opens "page 2" and the third opens "page 1".
+- A held-button drag built from separate `mouse_move` steps did *not* reorder. It most likely never sent real drag events, and it is not evidence against the app.
+- **Real clicks on thumbnails: passed.** They select the page; this is the tap-gesture path, not an accessibility press.
+- **Hover: passed.** With the real pointer resting on Rotate, the tile drew the light purple wash and border, and it cleared once the pointer moved off. The Annotate header showed the same wash. The tool's bare cursor moves do not trigger hover; a scroll event at the spot did. The page-3 highlight left stuck by the background drags was gone after the first real-pointer event.
