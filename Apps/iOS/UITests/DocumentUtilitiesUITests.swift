@@ -26,18 +26,38 @@ import PaperNestStore
         return (app, store, item.id)
     }
 
+    /// In view: its centre lies inside the visible panel, clear of the pinned
+    /// Export / Save below it. `isHittable` alone is not enough — on the
+    /// iPhone Duo it reported the Annotate header unreachable while a tap on
+    /// it, made straight afterwards, landed (2026-11-14).
+    static func inView(_ element: XCUIElement, _ list: XCUIElement) -> Bool {
+        guard element.exists else { return false }
+        if element.isHittable { return true }
+        let visible = list.frame.insetBy(dx: 0, dy: 6)
+        return !visible.isEmpty && visible.contains(CGPoint(x: element.frame.midX, y: element.frame.midY))
+    }
+
     /// Brings a control in the panel into reach by scrolling the panel.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let list = app.scrollViews["pdf-tools-list"]
         // Short drags, down the list and then back up: a full swipe in a
         // phone's short drawer can carry a section header straight past.
+        // From the list's left margin, outside every card: a drag that starts
+        // on a tile can open its menu (Rotate, Filter, Replace Page) instead
+        // of scrolling, which on the iPhone Duo's drawer is where the middle
+        // of the list lands.
         func nudge(_ dy: CGFloat) {
-            let middle = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            middle.press(forDuration: 0.05, thenDragTo: middle.withOffset(CGVector(dx: 0, dy: dy)))
+            let margin = list.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 5, dy: 0))
+            // Slowly, and held at the end, so the list stops where the finger
+            // does. A flick coasts on: in the iPhone Duo's 213-point drawer a
+            // 140-point drag moved the list about 330 and carried a section
+            // header from below the window to above it in one step.
+            margin.press(forDuration: 0.05, thenDragTo: margin.withOffset(CGVector(dx: 0, dy: dy)),
+                         withVelocity: .slow, thenHoldForDuration: 0.15)
         }
-        for _ in 0..<14 where !(element.exists && element.isHittable) { nudge(-140) }
-        for _ in 0..<20 where !(element.exists && element.isHittable) { nudge(140) }
-        XCTAssertTrue(element.exists && element.isHittable, "\(element) cannot be reached in the panel", file: file, line: line)
+        for _ in 0..<24 where !Self.inView(element, list) { nudge(-100) }
+        for _ in 0..<34 where !Self.inView(element, list) { nudge(100) }
+        XCTAssertTrue(Self.inView(element, list), "\(element) cannot be reached in the panel", file: file, line: line)
     }
 
     func testOneControlShowsAndHidesPagesAndToolsTogether() async throws {

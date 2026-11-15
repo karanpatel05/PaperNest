@@ -29,11 +29,20 @@ extension XCUIApplication {
         let list = scrollViews["pdf-tools-list"]
         if !list.exists { buttons["editor-panels"].tap() }
         XCTAssertTrue(list.waitForExistence(timeout: 5), "Document Tools did not open", file: file, line: line)
+        // From the list's left margin, outside every card: a drag that starts
+        // on a tile can open its menu (Rotate, Filter, Replace Page) instead
+        // of scrolling, which on the iPhone Duo's drawer is where the middle
+        // of the list lands.
         func nudge(_ dy: CGFloat) {
-            let middle = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            middle.press(forDuration: 0.05, thenDragTo: middle.withOffset(CGVector(dx: 0, dy: dy)))
+            let margin = list.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 5, dy: 0))
+            // Slowly, and held at the end, so the list stops where the finger
+            // does. A flick coasts on: in the iPhone Duo's 213-point drawer a
+            // 140-point drag moved the list about 330 and carried a section
+            // header from below the window to above it in one step.
+            margin.press(forDuration: 0.05, thenDragTo: margin.withOffset(CGVector(dx: 0, dy: dy)),
+                         withVelocity: .slow, thenHoldForDuration: 0.15)
         }
-        for _ in 0..<14 where !(tool.exists && tool.isHittable) { nudge(-140) }
-        for _ in 0..<20 where !(tool.exists && tool.isHittable) { nudge(140) }
+        for _ in 0..<24 where !(tool.exists && tool.isHittable) { nudge(-100) }
+        for _ in 0..<34 where !(tool.exists && tool.isHittable) { nudge(100) }
     }
 }
