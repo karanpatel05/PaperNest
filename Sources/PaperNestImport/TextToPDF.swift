@@ -73,7 +73,7 @@ public enum TextToPDF {
 /// Chosen by the file's type, never by whether its bytes happen to decode: any
 /// binary decodes as Latin-1, and that would turn a spreadsheet into pages of
 /// noise. HTML is left out because reading it into styled text needs WebKit on
-/// the main thread, and imports run off it.
+/// the main thread, and imports run off it. On the Mac, Word too.
 enum TextDocumentConverter {
     /// PDF data for `data`, or nil when the file is not text this can lay out,
     /// so it is kept as the file it is.
@@ -84,9 +84,26 @@ enum TextDocumentConverter {
                                                        documentAttributes: nil) else { return nil }
             return TextToPDF.render(styled)
         }
+        #if os(macOS)
+        // The Mac reads Word itself. iPhone and iPad cannot here; the app lays
+        // Word out with WebKit instead (`OfficeDocumentRenderer`).
+        if let word = wordDocumentType(for: type) {
+            guard let styled = try? NSAttributedString(data: data, options: [.documentType: word],
+                                                       documentAttributes: nil) else { return nil }
+            return TextToPDF.render(styled)
+        }
+        #endif
         guard type.conforms(to: .text), !type.conforms(to: .html), let text = decoded(data) else { return nil }
         return TextToPDF.render(text)
     }
+
+    #if os(macOS)
+    static func wordDocumentType(for type: UTType) -> NSAttributedString.DocumentType? {
+        if let docx = UTType("org.openxmlformats.wordprocessingml.document"), type.conforms(to: docx) { return .officeOpenXML }
+        if let doc = UTType("com.microsoft.word.doc"), type.conforms(to: doc) { return .docFormat }
+        return nil
+    }
+    #endif
 
     /// UTF-16 when it says so with a byte-order mark, otherwise UTF-8. A NUL
     /// byte in what claims to be UTF-8 text means it is not text.

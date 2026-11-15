@@ -42,6 +42,39 @@ FILES_LIBRARY=/tmp/papernest-file-items-library
 rm -rf "$FILES_LIBRARY"
 swift run --scratch-path "$SCRATCH" papernest-seed "$FILES_LIBRARY" "$FIXTURES/Budget notes.html"
 
+# Office files laid out as pages on iPhone and iPad (OfficeImportUITests). The
+# Simulator cannot write Word or Excel, so they are made here: Word by
+# textutil from RTF, Excel as a hand-built minimal workbook. All synthetic.
+OFFICE=/tmp/papernest-office-fixtures
+rm -rf "$OFFICE" && mkdir -p "$OFFICE"
+{ printf '{\\rtf1\\ansi{\\fonttbl\\f0 Helvetica;}\\f0\\fs28 {\\b Project proposal}\\par\\fs22 Prepared for the quarterly review.\\par '
+  for i in $(seq 1 120); do printf 'Line %d of the proposal, long enough to wrap across the page width.\\par ' "$i"; done
+  printf '}'; } > "$OFFICE/proposal.rtf"
+textutil -convert docx "$OFFICE/proposal.rtf" -output "$OFFICE/Proposal.docx"
+textutil -convert doc "$OFFICE/proposal.rtf" -output "$OFFICE/Legacy proposal.doc"
+{ printf '{\\rtf1\\ansi{\\fonttbl\\f0 Helvetica;}\\f0\\fs22 '
+  for i in $(seq 1 2400); do printf 'Paragraph %d of a long report, written to run to many pages.\\par ' "$i"; done
+  printf '}'; } > "$OFFICE/long.rtf"
+textutil -convert docx "$OFFICE/long.rtf" -output "$OFFICE/Long report.docx"
+rm "$OFFICE/proposal.rtf" "$OFFICE/long.rtf"
+printf 'PK\003\004 not really a spreadsheet' > "$OFFICE/Broken.xlsx"
+python3 - "$OFFICE/Budget.xlsx" <<'PY_XLSX'
+import sys, zipfile
+ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+rels = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+parts = {
+    "[Content_Types].xml": '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>',
+    "_rels/.rels": f'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="{rels}/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    "xl/workbook.xml": f'<?xml version="1.0" encoding="UTF-8"?><workbook {ns} xmlns:r="{rels}"><sheets><sheet name="Budget" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    "xl/_rels/workbook.xml.rels": f'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="{rels}/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="{rels}/sharedStrings" Target="sharedStrings.xml"/></Relationships>',
+    "xl/sharedStrings.xml": f'<?xml version="1.0" encoding="UTF-8"?><sst {ns} count="3" uniqueCount="3"><si><t>Item</t></si><si><t>Amount</t></si><si><t>Paper</t></si></sst>',
+    "xl/worksheets/sheet1.xml": f'<?xml version="1.0" encoding="UTF-8"?><worksheet {ns}><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row><row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2"><v>1234.5</v></c></row></sheetData></worksheet>',
+}
+with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
+    for name, body in parts.items():
+        z.writestr(name, body)
+PY_XLSX
+
 # A missing synthetic original exercises the preview error and its dismissal.
 MISSING_FILE_LIBRARY=/tmp/papernest-missing-file-preview-library
 rm -rf "$MISSING_FILE_LIBRARY"

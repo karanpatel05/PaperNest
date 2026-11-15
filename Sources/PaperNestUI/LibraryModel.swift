@@ -200,6 +200,19 @@ public final class LibraryModel {
 
     // MARK: - Import
 
+    /// A Word or Excel file laid out as pages, on iPhone and iPad where WebKit
+    /// can show it; nil keeps it a file. The Mac reads Word in the importer
+    /// itself, and has no way to lay out Excel.
+    private func importOfficeDocument(_ url: URL, folderID: FolderID?) async -> PaperNestCore.LibraryItem? {
+        #if os(iOS)
+        guard let env = environment, let pdf = await OfficeDocumentRenderer.pdf(for: url) else { return nil }
+        let name = url.deletingPathExtension().lastPathComponent + ".pdf"
+        return try? await env.importer.importItem(.data(pdf, name: name), folderID: folderID)
+        #else
+        return nil
+        #endif
+    }
+
     /// Imports each file as its own document. Failures are collected and
     /// reported together; password-protected PDFs are queued for a prompt.
     func importFiles(_ urls: [URL], into target: ItemID? = nil, after pageID: PageID? = nil, chooseLocation: Bool = false) async {
@@ -228,9 +241,15 @@ public final class LibraryModel {
                         let item = try await env.importer.importItem(.file(url), folderID: folderID)
                         if firstImported == nil { firstImported = item.id }
                     } catch ImportError.unsupportedType {
-                        // Not something we can make pages from, so keep it as
-                        // the file it is rather than refusing it.
-                        let item = try await FileItemImporter(store: env.store).importFile(at: url, into: folderID)
+                        // Word and Excel become pages where the system can lay
+                        // them out; anything else is kept as the file it is
+                        // rather than refused.
+                        let item: PaperNestCore.LibraryItem
+                        if let pages = await importOfficeDocument(url, folderID: folderID) {
+                            item = pages
+                        } else {
+                            item = try await FileItemImporter(store: env.store).importFile(at: url, into: folderID)
+                        }
                         if firstImported == nil { firstImported = item.id }
                     }
                 }
@@ -579,8 +598,11 @@ public final class LibraryModel {
                 do {
                     _ = try await env.importer.importItem(.file(url), folderID: folder.id)
                 } catch {
-                    // Anything we cannot make pages from is still kept.
-                    _ = try? await FileItemImporter(store: env.store).importFile(at: url, into: folder.id)
+                    // Word and Excel become pages where they can; anything we
+                    // cannot make pages from is still kept.
+                    if await importOfficeDocument(url, folderID: folder.id) == nil {
+                        _ = try? await FileItemImporter(store: env.store).importFile(at: url, into: folder.id)
+                    }
                 }
             }
             session.didChange()

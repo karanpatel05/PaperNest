@@ -1,5 +1,8 @@
 import Foundation
 import Testing
+#if os(macOS)
+import AppKit
+#endif
 import PaperNestCore
 @testable import PaperNestStore
 @testable import PaperNestImport
@@ -11,7 +14,7 @@ import PaperNestCore
 @Suite struct TextDocumentImportTests {
     /// The words on every page of an imported document, read back from the
     /// stored PDF rather than from what was handed in.
-    private func storedText(of item: LibraryItem, in lib: TestLibrary) async throws -> String {
+    private func storedText(of item: PaperNestCore.LibraryItem, in lib: TestLibrary) async throws -> String {
         let pages = try await lib.store.pages(of: item.id)
         var text: [String] = []
         for page in pages {
@@ -66,6 +69,27 @@ import PaperNestCore
         #expect(text.contains("Signed by both parties"))
         #expect(!text.contains("rtf1"), "the RTF is laid out, not printed as its source")
     }
+
+    #if os(macOS)
+    /// The Mac reads Word itself, so a Word file becomes pages in the importer
+    /// (owner, 2026-11-15: "Yes, build both"). iPhone and iPad lay Word out
+    /// in the app instead, where WebKit can; see `OfficeDocumentRenderer`.
+    @Test(arguments: [("Proposal.docx", NSAttributedString.DocumentType.officeOpenXML),
+                      ("Proposal.doc", NSAttributedString.DocumentType.docFormat)])
+    func aWordFileBecomesPagesOnTheMac(_ filename: String, _ type: NSAttributedString.DocumentType) async throws {
+        let lib = try TestLibrary()
+        let lines = ["Project proposal", "Prepared for the quarterly review"] + (1...80).map { "Line \($0) of the proposal" }
+        let source = NSAttributedString(string: lines.joined(separator: "\n"))
+        let word = try source.data(from: NSRange(location: 0, length: source.length), documentAttributes: [.documentType: type])
+        let item = try await lib.importer.importItem(.file(try lib.writeFile(word, named: filename)))
+
+        #expect(item.name == "Proposal")
+        #expect(try await lib.store.pages(of: item.id).count >= 2, "80 lines run onto a second page")
+        let text = try await storedText(of: item, in: lib)
+        #expect(text.contains("Project proposal"))
+        #expect(text.contains("Line 80 of the proposal"), "nothing is lost at a page break")
+    }
+    #endif
 
     /// Not text, or nothing in it: kept as the file it is, not turned into
     /// pages of garbage or a blank page.

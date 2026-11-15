@@ -1,3 +1,31 @@
+## 2026-11-15 — Word and Excel import as pages: iPhone and iPad through WebKit, Word on the Mac (Claude, owner in session)
+
+Owner: "Yes, build both" (Word and Excel), after the throwaway test in the entry below. **iPhone and iPad:**
+`OfficeDocumentRenderer` copies the file somewhere WebKit's process can read it, loads it into a web view that sits
+behind the window's content, waits for `didFinish` and then for the print page count to read the same twice, and
+prints A4 pages with `UIPrintPageRenderer`. It gives up after 20 seconds, resumes its wait exactly once, and keeps
+the result only if at least one page carries words; otherwise the file is kept as a file. `.docx`, `.doc` and `.xlsx`
+only. `LibraryModel` calls it where an import would otherwise become a file item, and for files unpacked from a ZIP.
+**Mac:** `TextDocumentConverter` reads `.docx` and `.doc` with `NSAttributedString` and lays them out like RTF.
+
+| Check | Result |
+|---|---|
+| New Mac test, written first | `aWordFileBecomesPagesOnTheMac` (`.docx` and `.doc` generated in the test by `NSAttributedString`, 82 lines) failed with `unsupportedType`, then passed: two or more pages, first and last line read back from the stored PDF. |
+| `./scripts/test.sh`, clean worktree of `HEAD` plus only this change | **Passed: 1077 tests** (342 + 49 + 191 + 188 + 179 + 128), 0 failures, 0 warnings. |
+| New `OfficeImportUITests`, iPhone 17 / iOS 26.5, clean worktree | **5/5:** `.docx` opens in the editor with ≥ 2 pages and find matches "Line 120 of the proposal"; `.doc` opens and finds "Project proposal"; `.xlsx` opens and finds "1234.5"; a 2,400-paragraph `.docx` opens as ≥ 30 pages and finds its last paragraph (test 25 s); a fake `PK…` `.xlsx` opens as a file preview, not the editor. |
+| The same, iPad Air 11-inch (M4) / iOS 26.5 | **5/5.** |
+| Through the real file picker, iPhone 17, by hand | A `.docx` placed in On My iPhone, picked from Home → Import File → Open → Save and Open: opened in the editor as pages. This is the security-scoped path the automated tests skip. |
+| Looked at | The iPhone screenshots: both open with the full editor tool bar. **The Word text prints smaller than in Word** — the file's own margins plus the print inset leave it in the middle of the page; readable, and it zooms. The spreadsheet shows its two columns and values. |
+
+**Fixtures.** `scripts/ui-test-ios.sh` writes them to `/tmp/papernest-office-fixtures` before each run: `textutil`
+makes the `.docx`, `.doc` and the long `.docx` from generated RTF, Python writes a minimal `.xlsx`, and `printf` the
+broken one. All synthetic.
+
+**Not built, not run.** Excel on the Mac stays a file: the Mac has no reader for it. `.xls` (no way to make one here),
+PowerPoint, Pages, Numbers and Keynote stay files, not tried. Adding an Office file into an existing document as
+pages (`insertPages`) still says unsupported. The Mac was not looked at on screen. `--sanitize=thread` was not run on
+the Mac Word reading; the Mac test reads Word off the main thread and passed.
+
 ## 2026-11-15 — Text files import as pages that open ready to mark up (Claude, owner in session)
 
 Owner: "on iphone when i import any dicuments it does not open notes and pdf section rrady for edit", then, asked

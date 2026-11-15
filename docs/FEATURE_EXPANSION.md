@@ -18,8 +18,10 @@ This is a multi-release expansion. The table is a coverage ledger, not a stateme
 > read-only preview: *"all files show be editable"*, meaning marked up like a PDF, not their words rewritten. Text
 > files (plain text, Markdown, CSV, logs, code, JSON) and RTF now import as pages through `TextDocumentConverter`.
 > Word and Excel were tried on the iPhone in a throwaway test (WebKit laid out a `.docx` as four pages with every word
-> readable, and an `.xlsx` as one page with long cells clipped); whether to build that is the owner's next call.
-> PowerPoint, Pages, Numbers and Keynote were not tried. See TEST_MATRIX, 2026-11-15.
+> readable, and an `.xlsx` as one page with long cells clipped). The owner said *"Yes, build both"*: on iPhone and
+> iPad `.docx`, `.doc` and `.xlsx` now import as pages through `OfficeDocumentRenderer` (WebKit, then the print
+> system); on the Mac `.docx` and `.doc` do, through the importer. Excel on the Mac, `.xls`, PowerPoint, Pages,
+> Numbers and Keynote still stay files. See TEST_MATRIX, 2026-11-15.
 
 After reviewing the feature list and the Convert Files / Enjoy Media screenshot, the owner explicitly requested: **“All features to pipeline including media.”** All identified capabilities below and in the 48-row reference inventory are included in the product pipeline. This confirms scope; it does not change implementation status or move media ahead of the current document work.
 
