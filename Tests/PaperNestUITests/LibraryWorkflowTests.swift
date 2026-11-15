@@ -80,14 +80,15 @@ import PaperNestTestSupport
         let letter = try writeSample(SyntheticDocuments.textPDF(pages: ["Alpha page", "Bêta page", "Gamma página"]), "Letter.pdf")
         let receipt = try writeSample(SyntheticDocuments.image(width: 600, height: 900, type: .jpeg, exifOrientation: 6), "Receipt.jpg")
         let locked = try writeSample(SyntheticDocuments.encryptedPDF(text: "Locked text", password: "sample"), "Locked.pdf")
-        let notes = try writeSample(Data("not a document".utf8), "notes.txt")
+        let notes = try writeSample(Data([0x00, 0x9F, 0x00, 0xFF]), "notes.dat")
 
         // --- First launch: import ---
         var session: LibrarySession? = try await readySession()
         let library = LibraryModel(session: session!)
         await library.importFiles([letter, receipt, locked, notes])
-        // A text file cannot become pages, so it is kept as a file item
-        // rather than refused (F2a; see docs/F2_FILE_ITEMS_DESIGN.md).
+        // A file that cannot become pages is kept as a file item rather than
+        // refused (F2a; see docs/F2_FILE_ITEMS_DESIGN.md). Text files do
+        // become pages since 2026-11-15, so this one is not text.
         #expect(library.presentedError == nil)
         #expect(library.passwordQueue.map(\.filename) == ["Locked.pdf"])
 
@@ -101,7 +102,7 @@ import PaperNestTestSupport
         let kept = try #require(library.items.first { $0.item.name == "notes" })
         #expect(kept.item.kind == .file)
         #expect(kept.pageCount == 0)
-        #expect(kept.file?.originalFilename == "notes.txt")
+        #expect(kept.file?.originalFilename == "notes.dat")
         let letterID = try #require(library.items.first { $0.item.name == "Letter" }?.id)
 
         // --- Edit: rotate page 2, move page 3 to the front, delete + undo ---

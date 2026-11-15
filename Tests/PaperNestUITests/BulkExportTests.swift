@@ -102,7 +102,7 @@ import PaperNestTestSupport
         defer { try? FileManager.default.removeItem(at: root) }
         let letter = root.appendingPathComponent("Letter.pdf")
         try SyntheticDocuments.textPDF(pages: ["Alpha"]).write(to: letter)
-        let notes = root.appendingPathComponent("Notes.txt")
+        let notes = root.appendingPathComponent("Notes.dat")
         let noteBytes = Data("plain text, kept exactly\n".utf8)
         try noteBytes.write(to: notes)
 
@@ -121,7 +121,7 @@ import PaperNestTestSupport
         defer { model.finish() }
 
         // Selection order, and the file keeps its own name and extension.
-        #expect(try entries(of: output.files[0]) == ["Notes.txt", "Letter.pdf"])
+        #expect(try entries(of: output.files[0]) == ["Notes.dat", "Letter.pdf"])
 
         let extracted = root.appendingPathComponent("mixed", isDirectory: true)
         let unzip = Process()
@@ -130,7 +130,7 @@ import PaperNestTestSupport
         try unzip.run()
         unzip.waitUntilExit()
         // The file is byte-for-byte what was imported: not re-encoded.
-        let restored = try Data(contentsOf: extracted.appendingPathComponent("Notes.txt"))
+        let restored = try Data(contentsOf: extracted.appendingPathComponent("Notes.dat"))
         #expect(restored == noteBytes)
         let pdf = try #require(PDFDocument(url: extracted.appendingPathComponent("Letter.pdf")))
         #expect(pdf.pageCount == 1)
@@ -140,7 +140,7 @@ import PaperNestTestSupport
 
     @Test func anArchiveOfOnlyFilesIsStillProduced() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
-        let notes = root.appendingPathComponent("Only.txt")
+        let notes = root.appendingPathComponent("Only.dat")
         try Data("just a file".utf8).write(to: notes)
         let session = try await readySession()
         let library = LibraryModel(session: session)
@@ -153,7 +153,7 @@ import PaperNestTestSupport
         try await settle { model.output != nil }
         let output = try #require(model.output, "a selection with no pages at all should still archive")
         defer { model.finish() }
-        #expect(try entries(of: output.files[0]) == ["Only.txt"])
+        #expect(try entries(of: output.files[0]) == ["Only.dat"])
     }
 
     /// The Settings backup is the one place that promises "everything".
@@ -161,7 +161,7 @@ import PaperNestTestSupport
         defer { try? FileManager.default.removeItem(at: root) }
         let letter = root.appendingPathComponent("Letter.pdf")
         try SyntheticDocuments.textPDF(pages: ["Alpha"]).write(to: letter)
-        let notes = root.appendingPathComponent("Receipt.txt")
+        let notes = root.appendingPathComponent("Receipt.dat")
         try Data("a receipt".utf8).write(to: notes)
         let session = try await readySession()
         let library = LibraryModel(session: session)
@@ -179,7 +179,7 @@ import PaperNestTestSupport
         }
         defer { settings.finishBackup() }
         let names = try entries(of: output.files[0]).sorted()
-        #expect(names == ["Letter.pdf", "Receipt.txt"], "a backup must carry files too, got \(names)")
+        #expect(names == ["Letter.pdf", "Receipt.dat"], "a backup must carry files too, got \(names)")
     }
 
     @Test func cancellingKeepsTheLibraryIdleAndLeavesNoArchiveBehind() async throws {

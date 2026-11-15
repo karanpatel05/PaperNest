@@ -35,11 +35,12 @@ for TOOLS_LIBRARY in /tmp/papernest-file-tools-uitest-library /tmp/papernest-fil
     rm -rf "$TOOLS_LIBRARY"
     swift run --scratch-path "$SCRATCH" papernest-seed "$TOOLS_LIBRARY" "$FIXTURES/Crop target.png"
 done
-# The file-item test needs something that cannot become pages.
-printf 'quarterly figures\n' > "$FIXTURES/Budget notes.txt"
+# The file-item test needs something that does not become pages. Text files
+# do since 2026-11-15; a web page does not, and Quick Look still shows its words.
+printf 'quarterly figures\n' > "$FIXTURES/Budget notes.html"
 FILES_LIBRARY=/tmp/papernest-file-items-library
 rm -rf "$FILES_LIBRARY"
-swift run --scratch-path "$SCRATCH" papernest-seed "$FILES_LIBRARY" "$FIXTURES/Budget notes.txt"
+swift run --scratch-path "$SCRATCH" papernest-seed "$FILES_LIBRARY" "$FIXTURES/Budget notes.html"
 
 # A missing synthetic original exercises the preview error and its dismissal.
 MISSING_FILE_LIBRARY=/tmp/papernest-missing-file-preview-library

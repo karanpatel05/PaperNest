@@ -55,8 +55,8 @@ import PaperNestTestSupport
         let staging = root.appendingPathComponent("staging", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         try SyntheticDocuments.textPDF(pages: ["Inside the archive"]).write(to: staging.appendingPathComponent("Letter.pdf"))
-        try Data("plain notes".utf8).write(to: staging.appendingPathComponent("Notes.txt"))
-        let status = try zip(["-q", "Bundle.zip", "Letter.pdf", "Notes.txt"], in: staging)
+        try Data([0x00, 0x9F, 0x00, 0xFF]).write(to: staging.appendingPathComponent("Notes.dat"))
+        let status = try zip(["-q", "Bundle.zip", "Letter.pdf", "Notes.dat"], in: staging)
         #expect(status == 0)
 
         let session = try await readySession()
@@ -77,8 +77,8 @@ import PaperNestTestSupport
         // Anything we cannot make pages from is still kept.
         let notes = try #require(extracted.first { $0.item.name == "Notes" })
         #expect(notes.item.kind == .file)
-        #expect(notes.file?.originalFilename == "Notes.txt")
-        #expect(try await env.store.assetData(try #require(notes.file).assetID).0 == Data("plain notes".utf8))
+        #expect(notes.file?.originalFilename == "Notes.dat")
+        #expect(try await env.store.assetData(try #require(notes.file).assetID).0 == Data([0x00, 0x9F, 0x00, 0xFF]))
         // The archive itself is kept; unpacking is not moving.
         #expect(try await env.store.item(archive.id) != nil)
         #expect(library.presentedError == nil)

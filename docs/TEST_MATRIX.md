@@ -1,3 +1,42 @@
+## 2026-11-15 — Text files import as pages that open ready to mark up (Claude, owner in session)
+
+Owner: "on iphone when i import any dicuments it does not open notes and pdf section rrady for edit", then, asked
+which kind, "Word or text file", "Mark up its pages" and "all files show be editable". Reproduced first, on `HEAD` in
+a clean worktree, on iPhone 17 / iOS 26.5: a PDF imported from Home through the real file picker, a PDF imported from
+All Documents, and a photo all opened in the editor; a `.txt` opened in a read-only Quick Look preview, as designed.
+The owner's 2026-10-28 decision to drop file conversion is reopened in FEATURE_EXPANSION and the inventory.
+
+**What changed.** `DocumentImporter.prepare` lays out a text file as PDF before deciding the path
+(`TextDocumentConverter` in `TextToPDF.swift`): any type that conforms to `public.text` except HTML, decoded as UTF-8
+(or UTF-16 with a byte-order mark, and no NUL bytes), and RTF through `NSAttributedString`. Chosen by the file's type,
+not by whether its bytes decode, so a binary is never turned into pages. HTML stays a file: reading it needs WebKit on
+the main thread and imports run off it. What is stored is the PDF; its words are real text in it. **The original text
+file is not kept beside the pages** — the store sweeps an original no page refers to — so the content survives as the
+PDF's text and the source file stays wherever it was imported from.
+
+| Check | Result |
+|---|---|
+| New `TextDocumentImportTests`, written first | Failed 8 ways before the change (every text type was `unsupportedType`), pass after: `.txt`, `.md`, `.csv`, `.log`, `.swift`, `.json`, UTF-16 `.txt` and `.rtf` become pages whose words read back from the stored PDF; a binary `.bin`, a `.txt` holding NULs, a blank `.txt` and a fake `.xlsx` still throw `unsupportedType` and leave no asset behind. |
+| `./scripts/test.sh`, shared tree, 17:02 | **Passed: 1076 tests**, 0 failures, 0 warnings (held Codex's uncommitted panel edits as well). |
+| `./scripts/test.sh`, clean worktree of `HEAD` plus only this change, 17:16 | **Passed: 1076 tests** (342 + 49 + 191 + 187 + 179 + 128), 0 failures, 0 warnings. |
+| **iPhone 17 / iOS 26.5** and **iPad Air 11-inch (M4) / iOS 26.5**, clean worktree, `scripts/ui-test-ios.sh`, 17:05–17:12 | **4/4 on each:** `testATextFileImportsAsPagesAndOpensInTheEditor` (new: a `.txt` imports, opens in the editor with the pen tool, "Page 1 of 1", no preview), `testImportDestinationCreatesFolderAndOpensDocument`, `testAFileItemPreviewsAndShowsItsTypeSizeAndACopy`, `testMissingFilePreviewCanBeClosedInEveryLanguage`. |
+
+**Tests changed, and why.** Five tests used a text file as the example of something that stays a file:
+`ImportTests.damagedEmptyAndUnsupportedFilesAreRejectedWithoutSideEffects`, `LibraryWorkflowTests`, `ArchiveExtractionTests`
+and three in `BulkExportTests` now use non-text bytes (`.bin`, `.dat`); the file-preview UI tests' seeded fixture in
+`scripts/ui-test-ios.sh` is now `Budget notes.html`, which stays a file and which Quick Look still shows as text.
+
+**Word and Excel on the iPhone: a throwaway test, deleted afterwards.** In a separate worktree a debug hook loaded
+files into a `WKWebView` and paginated them with `UIPrintPageRenderer` on iPhone 17 Pro / iOS 26.5. A `.docx` made by
+`textutil` (a heading and 120 wrapped lines) came out as **4 Letter pages with all 11,705 characters extractable** and
+the heading bold. A hand-built `.xlsx` (a 2×2 table) came out as **1 page with real text, but "Quarterly paper" clipped
+to "Quarterly"** at its column edge. The `.doc` written next to the `.docx` shared its output name and was not looked at
+separately. PowerPoint, Pages, Numbers and Keynote were not tried: no sample could be made here. The Mac has no WebKit
+route for these; its `NSAttributedString` reads Word but not Excel. Nothing of this is in the app.
+
+**Not run.** The Mac was not looked at; the importer is shared, so a text file becomes pages there too, unverified on
+screen. No other UI test was run.
+
 ## 2026-11-15 — Document Tools on the Mac: the rest seen, two more Mac bugs fixed (Claude)
 
 Dev Mac app, throwaway library, sample PDF, forced dark with `-AppleInterfaceStyle Dark`.

@@ -2,6 +2,12 @@ import CoreGraphics
 import CoreText
 import Foundation
 import PaperNestCore
+import UniformTypeIdentifiers
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Turns a plain text file into pages, so it can be annotated, cropped,
 /// reordered and exported like any other document instead of sitting in the
@@ -22,13 +28,16 @@ public enum TextToPDF {
     /// The pages carry real text rather than a picture of it, so a converted
     /// document is searchable and its words can be annotated.
     public static func render(_ text: String, pageSize: CGSize = a4, margin: CGFloat = 54) -> Data? {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-
         let attributes: [NSAttributedString.Key: Any] = [
             kCTFontAttributeName as NSAttributedString.Key: CTFontCreateWithName("Helvetica" as CFString, 11, nil),
             kCTForegroundColorAttributeName as NSAttributedString.Key: CGColor(red: 0, green: 0, blue: 0, alpha: 1),
         ]
-        let attributed = NSAttributedString(string: text, attributes: attributes)
+        return render(NSAttributedString(string: text, attributes: attributes), pageSize: pageSize, margin: margin)
+    }
+
+    /// The same, for text that carries its own fonts and styles (RTF).
+    public static func render(_ attributed: NSAttributedString, pageSize: CGSize = a4, margin: CGFloat = 54) -> Data? {
+        guard !attributed.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let framesetter = CTFramesetterCreateWithAttributedString(attributed)
         let textRect = CGRect(x: margin, y: margin,
                               width: pageSize.width - margin * 2,
@@ -58,21 +67,50 @@ public enum TextToPDF {
     }
 }
 
+/// Files that are text, turned into pages on import so they open in the
+/// editor to be marked up (owner, 2026-11-15: "all files should be editable").
+///
+/// Chosen by the file's type, never by whether its bytes happen to decode: any
+/// binary decodes as Latin-1, and that would turn a spreadsheet into pages of
+/// noise. HTML is left out because reading it into styled text needs WebKit on
+/// the main thread, and imports run off it.
+enum TextDocumentConverter {
+    /// PDF data for `data`, or nil when the file is not text this can lay out,
+    /// so it is kept as the file it is.
+    static func pdf(from data: Data, filename: String) -> Data? {
+        guard let type = UTType(filenameExtension: (filename as NSString).pathExtension) else { return nil }
+        if type.conforms(to: .rtf) {
+            guard let styled = try? NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.rtf],
+                                                       documentAttributes: nil) else { return nil }
+            return TextToPDF.render(styled)
+        }
+        guard type.conforms(to: .text), !type.conforms(to: .html), let text = decoded(data) else { return nil }
+        return TextToPDF.render(text)
+    }
+
+    /// UTF-16 when it says so with a byte-order mark, otherwise UTF-8. A NUL
+    /// byte in what claims to be UTF-8 text means it is not text.
+    static func decoded(_ data: Data) -> String? {
+        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
+            return String(data: data, encoding: .utf16)
+        }
+        guard !data.contains(0) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+}
+
 extension DocumentImporter {
     /// Converts plain text into a page-based document.
     ///
-    /// Deliberately a separate call rather than something `importItem` does on
-    /// its own for a `.txt`: keeping a file as the bytes it arrived with is
-    /// the right default, and existing behaviour depends on it. This is the
-    /// conversion someone chooses when they want to annotate or crop the text
-    /// instead of just keeping it.
+    /// `importItem` now does this by itself for a text file; this call is for
+    /// text that is not a file, such as words already in hand.
     ///
     /// The rendered PDF goes through the ordinary import path, so durability,
     /// content-addressed storage and name de-duplication are unchanged. Text
     /// with nothing in it is refused rather than producing a blank document.
     @discardableResult
     public func importTextAsDocument(_ text: String, named name: String,
-                                     folderID: FolderID? = nil) async throws -> LibraryItem {
+                                     folderID: FolderID? = nil) async throws -> PaperNestCore.LibraryItem {
         guard let pdf = TextToPDF.render(text) else { throw ImportError.empty(filename: name) }
         return try await importItem(.data(pdf, name: name), folderID: folderID)
     }

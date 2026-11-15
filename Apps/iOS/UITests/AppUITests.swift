@@ -800,7 +800,7 @@ final class AppUITests: XCTestCase {
             app.buttons["file-preview-done"].tap()
         }
         showAllDocuments(app)
-        // A text file cannot become pages, so it is kept as a file and the
+        // A web page is not turned into pages, so it is kept as a file and the
         // tile shows its size where a document shows its page count.
         let cell = app.descendants(matching: .any)["Budget notes, 18 bytes"].firstMatch
         XCTAssertTrue(cell.waitForExistence(timeout: 15), "the file should be in the library")
@@ -813,7 +813,7 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(preview.waitForExistence(timeout: 10), "the file copy should load")
         let text = app.descendants(matching: .any).matching(NSPredicate(
             format: "label CONTAINS %@ OR value CONTAINS %@", "quarterly figures", "quarterly figures")).firstMatch
-        XCTAssertTrue(text.waitForExistence(timeout: 15), "Quick Look should show the actual text file")
+        XCTAssertTrue(text.waitForExistence(timeout: 15), "Quick Look should show the actual file")
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "file-preview-text"
         attachment.lifetime = .keepAlways
@@ -834,7 +834,7 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(header.waitForExistence(timeout: 5))
         // A LabeledContent row is one element labelled "<label>, <value>".
         let originalName = app.staticTexts
-            .matching(NSPredicate(format: "label CONTAINS %@", "Budget notes.txt")).firstMatch
+            .matching(NSPredicate(format: "label CONTAINS %@", "Budget notes.html")).firstMatch
         XCTAssertTrue(originalName.waitForExistence(timeout: 5), "the details should name the original file")
         XCTAssertTrue(app.buttons["file-save-copy"].waitForExistence(timeout: 10),
                       "a copy of the file should be offered")
@@ -1896,6 +1896,25 @@ final class AppUITests: XCTestCase {
         name.typeText("Receipts")
         app.buttons["import-location-save"].tap()
         XCTAssertTrue(app.buttons["editor-export"].waitForExistence(timeout: 15))
+    }
+
+    /// Owner, 2026-11-15: imported files should open ready to mark up. A text
+    /// file becomes pages and opens in the editor, not in a read-only preview.
+    func testATextFileImportsAsPagesAndOpensInTheEditor() throws {
+        let fixture = URL(fileURLWithPath: "/tmp/papernest-text-import-\(UUID().uuidString).txt")
+        try XCTUnwrap("Meeting notes\nBuy more paper\n".data(using: .utf8)).write(to: fixture)
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        let app = launch(["-PaperNestDebugImportFile", fixture.path],
+                         libraryPath: "/tmp/papernest-text-import-ui-\(UUID().uuidString)")
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["import-location-save"].waitForExistence(timeout: 15))
+        app.buttons["import-location-save"].tap()
+        XCTAssertTrue(app.buttons["editor-back"].waitForExistence(timeout: 20), "the text file did not open in the editor")
+        XCTAssertFalse(app.buttons["file-preview-done"].exists, "a text file must not open as a read-only preview")
+        XCTAssertTrue(app.buttons["studio-tool-pen"].waitForExistence(timeout: 10), "the editor's marking tools are not there")
+        XCTAssertEqual(app.descendants(matching: .any)["document-page-image"].firstMatch.label, "Page 1 of 1")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "text-import-editor"; shot.lifetime = .keepAlways; add(shot)
     }
 
     func testImportDestinationLocalesAndLargeTextCancellation() throws {

@@ -48,10 +48,20 @@ public struct DocumentImporter: Sendable {
     /// Validates `source` and durably stores its original. Nothing is visible
     /// in the library until the result is committed.
     public func prepare(_ source: Source, password: String? = nil) throws -> Prepared {
-        let data = try loadData(source)
+        var data = try loadData(source)
         let name = source.displayName
         guard !data.isEmpty else { throw ImportError.empty(filename: name) }
-        guard let kind = FileTypeSniffer.kind(of: data) else { throw ImportError.unsupportedType(filename: name) }
+        var sniffed = FileTypeSniffer.kind(of: data)
+        var storedName = name
+        // A text file becomes pages, so it can be marked up like any other
+        // document. What is stored is the PDF it is laid out as; its words
+        // are real text in that PDF, searchable and selectable.
+        if sniffed == nil, let pdf = TextDocumentConverter.pdf(from: data, filename: name) {
+            data = pdf
+            sniffed = .pdf
+            storedName = (name as NSString).deletingPathExtension + ".pdf"
+        }
+        guard let kind = sniffed else { throw ImportError.unsupportedType(filename: name) }
         switch kind {
         case .file:
             // This path builds page-based documents. Bytes we do not
@@ -59,7 +69,7 @@ public struct DocumentImporter: Sendable {
             throw ImportError.unsupportedType(filename: name)
         case .pdf:
             let facts = try PDFInspector.open(data, password: password, filename: name)
-            let staged = try store.assets.store(facts.storedData, kind: .pdf, originalFilename: name)
+            let staged = try store.assets.store(facts.storedData, kind: .pdf, originalFilename: storedName)
             let pages = facts.pageSizes.enumerated().map { index, size in
                 LibraryStore.NewPage(sourceSize: size, content: .pdfPage(staged.id, index: index))
             }

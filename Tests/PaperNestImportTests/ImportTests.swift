@@ -93,8 +93,10 @@ final class TestLibrary: @unchecked Sendable {
         await #expect(throws: ImportError.empty(filename: "Empty.pdf")) {
             try await lib.importer.importItem(.data(Data(), name: "Empty.pdf"))
         }
-        await #expect(throws: ImportError.unsupportedType(filename: "notes.txt")) {
-            try await lib.importer.importItem(.file(try lib.writeFile(Data("plain text".utf8), named: "notes.txt")))
+        // A text file becomes pages since 2026-11-15 (`TextDocumentImportTests`),
+        // so the unsupported case is bytes that are not text.
+        await #expect(throws: ImportError.unsupportedType(filename: "notes.bin")) {
+            try await lib.importer.importItem(.file(try lib.writeFile(Data([0x00, 0xFF, 0x10, 0x00]), named: "notes.bin")))
         }
         await #expect(throws: ImportError.unreadable(filename: "missing.pdf")) {
             try await lib.importer.importItem(.file(lib.url.appendingPathComponent("missing.pdf")))
