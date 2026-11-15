@@ -6793,3 +6793,11 @@ Notes/PDF redesign remains a design preview pending owner review; no PDF reliabi
 - `./scripts/ui-test-ios.sh DCC189ED-… -only-testing:PaperNest-iOSUITests/NotesToolbarUITests/testEveryToolChangesWhatIsSaved` (iPad Pro 11-inch): **passed**, 166.8 s.
 - `-only-testing:PaperNest-iOSUITests/NotesToolbarUITests` on the iPad Pro 13-inch (M5) (046CA563-…): **TEST SUCCEEDED, 3 passed** (167.1 s, 33.4 s, 67.4 s).
 - The same suite on the iPhone 17 Pro (63992C10-…): the first attempt never ran, because the simulator failed to launch the test runner ("system shell probably crashed"). After a simulator reboot: **TEST SUCCEEDED, 3 passed** (109.8 s, 11.3 s, 56.1 s).
+
+## Document Tools on the Mac, background-control checks — Claude, 2026-11-15
+
+- Ran `./scripts/run-mac-app.sh /tmp/pn-mac-check -- -PaperNestDebugSkipWelcome YES -PaperNestDebugOpenItem multilingual-letter`: built with **0 warnings**. The seeded throwaway library opened the 3-page `multilingual-letter`, and Document Tools was showing.
+- **Resizing the sidebar: passed.** Dragged the inspector's edge with background raw input. At the default width the tool grid is 4 columns. Widened (≈350 pt, as wide as the drag went), it is 5 columns, with Crop, Rotate, Filter, Split and Replace Page on one row. At the narrowest width it is 4 columns again; "Delete Page" and "Replace Page" wrap onto two lines and nothing is cut off.
+- **Clicking a thumbnail: passed.** Clicking page 2 opened page 2 and the counter read 2/3. That click went in as an accessibility press, not a raw mouse click.
+- **Hover: seen only incidentally.** After the raw drags, page 3's thumbnail stayed lavender, so the hover wash does draw. It did not clear while the pointer was elsewhere, which looks like a leftover of the synthetic events and is not proven to be an app bug. A real-pointer check is still needed.
+- **Drag to reorder: NOT verified.** A background raw-input drag from page 1 onto page 3 changed nothing: the `pages` table still holds pdf_page_index 0, 1, 2 at revision 1. A SwiftUI `.draggable` session probably needs a real mouse drag. Full-screen control was requested three times this session and timed out each time.
