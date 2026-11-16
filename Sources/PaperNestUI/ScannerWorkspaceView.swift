@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import PhotosUI
+import PaperNestCore
 
 /// Capture and review only. Completion goes through the existing import-location
 /// and document naming workflow; it never reports an uncommitted document saved.
@@ -30,6 +31,18 @@ struct ScannerWorkspaceView: View {
     @State private var photoPickerPresented = false
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var kind = ScanKind.document
+    /// The Cleanup sheet, for the page being shown or for the pages picked.
+    @State private var cleanupRequest: CleanupRequest?
+    /// Picking several pages in the filmstrip, and which are picked.
+    @State private var selecting = false
+    @State private var selection: Set<UUID> = []
+    @State private var confirmingDelete = false
+
+    private struct CleanupRequest: Identifiable {
+        let id = UUID()
+        let page: ScannerPage
+        let scope: ScannerCleanupSheet.Scope
+    }
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -92,6 +105,7 @@ struct ScannerWorkspaceView: View {
         // automatic exposure.
         .onChange(of: kind) { _, value in if !value.findsEdges { automatic = false } }
         .onChange(of: reviewing) { _, value in
+            if !value { endSelection() }
             if value { stopCamera(); torch = false } else if canRunCamera { camera.start() }
         }
         .photosPicker(isPresented: $photoPickerPresented, selection: $photoItems, matching: .images)
@@ -247,6 +261,7 @@ struct ScannerWorkspaceView: View {
                     }.padding().background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 16)).padding()
                 }
                 ScannerKindSelector(kind: $kind).disabled(busy).padding(.bottom, 12)
+                ScannerFutureModesPreview().padding(.bottom, 4)
                 HStack(spacing: 16) {
                     reviewStackButton
                     Spacer(minLength: 0)
@@ -336,6 +351,15 @@ struct ScannerWorkspaceView: View {
         .disabled(busy)
         .interactiveDismissDisabled(busy)
         .overlay { if busy { ProgressView().padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
+        .sheet(item: $cleanupRequest) { request in
+            ScannerCleanupSheet(page: request.page, scope: request.scope) { cleanup, target in
+                applyCleanup(cleanup, to: target, from: request)
+            }
+        }
+        .alert(L10n.scannerDeletePagesTitle(selection.count), isPresented: $confirmingDelete) {
+            Button(L10n.delete, role: .destructive) { deleteSelection() }
+            Button(L10n.cancel, role: .cancel) {}
+        } message: { Text(L10n.scannerDeletePagesMessage) }
     }
 
     private var stackedReview: some View {
@@ -355,15 +379,23 @@ struct ScannerWorkspaceView: View {
                 }.padding(.horizontal)
             }
             previewArea
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 20) {
-                    cropTool; rotateTool; filterTool(vertical: false); enhanceTool; resetTool; deleteTool
-                }
-                .padding(12)
-                .background(ScannerChrome.panel, in: RoundedRectangle(cornerRadius: 18))
-                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
-                .padding(.horizontal)
-            }.disabled(pages.isEmpty || busy)
+            if selecting {
+                // While pages are being picked, the bar is about them and
+                // not about the one page being shown.
+                batchToolbar.padding(.horizontal)
+            } else {
+                presetStrip.padding(.horizontal)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 20) {
+                        cropTool; rotateTool; filterTool(vertical: false); enhanceTool; cleanupTool
+                        batchSelectTool; resetTool; deleteTool
+                    }
+                    .padding(12)
+                    .background(ScannerChrome.panel, in: RoundedRectangle(cornerRadius: 18))
+                    .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
+                    .padding(.horizontal)
+                }.disabled(pages.isEmpty || busy)
+            }
         }
         .padding(.vertical, 12)
     }
@@ -389,12 +421,19 @@ struct ScannerWorkspaceView: View {
                 .background(ScannerChrome.panel.opacity(0.6))
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(L10n.scannerPages)
-                previewArea.padding(12).frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 8) {
+                    previewArea
+                    if !selecting { presetStrip }
+                }
+                .padding(12).frame(maxWidth: .infinity, maxHeight: .infinity)
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 8) {
-                        enhanceTool; cropTool; rotateTool; filterTool(vertical: true)
-                        moveTool(by: -1); moveTool(by: 1); duplicateTool
-                        resetTool; deleteTool
+                        // One page's tools rest while several are being picked.
+                        Group { enhanceTool; cropTool; rotateTool; filterTool(vertical: true); cleanupTool }
+                            .disabled(selecting)
+                        batchSelectTool
+                        Group { moveTool(by: -1); moveTool(by: 1); duplicateTool; resetTool; deleteTool }
+                            .disabled(selecting)
                     }.padding(12)
                 }
                 .frame(width: 208)
@@ -409,6 +448,7 @@ struct ScannerWorkspaceView: View {
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
             .background(ScannerChrome.panel)
+            if selecting { batchToolbar.padding(.horizontal, 12).padding(.bottom, 8).background(ScannerChrome.panel) }
         }
         .environment(\.scannerToolsVertical, true)
     }
@@ -441,26 +481,53 @@ struct ScannerWorkspaceView: View {
 
     private var pageThumbnails: some View {
         ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
-            Button { guard !busy else { return }; selected = index } label: {
-                VStack(spacing: 4) {
-                    ScannerThumbnail(page: page).frame(width: 56, height: 70)
-                    Text(verbatim: String(index + 1)).font(.caption.monospacedDigit())
+            // While pages are being picked a tap picks or unpicks; otherwise
+            // it shows the page. The outline follows whichever is in force.
+            let marked: Bool = selecting ? selection.contains(page.id) : selected == index
+            Button {
+                guard !busy else { return }
+                if selecting {
+                    if selection.contains(page.id) { selection.remove(page.id) } else { selection.insert(page.id) }
+                } else {
+                    selected = index
                 }
-                .padding(5)
-                .background(selected == index ? ScannerChrome.purple.opacity(0.28) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected == index ? Theme.accent : ScannerChrome.stroke,
-                                                                  lineWidth: selected == index ? 2 : 1))
+            } label: {
+                pageChip(page, number: index + 1, marked: marked)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("scanner.page.\(index)")
             .accessibilityLabel(L10n.scannerReview + " " + String(index + 1))
-            .accessibilityAddTraits(selected == index ? [.isSelected] : [])
+            .accessibilityValue(selecting ? (marked ? L10n.selectionOn : L10n.selectionOff) : "")
+            .accessibilityAddTraits(marked ? [.isSelected] : [])
             .contextMenu {
                 Button(L10n.duplicate) { duplicatePage(at: index) }
                 Button(L10n.scannerMoveEarlier) { movePage(at: index, by: -1) }.disabled(index == 0)
                 Button(L10n.scannerMoveLater) { movePage(at: index, by: 1) }.disabled(index == pages.count - 1)
             }
         }
+    }
+
+    /// One page in the filmstrip: its picture, its number, and while pages
+    /// are being picked, whether this one is.
+    private func pageChip(_ page: ScannerPage, number: Int, marked: Bool) -> some View {
+        let outline: Color = marked ? Theme.accent : ScannerChrome.stroke
+        let fill: Color = marked ? ScannerChrome.purple.opacity(0.28) : Color.clear
+        return VStack(spacing: 4) {
+            ScannerThumbnail(page: page).frame(width: 56, height: 70)
+                .overlay(alignment: .topTrailing) { if selecting { pickMark(marked) } }
+            Text(verbatim: String(number)).font(.caption.monospacedDigit())
+        }
+        .padding(5)
+        .background(fill, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(outline, lineWidth: marked ? 2 : 1))
+    }
+
+    private func pickMark(_ marked: Bool) -> some View {
+        Image(systemName: marked ? "checkmark.circle.fill" : "circle")
+            .font(.body.weight(.semibold))
+            .foregroundStyle(marked ? Theme.accent : Color.white)
+            .background(Circle().fill(Color.black.opacity(0.55)))
+            .padding(2)
     }
 
     private var addPageButton: some View {
@@ -483,8 +550,7 @@ struct ScannerWorkspaceView: View {
                     set: { if !busy && pages.indices.contains(selected) { pages[selected] = $0 } }
                 ))
             } else if let image = previewImage, pages.indices.contains(selected) {
-                ScannerZoomPreview(image: image,
-                    accessibilityValue: "\(selected + 1); \(L10n.rotate) \(pages[selected].quarterTurns); \(L10n.filter) \(pages[selected].filter)")
+                ScannerZoomPreview(image: image, accessibilityValue: previewValue(pages[selected]))
                     .id(pages[selected].id)
             } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
         }
@@ -510,27 +576,122 @@ struct ScannerWorkspaceView: View {
         reviewTool("rotate.right", label: L10n.rotate) { pages[selected].quarterTurns = (pages[selected].quarterTurns + 1) % 4 }
     }
 
+    /// What tests and VoiceOver are told about the page on screen: its
+    /// number, its turn, its preset and its three Cleanup amounts.
+    private func previewValue(_ page: ScannerPage) -> String {
+        "\(selected + 1); \(L10n.rotate) \(page.quarterTurns); \(L10n.filter) \(page.appearance.preset.rawValue); "
+            + "\(L10n.scannerCleanup) \(ScannerCleanupSheet.describe(page.appearance.cleanup))"
+    }
+
+    private func setPreset(_ preset: ScanPreset) {
+        guard !busy, pages.indices.contains(selected) else { return }
+        pages[selected].appearance.preset = preset
+    }
+
+    /// The same presets as the strip, as a menu: the strip scrolls, and a
+    /// menu names them all at once.
     private func filterTool(vertical: Bool) -> some View {
         Menu {
-            Button(L10n.filterOriginal) { guard !busy else { return }; pages[selected].filter = 0 }
-            Button(L10n.filterGrayscale) { guard !busy else { return }; pages[selected].filter = 1 }
-            Button(L10n.filterBlackAndWhite) { guard !busy else { return }; pages[selected].filter = 2 }
+            ForEach(ScanPreset.allCases, id: \.self) { preset in
+                Button { setPreset(preset) } label: {
+                    if selectedPage?.appearance.preset == preset { Label(preset.title, systemImage: "checkmark") }
+                    else { Text(preset.title) }
+                }
+            }
         } label: {
-            ScannerToolLabel(symbol: "camera.filters", title: L10n.filter, active: (selectedPage?.filter ?? 0) != 0)
+            ScannerToolLabel(symbol: "camera.filters", title: L10n.filter,
+                             active: (selectedPage?.appearance.preset ?? .original) != .original)
+                // A menu's label is not told it is disabled, so while pages
+                // are being picked it has to be dimmed here like its neighbours.
+                .opacity(selecting ? 0.4 : 1)
         }
         .accessibilityLabel(L10n.filter)
+        .accessibilityValue(selectedPage?.appearance.preset.title ?? "")
         .accessibilityIdentifier("scanner.tool.camera.filters")
     }
 
+    /// One tap for the Auto preset, which is what Enhance has always applied.
     private var enhanceTool: some View {
-        reviewTool("sparkles", label: L10n.scannerEnhance, active: selectedPage?.enhanced ?? false) { pages[selected].enhanced.toggle() }
-            .accessibilityValue(selectedPage?.enhanced ?? false ? L10n.selectionOn : L10n.selectionOff)
+        let isAuto = selectedPage?.appearance.preset == .auto
+        return reviewTool("sparkles", label: L10n.scannerEnhance, active: isAuto) { setPreset(isAuto ? .original : .auto) }
+            .accessibilityValue(isAuto ? L10n.selectionOn : L10n.selectionOff)
+    }
+
+    private var cleanupTool: some View {
+        let isOn = selectedPage?.appearance.cleanup.isActive ?? false
+        return reviewTool("slider.horizontal.3", label: L10n.scannerCleanup, active: isOn) { openCleanup() }
+            .accessibilityValue(isOn ? L10n.selectionOn : L10n.selectionOff)
+    }
+
+    private var batchSelectTool: some View {
+        reviewTool("checklist", label: L10n.scannerSelectPages, active: selecting) {
+            if selecting { endSelection() } else { cropping = false; selecting = true }
+        }
+        .accessibilityValue(selecting ? L10n.selectionOn : L10n.selectionOff)
+    }
+
+    private var presetStrip: some View {
+        ScannerPresetStrip(selection: selectedPage?.appearance.preset,
+                           cleanupActive: selectedPage?.appearance.cleanup.isActive ?? false,
+                           onSelect: setPreset, onCleanup: openCleanup)
+            .disabled(pages.isEmpty || busy)
+    }
+
+    private func openCleanup() {
+        guard !busy, let page = selectedPage else { return }
+        cleanupRequest = CleanupRequest(page: page, scope: .page(total: pages.count))
+    }
+
+    private func applyCleanup(_ cleanup: ScanCleanup, to target: ScannerCleanupSheet.Target, from request: CleanupRequest) {
+        switch target {
+        case .page: ScanPageBatch.update([request.page.id], in: &pages) { $0.appearance.cleanup = cleanup }
+        case .allPages: for index in pages.indices { pages[index].appearance.cleanup = cleanup }
+        case .selection: ScanPageBatch.update(selection, in: &pages) { $0.appearance.cleanup = cleanup }
+        }
+    }
+
+    // MARK: - Several pages at once
+
+    private var batchToolbar: some View {
+        ScannerBatchToolbar(
+            count: selection.count,
+            canMoveEarlier: ScanPageBatch.canMove(selection, .earlier, in: pages),
+            canMoveLater: ScanPageBatch.canMove(selection, .later, in: pages),
+            onClose: endSelection,
+            onFilter: { preset in ScanPageBatch.update(selection, in: &pages) { $0.appearance.preset = preset } },
+            onCleanup: {
+                // The first picked page stands for the rest in the sheet's preview.
+                guard let page = pages.first(where: { selection.contains($0.id) }) else { return }
+                cleanupRequest = CleanupRequest(page: page, scope: .selection(count: selection.count))
+            },
+            onDuplicate: {
+                let result = ScanPageBatch.duplicate(selection, in: pages, focus: selected) { $0.copy() }
+                pages = result.pages; selected = result.focus
+            },
+            onMove: { direction in
+                let result = ScanPageBatch.move(selection, direction, in: pages, focus: selected)
+                pages = result.pages; selected = result.focus
+            },
+            // One page goes at once, as the single-page Delete does. More
+            // than one is asked about first.
+            onDelete: { if selection.count > 1 { confirmingDelete = true } else { deleteSelection() } })
+            .disabled(busy)
+    }
+
+    private func deleteSelection() {
+        let result = ScanPageBatch.delete(selection, from: pages, focus: selected)
+        pages = result.pages; selected = result.focus
+        selection.removeAll()
+        if pages.isEmpty { reviewing = false }
+    }
+
+    private func endSelection() {
+        selecting = false
+        selection.removeAll()
     }
 
     private var resetTool: some View {
-        reviewTool("arrow.counterclockwise", label: L10n.cropReset) {
-            pages[selected].quarterTurns = 0; pages[selected].filter = 0; pages[selected].enhanced = false; pages[selected].corners = ScannerPage(original: pages[selected].original).corners
-        }
+        reviewTool("arrow.counterclockwise", label: L10n.cropReset) { pages[selected].reset() }
     }
 
     private var deleteTool: some View {
@@ -552,9 +713,7 @@ struct ScannerWorkspaceView: View {
 
     private func duplicatePage(at index: Int) {
         guard !busy, pages.indices.contains(index) else { return }
-        let page = pages[index]
-        pages.insert(ScannerPage(original: page.original, quarterTurns: page.quarterTurns, filter: page.filter,
-                                 enhanced: page.enhanced, corners: page.corners), at: index + 1)
+        pages.insert(pages[index].copy(), at: index + 1)
         selected = index + 1
     }
 
@@ -591,8 +750,7 @@ struct ScannerWorkspaceView: View {
 
     private var previewKey: String {
         guard pages.indices.contains(selected) else { return "empty" }
-        let page = pages[selected]
-        return "\(page.id)-\(page.quarterTurns)-\(page.filter)-\(page.enhanced)-\(page.corners)-\(cropping)"
+        return "\(pages[selected].drawKey)-\(cropping)"
     }
 
     private func reviewTool(_ symbol: String, label: String, active: Bool = false, action: @escaping () -> Void) -> some View {

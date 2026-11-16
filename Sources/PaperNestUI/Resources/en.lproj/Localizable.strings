@@ -968,3 +968,30 @@
 "display.twoPages.detail" = "Shows a document two pages side by side. A wide page is shown on its own.";
 "display.twoPages.cover" = "Cover Page Alone";
 "display.twoPages.cover.detail" = "Shows the first page on its own, so the pages after it pair as a printed book does.";
+
+/* Scan Studio visual preview */
+"scanner.mode.whiteboard" = "Whiteboard";
+"scanner.mode.card" = "ID / Card";
+"scanner.comingSoon" = "Coming soon";
+"scanner.presets" = "Page presets";
+"scanner.preset.original" = "Original";
+"scanner.preset.auto" = "Auto";
+"scanner.preset.enhanced" = "Enhanced";
+"scanner.preset.highContrast" = "High Contrast";
+"scanner.cleanup" = "Cleanup";
+"scanner.cleanup.shadows" = "Remove shadows";
+"scanner.cleanup.whiten" = "Whiten background";
+"scanner.cleanup.sharpen" = "Sharpen text";
+"scanner.cleanup.applyPage" = "Apply to this page";
+"scanner.cleanup.applyAll" = "Apply to all pages";
+"scanner.selectPages" = "Select pages";
+
+/* Scan Studio functionality */
+"scanner.cleanup.before" = "Before";
+"scanner.cleanup.after" = "After";
+"scanner.cleanup.compare" = "Compare";
+"scanner.cleanup.recommended" = "Recommended";
+"scanner.cleanup.applySelected" = "Apply to selected pages";
+"scanner.batch.selected" = "Selected: %d";
+"scanner.batch.deleteTitle" = "Delete %d pages?";
+"scanner.batch.deleteMessage" = "These pages will be removed from this scan.";

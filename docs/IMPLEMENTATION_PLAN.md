@@ -44,7 +44,7 @@ Remaining (in order):
 3. **Rescan a page: implemented** (2026-10-21). Replace in place, extra pages inserted after, look kept and geometry reset, undo/redo, v3 history so undo survives other deletions. Store and workflow tests pass. **Camera path: needs a device** (the Simulator has no document camera). **File path: verified in the Simulator** (replace in place, extras after, cancel is silent), after fixing replace-became-add and building the Simulator app from the Xcode project. Replace and insert are one transaction. **M3 note:** a rescanned page keeps its page objects (and transform history) in the old capture's source coordinates; ink now exists; decide whether to keep, rescale or flag existing marks on rescan.
 4. Real-device camera capture for the M1 gate (needs signing). Simulator imports don't count as camera tests. iPhone/iPad interaction coverage now exists; remaining flow-specific manual checks are in TEST_MATRIX.
 5. Continuity Camera import on Mac (`ImportFromDevices` services menu), if feasible.
-6. Adaptive black-and-white threshold for unevenly lit scans (the current Otsu threshold is global).
+6. Adaptive black-and-white threshold for unevenly lit scans. **Done for a scan being reviewed (2026-11-15):** the scanner's Black & White preset judges ink against the paper around it (`ScanImageProcessor`, see ARCHITECTURE → Rendering). **Still open for a saved page:** `PageFilter.blackAndWhite` in the editor is the global Otsu threshold.
 7. ~~Folders UI~~ **done**: create/rename/delete, move documents, counts, and iPhone interaction coverage.
 8. ~~Settings screen~~ **done** (2026-10-21): storage, export-all backup, language, about; no login by design. Mac Settings window viewed on 2026-10-23; Mac backup interaction still pending.
 

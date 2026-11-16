@@ -1,3 +1,107 @@
+## 2026-11-15 — Scan Studio: presets and Cleanup change the page, and several pages can be edited together (Claude, owner in session)
+
+Owner: "Codex is designing and implementing additional scanning features, you have to implement functionality", then
+Codex's written brief: make the preset strip, the Cleanup sheet and the batch toolbar it had laid out as a shell do
+what they say (Phase 1), then the batch page actions (Phase 2); Whiteboard and ID/Card stay marked Coming soon.
+Design: `docs/design/SCAN_FEATURES_DESIGN.md`. What was built and how it works: `docs/ARCHITECTURE.md` → Rendering.
+
+**What works now.** Each page of a scan being reviewed has one preset (Original, Auto, Enhanced, Grayscale,
+Black & White, High Contrast) and three Cleanup amounts (Remove shadows, Whiten background, Sharpen text). They are
+drawn each time the page is shown or saved and never into the capture, so Reset and Original still give back what
+the camera took. The strip, the Filter menu and Enhance all show and set the page's one preset. Cleanup opens on the
+page's own amounts, shows Before and After on a picture of the page, and changes only what the button pressed says:
+this page, all pages, or the picked pages. Select pages picks pages in the filmstrip; the bar then filters, cleans
+up, duplicates, moves as one block, or deletes them, asking first only when more than one page would go.
+
+**Unit tests (Mac, `./scripts/test.sh`, shared tree).** **1,118 passed, 0 failed, 0 warnings**, 37 of them new here.
+
+- `ScanAppearanceTests` 6 and `ScanPageBatchTests` 14 (`PaperNestCoreTests`): amounts clamp, on assignment too, and
+  NaN means none; delete, duplicate, group move and edit on a queue, with the page being shown followed through each.
+- `ScanImageProcessorTests` 17 (`PaperNestImportTests`), on pages made pixel by pixel: a shadow over a quarter of
+  the page is lifted to within 12 levels of the lit paper at full amount and about half way at half; tinted paper
+  goes to white on every channel while ink stays dark; a soft edge gets at least 15% steeper and flat areas do not
+  move; Grayscale, High Contrast and Enhanced do what their names say; Black & White gives white paper and black ink
+  under the shadow too; a heading bar and a picture keep their colour through Remove shadows and stay black through
+  Black & White; every preset with and without Cleanup keeps the page's size and covers it; a preview a third the
+  size shows the same as the full page; 48 pages given Auto at once finish.
+
+**Two faults found by looking, not by the first tests.** (1) The first Remove shadows passed its numbers and
+bleached every filled block: a contact sheet of a made-up page with a heading bar, a highlight and a picture showed
+the bar with a pale hole and the picture washed out, and Black & White turned the picture into an empty frame. The
+lighting is now read from paper alone; two tests pin it. (2) A test run hung with eight threads in
+`CIVNFaceDetector` under `autoAdjustmentFilters`: Core Image's automatic adjustment looks for faces through Vision,
+which parks the calling thread. A probe outside the project: 48 calls at once on Swift concurrency's threads never
+returned; with an empty `features` list they took 26 ms together and gave the same two filters. **The scanner's
+Enhance had this before today**, one page at a time; it could have hung the review screen once several enhanced
+pages redrew together. Fixed in the engine and pinned by a test that stops the run with the reason.
+
+**iOS unit tests (`xcodebuild test -scheme PaperNest-Canvas`, PaperNest iPhone Duo, iOS 27.1).**
+`ScannerPageTests` **11 passed, 0 failed**: presets and Cleanup change the saved picture and not the capture; Reset
+undoes look, turn and crop; a copy carries every edit; the redraw key changes with each of them; a preview is no
+larger than asked and keeps the look; the Cleanup sheet's picture is the page without its look, turned by the preview.
+
+**iOS UI tests (`ScannerWorkspaceUITests`, the script's `xcodebuild test` line run directly; these suites make
+their own libraries).** On the final source:
+
+| Simulator | Result |
+|---|---|
+| **iPhone 17, iOS 26.5** | **7 passed, 0 failed**, 256 s |
+| **iPad Air 13-inch (M4), iOS 27.0** | **7 passed, 0 failed**, 252 s |
+| **PaperNest iPhone Duo, iOS 27.1** | **6 passed, 1 failed**, 280 s. The failure is `testReviewEditsSaveAndReopen` at its first check, before it touches anything: Save's top edge is at 12 points and the test expects at least the 44 it assumes for a phone on which it finds no status bar. **It fails the same way, with the same two numbers, at the last commit `55f163e` with none of this work in it** (one run, from a clean worktree, same simulator), so it is older than this change. Whether the test's 44 points or the screen is wrong on that device was not looked into. |
+
+The three new tests, all passing on all three: `testCleanupAppliesToThisPageOrToAllPages` (opens Cleanup from the tool
+and from the strip's tile, moves a slider, Recommended, Before and After, Apply to this page changes that page only,
+Cancel changes nothing, Apply to all pages reaches all three, Reset undoes one page, and the scan still saves),
+`testPresetsBelongToEachPageAndEveryControlShowsThem` (the strip, Enhance and the Filter menu on two pages, then Reset)
+and `testPickedPagesAreChangedMovedDuplicatedAndDeletedTogether` (pick and unpick, batch filter, batch Cleanup, move a
+page to the front, duplicate two, delete three after the question and its Cancel, delete one without a question).
+The four older tests pass with them.
+
+**Runs that failed on the way, and why.** (1) The Cleanup test's first three runs on the Duo: the layout fault below.
+(2) On iPhone 17, three tests, the older `testReviewEditsSaveAndReopen` among them, could not tap Reset: **on a
+393-point iPhone the tool row is now eight tools wide** (the shell added Cleanup and Select pages to six), so Select
+pages is cut by the screen's edge and Reset and Delete start beyond it. The row scrolls and has no indicator.
+XCUITest does not scroll it by itself, so the tests now drag the row to a tool before using it (`tool(_:_:)`); a
+first version of that helper asked `isHittable` of the hidden tool, which is itself a failure, and failed the same
+three. **The row's width is a design matter left for Codex; nothing was removed from it.**
+
+**One layout fault found by a UI test.** On the 678-point-tall PaperNest iPhone Duo the Cleanup sheet's Recommended
+button lay underneath "Apply to this page" (frames read from the accessibility tree: Recommended at y 548, Apply at
+y 536 to 580), so a tap meant for Recommended applied and closed the sheet. It is in the sheet's top bar now.
+
+**Builds.** `./scripts/build-ios-sim-app.sh` and `./scripts/build-mac-app.sh` on the final source: both built, no warnings.
+
+**The commit, alone, in a clean worktree** (`HEAD` plus this slice; `Localization.swift` and the three strings
+files as `HEAD` plus the scanner keys only). `./scripts/test.sh` **1,114 passed, 0 failed, 0 warnings**
+(four fewer than the shared tree, which also has Codex's uncommitted OCR panel tests);
+`xcodebuild -scheme PaperNestUI -destination 'generic/platform=iOS Simulator' build` succeeded with no warnings. The UI
+tests were run from the shared tree, not from that worktree.
+
+**Not run, and not verified.**
+
+- **No camera and no photographed page.** Every look was judged on synthetic pages, by numbers and by eye on a
+  contact sheet. How Remove shadows, Whiten and Black & White do on real paper under real light is unknown.
+- **No device.** Nothing was installed on the iPad or an iPhone. Cost was measured only on this Mac in a debug
+  build: about 0.2 s for a 3-megapixel page with Cleanup, 0.02 s for a preset alone.
+- **French and Spanish were not looked at.** The strings exist and `LocalizationTests` passes; the layouts were
+  only ever opened in English. Accessibility text sizes were not opened either. Both are Codex's to see.
+- VoiceOver was not used. The Mac has no scanner, so nothing there changed.
+- The rest of the iOS UI suites were not run, and `scripts/ui-test-ios.sh` was not run whole: only
+  `ScannerWorkspaceUITests`, through the script's own `xcodebuild test` line. `./scripts/test.sh --sanitize=thread`
+  was not run.
+- After the last UI runs nothing in `Sources` changed. Screenshots from the runs were looked at on iPad and on
+  iPhone 17 (Cleanup sheet, strip, picked pages); they are in the runs' result bundles, not in the repository.
+
+**Not built** (design sections in brackets): Whiteboard and ID/Card capture and front/back pairing [1, 8], which
+stay marked Coming soon; the Scan settings sheet [2]; the Move closer / Hold steady / Ready labels [3]; Cleanup as
+an inline inspector on iPad [6], where it is the same sheet as on the phone; thumbnail pictures in the preset tiles
+[5], which show symbols; the destination row before Save [9]. Group move is two buttons, not a drag.
+
+**Known limit.** A filled area in a gray close to the paper's own colour reads as paper in shadow, and Remove
+shadows lightens it. A page with almost no paper in it, a photograph, is left alone by Remove shadows and Whiten.
+With Black & White the page is always evened out and taken to white, so those two sliders change nothing there;
+Sharpen text still does.
+
 ## 2026-11-15 21:39 CST — The iPad UI run on the committed editor fix: 27 passed, none failed (Claude)
 
 Closes the row left open in the entry below ("Still running when this was committed"). The same 28 tests on the same

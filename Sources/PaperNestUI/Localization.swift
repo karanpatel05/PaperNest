@@ -48,6 +48,21 @@ enum L10n {
     static var scannerCameraUnavailable: String { tr("scanner.cameraUnavailable") }
     static var scannerRetry: String { tr("scanner.retry") }
     static var scannerReview: String { tr("scanner.review") }
+    static var scannerWhiteboard: String { tr("scanner.mode.whiteboard") }
+    static var scannerCard: String { tr("scanner.mode.card") }
+    static var scannerComingSoon: String { tr("scanner.comingSoon") }
+    static var scannerPresets: String { tr("scanner.presets") }
+    static var scannerOriginal: String { tr("scanner.preset.original") }
+    static var scannerAutoPreset: String { tr("scanner.preset.auto") }
+    static var scannerEnhancedPreset: String { tr("scanner.preset.enhanced") }
+    static var scannerHighContrast: String { tr("scanner.preset.highContrast") }
+    static var scannerCleanup: String { tr("scanner.cleanup") }
+    static var scannerRemoveShadows: String { tr("scanner.cleanup.shadows") }
+    static var scannerWhitenBackground: String { tr("scanner.cleanup.whiten") }
+    static var scannerSharpenText: String { tr("scanner.cleanup.sharpen") }
+    static var scannerApplyToPage: String { tr("scanner.cleanup.applyPage") }
+    static var scannerApplyToAll: String { tr("scanner.cleanup.applyAll") }
+    static var scannerSelectPages: String { tr("scanner.selectPages") }
 
     // Approved studio redesign: workspace navigation.
     static var showPageThumbnails: String { tr("studio.showPages") }
@@ -1084,4 +1099,16 @@ extension L10n {
     static var twoPagesDetail: String { tr("display.twoPages.detail") }
     static var twoPagesCover: String { tr("display.twoPages.cover") }
     static var twoPagesCoverDetail: String { tr("display.twoPages.cover.detail") }
+}
+
+// Scan Studio functionality: presets and Cleanup that change the page, and batch page actions.
+extension L10n {
+    static var scannerBefore: String { tr("scanner.cleanup.before") }
+    static var scannerAfter: String { tr("scanner.cleanup.after") }
+    static var scannerCompare: String { tr("scanner.cleanup.compare") }
+    static var scannerRecommended: String { tr("scanner.cleanup.recommended") }
+    static var scannerApplyToSelected: String { tr("scanner.cleanup.applySelected") }
+    static func scannerSelectedCount(_ count: Int) -> String { tr("scanner.batch.selected", count) }
+    static func scannerDeletePagesTitle(_ count: Int) -> String { tr("scanner.batch.deleteTitle", count) }
+    static var scannerDeletePagesMessage: String { tr("scanner.batch.deleteMessage") }
 }

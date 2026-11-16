@@ -968,3 +968,30 @@
 "display.twoPages.detail" = "Muestra un documento con dos páginas una al lado de la otra. Una página apaisada se muestra sola.";
 "display.twoPages.cover" = "Portada sola";
 "display.twoPages.cover.detail" = "Muestra la primera página sola, para que las siguientes queden enfrentadas como en un libro impreso.";
+
+/* Vista visual de Scan Studio */
+"scanner.mode.whiteboard" = "Pizarra";
+"scanner.mode.card" = "ID / Tarjeta";
+"scanner.comingSoon" = "Próximamente";
+"scanner.presets" = "Preajustes de página";
+"scanner.preset.original" = "Original";
+"scanner.preset.auto" = "Auto";
+"scanner.preset.enhanced" = "Mejorado";
+"scanner.preset.highContrast" = "Alto contraste";
+"scanner.cleanup" = "Limpiar";
+"scanner.cleanup.shadows" = "Quitar sombras";
+"scanner.cleanup.whiten" = "Blanquear fondo";
+"scanner.cleanup.sharpen" = "Enfocar texto";
+"scanner.cleanup.applyPage" = "Aplicar a esta página";
+"scanner.cleanup.applyAll" = "Aplicar a todas las páginas";
+"scanner.selectPages" = "Seleccionar páginas";
+
+/* Funciones de Scan Studio */
+"scanner.cleanup.before" = "Antes";
+"scanner.cleanup.after" = "Después";
+"scanner.cleanup.compare" = "Comparar";
+"scanner.cleanup.recommended" = "Recomendado";
+"scanner.cleanup.applySelected" = "Aplicar a las páginas seleccionadas";
+"scanner.batch.selected" = "Seleccionadas: %d";
+"scanner.batch.deleteTitle" = "¿Eliminar %d páginas?";
+"scanner.batch.deleteMessage" = "Estas páginas se quitarán de este escaneo.";

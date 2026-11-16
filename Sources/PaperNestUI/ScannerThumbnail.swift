@@ -9,7 +9,7 @@ struct ScannerThumbnail: View {
             if let image { Image(uiImage: image).resizable().scaledToFit() }
             else { ProgressView() }
         }
-        .task(id: "\(page.id)-\(page.quarterTurns)-\(page.filter)-\(page.enhanced)-\(page.corners)") {
+        .task(id: page.drawKey) {
             let draft = page
             let data = await Task.detached(priority: .utility) {
                 draft.rendered(maxDimension: 160)?.jpegData(compressionQuality: 0.7)
