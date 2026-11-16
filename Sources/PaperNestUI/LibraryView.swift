@@ -440,6 +440,10 @@ struct LibraryView: View {
                 } actions: {
                     Button(L10n.importFiles) { model.isShowingFileImporter = true }
                         .buttonStyle(.borderedProminent)
+                    // A note made here goes in this folder (owner, 2026-11-15).
+                    Button(L10n.homeNewNote) { creatingNotebook = true }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("folder-new-note")
                 }
             case .all, .folder(nil):
                 ContentUnavailableView {
@@ -456,6 +460,20 @@ struct LibraryView: View {
                 }
             }
         }
+    }
+
+    /// Inside a folder, a new note sits beside Import, and is made in that folder.
+    private var showsFolderNewNote: Bool {
+        guard case .folder(.some) = model.scope else { return false }
+        return model.contentKind != .notes
+    }
+
+    private var folderNewNoteButton: some View {
+        Button { creatingNotebook = true } label: {
+            Label(L10n.homeNewNote, systemImage: "pencil.line")
+        }
+        .accessibilityIdentifier("library-new-note")
+        .disabled(isSelecting || isComposing)
     }
 
     @ToolbarContentBuilder
@@ -488,9 +506,13 @@ struct LibraryView: View {
                 }
                 .disabled(model.scope == .recentlyDeleted)
             }
+            if showsFolderNewNote { folderNewNoteButton }
         }
         #endif
         #if os(iOS)
+        ToolbarItem(placement: .primaryAction) {
+            if showsFolderNewNote { folderNewNoteButton }
+        }
         ToolbarItem(placement: .primaryAction) {
             if model.contentKind != .notes, model.scope != .recentlyDeleted {
                 Button { model.isShowingFileImporter = true } label: {

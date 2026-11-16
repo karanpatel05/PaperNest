@@ -94,6 +94,11 @@ public final class LibraryModel {
         if sidebarSelection == nil {
             if usesCompactNavigation { homeDocument = id }
             else { path = [id] }
+        } else if case .folder(.some) = sidebarSelection {
+            // Opened from a folder, such as a note just made in it: open over
+            // the folder, so Back returns there. Switching to All Documents
+            // first also lost the push on iPad.
+            path = [id]
         } else {
             sidebarSelection = .all
             path = [id]

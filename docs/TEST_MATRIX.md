@@ -1,3 +1,24 @@
+## 2026-11-15 — Folders offer New Note beside Import File, on iPhone, iPad and Mac (Claude, owner in session)
+
+Owner: "When created new folder, along with import file, it should have option to create new Note", then "also on
+mac". The empty-folder screen shows **New Note** next to Import… (`folder-new-note`), and a folder's toolbar has
+**New Note** next to Import (`library-new-note`) so it is still there once the folder has something in it — that
+second place is Claude's call. The note is made in the folder (`createNotebook` already used the folder showing).
+
+**Found by the first run, and fixed.** `LibraryModel.open` switched to All Documents before opening anything from a
+library scope. A note made in a folder therefore opened over All Documents on iPhone (Back did not return to the
+folder) and did not open at all on iPad (changing the selection lost the push). It now opens over the folder when
+opened from one; Favorites and the other scopes behave as before. A file imported while inside a folder now also opens
+over that folder.
+
+| Check | Result |
+|---|---|
+| New `FolderNoteUITests`, iPhone 17 / iOS 26.5, clean worktree | Failed before the `open` fix (Back went to All Documents), **passed** after: Home → New Folder → the empty folder offers New Note and Import → New Note → "Cells" opens → Back is the folder, the note is in it, New Note is in the toolbar. |
+| The same, iPad Air 11-inch (M4) / iOS 26.5 | Failed before the fix (the note did not open), **passed** after. |
+| Around it, both devices | Passed: `testPremiumFolderActionCreatesARealFolder`, `testImportDestinationCreatesFolderAndOpensDocument`, `testNotebookCreationOpensAndSurvivesRelaunch`; iPhone `testAFolderMadeInTheSidebarHoldsAMovedDocument`; iPad `testIPadSidebarKeepsTheBrandAndFoldersIsOneDestination`; `ApprovedLibraryUITests` 2/2 on each in the first run. |
+| `./scripts/test.sh`, clean worktree | **Passed: 1077 tests**, 0 failures, 0 warnings. |
+| Mac, offscreen render of `LibraryView` on an empty folder | "This Folder Is Empty" with **Import…** and **New Note** side by side. The Mac toolbar's New Note was not seen: the offscreen render draws no window toolbar. Nothing was clicked on the Mac. |
+
 ## 2026-11-15 — Word and Excel import as pages: iPhone and iPad through WebKit, Word on the Mac (Claude, owner in session)
 
 Owner: "Yes, build both" (Word and Excel), after the throwaway test in the entry below. **iPhone and iPad:**
