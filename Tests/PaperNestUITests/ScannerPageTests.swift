@@ -167,11 +167,48 @@ struct ScannerPageTests {
         #expect(abs(block.r - block.g) <= 2 && abs(block.g - block.b) <= 2, "the red block is \(block)")
     }
 
-    @Test func invalidInputCannotProduceSavedPage() {
+    @Test func invalidInputCannotProduceSavedPage() throws {
         let page = ScannerPage(original: Data([1, 2, 3]))
         #expect(page.rendered() == nil)
         #expect(page.base(maxDimension: 60) == nil)
-        #expect(ScannerPage.detectedCorners(page.original) == nil)
+        for mode in [ScanCaptureMode.document, .whiteboard, .card] {
+            let detection = try #require(mode.detection)
+            #expect(ScannerPage.detectedCorners(page.original, detection: detection) == nil, "\(mode)")
+        }
+    }
+
+    /// A still with nothing in it the mode accepts is kept whole, never dropped.
+    @Test func aStillWithNothingToCropToKeepsItsWholeFrame() throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let plain = UIGraphicsImageRenderer(size: CGSize(width: 300, height: 400), format: format).image { context in
+            UIColor.gray.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 300, height: 400))
+        }.pngData()!
+        for mode in [ScanCaptureMode.document, .whiteboard, .card] {
+            let detection = try #require(mode.detection)
+            #expect(ScannerPage.detectedCorners(plain, detection: detection) == ScannerPage.wholeFrame, "\(mode)")
+        }
+    }
+
+    /// Card mode crops a still to the card in it, by the same rule the
+    /// outline was drawn with before the shutter.
+    @Test func aCardInAStillIsCroppedToInCardMode() throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        // 900 by 1200, with a light card 342 by 216 at (300, 700): 85.6 by 54 in proportion.
+        let still = UIGraphicsImageRenderer(size: CGSize(width: 900, height: 1200), format: format).image { context in
+            UIColor(white: 0.2, alpha: 1).setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 900, height: 1200))
+            UIColor(white: 0.85, alpha: 1).setFill()
+            context.fill(CGRect(x: 300, y: 700, width: 342, height: 216))
+        }.pngData()!
+        let detection = try #require(ScanCaptureMode.card.detection)
+        let corners = try #require(ScannerPage.detectedCorners(still, detection: detection))
+        let drawn = [CGPoint(x: 300.0 / 900, y: 700.0 / 1200), CGPoint(x: 642.0 / 900, y: 700.0 / 1200),
+                     CGPoint(x: 642.0 / 900, y: 916.0 / 1200), CGPoint(x: 300.0 / 900, y: 916.0 / 1200)]
+        let worst = zip(corners, drawn).map { hypot($0.x - $1.x, $0.y - $1.y) }.max() ?? 1
+        #expect(worst < 0.03, "found \(corners)")
     }
 }
 #endif

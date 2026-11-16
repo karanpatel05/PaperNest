@@ -3,6 +3,8 @@
 import Vision
 import UIKit
 import SwiftUI
+import PaperNestCore
+import PaperNestRender
 
 /// All session mutation and frame analysis are confined to queue. Only value
 /// snapshots and encoded images cross back to the main actor.
@@ -18,6 +20,8 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
     private var intent = ScannerSessionIntent()
     private var automatic = false
     private var capturePolicy = ScannerCapturePolicy()
+    /// What the mode looks for in each frame. Nil keeps the whole frame: no outline, no automatic shutter.
+    private var detection: ScanDetection? = ScanCaptureMode.document.detection
     private var frame = 0
     private var observers: [NSObjectProtocol] = []
     @MainActor var onOutline: (@MainActor @Sendable ([CGPoint]) -> Void)?
@@ -129,6 +133,12 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
         queue.async { [self] in automatic = enabled; capturePolicy.reset() }
     }
 
+    /// A change of mode. What was held still under the last mode's rule says
+    /// nothing under this one, so the automatic shutter starts over.
+    func setDetection(_ detection: ScanDetection?) {
+        queue.async { [self] in self.detection = detection; capturePolicy.reset() }
+    }
+
     func capture() {
         queue.async { [self] in
             guard intent.wantsRunning, session.isRunning, !capturing else {
@@ -152,12 +162,13 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         frame += 1
         guard frame % 8 == 0, let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        let request = VNDetectRectanglesRequest()
-        request.maximumObservations = 1
-        request.minimumConfidence = 0.7
-        request.minimumSize = 0.2
-        try? VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up).perform([request])
-        let points = request.results?.first.map { [$0.topLeft, $0.topRight, $0.bottomRight, $0.bottomLeft].map { CGPoint(x: $0.x, y: 1 - $0.y) } } ?? []
+        var points: [CGPoint] = []
+        if let detection {
+            let request = ScanEdgeDetector.request(for: detection)
+            try? VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up).perform([request])
+            let aspect = Double(CVPixelBufferGetWidth(buffer)) / Double(max(1, CVPixelBufferGetHeight(buffer)))
+            points = ScanEdgeDetector.chosen(from: request, for: detection, imageAspect: aspect)?.corners ?? []
+        }
         Task { @MainActor [weak self] in self?.onOutline?(points) }
         if automatic, intent.wantsRunning, !capturing, capturePolicy.observe(points, at: ProcessInfo.processInfo.systemUptime) {
             Task { @MainActor [weak self] in self?.onAutoCapture?() }

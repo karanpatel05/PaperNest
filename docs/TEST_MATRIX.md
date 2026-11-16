@@ -1,3 +1,123 @@
+## 2026-11-16 — Scan Studio Phase 3: Whiteboard and ID / Card are modes that do something, and the scanner has defaults (Claude, owner in session)
+
+Owner: "Start Phase 3", after Phases 1 and 2 landed as `c42ce81`. Design: `docs/design/SCAN_FEATURES_DESIGN.md`, sections
+1, 2 and 8. How it works: `docs/ARCHITECTURE.md` → Rendering, "What the scanner looks for depends on its mode".
+
+**What works now.** The capture screen offers four modes in one pill: Document, Whiteboard, Photo, ID / Card. The two
+chips that said Coming soon are gone, with their string.
+
+- **Whiteboard** looks for the largest rectangle in view, allows corners further from square, and accepts a board much
+  wider than it is tall. The capture starts as High Contrast with its lighting evened out (Cleanup 100/60/20); Reset
+  still gives back the capture as taken.
+- **ID / Card** looks for a small rectangle of a card's proportions. A kept capture is a front, and its back is offered:
+  "Scan back" makes the next capture that front's back, placed straight after it; "Continue", or simply taking another
+  picture, leaves the front on its own. The capture screen says which side comes next, and in review each page says
+  Front or Back. The sides are two pages, edited and deleted separately.
+- **Scan settings**, in More: the mode the scanner opens in, the filter a new Document or Card capture starts with,
+  and whether the automatic shutter is on when it opens. They are three preferences, never the library, and change
+  nothing about the mode in use or the pages already scanned.
+- The live outline and the crop of the still now come from one rule (`ScanEdgeDetector`). Document mode asks the
+  detector exactly what it asked before.
+
+**Unit tests (Mac, `./scripts/test.sh`).** Shared tree: **1,150 passed, 0 failed, 0 warnings**, 32 of them new here.
+This commit alone, in a clean worktree outside iCloud, on the final source: **1,146 passed, 0 failed, 0 warnings**
+(four fewer: Codex's uncommitted OCR panel tests are not in it).
+
+- `ScanCaptureModeTests` 10, `ScanCardPairingTests` 9, `ScanSettingsTests` 4 (`PaperNestCoreTests`): a quad's area and
+  its proportions in a picture that is not square; which of several quads each mode takes; a shape outside a mode's
+  range is not taken; each mode's starting look; the front, the offer, Scan back, Continue, a second capture without
+  answering, a back deleted before it is kept, either side deleted, the mode left with a question up; stored values
+  that are missing or unknown.
+- `ScanEdgeDetectorTests` 5 (`PaperNestImportTests`), each mode's request put to the real rectangle detector on
+  scenes drawn here: a sheet on a desk is found to within 3% of the picture at every corner; Whiteboard takes the
+  whole board and not the sheet pinned to it; a board seen from the side is found; Card takes the card and not the
+  sheet of paper beside it; an empty frame gives nothing in any mode.
+- `ScanSettingsStoreTests` 4 (`PaperNestUITests`), on preferences of their own. Written after the eight lines they
+  test, so they were then shown to fail: with the stored filter ignored, two of the four fail.
+
+**What the modes change, measured.** A throwaway probe put each mode's request to each scene. A board whose short
+side is 0.47 of its long side with a sheet pinned to it: Document finds only the sheet (the board is outside the
+detector's own range of shapes), Whiteboard finds both and takes the board, Card finds nothing. A card beside a
+sheet of paper: Document and Whiteboard take the sheet, Card finds both and takes the card. A board seen from the
+side: Document finds nothing, Whiteboard finds it. The Whiteboard look was chosen by eye on a drawn board with a
+glare, a shadow and four marker colours: High Contrast alone keeps the glare and the shadow; with the lighting
+evened out the board comes out white and the colours stay.
+
+**iOS unit tests (`xcodebuild test -scheme PaperNest-Canvas`, iPhone 17, iOS 26.5).** `ScannerPageTests` **13 passed,
+0 failed**: the eleven from Phase 1, a still with nothing to crop to keeps its whole frame in every mode, and a card
+in a still is cropped to in Card mode by the simulator's own detector.
+
+**iOS UI tests (`ScannerWorkspaceUITests`, ten tests, the script's `xcodebuild test` line run directly), on the final
+source, from the clean worktree: this commit alone.**
+
+| Simulator | Result |
+|---|---|
+| **iPad Air 13-inch (M4), iOS 27.0** | **10 passed, 0 failed**, 398 s. The settings test passed again alone with its last change, 84 s. |
+| **iPhone 17, iOS 26.5** | **All 10 passed, over two runs.** The full run: 9 passed, 358 s, and the settings test failed in its own tap, because the Auto capture switch lay under the Done bar; the test now scrolls it clear. That test alone, afterwards: passed, 82 s. No product source changed between the two. |
+| **PaperNest iPhone Duo, iOS 27.1** | **9 passed, 1 failed**, 431 s. The failure is `testReviewEditsSaveAndReopen` at its first layout check (Save's top at 12 points against the 44 the test assumes), which fails the same way at `55f163e`, before any of this work. A screenshot from this run shows why: that device's status area is down its right-hand side, not across its top. The settings test passed again alone with its last change, 103 s. |
+
+The three new tests: `testWhiteboardModeFindsTheBoardAndStartsWithItsLook` (four modes offered and nothing says Coming
+soon; the same wide board is kept whole by Document and cropped to by Whiteboard, corners read from the crop tool;
+the capture starts as highContrast with Cleanup 100/60/20; Reset removes it), `testCardModeAsksForTheBackAndNamesBothSides`
+(Front, the offer, Scan back, Back, the next card, Continue, the question withdrawn on leaving the mode, five pages
+named in review with the back after its front, the crop on the card, the front deleted and the back still named) and
+`testScanSettingsDecideHowTheScannerOpensNextTime` (set, relaunched, the scanner opens in Card with Auto on and a new
+capture starts Grayscale while the page already there keeps its look; then put back and relaunched again).
+**Every other scanner test now pins the three defaults with launch arguments**, so a default left stored on a
+simulator cannot change how they open; the settings test is the one that does not, and it restores them.
+
+**Two faults the UI tests found in the settings sheet, both about a short sheet.** (1) On iPad the Auto capture switch
+could not be found: the list makes its rows as they come into view and the sheet is shorter than the list, so the
+last row does not exist until it is scrolled to. The test scrolls now; **on iPad the third setting is below the
+fold**, which is Codex's to judge. (2) On the Duo, once the list had scrolled, Done could not be found: a screenshot
+shows the sheet's top bar gone, title and Done with it. **Under iOS 27.1 on that short screen an inline navigation
+bar and everything in it disappears when the list under it scrolls.** Done is in a fixed bar at the bottom of the
+sheet now, and the test passes on all three. The Cleanup sheet keeps Cancel and Recommended in its top bar; its
+scrolling part is not the bar's own scroll view and its tests pass on the Duo, but it was not scrolled there.
+
+**Runs that failed on the way.** The settings test on iPad (1 of 10) and on the Duo (the same, with the older
+failure: 2 of 10) before fix (1); on the Duo again before fix (2); and on iPhone 17 after fix (2), where the
+switch was in the list but under the new Done bar and the test's tap landed on the bar. One `xcodebuild test` in the shared tree sat for
+twenty minutes at 0% CPU with `Config/Signing.local.xcconfig` open and was stopped: see iCloud, below.
+
+**Builds.** `./scripts/build-ios-sim-app.sh` and `./scripts/build-mac-app.sh` in the shared tree before the last change to
+the settings sheet: both built, no warnings. After it, the app was built for the Simulator from the worktree by the
+UI runs above; the shared tree was not built again, because it could not be read reliably.
+
+**What the worktree is.** `c42ce81` plus this slice, with `Localization.swift` and the three strings files as `c42ce81`
+less the Coming soon key plus this slice's block. The commit was made from it, so what was tested is what was committed.
+
+**iCloud evicted this checkout twice during the work, and that is why the last runs are from the worktree.** The disk
+was 97% full (12 to 15 GB free of 460). When work resumed after the app was quit, 571 files of the checkout were
+evicted, 159 of them inside `.git` and eight of them this slice's uncommitted files; `git status` sat for minutes in
+`read()` on an evicted test file. They were read back (92 s for code, tests and `.git`) and forty minutes later 575
+were evicted again, git's pack files among them; this time one read of an evicted source file did not return in ten
+minutes and a build froze. Nothing was lost: every file of the slice was compared byte for byte with the worktree's
+copy, which is in `~/Library/Caches` and never evicted. `brctl download` on the evicted files brought `.git` back in
+under a minute when plain reads had stalled. **Until this checkout is out of an iCloud-synced folder, kept
+downloaded, or the disk has room, any session can meet the same stall.** `ls -lO` shows `dataless` on an evicted
+file; `git -c core.trustctime=false status` avoids reading files that were only evicted.
+
+**Not run, and not verified.**
+
+- **No camera, no board, no card.** Every scene was drawn. Whether the live outline settles on a real whiteboard or a
+  real card, how the automatic shutter behaves in those modes, and what the board look does to a real board under
+  real light are all unknown. The live path (`ScannerCamera.captureOutput`) was compiled and never run: the
+  Simulator has no camera, and the UI tests deliver a still through the same code a camera still takes.
+- **No device.** Nothing was installed on the iPad or an iPhone.
+- **French and Spanish were not looked at**, nor accessibility text sizes. The mode pill is built to scroll when four
+  names do not fit, and that was not seen happening. Both are Codex's to see.
+- VoiceOver was not used. The rest of the iOS UI suites, `scripts/ui-test-ios.sh` whole and
+  `./scripts/test.sh --sanitize=thread` were not run.
+
+**Not built** (design sections in brackets): the Move closer / Hold steady / Ready labels [3]; the camera orientation
+hint [2]; the destination row before Save [9]; Cleanup as an inline inspector on iPad [6]. A card's two sides are
+two pages named Front and Back; they are not put on one sheet and they do not move or delete as one.
+
+**Known limits.** The default filter applies to Document and Card captures made with this camera, not to pictures
+imported from Photos or pages from the system scanner. In Card mode a sheet of paper alone in view is close enough
+to a card's shape to be taken. A board whose short side is under 0.3 of its long side is outside Whiteboard's range.
+
 ## 2026-11-15 — Scan Studio: presets and Cleanup change the page, and several pages can be edited together (Claude, owner in session)
 
 Owner: "Codex is designing and implementing additional scanning features, you have to implement functionality", then

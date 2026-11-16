@@ -4,37 +4,7 @@ import PaperNestCore
 
 /// Scan Studio's review controls. The preset strip and the batch bar act on
 /// the pages themselves (`ScannerPage.appearance`, `ScanPageBatch`); the
-/// Cleanup sheet is in `ScannerCleanupSheet.swift`. Only the two mode chips
-/// below are still a promise, and they say so.
-
-/// Capture modes that do not exist yet. Nothing here changes a capture.
-struct ScannerFutureModesPreview: View {
-    var body: some View {
-        HStack(spacing: 8) {
-            futureMode("square.and.pencil", title: L10n.scannerWhiteboard)
-            futureMode("creditcard", title: L10n.scannerCard)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(ScannerChrome.panel.opacity(0.82), in: Capsule())
-        .overlay { Capsule().strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(L10n.scannerComingSoon)
-    }
-
-    private func futureMode(_ symbol: String, title: String) -> some View {
-        Label(title, systemImage: symbol)
-            .font(.caption.weight(.medium))
-            .foregroundStyle(ScannerChrome.secondaryText)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(ScannerChrome.raised.opacity(0.7), in: Capsule())
-            .overlay(alignment: .topTrailing) {
-                Circle().fill(ScannerChrome.purple).frame(width: 5, height: 5).offset(x: 1, y: -1)
-            }
-            .accessibilityLabel("\(title), \(L10n.scannerComingSoon)")
-    }
-}
+/// Cleanup sheet is in `ScannerCleanupSheet.swift`.
 
 extension ScanPreset {
     var title: String {

@@ -972,7 +972,6 @@
 /* Aperçu visuel de Scan Studio */
 "scanner.mode.whiteboard" = "Tableau blanc";
 "scanner.mode.card" = "ID / Carte";
-"scanner.comingSoon" = "Bientôt disponible";
 "scanner.presets" = "Préréglages de page";
 "scanner.preset.original" = "Original";
 "scanner.preset.auto" = "Auto";
@@ -995,3 +994,16 @@
 "scanner.batch.selected" = "Sélection : %d";
 "scanner.batch.deleteTitle" = "Supprimer %d pages ?";
 "scanner.batch.deleteMessage" = "Ces pages seront retirées de cette numérisation.";
+
+/* Modes de capture de Scan Studio */
+"scanner.card.front" = "Recto";
+"scanner.card.back" = "Verso";
+"scanner.card.frontSaved" = "Recto enregistré";
+"scanner.card.backPrompt" = "Capturez le verso de la carte, ou continuez avec le recto seul.";
+"scanner.card.scanBack" = "Numériser le verso";
+"scanner.card.continue" = "Continuer";
+"scanner.settings" = "Réglages de numérisation";
+"scanner.settings.defaultMode" = "Mode par défaut";
+"scanner.settings.defaultFilter" = "Filtre par défaut";
+"scanner.settings.autoOnEntry" = "Démarrer en capture automatique";
+"scanner.settings.note" = "Le filtre par défaut s’applique aux captures Document et ID / Carte. Les pages déjà numérisées gardent leur apparence.";

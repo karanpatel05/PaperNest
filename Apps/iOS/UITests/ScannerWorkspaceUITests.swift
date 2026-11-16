@@ -2,6 +2,13 @@ import XCTest
 import UIKit
 
 @MainActor final class ScannerWorkspaceUITests: XCTestCase {
+    /// The scanner opens as its stored defaults say (Scan settings). Every test
+    /// but the one about those settings pins them, so it starts in Document
+    /// mode with no default filter and the shutter manual, whatever an
+    /// earlier run left stored on the simulator.
+    private static let standardScanDefaults = ["-scanner.defaultMode", "document", "-scanner.defaultPreset", "original",
+                                               "-scanner.autoOnEntry", "NO"]
+
     func testReviewEditsSaveAndReopen() throws {
         continueAfterFailure = false
         let fixture = URL(fileURLWithPath: "/tmp/papernest-scanner-\(UUID().uuidString).png")
@@ -18,6 +25,7 @@ import UIKit
         let base = ["-PaperNestLibraryPath", library, "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)",
                     "-AppleLocale", "en_US", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
         app.launchArguments = base + ["-PaperNestDebugScannerImages", fixture.path + ";" + fixture.path]
+        app.launchArguments += Self.standardScanDefaults
         app.launch()
         defer { app.terminate() }
         let finish = app.buttons["scanner.finish"]
@@ -107,6 +115,7 @@ import UIKit
             .waitForExistence(timeout: 15), "the saved scan is in Home's recent documents")
         app.terminate()
         app.launchArguments = base + ["-PaperNestDebugOpenItem", "Scanner workflow"]
+        app.launchArguments += Self.standardScanDefaults
         app.launch()
         // The editor's Back button says the saved scan opens; which toolbar
         // items fit beside it is the editor's business, not the scanner's.
@@ -132,6 +141,7 @@ import UIKit
         app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-scanner-export-\(UUID().uuidString)",
                                "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
                                "-PaperNestDebugScannerImages", fixture.path]
+        app.launchArguments += Self.standardScanDefaults
         app.launch()
         defer { app.terminate() }
         let finish = app.buttons["scanner.finish"]
@@ -171,6 +181,7 @@ import UIKit
         app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-scanner-photo-\(UUID().uuidString)",
                                "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
                                "-PaperNestDebugScannerImages", fixture.path, "-PaperNestDebugScannerPendingCapture", "YES"]
+        app.launchArguments += Self.standardScanDefaults
         app.launch()
         defer { app.terminate() }
         // The fixture arrives as a capture waiting for its answer. Keeping it
@@ -240,6 +251,7 @@ import UIKit
                 "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)",
                 "-PaperNestDebugScannerImages", fixture.path + ";" + fixture.path,
                 "-PaperNestDebugScannerPendingCapture", "YES"]
+            app.launchArguments += Self.standardScanDefaults
             app.launch()
             let keepButton = app.buttons["scanner.capture-keep"]
             let deleteButton = app.buttons["scanner.capture-delete"]
@@ -296,6 +308,7 @@ import UIKit
         app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-scan-studio-\(name)-\(UUID().uuidString)",
                                "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
                                "-PaperNestDebugScannerImages", Array(repeating: fixture.path, count: pageCount).joined(separator: ";")]
+        app.launchArguments += Self.standardScanDefaults
         app.launch()
         return app
     }
@@ -553,6 +566,265 @@ import UIKit
         stopPicking()
         expectPage(app, toShow: "1; Rotate 0; Filter original; Cleanup 0/0/0", "the page left is the untouched one")
         XCTAssertTrue(app.buttons["scanner.finish"].isEnabled)
+    }
+
+    // MARK: - Scan Studio: Whiteboard, ID / Card and Scan settings
+
+    /// A picture `size` with one light rectangle on a dark ground, written to a file.
+    private func fixture(_ name: String, size: CGSize, shape: CGRect) throws -> URL {
+        let url = URL(fileURLWithPath: "/tmp/papernest-scan-mode-\(name)-\(UUID().uuidString).png")
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor(white: 0.25, alpha: 1).setFill(); context.fill(CGRect(origin: .zero, size: size))
+            UIColor(white: 0.9, alpha: 1).setFill(); context.fill(shape)
+        }
+        try XCTUnwrap(image.pngData()).write(to: url)
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        return url
+    }
+
+    /// Opens the scanner with `picture` waiting for Keep or Delete; the
+    /// shutter then delivers the same picture, as a camera still would.
+    private func launchCapture(_ picture: URL, named name: String, pinningDefaults: Bool = true) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-scan-mode-\(name)-\(UUID().uuidString)",
+                               "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-PaperNestDebugScannerImages", picture.path, "-PaperNestDebugScannerPendingCapture", "YES"]
+        if pinningDefaults { app.launchArguments += Self.standardScanDefaults }
+        app.launch()
+        return app
+    }
+
+    private func keepCapture(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let keep = app.buttons["scanner.capture-keep"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 25), "the capture is shown for Keep or Delete", file: file, line: line)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: keep)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 20), .completed, file: file, line: line)
+        keep.tap()
+    }
+
+    /// A crop corner's place, as whole percentages of the capture.
+    private func corner(_ app: XCUIApplication, _ index: Int) -> (x: Int, y: Int)? {
+        let value = app.descendants(matching: .any)["scanner.corner.\(index)"].firstMatch.value as? String ?? ""
+        let parts = value.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        return parts.count == 2 ? (parts[0], parts[1]) : nil
+    }
+
+    /// Whiteboard is a mode that does something: it crops to a board that
+    /// Document mode does not find, and the capture starts with the board's
+    /// look. The chips that said Coming soon are gone.
+    func testWhiteboardModeFindsTheBoardAndStartsWithItsLook() throws {
+        continueAfterFailure = false
+        // A board much wider than it is tall, as a wall board is: 0.4 of its long side.
+        let board = try fixture("board", size: CGSize(width: 800, height: 600), shape: CGRect(x: 40, y: 156, width: 720, height: 288))
+        let app = launchCapture(board, named: "whiteboard")
+        defer { app.terminate() }
+        keepCapture(app)
+        for mode in ["document", "whiteboard", "photo", "card"] {
+            XCTAssertTrue(app.buttons["scanner.kind.\(mode)"].waitForExistence(timeout: 10), "\(mode) is offered")
+        }
+        XCTAssertEqual(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", "coming soon")).count, 0,
+                       "a mode that works is not marked Coming soon")
+        XCTAssertTrue(app.buttons["scanner.kind.document"].isSelected)
+
+        // The same picture in Document mode first: that board is not a document's shape.
+        app.buttons["scanner.shutter"].tap()
+        keepCapture(app)
+        app.buttons["scanner.kind.whiteboard"].tap()
+        XCTAssertTrue(app.buttons["scanner.kind.whiteboard"].isSelected)
+        XCTAssertTrue(app.buttons["scanner.mode"].isEnabled, "a board is a rectangle to wait for, so Auto is offered")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "scanner-four-modes"; shot.lifetime = .keepAlways; add(shot)
+        app.buttons["scanner.shutter"].tap()
+        keepCapture(app)
+
+        let review = app.buttons["scanner.review"]
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "3"), evaluatedWith: review)], timeout: 20)
+        review.tap()
+        expectPage(app, toShow: "3; Rotate 0; Filter highContrast; Cleanup 100/60/20", "a board capture starts with the board's look")
+        tool(app, "crop").tap()
+        XCTAssertTrue(app.descendants(matching: .any)["scanner.corner.0"].firstMatch.waitForExistence(timeout: 10))
+        let topLeft = try XCTUnwrap(corner(app, 0)), bottomRight = try XCTUnwrap(corner(app, 2))
+        XCTAssertTrue(abs(topLeft.x - 5) <= 3 && abs(topLeft.y - 26) <= 3, "Whiteboard crops to the board, got \(topLeft)")
+        XCTAssertTrue(abs(bottomRight.x - 95) <= 3 && abs(bottomRight.y - 74) <= 3, "Whiteboard crops to the board, got \(bottomRight)")
+        tool(app, "crop").tap()
+
+        app.buttons["scanner.page.1"].tap()
+        expectPage(app, toShow: "2; Rotate 0; Filter original; Cleanup 0/0/0", "a document capture has no look of its own")
+        tool(app, "crop").tap()
+        XCTAssertTrue(app.descendants(matching: .any)["scanner.corner.0"].firstMatch.waitForExistence(timeout: 10))
+        let whole = try XCTUnwrap(corner(app, 0)), wholeEnd = try XCTUnwrap(corner(app, 2))
+        XCTAssertTrue(whole == (0, 0) && wholeEnd == (100, 100), "Document mode does not take that board, got \(whole) to \(wholeEnd)")
+        tool(app, "crop").tap()
+
+        // The look is a starting point: Reset still gives back the capture as taken.
+        app.buttons["scanner.page.2"].tap()
+        tool(app, "arrow.counterclockwise").tap()
+        expectPage(app, toShow: "3; Rotate 0; Filter original; Cleanup 0/0/0", "Reset removes the board's look")
+    }
+
+    /// A card is two captures: the front, then a question, then the back if
+    /// asked for. The two stay separate pages that say which side they are.
+    func testCardModeAsksForTheBackAndNamesBothSides() throws {
+        continueAfterFailure = false
+        // 85.6 by 54 in proportion: 300 by 189, a quarter of the way in.
+        let card = try fixture("card", size: CGSize(width: 600, height: 800), shape: CGRect(x: 150, y: 320, width: 300, height: 189))
+        let app = launchCapture(card, named: "card")
+        defer { app.terminate() }
+        keepCapture(app)
+        let side = app.staticTexts["scanner.card.side"]
+        let scanBack = app.buttons["scanner.card.scan-back"], carryOn = app.buttons["scanner.card.continue"]
+        XCTAssertTrue(app.buttons["scanner.kind.card"].waitForExistence(timeout: 10))
+        XCTAssertFalse(side.exists, "sides are a card's; a document has none")
+        app.buttons["scanner.kind.card"].tap()
+        XCTAssertTrue(side.waitForExistence(timeout: 5))
+        XCTAssertEqual(side.label, "Front")
+
+        app.buttons["scanner.shutter"].tap()
+        keepCapture(app)
+        XCTAssertTrue(scanBack.waitForExistence(timeout: 10), "keeping a front asks about its back")
+        XCTAssertTrue(app.staticTexts["Front saved"].exists)
+        XCTAssertEqual(side.label, "Front", "nothing is a back until it is asked for")
+        let asked = XCTAttachment(screenshot: app.screenshot())
+        asked.name = "scanner-card-back-offer"; asked.lifetime = .keepAlways; add(asked)
+        scanBack.tap()
+        XCTAssertTrue(scanBack.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(side.label, "Back")
+
+        app.buttons["scanner.shutter"].tap()
+        keepCapture(app)
+        XCTAssertTrue(side.waitForExistence(timeout: 10))
+        XCTAssertEqual(side.label, "Front", "the card is complete; the next capture starts another")
+        XCTAssertFalse(scanBack.exists, "a back is not asked about")
+
+        // A second card, front only.
+        app.buttons["scanner.shutter"].tap()
+        keepCapture(app)
+        XCTAssertTrue(carryOn.waitForExistence(timeout: 10))
+        carryOn.tap()
+        XCTAssertTrue(carryOn.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(side.label, "Front")
+
+        // A third, and the mode is left with the question still up.
+        app.buttons["scanner.shutter"].tap()
+        keepCapture(app)
+        XCTAssertTrue(scanBack.waitForExistence(timeout: 10))
+        app.buttons["scanner.kind.document"].tap()
+        XCTAssertTrue(scanBack.waitForNonExistence(timeout: 5), "leaving Card mode withdraws the question")
+        XCTAssertFalse(side.exists)
+
+        let review = app.buttons["scanner.review"]
+        XCTAssertEqual(review.value as? String, "5")
+        review.tap()
+        func page(_ index: Int) -> XCUIElement { app.buttons["scanner.page.\(index)"] }
+        XCTAssertTrue(page(4).waitForExistence(timeout: 10))
+        XCTAssertEqual(page(0).label, "Review scan 1", "the page kept before Card mode is not a side")
+        XCTAssertEqual(page(1).label, "Review scan 2, Front")
+        XCTAssertEqual(page(2).label, "Review scan 3, Back", "the back follows its front")
+        XCTAssertEqual(page(3).label, "Review scan 4, Front")
+        XCTAssertEqual(page(4).label, "Review scan 5, Front")
+        let sides = XCTAttachment(screenshot: app.screenshot())
+        sides.name = "scanner-card-sides"; sides.lifetime = .keepAlways; add(sides)
+
+        // Card mode cropped to the card, not to the frame.
+        page(1).tap()
+        tool(app, "crop").tap()
+        XCTAssertTrue(app.descendants(matching: .any)["scanner.corner.0"].firstMatch.waitForExistence(timeout: 10))
+        let topLeft = try XCTUnwrap(corner(app, 0)), bottomRight = try XCTUnwrap(corner(app, 2))
+        XCTAssertTrue(abs(topLeft.x - 25) <= 3 && abs(topLeft.y - 40) <= 3, "Card mode crops to the card, got \(topLeft)")
+        XCTAssertTrue(abs(bottomRight.x - 75) <= 3 && abs(bottomRight.y - 63) <= 3, "Card mode crops to the card, got \(bottomRight)")
+        tool(app, "crop").tap()
+
+        // Each side is its own page: deleting the front leaves the back, still named.
+        tool(app, "trash").tap()
+        XCTAssertTrue(page(4).waitForNonExistence(timeout: 10))
+        XCTAssertEqual(page(1).label, "Review scan 2, Back")
+        XCTAssertEqual(page(2).label, "Review scan 3, Front")
+    }
+
+    /// Scan settings are defaults: they decide how the scanner opens next
+    /// time and what a new capture starts with, and nothing about now.
+    /// This test is the one that does not pin them, and puts them back.
+    func testScanSettingsDecideHowTheScannerOpensNextTime() throws {
+        continueAfterFailure = false
+        let card = try fixture("settings", size: CGSize(width: 600, height: 800), shape: CGRect(x: 150, y: 320, width: 300, height: 189))
+        var app = launchCapture(card, named: "settings", pinningDefaults: false)
+        defer { app.terminate() }
+        func openSettings() {
+            app.buttons["scanner.more"].tap()
+            let item = app.buttons["Scan settings"]
+            XCTAssertTrue(item.waitForExistence(timeout: 5), "Scan settings is in More")
+            item.tap()
+            XCTAssertTrue(app.buttons["scanner.settings.done"].waitForExistence(timeout: 10))
+        }
+        func choose(mode: String, preset: String, automatic: Bool) {
+            app.buttons["scanner.settings.mode.\(mode)"].tap()
+            app.buttons["scanner.settings.preset.\(preset)"].tap()
+            XCTAssertEqual(app.buttons["scanner.settings.mode.\(mode)"].value as? String, "Selected")
+            XCTAssertEqual(app.buttons["scanner.settings.preset.\(preset)"].value as? String, "Selected")
+            // The list makes its rows as they come into view, so on a sheet
+            // shorter than the list the last row does not exist until it is
+            // scrolled to, and then it can still be lying under Done, which
+            // stays put below the list. Scroll until it is clear of Done.
+            let toggle = app.switches["scanner.settings.auto"]
+            let done = app.buttons["scanner.settings.done"]
+            for _ in 0..<3 where !toggle.exists || toggle.frame.maxY > done.frame.minY - 8 { app.swipeUp() }
+            XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Auto capture switch is in the list")
+            XCTAssertLessThanOrEqual(toggle.frame.maxY, done.frame.minY, "the last setting scrolls clear of Done")
+            if (toggle.value as? String == "1") != automatic {
+                // The switch itself, at the row's trailing edge; the row's middle is its name.
+                toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+            }
+            XCTAssertEqual(toggle.value as? String, automatic ? "1" : "0")
+            app.buttons["scanner.settings.done"].tap()
+            XCTAssertTrue(app.buttons["scanner.settings.done"].waitForNonExistence(timeout: 10))
+        }
+        func relaunch() {
+            app.terminate()
+            app = launchCapture(card, named: "settings", pinningDefaults: false)
+            keepCapture(app)
+            XCTAssertTrue(app.buttons["scanner.kind.document"].waitForExistence(timeout: 10))
+        }
+
+        // Whatever an earlier run left: start from the standard defaults.
+        keepCapture(app)
+        XCTAssertTrue(app.buttons["scanner.more"].waitForExistence(timeout: 10))
+        openSettings()
+        choose(mode: "document", preset: "original", automatic: false)
+        relaunch()
+        XCTAssertTrue(app.buttons["scanner.kind.document"].isSelected)
+        XCTAssertEqual(app.buttons["scanner.mode"].value as? String, "Off")
+
+        openSettings()
+        XCTAssertEqual(app.buttons["scanner.settings.mode.document"].value as? String, "Selected", "the sheet shows what is stored")
+        XCTAssertEqual(app.buttons["scanner.settings.mode.card"].value as? String, "Not selected")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "scanner-settings"; shot.lifetime = .keepAlways; add(shot)
+        choose(mode: "card", preset: "grayscale", automatic: true)
+        XCTAssertTrue(app.buttons["scanner.kind.document"].isSelected, "a default is for next time; the mode in use stays")
+        XCTAssertEqual(app.buttons["scanner.mode"].value as? String, "Off")
+
+        relaunch()
+        XCTAssertTrue(app.buttons["scanner.kind.card"].isSelected, "the scanner opens in the default mode")
+        XCTAssertEqual(app.buttons["scanner.mode"].value as? String, "On", "and with the automatic shutter on")
+        app.buttons["scanner.shutter"].tap()
+        keepCapture(app)
+        XCTAssertTrue(app.buttons["scanner.card.continue"].waitForExistence(timeout: 10))
+        app.buttons["scanner.card.continue"].tap()
+        app.buttons["scanner.review"].tap()
+        expectPage(app, toShow: "2; Rotate 0; Filter grayscale; Cleanup 0/0/0", "a new capture starts with the default filter")
+        app.buttons["scanner.page.0"].tap()
+        expectPage(app, toShow: "1; Rotate 0; Filter original", "a page that was already there keeps its look")
+
+        // Back as they were.
+        app.buttons["scanner.add-page"].tap()
+        XCTAssertTrue(app.buttons["scanner.more"].waitForExistence(timeout: 10))
+        openSettings()
+        choose(mode: "document", preset: "original", automatic: false)
+        relaunch()
+        XCTAssertTrue(app.buttons["scanner.kind.document"].isSelected, "the defaults are back to standard")
+        XCTAssertEqual(app.buttons["scanner.mode"].value as? String, "Off")
     }
 
 }

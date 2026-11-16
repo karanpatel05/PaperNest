@@ -11,7 +11,8 @@ struct ScannerWorkspaceView: View {
     @State private var camera = ScannerCamera()
     @FocusState private var naming: Bool
     @State private var name = L10n.scanName(Date().formatted(date: .abbreviated, time: .shortened))
-    @State private var automatic = false
+    /// The automatic shutter: on from the start when the scanner's defaults say so.
+    @State private var automatic = ScanSettingsStore.load().automaticOnEntry
     @State private var previewImage: UIImage?
     @State private var ready = false
     @State private var hasTorch = false
@@ -30,7 +31,13 @@ struct ScannerWorkspaceView: View {
     @State private var completed = false
     @State private var photoPickerPresented = false
     @State private var photoItems: [PhotosPickerItem] = []
-    @State private var kind = ScanKind.document
+    /// The scanner's defaults. The mode it opens in comes from them; after
+    /// that the mode is whatever the person picks.
+    @State private var settings = ScanSettingsStore.load()
+    @State private var settingsPresented = false
+    @State private var kind = ScanSettingsStore.load().mode
+    /// Which side of a card each capture is, in ID / Card mode.
+    @State private var cards = ScanCardPairing<UUID>()
     /// The Cleanup sheet, for the page being shown or for the pages picked.
     @State private var cleanupRequest: CleanupRequest?
     /// Picking several pages in the filmstrip, and which are picked.
@@ -58,6 +65,10 @@ struct ScannerWorkspaceView: View {
                 ready = available; hasTorch = flash
                 if !available { torch = false }
             }
+            // The camera starts out looking for a document with the shutter
+            // manual; tell it what this scanner opened as.
+            camera.setDetection(kind.detection)
+            camera.setAutomatic(automatic)
             camera.onAutoCapture = {
                 guard captureReview.pending == nil, !native, !reviewing, !photoPickerPresented, !completed else { return }
                 busy = true
@@ -103,7 +114,11 @@ struct ScannerWorkspaceView: View {
         .onChange(of: automatic) { _, value in camera.setAutomatic(value) }
         // A photo has no sheet to wait for, so there is nothing to trigger an
         // automatic exposure.
-        .onChange(of: kind) { _, value in if !value.findsEdges { automatic = false } }
+        .onChange(of: kind) { _, value in
+            if !value.findsEdges { automatic = false }
+            camera.setDetection(value.detection)
+            if !value.pairsSides { cards.cancelPending() }
+        }
         .onChange(of: reviewing) { _, value in
             if !value { endSelection() }
             if value { stopCamera(); torch = false } else if canRunCamera { camera.start() }
@@ -216,8 +231,14 @@ struct ScannerWorkspaceView: View {
         guard captureReview.pending != nil else { return }
         captureGeneration = UUID()
         if keep, let page = captureReview.keep() {
-            pages.append(page)
-            selected = pages.count - 1
+            // A card's back goes straight after its front, wherever that is by now.
+            if kind.pairsSides, let front = cards.keep(page.id).front, let index = pages.firstIndex(where: { $0.id == front }) {
+                pages.insert(page, at: index + 1)
+                selected = index + 1
+            } else {
+                pages.append(page)
+                selected = pages.count - 1
+            }
         } else { captureReview.discard() }
         pendingPreview = nil
         if canRunCamera && scenePhase == .active { camera.start(waitForNextSheet: keep) }
@@ -248,6 +269,9 @@ struct ScannerWorkspaceView: View {
                                 captureGeneration = UUID(); stopCamera(); native = true
                             } label: { Label(L10n.scannerNative, systemImage: "doc.viewfinder") }
                         }
+                        Button { settingsPresented = true } label: {
+                            Label(L10n.scannerSettings, systemImage: "gearshape")
+                        }
                     } label: { Image(systemName: "ellipsis.circle").font(.title3).frame(width: 44, height: 44) }
                     .accessibilityLabel(L10n.more).disabled(busy)
                     .accessibilityIdentifier("scanner.more")
@@ -260,8 +284,9 @@ struct ScannerWorkspaceView: View {
                         Button(L10n.scannerRetry) { camera.start() }.buttonStyle(.bordered).disabled(busy)
                     }.padding().background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 16)).padding()
                 }
-                ScannerKindSelector(kind: $kind).disabled(busy).padding(.bottom, 12)
-                ScannerFutureModesPreview().padding(.bottom, 4)
+                if kind.pairsSides, cards.offer != nil { cardBackOffer.padding(.horizontal).padding(.bottom, 10) }
+                ScannerKindSelector(kind: $kind).disabled(busy).padding(.horizontal, 8).padding(.bottom, 12)
+                if kind.pairsSides { cardSideLabel.padding(.bottom, 6) }
                 HStack(spacing: 16) {
                     reviewStackButton
                     Spacer(minLength: 0)
@@ -284,6 +309,46 @@ struct ScannerWorkspaceView: View {
                 .background(.black.opacity(0.85), in: UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24))
             }.foregroundStyle(.white)
         }
+        .sheet(isPresented: $settingsPresented) { ScannerSettingsSheet(settings: $settings) }
+        .onChange(of: settings) { _, value in ScanSettingsStore.save(value) }
+    }
+
+    /// Which side of the card the next capture will be.
+    private var cardSideLabel: some View {
+        let side = cards.nextSide == .front ? L10n.scannerCardFront : L10n.scannerCardBack
+        return Text(side).font(.footnote.weight(.semibold))
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background(ScannerChrome.raised, in: Capsule())
+            .accessibilityIdentifier("scanner.card.side")
+    }
+
+    /// Asked once a card's front is kept. Taking another picture instead of
+    /// answering starts another card.
+    private var cardBackOffer: some View {
+        VStack(spacing: 10) {
+            Text(L10n.scannerCardFrontSaved).font(.subheadline.weight(.semibold))
+            Text(L10n.scannerCardBackPrompt).font(.footnote).multilineTextAlignment(.center)
+                .foregroundStyle(ScannerChrome.secondaryText)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { cardBackOfferButtons }
+                VStack(spacing: 8) { cardBackOfferButtons }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: 420)
+        .background(ScannerChrome.panel.opacity(0.95), in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("scanner.card.offer")
+    }
+
+    @ViewBuilder private var cardBackOfferButtons: some View {
+        Button { cards.scanBack() } label: { Text(L10n.scannerCardScanBack).frame(minWidth: 110, minHeight: 36) }
+            .buttonStyle(.borderedProminent).tint(ScannerChrome.purple)
+            .accessibilityIdentifier("scanner.card.scan-back")
+        Button { cards.continueWithFrontOnly() } label: { Text(L10n.scannerCardContinue).frame(minWidth: 110, minHeight: 36) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("scanner.card.continue")
     }
 
     /// The pages kept so far: the latest one with a count, and the way into review.
@@ -496,7 +561,7 @@ struct ScannerWorkspaceView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("scanner.page.\(index)")
-            .accessibilityLabel(L10n.scannerReview + " " + String(index + 1))
+            .accessibilityLabel(pageLabel(page, number: index + 1))
             .accessibilityValue(selecting ? (marked ? L10n.selectionOn : L10n.selectionOff) : "")
             .accessibilityAddTraits(marked ? [.isSelected] : [])
             .contextMenu {
@@ -516,10 +581,28 @@ struct ScannerWorkspaceView: View {
             ScannerThumbnail(page: page).frame(width: 56, height: 70)
                 .overlay(alignment: .topTrailing) { if selecting { pickMark(marked) } }
             Text(verbatim: String(number)).font(.caption.monospacedDigit())
+            // A card's two sides are two pages; this is what says they belong together.
+            if let side = sideName(of: page) { Text(side).font(.caption2).foregroundStyle(ScannerChrome.secondaryText) }
         }
         .padding(5)
         .background(fill, in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(outline, lineWidth: marked ? 2 : 1))
+    }
+
+    /// What a page in the filmstrip is called: its number, and its side when it is a card's.
+    private func pageLabel(_ page: ScannerPage, number: Int) -> String {
+        let name: String = L10n.scannerReview + " " + String(number)
+        guard let side = sideName(of: page) else { return name }
+        return name + ", " + side
+    }
+
+    /// "Front" or "Back" for a page scanned as a card's side.
+    private func sideName(of page: ScannerPage) -> String? {
+        switch cards.side(of: page.id) {
+        case .front: L10n.scannerCardFront
+        case .back: L10n.scannerCardBack
+        case nil: nil
+        }
     }
 
     private func pickMark(_ marked: Bool) -> some View {
@@ -681,6 +764,7 @@ struct ScannerWorkspaceView: View {
     private func deleteSelection() {
         let result = ScanPageBatch.delete(selection, from: pages, focus: selected)
         pages = result.pages; selected = result.focus
+        cards.forget(selection)
         selection.removeAll()
         if pages.isEmpty { reviewing = false }
     }
@@ -696,6 +780,7 @@ struct ScannerWorkspaceView: View {
 
     private var deleteTool: some View {
         reviewTool("trash", label: L10n.delete) {
+            cards.forget([pages[selected].id])
             pages.remove(at: selected); selected = max(0, min(selected, pages.count - 1))
             if pages.isEmpty { reviewing = false }
         }
@@ -731,10 +816,13 @@ struct ScannerWorkspaceView: View {
     private func appendCapture(_ data: Data, generation: UUID) async {
         // A document is cropped to the edges found in it. A photo keeps the
         // whole frame, so it only has to be an image that decodes.
-        let findsEdges = kind.findsEdges
-        let corners = await Task.detached(priority: .userInitiated) {
-            findsEdges ? ScannerPage.detectedCorners(data)
-                       : (UIImage(data: data) == nil ? nil : ScannerPage(original: data).corners)
+        // What is looked for, and the look the page starts with, are the
+        // mode's as it was when the shutter was pressed.
+        let detection = kind.detection
+        let look = kind.startingAppearance(defaultPreset: settings.preset)
+        let corners = await Task.detached(priority: .userInitiated) { () -> [CGPoint]? in
+            if let detection { return ScannerPage.detectedCorners(data, detection: detection) }
+            return UIImage(data: data) == nil ? nil : ScannerPage.wholeFrame
         }.value
         guard !completed, !native, !reviewing, generation == captureGeneration else { return }
         guard let corners else {
@@ -744,7 +832,7 @@ struct ScannerWorkspaceView: View {
         }
         // On iPhone as on iPad, a capture is not kept until the person says
         // so: it is staged, shown, and joins the queue only on Keep.
-        _ = captureReview.stage(ScannerPage(original: data, corners: corners))
+        _ = captureReview.stage(ScannerPage(original: data, appearance: look, corners: corners))
         busy = false
     }
 

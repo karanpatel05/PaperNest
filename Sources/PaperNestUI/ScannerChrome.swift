@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import PaperNestCore
 
 /// The scanner's own dark surface. These are fixed, not adaptive: capture and
 /// review stay dark in both appearances, like a camera.
@@ -13,36 +14,40 @@ enum ScannerChrome {
     static let secondaryText = Color.white.opacity(0.70)
 }
 
-/// What the camera is pointed at.
-///
-/// Only modes that change what the scanner does are here. A document has its
-/// edges found, outlined and cropped to; a photo keeps the whole frame.
-enum ScanKind: String, CaseIterable, Identifiable {
-    case document, photo
-
-    var id: String { rawValue }
-
+extension ScanCaptureMode {
     var title: String {
         switch self {
         case .document: L10n.scannerKindDocument
+        case .whiteboard: L10n.scannerWhiteboard
         case .photo: L10n.scannerKindPhoto
+        case .card: L10n.scannerCard
         }
     }
-
-    /// Whether edges are detected, drawn over the preview and cropped to.
-    var findsEdges: Bool { self == .document }
 }
 
-/// The capture screen's mode picker.
+/// The capture screen's mode picker: one pill, every mode in it. Where the
+/// names do not fit across the screen, in French or at a large text size,
+/// the pill scrolls instead of squeezing them.
 struct ScannerKindSelector: View {
-    @Binding var kind: ScanKind
+    @Binding var kind: ScanCaptureMode
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            modes
+            ScrollView(.horizontal, showsIndicators: false) { modes }
+        }
+        .background(.black.opacity(0.6), in: Capsule())
+        .foregroundStyle(.white)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L10n.scannerKind)
+    }
+
+    private var modes: some View {
         HStack(spacing: 4) {
-            ForEach(ScanKind.allCases) { option in
+            ForEach(ScanCaptureMode.allCases, id: \.self) { option in
                 Button { kind = option } label: {
-                    Text(option.title).font(.footnote.weight(.semibold))
-                        .padding(.horizontal, 16).frame(minHeight: 44)
+                    Text(option.title).font(.footnote.weight(.semibold)).lineLimit(1)
+                        .padding(.horizontal, 10).frame(minHeight: 44)
                         .background(kind == option ? ScannerChrome.purple : .clear, in: Capsule())
                         .contentShape(Capsule())
                 }
@@ -52,10 +57,6 @@ struct ScannerKindSelector: View {
             }
         }
         .padding(4)
-        .background(.black.opacity(0.6), in: Capsule())
-        .foregroundStyle(.white)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(L10n.scannerKind)
     }
 }
 

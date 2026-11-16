@@ -2,7 +2,6 @@
 import UIKit
 import CoreImage
 import CoreImage.CIFilterBuiltins
-import Vision
 import PaperNestCore
 import PaperNestRender
 
@@ -93,15 +92,11 @@ struct ScannerPage: Identifiable, Sendable {
     }
 
     /// Detection only: preserve raw still bytes so crop/reset can recover edges.
-    static func detectedCorners(_ data: Data) -> [CGPoint]? {
+    /// The whole frame when nothing the mode accepts is found; nil only for
+    /// bytes that are not a picture.
+    static func detectedCorners(_ data: Data, detection: ScanDetection) -> [CGPoint]? {
         guard let source = CIImage(data: data, options: [.applyOrientationProperty: true]) else { return nil }
-        let request = VNDetectRectanglesRequest()
-        request.maximumObservations = 1
-        request.minimumConfidence = 0.7
-        request.minimumSize = 0.2
-        try? VNImageRequestHandler(ciImage: source, orientation: .up).perform([request])
-        guard let rectangle = request.results?.first else { return ScannerPage(original: data).corners }
-        return [rectangle.topLeft, rectangle.topRight, rectangle.bottomRight, rectangle.bottomLeft].map { CGPoint(x: $0.x, y: 1 - $0.y) }
+        return ScanEdgeDetector.detect(detection, in: source)?.corners ?? wholeFrame
     }
 }
 #endif

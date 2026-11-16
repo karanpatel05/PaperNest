@@ -50,7 +50,6 @@ enum L10n {
     static var scannerReview: String { tr("scanner.review") }
     static var scannerWhiteboard: String { tr("scanner.mode.whiteboard") }
     static var scannerCard: String { tr("scanner.mode.card") }
-    static var scannerComingSoon: String { tr("scanner.comingSoon") }
     static var scannerPresets: String { tr("scanner.presets") }
     static var scannerOriginal: String { tr("scanner.preset.original") }
     static var scannerAutoPreset: String { tr("scanner.preset.auto") }
@@ -1111,4 +1110,19 @@ extension L10n {
     static func scannerSelectedCount(_ count: Int) -> String { tr("scanner.batch.selected", count) }
     static func scannerDeletePagesTitle(_ count: Int) -> String { tr("scanner.batch.deleteTitle", count) }
     static var scannerDeletePagesMessage: String { tr("scanner.batch.deleteMessage") }
+}
+
+// Scan Studio capture modes: a card's two sides, and the scanner's defaults.
+extension L10n {
+    static var scannerCardFront: String { tr("scanner.card.front") }
+    static var scannerCardBack: String { tr("scanner.card.back") }
+    static var scannerCardFrontSaved: String { tr("scanner.card.frontSaved") }
+    static var scannerCardBackPrompt: String { tr("scanner.card.backPrompt") }
+    static var scannerCardScanBack: String { tr("scanner.card.scanBack") }
+    static var scannerCardContinue: String { tr("scanner.card.continue") }
+    static var scannerSettings: String { tr("scanner.settings") }
+    static var scannerSettingsDefaultMode: String { tr("scanner.settings.defaultMode") }
+    static var scannerSettingsDefaultFilter: String { tr("scanner.settings.defaultFilter") }
+    static var scannerSettingsAutoOnEntry: String { tr("scanner.settings.autoOnEntry") }
+    static var scannerSettingsNote: String { tr("scanner.settings.note") }
 }

@@ -972,7 +972,6 @@
 /* Scan Studio visual preview */
 "scanner.mode.whiteboard" = "Whiteboard";
 "scanner.mode.card" = "ID / Card";
-"scanner.comingSoon" = "Coming soon";
 "scanner.presets" = "Page presets";
 "scanner.preset.original" = "Original";
 "scanner.preset.auto" = "Auto";
@@ -995,3 +994,16 @@
 "scanner.batch.selected" = "Selected: %d";
 "scanner.batch.deleteTitle" = "Delete %d pages?";
 "scanner.batch.deleteMessage" = "These pages will be removed from this scan.";
+
+/* Scan Studio capture modes */
+"scanner.card.front" = "Front";
+"scanner.card.back" = "Back";
+"scanner.card.frontSaved" = "Front saved";
+"scanner.card.backPrompt" = "Capture the back of the card, or continue with the front only.";
+"scanner.card.scanBack" = "Scan back";
+"scanner.card.continue" = "Continue";
+"scanner.settings" = "Scan settings";
+"scanner.settings.defaultMode" = "Default mode";
+"scanner.settings.defaultFilter" = "Default filter";
+"scanner.settings.autoOnEntry" = "Start with Auto capture";
+"scanner.settings.note" = "The default filter is used for Document and ID / Card captures. Pages already scanned keep their look.";
