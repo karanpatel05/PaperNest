@@ -1,3 +1,23 @@
+## 2026-11-16 16:29 CST — Whole-commit check of `6a09a67` after Codex committed its UI work (Claude)
+
+Owner: "codex has committed everything". Checked `6a09a67` (Codex's OCR, document tools and Home commit on top of
+`bb2a3d0`) in a clean detached worktree outside iCloud. The working tree was clean, so this is everything committed
+and nothing else.
+
+- `./scripts/test.sh`: **1,152 passed, 0 failed, 0 warnings** (1,148 at `bb2a3d0`, plus Codex's four
+  `OCRPanelTests`). `PrivacyManifestTests` passes, so nothing in the new UI code calls an undeclared required-reason API.
+- `xcodebuild` `PaperNest-iOS` (generic iOS Simulator) and `PaperNest-macOS`, `CODE_SIGNING_ALLOWED=NO`: **both
+  succeeded, 0 warnings.**
+
+**Not run:** no iOS UI tests (XCUITest), no simulator or device interaction, no Mac interaction, no signed or archived
+build. Still open from Codex's own records: the native color picker does not open on iPad iOS 27, and the iPhone
+French XXXL scanner-settings run was blocked by the simulator. Not addressed by this commit: on a 393-point iPhone the
+scanner's page-tool row runs past the screen, and `testReviewEditsSaveAndReopen` fails on the iPhone Duo.
+
+The commit also adds three screenshots from the owner's Desktop that are not referenced anywhere: one in the
+repository root and two in a folder named `changes ` (with a trailing space). `origin` is public, and the branch is
+not pushed.
+
 ## 2026-11-16 — Privacy manifest declares system boot time; a test keeps it complete (Claude, owner in session)
 Found while answering the owner's "is PaperNest ready to deploy?": `ProcessInfo.systemUptime` is called in
 `ScannerCamera.swift` (how long the outline has held still before the automatic shutter fires) and in
