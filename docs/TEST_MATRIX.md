@@ -1,3 +1,60 @@
+## 2026-11-15 — A document opens on a real iPad again: the editor's body no longer needs most of a megabyte of stack (Claude, owner in session)
+
+Owner: "APP crashes on Ipad and home srcreen of ipad comes in". Seventeen PaperNest crash reports on the owner's
+iPad Pro 12.9-inch (6th generation), iPadOS 27.0.1, between 18:18 and 19:56, read off the device with `devicectl`
+(PaperNest's reports only; the real library was not read). Sixteen are crashes; six of them were copied and read,
+from each batch, and are one signature:
+`EXC_BAD_ACCESS / KERN_PROTECTION_FAILURE` in the main thread's stack guard, in `swift_getTypeByMangledName` called
+from `DocumentView.body.getter`. The app reopens the last document at launch, so it died one to four seconds after
+each launch and could not be used at all.
+
+**Cause, measured.** `DocumentView.body` was one chain of some seventy-five modifiers. Each modifier's result holds
+everything chained before it, and a debug build keeps every one of them on the stack until the function returns:
+under lldb the frame of `body.getter` alone was **885,408 bytes**. A device's main thread has **1008 KB** (the crash
+report's own region list); the Simulator and the Mac gave 8 MB, so it never failed anywhere but on the device. Ten
+modifiers were added between 2026-11-13 and 2026-11-15 and four more in the uncommitted panel work; the first device
+run after that was the first crash. The type-decoding recursion at the top of the crash stack is the last straw and
+not the cause (74 frames, 79 KB).
+
+**Fix.** The chain is split into seven functions that `body` applies in order (`bars`, `toolsPanel`, `lifecycle`,
+`exportAndPictures`, `toolSheets`, `pageSources`, `readerServices`), each `@inline(never)`. The view built is the
+same value of the same type, evaluated in the one `body`; only the stack changes. `project.yml` now links Simulator
+builds with a device's stack (`-stack_size 0xFC000`, and no debug dylib there, since the linker only takes a stack
+size for a main executable), so a UI test that opens a screen needing more stack than a device has now crashes in
+the Simulator too. `CLAUDE.md` has the convention. No schema, store or model change.
+
+**A first attempt was wrong, and is not what is committed.** Moving the seven runs into `ViewModifier`s cut the
+stack further (the editor opened with 384 KB) and passed 26 of 27 iPad UI tests, but
+`NightModeUITests.testInkDrawnAtNightShowsLightAndIsSavedInTheColourChosen` failed twice on it and passed on the
+pre-fix code on the same simulator. The screen recording shows why: the stroke is light under the finger, gone the
+moment the finger lifts, and back only when drawing is switched off. Each modifier re-evaluated on its own, where
+the editor had always re-evaluated whole, and the live ink relies on that. **That build was on the owner's iPad from
+20:12 to 21:06**; the owner reported "it opens now on ipad" on it. The committed version replaced it at 21:06.
+
+| Check | Result |
+|---|---|
+| Crash reports from the iPad | 17 today, 18:18–19:56. Six of the sixteen crashes read, one signature (above); the other ten were not opened. None after the 20:12 install. The seventeenth (19:36) and two older ones (11 and 12 November) are scene-update watchdog kills with an idle main thread: a different matter, not looked into. |
+| The crash, off the device: the tree as it was, Simulator build, main-thread stack set to the iPad's 1008 KB (`LC_MAIN`), launched into a seeded throwaway library with `-PaperNestDebugOpenItem` — iPad Air 13-inch (M4), iOS 27.0 | **Crashed** inside 4 s, SIGSEGV. Under lldb: `EXC_BAD_ACCESS` code 2 on the main thread, `DocumentView.body.getter` → `__swift_instantiateConcreteTypeFromMangledNameV2`, 188 frames (the iPad's reports: 180–185). The same build with the Simulator's default stack stayed up (control). |
+| The same launch with the fix, at 1008 KB | Stayed up; the editor and Document Tools on screen (screenshot looked at). |
+| How much stack the editor needs now: the same launch at smaller stacks | Opens at **448 KB**, dies at 384 KB. Before the fix it died at 1008 KB. |
+| `./scripts/test.sh`, clean worktree at `9a32c7d` plus this change only | **1,077 passed**, exit 0, no warnings. |
+| `./scripts/test.sh`, shared tree (also carrying Codex's uncommitted panel work) | 1,083 passed, exit 0, with the first attempt in place; not run again after the change of approach. |
+| The committed tree's own Simulator build opening a document at device stack — clean worktree, iPad Pro 11-inch (M5), iOS 27.0 | Built, exit 0, stack size 0xFC000. Launched into a seeded throwaway library with `-PaperNestDebugOpenItem`: stayed up for the 20 s watched, the editor on screen (screenshot looked at). |
+| The built Simulator app's stack size (`otool -l`, `LC_MAIN`) | 1032192 (0xFC000); one executable, no `PaperNest.debug.dylib`. |
+| iPad UI tests on the **first attempt** (the `ViewModifier`s), device-sized stack, shared tree — iPad Air 13-inch (M4), iOS 27.0, load average 20–35 from an unrelated video render | 29 run: **26 passed, 1 failed, 2 skipped** as phone-only. Passed: `AppUITests` notebook create and reopen, export panel close and reopen, tool panels, OCR panel, export tiles; `DocumentUtilitiesUITests` 5, `DocumentTabsUITests` 1, `FolderNoteUITests` 1, `DocumentFindUITests` 3, `DocumentPrintUITests` 2, `BookmarksUITests` 3, `ReadAloudUITests` 4, `NightModeUITests` 2 of 3. Failed: the night ink test, again when run alone; it **passed on the pre-fix code** on the same simulator (default stack, since that code cannot open a document at a device's). |
+| The same set on **the committed fix** | **Still running when this was committed.** Three passed, none failed: tool panels, export tiles, notebook create and reopen. The Mac is swapping under the same render (load average over 400), and the run is crawling. **`NightModeUITests` has not run on this version yet**; what is known is that it builds the same view in the same single `body` as the code that passed. The outcome goes in a later entry. |
+| `./scripts/build-mac-app.sh`, shared tree | Passed, no warnings (run on the first attempt; the Mac compiles the same file). |
+| On the iPad itself | Signed Debug build of the shared tree installed with `devicectl` at 21:06. Not launched by me: the iPad refused a remote launch. **The owner opened it: "opened it again, works fine".** |
+
+**Not run.** XCUITest on the iPad: there is no provisioning profile for the UI-test runner and I did not pass
+`-allowProvisioningUpdates`, which would create one in the owner's developer account. A release build on a device
+(the 885 KB is a debug build's; release was not measured). iPhone UI tests, the rest of the UI suite, Mac
+interaction. The seven functions leave the editor needing about 450 KB of a device's 1008; it will creep up as
+modifiers are added, and the Simulator's device stack is what catches it.
+
+**Left on the iPad:** a 600 KB synthetic library in the app's `tmp` (`PaperNestUITest-F364B5C5-…`), copied there for a
+launch that the lock then refused. iOS clears `tmp`.
+
 ## 2026-11-15 — Folders offer New Note beside Import File, on iPhone, iPad and Mac (Claude, owner in session)
 
 Owner: "When created new folder, along with import file, it should have option to create new Note", then "also on

@@ -168,7 +168,30 @@ struct DocumentView: View {
     }
     #endif
 
+    /// The editor's modifiers are applied by the seven functions below, in
+    /// this order, rather than as one chain here, and that is not a matter of
+    /// taste. Every modifier wraps all that was chained before it in a new
+    /// value, and an unoptimised build keeps each of those values on the
+    /// stack until the function returns. As a single chain of some
+    /// seventy-five modifiers this body needed 885 KB of stack to run. An
+    /// iPhone or iPad gives its main thread 1 MB, where the Mac and the
+    /// Simulator gave 8, so the editor passed every Simulator and Mac check
+    /// and then crashed on a real iPad as it opened (2026-11-15).
+    ///
+    /// Split this way each function's values are gone when it returns, and
+    /// nothing else changes: the view built is the same view, of the same
+    /// type, evaluated in this one `body` as before, so everything read
+    /// along the way still re-evaluates the whole editor. (Turning the runs
+    /// into `ViewModifier`s saves more stack but each then re-evaluates on
+    /// its own, and a stroke drawn at night stopped showing until the pen
+    /// was put down.) Put a new modifier in the function it belongs with,
+    /// and start another function rather than let one grow past a dozen.
     var body: some View {
+        readerServices(pageSources(toolSheets(exportAndPictures(lifecycle(toolsPanel(bars(pages)))))))
+    }
+
+    /// The pages themselves, or what stands in for them while there are none.
+    private var pages: some View {
         Group {
             if !model.hasLoaded {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -216,287 +239,330 @@ struct DocumentView: View {
                 }
             }
         }
-        .onChange(of: zoom) { _, value in retainedState?.zoom = value }
-        .navigationTitle(model.item?.name ?? "")
-        // The title's ▾ menu, as in the mockups.
-        .toolbarTitleMenu { titleMenu }
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        // iPad: title at the leading edge, editing tools in the middle.
-        .toolbarRole(isCompact ? .automatic : .editor)
-        #endif
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                if let workspaceHeader { workspaceHeader }
-                if !model.pages.isEmpty { NotebookToolbar(editor: self) }
-                if find.isPresented && !model.pages.isEmpty {
-                    DocumentFindBar(find: find, model: model) { id in
-                        Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
+    }
+
+    /// The title and its menu, and the bars above and below the page.
+    @inline(never)
+    private func bars<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: zoom) { _, value in retainedState?.zoom = value }
+            .navigationTitle(model.item?.name ?? "")
+            // The title's ▾ menu, as in the mockups.
+            .toolbarTitleMenu { titleMenu }
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            // iPad: title at the leading edge, editing tools in the middle.
+            .toolbarRole(isCompact ? .automatic : .editor)
+            #endif
+            .safeAreaInset(edge: .top, spacing: 0) {
+                VStack(spacing: 0) {
+                    if let workspaceHeader { workspaceHeader }
+                    if !model.pages.isEmpty { NotebookToolbar(editor: self) }
+                    if find.isPresented && !model.pages.isEmpty {
+                        DocumentFindBar(find: find, model: model) { id in
+                            Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
+                        }
+                    }
+                    if readAloud.isActive && !model.pages.isEmpty {
+                        ReadAloudBar(readAloud: readAloud, model: model)
+                    }
+                    if textSession.hasFailure && (model.selectedPageID != textSession.page?.id ||
+                        !model.pages.contains(where: { $0.id == textSession.page?.id })) {
+                        InlineTextRecoveryBar(session: textSession, undoManager: undoManager)
+                            .background(Theme.surface)
                     }
                 }
-                if readAloud.isActive && !model.pages.isEmpty {
-                    ReadAloudBar(readAloud: readAloud, model: model)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                // A phone's keyboard leaves little enough of the page; the palette
+                // would cover what is left, including the hit just found.
+                if !model.pages.isEmpty && !(isCompact && (textSession.isSelected || find.isTyping)) {
+                    studioPalette.opacity(textSession.isSelected ? 0 : 1)
+                        .allowsHitTesting(!textSession.isSelected)
+                        .accessibilityHidden(textSession.isSelected)
                 }
-                if textSession.hasFailure && (model.selectedPageID != textSession.page?.id ||
-                    !model.pages.contains(where: { $0.id == textSession.page?.id })) {
-                    InlineTextRecoveryBar(session: textSession, undoManager: undoManager)
-                        .background(Theme.surface)
+            }
+    }
+
+    /// The tools panel, as a drawer or as a column, and the toolbar that opens it.
+    @inline(never)
+    private func toolsPanel<Content: View>(_ content: Content) -> some View {
+        content
+            .overlay {
+                // A phone has no room for a column, so the same panel rises from
+                // the bottom instead — drawn here, not as a system sheet, because
+                // the tools in it open sheets of their own.
+                if !usesPDFToolsSidebar && isShowingPDFTools {
+                    UtilitiesDrawer(close: { closeUtilities() }) { PDFToolsSidebar(editor: self) }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            // A phone's keyboard leaves little enough of the page; the palette
-            // would cover what is left, including the hit just found.
-            if !model.pages.isEmpty && !(isCompact && (textSession.isSelected || find.isTyping)) {
-                studioPalette.opacity(textSession.isSelected ? 0 : 1)
-                    .allowsHitTesting(!textSession.isSelected)
-                    .accessibilityHidden(textSession.isSelected)
+            .onChange(of: isPresentingOverUtilities) { _, presenting in
+                if presenting && !usesPDFToolsSidebar { isShowingPDFTools = false }
             }
-        }
-        .overlay {
-            // A phone has no room for a column, so the same panel rises from
-            // the bottom instead — drawn here, not as a system sheet, because
-            // the tools in it open sheets of their own.
-            if !usesPDFToolsSidebar && isShowingPDFTools {
-                UtilitiesDrawer(close: { closeUtilities() }) { PDFToolsSidebar(editor: self) }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            .toolbar { toolbar }
+            .inspector(isPresented: inspectorBinding) {
+                PDFToolsSidebar(editor: self)
+                    .inspectorColumnWidth(min: 280, ideal: 320, max: 400)
             }
-        }
-        .onChange(of: isPresentingOverUtilities) { _, presenting in
-            if presenting && !usesPDFToolsSidebar { isShowingPDFTools = false }
-        }
-        .toolbar { toolbar }
-        .inspector(isPresented: inspectorBinding) {
-            PDFToolsSidebar(editor: self)
-                .inspectorColumnWidth(min: 280, ideal: 320, max: 400)
-        }
-        .navigationBarBackButtonHidden()
-        .onChange(of: scenePhase) { _, phase in
-            if phase != .active { Task { await textSession.commitAndFlush(undoManager: undoManager) } }
-            // Without background audio the system silences the app anyway;
-            // paused, it carries on from the same word when the reader is back.
-            if phase == .background { readAloud.pause() }
-        }
-        .onAppear {
-            editingGuard.owner = editingOwner
-            editingGuard.finish = { await finishEditing() }
-            commandContext = makeCommandContext()
-            let settings = toolSettings
-            textSession.styleForNewBox = { settings.settings.text.apply(to: &$0) }
-        }
-        .onDisappear {
-            readAloud.stop()
-            Task { await textSession.commitAndFlush(undoManager: undoManager) }
-            if editingGuard.owner == editingOwner {
-                editingGuard.owner = nil
-                editingGuard.finish = nil
+            .navigationBarBackButtonHidden()
+    }
+
+    /// What the editor does as it comes and goes and as the document loads,
+    /// with the prompts that belong to the document as a whole.
+    @inline(never)
+    private func lifecycle<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { Task { await textSession.commitAndFlush(undoManager: undoManager) } }
+                // Without background audio the system silences the app anyway;
+                // paused, it carries on from the same word when the reader is back.
+                if phase == .background { readAloud.pause() }
             }
-        }
-        .alert(L10n.renameTitle, isPresented: $isRenaming) {
-            TextField(L10n.renamePlaceholder, text: $renameText)
-            Button(L10n.cancel, role: .cancel) {}
-            Button(L10n.ok) {
-                let name = renameText
-                Task { await model.rename(to: name) }
+            .onAppear {
+                editingGuard.owner = editingOwner
+                editingGuard.finish = { await finishEditing() }
+                commandContext = makeCommandContext()
+                let settings = toolSettings
+                textSession.styleForNewBox = { settings.settings.text.apply(to: &$0) }
             }
-        }
-        .alert(L10n.goToPage, isPresented: $isShowingGoToPage) {
-            TextField(L10n.goToPageField, text: $goToPageText)
-                #if os(iOS)
-                .keyboardType(.numberPad)
-                #endif
-            Button(L10n.cancel, role: .cancel) {}
-            Button(L10n.goToPageGo) {
-                guard let index = PageNumberEntry.pageIndex(for: goToPageText, pageCount: model.pages.count)
-                else { return }
-                model.selectedPageID = model.pages[index].id
+            .onDisappear {
+                readAloud.stop()
+                Task { await textSession.commitAndFlush(undoManager: undoManager) }
+                if editingGuard.owner == editingOwner {
+                    editingGuard.owner = nil
+                    editingGuard.finish = nil
+                }
             }
-        } message: {
-            Text(L10n.goToPageMessage(model.pages.count))
-        }
-        .onChange(of: model.hasLoaded, initial: true) { _, loaded in
-            guard loaded, !didChooseInitialTool else { return }
-            didChooseInitialTool = true
-            if isNotebook { inkTool = .lasso; isMarkingUp = true }
-        }
-        .task(id: model.session.changeToken) { await model.load() }
-        // Opening a document that is only in iCloud fetches it.
-        .task(id: model.itemID) { await model.session.sync?.downloadIfNeeded(model.itemID) }
-        .task(id: model.selectedPageID) { await model.loadSelectedPageObjects() }
-        #if DEBUG
-        // Dev/screenshot hooks: `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`,
-        // `-PaperNestDebugShowMarkup YES` (iPad), `-PaperNestDebugShowOutline YES`.
-        .task {
-            isShowingExport = UserDefaults.standard.bool(forKey: "PaperNestDebugShowExport")
-            isShowingCrop = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCrop")
-            isShowingCompress = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCompress")
-            if UserDefaults.standard.bool(forKey: "PaperNestDebugShowMarkup") { isMarkingUp = true }
-            isShowingOutline = UserDefaults.standard.bool(forKey: "PaperNestDebugShowOutline")
-        }
-        #endif
-        .proPaywall(Binding(get: { model.proPaywall }, set: { model.proPaywall = $0 }))
-        .alert(model.presentedError?.title ?? "", isPresented: errorBinding, presenting: model.presentedError) { _ in
-            Button(L10n.ok, role: .cancel) {}
-        } message: { error in
-            Text(error.message)
-        }
-        .sheet(isPresented: $isShowingCompress) { CompressSheet(itemID: model.itemID) }
-        .alert(L10n.splitDoneTitle, isPresented: Binding(get: { splitCount != nil }, set: { if !$0 { splitCount = nil } })) {
-            Button(L10n.ok, role: .cancel) {}
-        } message: { Text(L10n.splitDoneMessage(splitCount ?? 0)) }
-        .onChange(of: isShowingExport) { _, showing in if !showing { exportFormat = nil } }
-        .sheet(isPresented: $isShowingExport) {
-            ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID, initialFormat: exportFormat)
-        }
-        .fileImporter(isPresented: $isShowingImagePicker,
-                      allowedContentTypes: [.image], onCompletion: insertPickedImage)
-        .photosPicker(isPresented: $isShowingPhotoPicker, selection: $selectedPhoto,
-                      matching: .images, preferredItemEncoding: .compatible)
-        .task(id: selectedPhoto) {
-            guard let selectedPhoto, let page = photoTargetPage else { return }
-            isLoadingPhoto = true
-            defer { isLoadingPhoto = false }
-            do {
-                guard let data = try await selectedPhoto.loadTransferable(type: Data.self) else {
+            .alert(L10n.renameTitle, isPresented: $isRenaming) {
+                TextField(L10n.renamePlaceholder, text: $renameText)
+                Button(L10n.cancel, role: .cancel) {}
+                Button(L10n.ok) {
+                    let name = renameText
+                    Task { await model.rename(to: name) }
+                }
+            }
+            .alert(L10n.goToPage, isPresented: $isShowingGoToPage) {
+                TextField(L10n.goToPageField, text: $goToPageText)
+                    #if os(iOS)
+                    .keyboardType(.numberPad)
+                    #endif
+                Button(L10n.cancel, role: .cancel) {}
+                Button(L10n.goToPageGo) {
+                    guard let index = PageNumberEntry.pageIndex(for: goToPageText, pageCount: model.pages.count)
+                    else { return }
+                    model.selectedPageID = model.pages[index].id
+                }
+            } message: {
+                Text(L10n.goToPageMessage(model.pages.count))
+            }
+            .onChange(of: model.hasLoaded, initial: true) { _, loaded in
+                guard loaded, !didChooseInitialTool else { return }
+                didChooseInitialTool = true
+                if isNotebook { inkTool = .lasso; isMarkingUp = true }
+            }
+            .task(id: model.session.changeToken) { await model.load() }
+            // Opening a document that is only in iCloud fetches it.
+            .task(id: model.itemID) { await model.session.sync?.downloadIfNeeded(model.itemID) }
+            .task(id: model.selectedPageID) { await model.loadSelectedPageObjects() }
+            #if DEBUG
+            // Dev/screenshot hooks: `-PaperNestDebugShowExport YES`, `-PaperNestDebugShowCrop YES`,
+            // `-PaperNestDebugShowMarkup YES` (iPad), `-PaperNestDebugShowOutline YES`.
+            .task {
+                isShowingExport = UserDefaults.standard.bool(forKey: "PaperNestDebugShowExport")
+                isShowingCrop = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCrop")
+                isShowingCompress = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCompress")
+                if UserDefaults.standard.bool(forKey: "PaperNestDebugShowMarkup") { isMarkingUp = true }
+                isShowingOutline = UserDefaults.standard.bool(forKey: "PaperNestDebugShowOutline")
+            }
+            #endif
+            .proPaywall(Binding(get: { model.proPaywall }, set: { model.proPaywall = $0 }))
+            .alert(model.presentedError?.title ?? "", isPresented: errorBinding, presenting: model.presentedError) { _ in
+                Button(L10n.ok, role: .cancel) {}
+            } message: { error in
+                Text(error.message)
+            }
+    }
+
+    /// Export and Compress, as sheets or in the tools panel, and choosing a picture.
+    @inline(never)
+    private func exportAndPictures<Content: View>(_ content: Content) -> some View {
+        content
+            .sheet(isPresented: $isShowingCompress) { CompressSheet(itemID: model.itemID) }
+            .alert(L10n.splitDoneTitle, isPresented: Binding(get: { splitCount != nil }, set: { if !$0 { splitCount = nil } })) {
+                Button(L10n.ok, role: .cancel) {}
+            } message: { Text(L10n.splitDoneMessage(splitCount ?? 0)) }
+            .onChange(of: isShowingExport) { _, showing in if !showing { exportFormat = nil } }
+            .sheet(isPresented: $isShowingExport) {
+                ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID, initialFormat: exportFormat)
+            }
+            .fileImporter(isPresented: $isShowingImagePicker,
+                          allowedContentTypes: [.image], onCompletion: insertPickedImage)
+            .photosPicker(isPresented: $isShowingPhotoPicker, selection: $selectedPhoto,
+                          matching: .images, preferredItemEncoding: .compatible)
+            .task(id: selectedPhoto) {
+                guard let selectedPhoto, let page = photoTargetPage else { return }
+                isLoadingPhoto = true
+                defer { isLoadingPhoto = false }
+                do {
+                    guard let data = try await selectedPhoto.loadTransferable(type: Data.self) else {
+                        importModel.reportPickerFailure()
+                        return
+                    }
+                    try Task.checkCancellation()
+                    try await model.addImage(data, named: nil, to: page, undoManager: undoManager)
+                } catch is CancellationError {
+                    // Leaving the editor cancels the load without inserting anything.
+                } catch {
+                    model.presentedError = .saveFailed()
+                }
+            }
+    }
+
+    /// The sheet each page tool opens where there is no tools panel to hold it.
+    @inline(never)
+    private func toolSheets<Content: View>(_ content: Content) -> some View {
+        content
+            .sheet(isPresented: $isShowingOutline) {
+                DocumentOutlineSheet(model: model) { id in
+                    Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
+                }
+            }
+            .sheet(isPresented: $isShowingCrop) {
+                if let page = model.selectedPage {
+                    CropEditor(page: page) { crop in
+                        Task { await model.setCrop(crop, undoManager: undoManager) }
+                    }
+                }
+            }
+            .sheet(item: $notebookPageRequest) { request in
+                NotebookPageSheet(model: model, request: request, undoManager: undoManager)
+            }
+            .sheet(isPresented: $isShowingPDFForm) {
+                PDFFormSheet(model: model, onClose: { clearFormDraft(); isShowingPDFForm = false },
+                             retainedSession: retainedState?.formSession ?? formSession) { armText() }
+            }
+            .sheet(item: $signaturePage) { page in
+                SignatureSheet(model: model, page: page, undoManager: undoManager,
+                               onClose: { clearSignatureDraft(page.id); signaturePage = nil },
+                               retainedDraft: retainedState?.signatureDrafts[page.id] ?? signatureDrafts[page.id])
+            }
+            .sheet(item: $stampPage) { page in
+                ShapeAnnotationSheet(model: model, page: page, undoManager: undoManager, stampsOnly: true)
+            }
+            .sheet(item: $shapePage) { page in
+                ShapeAnnotationSheet(model: model, page: page, undoManager: undoManager)
+            }
+            .sheet(item: $commentsPage) { page in
+                PageCommentsSheet(model: model, pageID: page.id, undoManager: undoManager)
+            }
+            .sheet(item: $annotationPage) { page in
+                TextAnnotationSheet(model: model, pageID: page.id, undoManager: undoManager, initialStyle: annotationStyle)
+            }
+            .sheet(item: $managedMarkupPage) { page in
+                MarkupManagerSheet(model: model, pageID: page.id, undoManager: undoManager)
+            }
+            .sheet(isPresented: $isShowingPageOrganizer) {
+                DocumentPagesSheet(model: model, undoManager: undoManager)
+            }
+    }
+
+    /// Where new pages come from: a file, the camera, a document that needs its password.
+    @inline(never)
+    private func pageSources<Content: View>(_ content: Content) -> some View {
+        content
+            // Adding or replacing a page needs something we can make pages from.
+            .fileImporter(isPresented: $isShowingFilePicker, allowedContentTypes: LibraryView.pageTypes,
+                          allowsMultipleSelection: filePurpose != .replace) { result in
+                let purpose = filePurpose
+                guard case .success(let urls) = result else {
                     importModel.reportPickerFailure()
                     return
                 }
-                try Task.checkCancellation()
-                try await model.addImage(data, named: nil, to: page, undoManager: undoManager)
-            } catch is CancellationError {
-                // Leaving the editor cancels the load without inserting anything.
-            } catch {
-                model.presentedError = .saveFailed()
-            }
-        }
-        .sheet(isPresented: $isShowingOutline) {
-            DocumentOutlineSheet(model: model) { id in
-                Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
-            }
-        }
-        .sheet(isPresented: $isShowingCrop) {
-            if let page = model.selectedPage {
-                CropEditor(page: page) { crop in
-                    Task { await model.setCrop(crop, undoManager: undoManager) }
-                }
-            }
-        }
-        .sheet(item: $notebookPageRequest) { request in
-            NotebookPageSheet(model: model, request: request, undoManager: undoManager)
-        }
-        .sheet(isPresented: $isShowingPDFForm) {
-            PDFFormSheet(model: model, onClose: { clearFormDraft(); isShowingPDFForm = false },
-                         retainedSession: retainedState?.formSession ?? formSession) { armText() }
-        }
-        .sheet(item: $signaturePage) { page in
-            SignatureSheet(model: model, page: page, undoManager: undoManager,
-                           onClose: { clearSignatureDraft(page.id); signaturePage = nil },
-                           retainedDraft: retainedState?.signatureDrafts[page.id] ?? signatureDrafts[page.id])
-        }
-        .sheet(item: $stampPage) { page in
-            ShapeAnnotationSheet(model: model, page: page, undoManager: undoManager, stampsOnly: true)
-        }
-        .sheet(item: $shapePage) { page in
-            ShapeAnnotationSheet(model: model, page: page, undoManager: undoManager)
-        }
-        .sheet(item: $commentsPage) { page in
-            PageCommentsSheet(model: model, pageID: page.id, undoManager: undoManager)
-        }
-        .sheet(item: $annotationPage) { page in
-            TextAnnotationSheet(model: model, pageID: page.id, undoManager: undoManager, initialStyle: annotationStyle)
-        }
-        .sheet(item: $managedMarkupPage) { page in
-            MarkupManagerSheet(model: model, pageID: page.id, undoManager: undoManager)
-        }
-        .sheet(isPresented: $isShowingPageOrganizer) {
-            DocumentPagesSheet(model: model, undoManager: undoManager)
-        }
-        // Adding or replacing a page needs something we can make pages from.
-        .fileImporter(isPresented: $isShowingFilePicker, allowedContentTypes: LibraryView.pageTypes,
-                      allowsMultipleSelection: filePurpose != .replace) { result in
-            let purpose = filePurpose
-            guard case .success(let urls) = result else {
-                importModel.reportPickerFailure()
-                return
-            }
-            guard !urls.isEmpty else { return }
-            switch purpose {
-            case .replace:
-                Task {
-                    await importModel.prepareFile(urls[0]) { prepared in
-                        await model.replaceSelectedPage(with: prepared, undoManager: undoManager)
-                    }
-                }
-            case .add:
-                let after = model.selectedPageID
-                Task { await importModel.importFiles(urls, into: model.itemID, after: after) }
-            }
-        }
-        #if os(iOS)
-        .fullScreenCover(item: $photoCameraPage) { page in
-            PhotoCameraView { outcome in
-                photoCameraPage = nil
-                switch outcome {
-                case .captured(let data):
-                    isLoadingPhoto = true
+                guard !urls.isEmpty else { return }
+                switch purpose {
+                case .replace:
                     Task {
-                        defer { isLoadingPhoto = false }
-                        do {
-                            try await model.addImage(data, named: nil, to: page, undoManager: undoManager)
-                        } catch {
-                            model.presentedError = .saveFailed()
+                        await importModel.prepareFile(urls[0]) { prepared in
+                            await model.replaceSelectedPage(with: prepared, undoManager: undoManager)
                         }
                     }
-                case .cancelled:
-                    break
-                case .failed:
-                    model.presentedError = PresentedError(title: L10n.genericErrorTitle,
-                                                         message: L10n.photoCaptureFailed)
+                case .add:
+                    let after = model.selectedPageID
+                    Task { await importModel.importFiles(urls, into: model.itemID, after: after) }
                 }
             }
-            .ignoresSafeArea()
-        }
-        .fullScreenCover(item: $cameraPurpose) { purpose in
-            DocumentCameraView { outcome in
-                cameraPurpose = nil
-                switch outcome {
-                case .scanned(let images):
-                    let name = model.item?.name ?? ""
-                    Task {
-                        await importModel.prepareImages(images, name: name) { prepared in
-                            switch purpose {
-                            case .add: await model.insertPages(prepared)
-                            case .replace: await model.replaceSelectedPage(with: prepared, undoManager: undoManager)
+            #if os(iOS)
+            .fullScreenCover(item: $photoCameraPage) { page in
+                PhotoCameraView { outcome in
+                    photoCameraPage = nil
+                    switch outcome {
+                    case .captured(let data):
+                        isLoadingPhoto = true
+                        Task {
+                            defer { isLoadingPhoto = false }
+                            do {
+                                try await model.addImage(data, named: nil, to: page, undoManager: undoManager)
+                            } catch {
+                                model.presentedError = .saveFailed()
                             }
                         }
+                    case .cancelled:
+                        break
+                    case .failed:
+                        model.presentedError = PresentedError(title: L10n.genericErrorTitle,
+                                                             message: L10n.photoCaptureFailed)
                     }
-                case .cancelled:
-                    break
-                case .failed:
-                    model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.scanFailed)
                 }
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
-        }
-        #endif
-        .alert(importModel.presentedError?.title ?? "", isPresented: importErrorBinding, presenting: importModel.presentedError) { _ in
-            Button(L10n.ok, role: .cancel) {}
-        } message: { error in
-            Text(error.message)
-        }
-        .modifier(PasswordPrompt(model: importModel))
-        .documentPrinting(printer)
-        .environment(\.pageNightMode, isNightMode)
-        .environment(\.readAloud, readAloud)
-        // Reading follows the reader: turning the page restarts it there.
-        .onChange(of: model.selectedPageID) { _, id in readAloud.pageChanged(to: id) }
-        .documentBookmarks(bookmarks, model: model) { id in
-            Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
-        }
-        .focusedSceneValue(\.documentCommands, commandContext)
-        .focusedSceneValue(\.documentPrinter, printer)
-        .focusedSceneValue(\.readerBookmarks, bookmarks)
-        .focusedSceneValue(\.readAloud, readAloud)
+            .fullScreenCover(item: $cameraPurpose) { purpose in
+                DocumentCameraView { outcome in
+                    cameraPurpose = nil
+                    switch outcome {
+                    case .scanned(let images):
+                        let name = model.item?.name ?? ""
+                        Task {
+                            await importModel.prepareImages(images, name: name) { prepared in
+                                switch purpose {
+                                case .add: await model.insertPages(prepared)
+                                case .replace: await model.replaceSelectedPage(with: prepared, undoManager: undoManager)
+                                }
+                            }
+                        }
+                    case .cancelled:
+                        break
+                    case .failed:
+                        model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.scanFailed)
+                    }
+                }
+                .ignoresSafeArea()
+            }
+            #endif
+            .alert(importModel.presentedError?.title ?? "", isPresented: importErrorBinding, presenting: importModel.presentedError) { _ in
+                Button(L10n.ok, role: .cancel) {}
+            } message: { error in
+                Text(error.message)
+            }
+            .modifier(PasswordPrompt(model: importModel))
+    }
+
+    /// Reading: print, night mode, read aloud, bookmarks, and the menu commands.
+    @inline(never)
+    private func readerServices<Content: View>(_ content: Content) -> some View {
+        content
+            .documentPrinting(printer)
+            .environment(\.pageNightMode, isNightMode)
+            .environment(\.readAloud, readAloud)
+            // Reading follows the reader: turning the page restarts it there.
+            .onChange(of: model.selectedPageID) { _, id in readAloud.pageChanged(to: id) }
+            .documentBookmarks(bookmarks, model: model) { id in
+                Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
+            }
+            .focusedSceneValue(\.documentCommands, commandContext)
+            .focusedSceneValue(\.documentPrinter, printer)
+            .focusedSceneValue(\.readerBookmarks, bookmarks)
+            .focusedSceneValue(\.readAloud, readAloud)
     }
 
     private var isToolBusy: Bool {

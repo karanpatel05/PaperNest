@@ -46,6 +46,14 @@ targets:
         SUPPORTS_MACCATALYST: NO
         # Empty unless Signing.local.xcconfig turns iCloud on; see Base.xcconfig.
         CODE_SIGN_ENTITLEMENTS: $(PAPERNEST_IOS_ENTITLEMENTS)
+        # The Simulator gets a device's stack. An iPhone or iPad gives the main
+        # thread 1 MB (1008 KB usable, measured on an iPad Pro, iPadOS 27.0.1);
+        # the Simulator gives 8 MB unless told otherwise, so a view that needs
+        # more stack than a device has passed every Simulator test and then
+        # crashed on a real iPad (2026-11-04 and 2026-11-15). The linker only
+        # takes a stack size for a main executable, hence no debug dylib here.
+        "OTHER_LDFLAGS[sdk=iphonesimulator*]": "$(inherited) -Wl,-stack_size,0xFC000"
+        "ENABLE_DEBUG_DYLIB[sdk=iphonesimulator*]": NO
     dependencies:
       - package: PaperNestKit
         product: PaperNestUI
