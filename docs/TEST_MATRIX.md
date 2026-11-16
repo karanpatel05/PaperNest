@@ -1,3 +1,16 @@
+## 2026-11-15 21:39 CST — The iPad UI run on the committed editor fix: 27 passed, none failed (Claude)
+
+Closes the row left open in the entry below ("Still running when this was committed"). The same 28 tests on the same
+simulator (iPad Air 13-inch (M4), iOS 27.0), the shared tree with `812434d`'s `DocumentView.body` (seven functions,
+one body) and the device-sized stack: **27 passed, 1 skipped as phone-only, 0 failed**, `TEST SUCCEEDED`, exit 0,
+1,933 s. `NightModeUITests` **3/3**, including `testInkDrawnAtNightShowsLightAndIsSavedInTheColourChosen`, the test
+the `ViewModifier` attempt failed twice. Also `AppUITests` 5 (notebook create and reopen, tool panels, OCR panel,
+export tiles, export panel close and reopen), `BookmarksUITests` 3, `DocumentFindUITests` 3, `DocumentPrintUITests` 2,
+`DocumentTabsUITests` 1, `DocumentUtilitiesUITests` 5, `FolderNoteUITests` 1, `ReadAloudUITests` 4. The Mac was
+swapping under an unrelated video render for the first part of the run (load average over 400, later about 35);
+nothing needed a rerun. `main` was fast-forwarded to `812434d` and pushed at the owner's request ("merge it to main").
+Still not run: what the entry below lists.
+
 ## 2026-11-15 — A document opens on a real iPad again: the editor's body no longer needs most of a megabyte of stack (Claude, owner in session)
 
 Owner: "APP crashes on Ipad and home srcreen of ipad comes in". Seventeen PaperNest crash reports on the owner's
