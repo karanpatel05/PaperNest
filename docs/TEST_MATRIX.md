@@ -1,3 +1,30 @@
+## 2026-11-16 — Privacy manifest declares system boot time; a test keeps it complete (Claude, owner in session)
+
+Found while answering the owner's "is PaperNest ready to deploy?": `ProcessInfo.systemUptime` is called in
+`ScannerCamera.swift` (how long the outline has held still before the automatic shutter fires) and in
+`NotebookScrollAppend.swift` (whether a Mac scroll followed a wheel event within 0.25 s), and
+`Apps/Shared/PrivacyInfo.xcprivacy` did not declare `NSPrivacyAccessedAPICategorySystemBootTime`. App Store Connect
+rejects such an upload (ITMS-91053); nothing fails before that. Added the category with reason **35F9.1** (time
+elapsed between events within the app). The other categories the source uses were already declared: file timestamps
+only in `AssetFileStore`'s own container (C617.1), `UserDefaults` only the app's own defaults with no shared suite
+(CA92.1). No disk-space or active-keyboard API is called.
+
+New `Tests/PaperNestUITests/PrivacyManifestTests.swift` (2 tests) reads every Swift file under `Sources`,
+`Apps/iOS/Sources` and `Apps/Mac/Sources` for Apple's required-reason symbols and fails, naming the files, for any
+category the manifest gives no reason for; a second test fails if the scan reads nothing. **Shown to fail first:**
+on `HEAD` with the old manifest it failed naming exactly those two files; it passed after the manifest change.
+
+Clean worktree at `b17eb70` outside iCloud, plus these three files:
+- `./scripts/test.sh`: **1,148 passed, 0 failed, 0 warnings** (1,146 before, plus the two new tests).
+- `plutil -lint Apps/Shared/PrivacyInfo.xcprivacy`: OK.
+- `xcodebuild` `PaperNest-iOS` (generic iOS Simulator) and `PaperNest-macOS`, `CODE_SIGNING_ALLOWED=NO`: **both
+  succeeded, 0 warnings**. `plutil -p` on the `PrivacyInfo.xcprivacy` inside each built `PaperNest.app` shows the
+  SystemBootTime entry with 35F9.1.
+
+**Not done:** no archive and no App Store Connect upload, so Apple's own check of the manifest has not run. The test
+covers Apple's list as of today and cannot pick reasons; additions to the list need adding to the test. Frameworks
+from Apple are not scanned (they carry their own manifests); there are no third-party dependencies.
+
 ## 2026-11-16 — Scan Studio Phase 3: Whiteboard and ID / Card are modes that do something, and the scanner has defaults (Claude, owner in session)
 
 Owner: "Start Phase 3", after Phases 1 and 2 landed as `c42ce81`. Design: `docs/design/SCAN_FEATURES_DESIGN.md`, sections

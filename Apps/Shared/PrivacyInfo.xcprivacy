@@ -21,6 +21,19 @@
 				<string>C617.1</string>
 			</array>
 		</dict>
+		<!-- ProcessInfo.systemUptime times events inside the app only: how long the
+		     scanner's outline has held still before the automatic shutter fires, and
+		     whether a Mac scroll followed a wheel event within a quarter second.
+		     Never stored or sent off the device. PrivacyManifestTests checks that
+		     every required-reason API the source calls is declared here. -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
 		<!-- App-private preferences only. -->
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>

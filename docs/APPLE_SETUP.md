@@ -103,6 +103,6 @@ These are real URLs you host. The app won't ship placeholder links:
 
 ## 5. Release-time declarations
 
-- App Privacy questionnaire in App Store Connect. `Apps/Shared/PrivacyInfo.xcprivacy` is a draft listing no tracking, no collected data, file timestamps (C617.1) and UserDefaults (CA92.1). Re-check it against Apple's current required-reason API list.
+- App Privacy questionnaire in App Store Connect. `Apps/Shared/PrivacyInfo.xcprivacy` is a draft listing no tracking, no collected data, file timestamps (C617.1), system boot time (35F9.1, for timing events inside the app) and UserDefaults (CA92.1). `PrivacyManifestTests` fails if the source starts calling a required-reason API in a category the manifest leaves out; it can't choose the reason or keep up with additions to Apple's list, so re-check both against Apple's current list before submission.
 - Export compliance (`ITSAppUsesNonExemptEncryption`). The app uses only OS-provided encryption, but you make this declaration.
 - Age rating and content descriptions.
