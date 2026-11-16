@@ -1,10 +1,68 @@
 # PaperNest
 
-A native document scanner and notebook app for iPhone, iPad and Mac: scan paper on iPhone, organize and annotate on iPad, then edit, organize and export on Mac. English, French and Spanish.
+<p align="center">
+  <img src="docs/design/mockups/mac-workspace.png" alt="PaperNest document workspace on Mac" width="720">
+</p>
+
+<p align="center">
+  A native document scanner, notebook and PDF workspace for iPhone, iPad and Mac.
+</p>
+
+<p align="center">
+  Scan paper on iPhone, organize and annotate on iPad, then edit and export wherever you work.
+</p>
+
+PaperNest is designed around a simple promise: your documents should feel as easy to work with as a notebook, without giving up the power of a serious PDF tool. It is built with SwiftUI and Apple frameworks, with shared document logic across iOS, iPadOS and macOS. The interface is localized in English, French and Spanish.
 
 "PaperNest" is a placeholder working name, not a cleared trademark. Branding lives in `Sources/PaperNestCore/Brand.swift` and `Config/Base.xcconfig`.
 
-**Status:** milestone M0 is done and M1 is partly done. The shared code and tests pass on macOS, and iPhone interactions are covered by Simulator UI tests. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for status and [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for evidence. This is not production-ready.
+**Status:** active development. Core scanning, import, library, notebook, annotation, recognition and export workflows are implemented and covered by unit and Simulator UI tests. The app is not production-ready yet; see [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) and [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for the current scope and evidence.
+
+## Design preview
+
+The current design is intentionally calm and native: familiar Apple navigation, generous spacing, focused tool panels and a workspace that adapts between phone, tablet and Mac.
+
+<p align="center">
+  <img src="docs/design/mockups/iphone-scan-library.png" alt="PaperNest scanning and library experience on iPhone" width="48%">
+  <img src="docs/design/mockups/ipad-home-options-approved-2026-11-15.png" alt="PaperNest home experience on iPad" width="48%">
+</p>
+
+<p align="center">
+  <img src="docs/design/mockups/verification-2026-11-15/home-iphone-built.png" alt="Built PaperNest home screen on iPhone" width="30%">
+  <img src="docs/design/mockups/verification-2026-11-15/home-ipad-built.png" alt="Built PaperNest home screen on iPad" width="45%">
+</p>
+
+## What PaperNest can do
+
+- **Scan and import:** capture paper with the native camera flow, review each capture before saving, or import PDFs and images from Files and Photos.
+- **Organize a library:** use folders, recent documents, search, selection actions, merge, duplicate, move, color labels and page extraction.
+- **Work like a notebook:** create blank, lined or grid notebooks, add pages, and keep edits reversible with document undo and redo.
+- **Annotate documents:** draw ink, add text, shapes, stamps, signatures, comments and text markup. Markup remains editable after reopening.
+- **Recognize text:** run on-device OCR in English, French or Spanish, search recognized text, and export searchable PDFs.
+- **Edit pages:** crop, reorder, split, rotate and manage pages without modifying the original asset.
+- **Export and share:** save or share PDF, JPEG, PNG, ZIP and plain-text outputs, with page ranges, quality controls and password protection where supported.
+- **Handle more than PDFs:** keep unsupported files with their original bytes and preview them through the system viewer; supported Word, Excel and text imports become editable page-based documents.
+- **Protect document limits:** PDFs with author restrictions can be opened while their copy, print and fill limits are preserved during export.
+
+## Feature tour
+
+| Area | Included today |
+|---|---|
+| Capture | Native camera scanning, photo import, review-before-save, crop and enhancement |
+| Library | Folders, search, recent documents, file items, selection mode and bulk actions |
+| Reading | Page navigation, thumbnails, text selection, find, bookmarks, two-page view and Night Mode |
+| Editing | Crop, page reorder, split, merge, notebook pages, ink and reversible history |
+| Markup | Text highlight/underline/strike, shapes, stamps, signatures and comments |
+| Intelligence | On-device OCR and searchable PDF/text export |
+| Output | PDF, images, ZIP and text export; Files, Copy and Share destinations |
+| Platforms | Native SwiftUI apps for iPhone, iPad and Mac; English, French and Spanish |
+
+## Why it is built this way
+
+- Originals are immutable; edits are stored as page transforms and history.
+- SQLite is the single authority for metadata, while assets are durable, content-addressed files.
+- Page geometry is shared across rendering, ink, text and OCR so coordinates stay consistent.
+- The app uses Apple frameworks and system SQLite with no third-party runtime dependencies.
 
 ## Layout
 
@@ -134,6 +192,6 @@ The remaining manual Apple setup (App IDs, iCloud container, StoreKit products) 
 
 | Platform | State |
 |---|---|
-| macOS 14+ (native) | Builds and runs (dev bundle). Import, library, page edits and export are covered by automated tests. The UI has not been visually verified yet. |
-| iOS 17+ (iPhone) | The Xcode project's `PaperNest-iOS` builds for the Simulator; shared code also compiles for devices. 0 warnings. Library, document and export screens verified in the Simulator (screenshots in `docs/screenshots/`). Taps and camera not yet exercised. |
-| iPadOS 17+ | Compiles (same target). Layout not verified: the installed runtime has no iPad simulator. |
+| macOS 14+ (native) | Builds and runs as a development bundle. Import, library, page editing and export are covered by automated tests; core library and document flows have been checked manually with disposable data. |
+| iOS 17+ (iPhone) | Builds for the Simulator and devices. Library, scanning, document, OCR, annotation and export workflows are covered by Simulator UI tests; camera hardware is not part of the automated suite. |
+| iPadOS 17+ | Uses the same native target with adaptive layouts. Home, document, OCR, annotation and export workflows are covered by iPad Simulator UI tests. |
