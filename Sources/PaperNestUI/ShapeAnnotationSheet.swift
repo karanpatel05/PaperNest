@@ -48,8 +48,8 @@ struct ShapeAnnotationSheet: View {
                             ForEach(stampsOnly ? ShapeAnnotation.stamps : ShapeAnnotation.shapes, id: \.self) { shape in
                                 kindButton(shape)
                                     .padding(.horizontal, 10)
-                                    .background(kind == shape ? Theme.accent.opacity(0.12) : Color.primary.opacity(0.04),
-                                                in: RoundedRectangle(cornerRadius: 10))
+                                    .background(kind == shape ? EditorChrome.lavender : EditorChrome.surface,
+                                                in: RoundedRectangle(cornerRadius: 12))
                             }
                         }
                         .padding(.vertical, 4)
@@ -57,6 +57,8 @@ struct ShapeAnnotationSheet: View {
                 }
                 Section {
                     preview.frame(height: 240)
+                        .padding(12)
+                        .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 16))
                     DisclosureGroup(L10n.shapePosition) {
                         positionSlider(L10n.shapeStartX, value: $start.x, id: "start-x")
                         positionSlider(L10n.shapeStartY, value: $start.y, id: "start-y")
@@ -100,11 +102,13 @@ struct ShapeAnnotationSheet: View {
                       .fixedSize(horizontal: false, vertical: true) }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(EditorChrome.secondaryBackground)
             .disabled(saving)
             .navigationTitle(stampsOnly ? L10n.stampTitle : L10n.shapeTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color(uiColor: .secondarySystemBackground), for: .navigationBar)
+            .toolbarBackground(EditorChrome.secondaryBackground, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             #endif
             .toolbar {
@@ -124,6 +128,7 @@ struct ShapeAnnotationSheet: View {
                 Button(L10n.ok) {}
             } message: { Text(stampsOnly ? L10n.stampSaveFailed : L10n.shapeSaveFailed) }
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 500, minHeight: 650)
         #endif

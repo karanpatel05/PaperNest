@@ -905,7 +905,7 @@
 "sync.actionFailed" = "That could not be completed. Nothing was deleted. Try again when iCloud is reachable.";
 
 /* Home and scanner redesign */
-"home.subtitle" = "Your notes, documents and files in one place.";
+"home.subtitle" = "A little space for what matters.";
 "home.newNote" = "New Note";
 "home.importFile" = "Import File";
 "home.recentDocuments" = "Recent Documents";
@@ -968,6 +968,24 @@
 "display.twoPages.detail" = "Shows a document two pages side by side. A wide page is shown on its own.";
 "display.twoPages.cover" = "Cover Page Alone";
 "display.twoPages.cover.detail" = "Shows the first page on its own, so the pages after it pair as a printed book does.";
+
+/* Approved OCR and Signature panels */
+"ocr.panel.languages" = "Languages";
+"ocr.panel.languagesHelp" = "Choose languages used in this document.";
+"ocr.panel.moreLanguages" = "More languages";
+"ocr.panel.chooseLanguage" = "Select at least one language.";
+"ocr.panel.rangeHint" = "For example: 1–3, 5";
+"ocr.panel.invalidRange" = "Enter page numbers within this document, such as 1–3, 5.";
+"ocr.panel.outputHelp" = "Extract text for search and copying. Searchable PDF is a separate export option.";
+"signature.saveThenPlace" = "Save first, then place it on your page.";
+"ocr.panel.selected" = "Selected pages: %d";
+"ocr.panel.start" = "Recognize %@";
+"ocr.panel.completed" = "Pages recognized: %d of %d";
+"ocr.panel.incomplete" = "Some pages could not be recognized or saved. Try again.";
+
+/* Spacious Home */
+"home.searchLibrary" = "Search your library";
+"home.myFolders" = "My Folders";
 
 /* Scan Studio visual preview */
 "scanner.mode.whiteboard" = "Whiteboard";

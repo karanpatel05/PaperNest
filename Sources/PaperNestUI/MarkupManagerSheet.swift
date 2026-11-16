@@ -26,7 +26,10 @@ struct MarkupManagerSheet: View {
                 if let page {
                     Section {
                         MarkupSelectionPreview(page: page, objects: objects.filter { selected.contains($0.id) })
-                            .frame(height: 180).accessibilityHidden(true)
+                            .frame(height: 180)
+                            .padding(12)
+                            .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 16))
+                            .accessibilityHidden(true)
                     }
                 }
                 Section {
@@ -47,7 +50,9 @@ struct MarkupManagerSheet: View {
                                     Image(systemName: selected.contains(object.id) ? "checkmark.circle.fill" : "circle")
                                         .foregroundStyle(Theme.accent)
                                 }
+                                .padding(10)
                                 .frame(minHeight: 44)
+                                .background(selected.contains(object.id) ? EditorChrome.lavender : Color.clear, in: RoundedRectangle(cornerRadius: 12))
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -79,6 +84,8 @@ struct MarkupManagerSheet: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(EditorChrome.secondaryBackground)
             .disabled(busy)
             .navigationTitle(L10n.manageMarkup)
             #if os(iOS)
@@ -95,6 +102,7 @@ struct MarkupManagerSheet: View {
                 Button(L10n.ok) { errorMessage = nil }
             } message: { Text(errorMessage ?? "") }
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 440, idealWidth: 520, minHeight: 360, idealHeight: 620, maxHeight: 680)
         #endif

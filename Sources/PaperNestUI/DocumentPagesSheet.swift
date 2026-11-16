@@ -30,6 +30,8 @@ struct DocumentPagesSheet: View {
                                     PageImageView(page: page, pixelSize: 160,
                                                   accessibilityLabel: L10n.pageLabel(index + 1, of: model.pages.count))
                                         .frame(width: 56, height: 76)
+                                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                                        .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(EditorChrome.border, lineWidth: 0.75) }
                                         .accessibilityHidden(true)
                                     Text(L10n.pageLabel(index + 1, of: model.pages.count))
                                         .font(.body).multilineTextAlignment(.leading)
@@ -62,6 +64,15 @@ struct DocumentPagesSheet: View {
                             .accessibilityLabel(L10n.more)
                             .accessibilityIdentifier("pages-more-\(index + 1)")
                         }
+                        .padding(10)
+                        .background(model.selectedPageID == page.id ? EditorChrome.lavender : EditorChrome.surface,
+                                    in: RoundedRectangle(cornerRadius: 14))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(model.selectedPageID == page.id ? EditorChrome.purple.opacity(0.45) : EditorChrome.border, lineWidth: 0.75)
+                        }
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                         .accessibilityElement(children: .contain)
                     }
                     .onMove { offsets, destination in
@@ -69,6 +80,8 @@ struct DocumentPagesSheet: View {
                     }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(EditorChrome.secondaryBackground)
                 .accessibilityIdentifier("pages-list")
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
@@ -89,7 +102,7 @@ struct DocumentPagesSheet: View {
                 }
                 .disabled(model.selectedPage == nil)
                 .accessibilityIdentifier("pages-actions")
-                .background(Theme.surface)
+                .background(EditorChrome.surface)
             }
             .disabled(busy || model.isChangingNotebookPage)
             #if os(iOS)
@@ -104,7 +117,7 @@ struct DocumentPagesSheet: View {
                             doneButton
                         }
                         historyActions
-                    }.padding(12).background(Theme.surface)
+                    }.padding(16).background(EditorChrome.surface)
                 }
             }
             .toolbar {
@@ -123,6 +136,7 @@ struct DocumentPagesSheet: View {
         .frame(minWidth: isEmbedded ? nil : 440, idealWidth: isEmbedded ? nil : 580,
                minHeight: isEmbedded ? nil : 400, idealHeight: isEmbedded ? nil : 620)
         #endif
+        .toolPanelAppearance(isEmbedded: isEmbedded)
         .interactiveDismissDisabled(busy)
         .proPaywall($proFeature)
         .sheet(item: $extractRequest, onDismiss: {
@@ -154,7 +168,10 @@ struct DocumentPagesSheet: View {
 
     private func action(_ title: String, icon: String, id: String, run: @escaping () -> Void) -> some View {
         Button(action: run) { Label(title, systemImage: icon).fixedSize(horizontal: true, vertical: false).frame(minHeight: 44) }
-            .buttonStyle(.bordered).accessibilityIdentifier(id)
+            .buttonStyle(.bordered)
+            .tint(EditorChrome.purple)
+            .buttonBorderShape(.roundedRectangle(radius: 12))
+            .accessibilityIdentifier(id)
     }
 
     private func selectPage(_ id: PageID) {

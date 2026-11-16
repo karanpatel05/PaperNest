@@ -44,18 +44,24 @@ final class DocumentModel {
     /// is useful before the last page is done, and a failure on one page does
     /// not discard the others.
     func recognizeText(on pageID: PageID? = nil) async {
+        let ids = Set(pages.filter { pageID == nil || $0.id == pageID }.map(\.id))
+        _ = await recognizeText(pageIDs: ids, languages: RecognitionLanguagePreference.choice().using)
+    }
+
+    /// Explicit panel choices use the same durable per-page recognition path.
+    /// Returns only the number of completed results actually committed.
+    func recognizeText(pageIDs: Set<PageID>, languages requested: [String], reportsErrors: Bool = true) async -> Int {
         guard SubscriptionStore.shared.allows(.textRecognition) else {
             proPaywall = .textRecognition
-            return
+            return 0
         }
         await finishPendingHistory()
-        guard let store, let renderer = session.environment?.renderer, recognitionProgress == nil else { return }
-        // One resolution for both: the list Vision is given and the list
-        // recorded with the result used to be worked out separately and
-        // agreed only because they started from the same constant.
-        let languages = RecognitionLanguagePreference.choice().using
+        guard let store, let renderer = session.environment?.renderer, recognitionProgress == nil else { return 0 }
+        let languages = TextRecognizer.supportedLanguages(from: requested)
+        let pages = self.pages.filter { pageIDs.contains($0.id) }
+        guard !pages.isEmpty, !languages.isEmpty else { return 0 }
         let recognizer = TextRecognizer(languages: languages)
-        let pages = self.pages.filter { pageID == nil || $0.id == pageID }
+        var completed = 0
         recognitionProgress = (0, pages.count)
         defer { recognitionProgress = nil }
         for (index, page) in pages.enumerated() {
@@ -68,12 +74,14 @@ final class DocumentModel {
                     result.status = .completed
                 }
                 try await store.saveRecognition(result)
+                if result.status == .completed { completed += 1 }
             } catch {
-                presentedError = .saveFailed()
+                if reportsErrors { presentedError = .saveFailed() }
             }
             recognitionProgress = (index + 1, pages.count)
         }
         session.didChange()
+        return completed
     }
 
     var selectedPage: Page? { pages.first { $0.id == selectedPageID } }

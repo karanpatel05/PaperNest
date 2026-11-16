@@ -38,8 +38,7 @@ struct CloudSyncCard: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14))
-            .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.border, lineWidth: 1) }
+            .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
             .contentShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)

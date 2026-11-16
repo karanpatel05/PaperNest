@@ -30,13 +30,26 @@ struct NotebookPageSheet: View {
                 Section {
                     ForEach(PageTemplate.allCases, id: \.self) { paper in
                         Button { template = paper } label: {
-                            HStack {
-                                Text(paper.notebookTitle)
+                            HStack(spacing: 12) {
+                                Image(systemName: paper == .blank ? "doc" : (paper == .grid ? "square.grid.3x3" : "doc.text"))
+                                    .font(.title3)
+                                    .foregroundStyle(EditorChrome.purple)
+                                    .frame(width: 40, height: 44)
+                                    .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 8))
+                                    .accessibilityHidden(true)
+                                Text(paper.notebookTitle).font(.body.weight(.medium))
                                 Spacer()
                                 Image(systemName: template == paper ? "checkmark.circle.fill" : "circle")
                                     .foregroundStyle(Theme.accent)
                             }
-                            .contentShape(Rectangle())
+                            .padding(10)
+                            .background(template == paper ? EditorChrome.lavender : EditorChrome.surface,
+                                        in: RoundedRectangle(cornerRadius: 12))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(template == paper ? EditorChrome.purple.opacity(0.45) : EditorChrome.border, lineWidth: 1)
+                            }
+                            .contentShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("add-page-paper-\(paper.rawValue)")
@@ -46,6 +59,8 @@ struct NotebookPageSheet: View {
                   footer: { Text(L10n.notebookPageFooter) }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(EditorChrome.secondaryBackground)
             .disabled(saving || model.isChangingNotebookPage)
             .navigationTitle(L10n.notebookPageTitle)
             #if os(iOS)
@@ -68,6 +83,7 @@ struct NotebookPageSheet: View {
                 Button(L10n.ok) {}
             } message: { Text(L10n.saveFailed) }
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 340)
         #endif

@@ -1,5 +1,4 @@
 ## 2026-11-16 — Privacy manifest declares system boot time; a test keeps it complete (Claude, owner in session)
-
 Found while answering the owner's "is PaperNest ready to deploy?": `ProcessInfo.systemUptime` is called in
 `ScannerCamera.swift` (how long the outline has held still before the automatic shutter fires) and in
 `NotebookScrollAppend.swift` (whether a Mac scroll followed a wheel event within 0.25 s), and
@@ -24,6 +23,22 @@ Clean worktree at `b17eb70` outside iCloud, plus these three files:
 **Not done:** no archive and no App Store Connect upload, so Apple's own check of the manifest has not run. The test
 covers Apple's list as of today and cannot pick reasons; additions to the list need adding to the test. Frameworks
 from Apple are not scanned (they carry their own manifests); there are no third-party dependencies.
+
+## 2026-11-16 16:17 CST — French XXXL phone verification blocked by test infrastructure (Codex heartbeat)
+
+Usage56% allowed; brief/claims/latest matrix/staging checked, no concurrent build. Existing French XXXL Scan settings test targeted iPhone17 Pro/iOS26.5 (`63992C10-33B4-4CE3-91C3-EE23ECC595A5`), focused rebuild/test, parallel testing off, signing disabled,240s process-group bound. **Timed out exit124**. Runner reported XCTDaemonErrorDomain Code18, “Timed out waiting for AX loaded notification”, before test initialization. No app-flow verdict. `/private/tmp/pn-fr-scanner-phone.log`; result `Test-PaperNest-iOS-2026.11.16_16-12-50--0600.xcresult` in default DerivedData. Initial wrapper invocation exited2 because `/private/tmp/papernest-bounded.py` had been removed; recreated wrapper then ran the one bounded attempt above.
+
+No source edits or new tests. Phone check remains pending; next check should restore healthy simulator accessibility/test startup before retrying, without treating this as a scanner failure. French iPad pass remains prior evidence only. No staging/commits, other work preserved, Vault/VPN deferred.
+
+## 2026-11-16 14:50 CST — French XXXL Scan settings remains reachable and dismissible (Codex heartbeat)
+
+Usage55% allowed. Read Phase3 release and current claims; no staged paths or competing builds. Added `testFrenchLargestTextScanSettingsRemainDismissible` to ScannerWorkspaceUITests.swift, pinning all scanner defaults and using a synthetic pending capture and disposable UUID library. No product edits.
+
+**1 passed23.606s,exit0**, iPad Pro13 M5/iOS26.5 (`046CA563-2BFA-4051-9804-3D17C8E41FF6`), focused rebuild/test bounded240s, signing disabled and parallel testing off. `/private/tmp/pn-fr-scanner-settings.log`. French + accessibilityXXXL: Keep capture, More, French Scan settings, scroll Auto capture fully above Done, tap Done, return to capture screen. Test changes no stored preferences.
+
+Viewed retained screenshot `french-XXXL-scan-settings`, exported `/private/tmp/pn-fr-settings-evidence/24F2292A-63B3-409D-9C45-63E5EFE27FC2.png`: long French toggle label wraps without ellipsis, switch is visible, Terminé remains fully visible at bottom. This checks reachability/dismissal only; not a full contrast/VoiceOver audit, not settings persistence, not camera capture (simulator shows unavailable-camera message behind sheet). Scrolling text is visible beneath translucent navigation title; visual refinement remains possible. Spanish/phone/other scanner surfaces remain pending.
+
+Claims released; no staging/commits, other work preserved. Vault/VPN deferred.
 
 ## 2026-11-16 — Scan Studio Phase 3: Whiteboard and ID / Card are modes that do something, and the scanner has defaults (Claude, owner in session)
 
@@ -145,6 +160,91 @@ two pages named Front and Back; they are not put on one sheet and they do not mo
 imported from Photos or pages from the system scanner. In Card mode a sheet of paper alone in view is close enough
 to a card's shape to be taken. A board whose short side is under 0.3 of its long side is outside Whiteboard's range.
 
+## 2026-11-16 09:08 CST — Shape save failure preserves draft and retries successfully (Codex heartbeat)
+
+Usage55% allowed; brief/latest claims/staging checked. Claude ACTIVE scanner Phase3 respected; no Scanner files edited. Updated only stale setup in `testShapeSaveFailureKeepsDraftAndCanRetry` to create through Notes instead of removed Home Tools and obsolete toolbar assertion. Test change retained; no product changes.
+
+**1 passed34.462s,exit0**, focused rebuilt iPad Pro13 M5/iOS26.5 test (`046CA563-2BFA-4051-9804-3D17C8E41FF6`), UUID disposable library,240s bound, parallel testing off, signing disabled. `/private/tmp/pn-save-retry26.log`. Real second SQLite connection holds BEGIN IMMEDIATE, save shows the expected failure message, dismissing alert keeps the selected ellipse draft, releasing lock allows retry, sheet closes and exactly one markup row appears. Retained screenshot shape-save-failure. This covers database-write contention UI, not every disk/I/O failure or device/runtime.
+
+No commits/staging. iOS27 native color activation remains separately unresolved. Other app-verification backlog and native Mac/device checks remain; Vault/VPN deferred. No new UI feature selected.
+
+## 2026-11-16 08:11 CST — Full XXXL Shape slider/custom-color/save flow passes on iPad26.5 (Codex heartbeat)
+
+Usage55% allowed; brief/current claims/latest results and staging checked. Retained a focused test correction in AppUITests.swift: activate the native well below its wrapped XXXL label and wait for the actual color grid instead of requiring an absent Close accessibility button. No product changes.
+
+**1 passed104.647s,exit0** on iPad Pro13 M5/iOS26.5 (`046CA563-2BFA-4051-9804-3D17C8E41FF6`), focused rebuild/test,240s bound, parallel testing off, signing disabled. `/private/tmp/pn-full-shape26.log`; default DerivedData result `Test-PaperNest-iOS-2026.11.16_08-08-13--0600.xcresult`. Real Notes creation at accessibilityXXXL, Shape position slider value change, width4 selection, native azure77 choice, popover dismissal, changed color label, Add, and saved markup-row appearance all pass. Retained screenshots cover position, width and native picker.
+
+After app termination, read-only SQLite inspection of this run's disposable library `/private/tmp/papernest-accessibility-ui-C672EB49-3045-4231-9767-87221A5E9023` confirms one ink shape: width4 and color(red0.6548919677734375,green0.776458740234375,blue1,alpha1), with edited endpoints. This is stored-state evidence, not merely a changed swatch. Not a relaunch/persistence UI test.
+
+iOS27 native activation remains separately unresolved and reproduces with a minimal native picker outside Shape; do not mark27 passed or rewrite product sheets speculatively. No staging/commits, other work preserved, Vault/VPN deferred. Minimal diagnostic routes are absent; current build is the actual app. Next verification can target another outstanding app flow while retaining the separate27 investigation.
+
+## 2026-11-16 07:09 CST — Bound color changes on iOS26.5; minimal activation still fails on iOS27 (Codex heartbeat)
+
+Usage54% allowed; brief/current claims/latest matrix and empty staging checked. Temporary isolated native picker exposed its bound SwiftUI Color description via a separate Text, instead of relying on the native well's coarse color-name value. No Shape, document or Form in diagnostic route. Disposable UUID libraries; focused rebuilt tests bounded240s each, parallel testing off, signing disabled.
+
+- iPad Pro13 M5/iOS26.5 (`046CA563-2BFA-4051-9804-3D17C8E41FF6`): **1 passed10.418s,exit0**. Native picker opened, azure77 selected, popover dismissed and actual bound Color description changed. Screenshot retained as bound-state-after-selection. `/private/tmp/pn-bound-color26.log`; result `Test-PaperNest-iOS-2026.11.16_07-05-57--0600.xcresult`. Confirms earlier azure==azure AX-name assertion was too coarse for state verification.
+- Same diagnostic on iPad Pro13 M5/iOS27 (`6528AE8B-27E3-44B5-9348-B654556BE3F9`): **1 failed18.204s,exit65**, waiting azure77; no color selection reached. `/private/tmp/pn-bound-color27.log`.
+
+Both temporary RootView wrapper and test restored exactly; no retained source edits/staging/commits. Last compiled bundle is diagnostic; rebuild before normal verification. Comparison supports an iOS27 simulator/native-activation issue outside Shape, not a proven PaperNest sheet bug. Next complete real Shape slider/color/save verification on iOS26.5 with picker-presence and persisted state assertions; track iOS27 activation as a separate runtime-specific investigation instead of speculative product rewrites. Largest-text flow and persistence are not covered by this minimal pass. Vault/VPN deferred, other work preserved.
+
+## 2026-11-16 06:03 CST — Minimal native picker comparison isolates failure beyond Shape (Codex heartbeat)
+
+Usage54% allowed; brief/claims/latest matrix and staging checked. Claimed temporary RootView body wrapper and existing shape-test substitution; both restored exactly, preserving all prior edits. Diagnostic launch rendered only a labelsHidden SwiftUI ColorPicker bound to local Color.blue; no Shape sheet, document, Form, or notebook UI. UUID disposable library. No competing build at comparison start.
+
+- iPad Pro13 M5/iOS27 (`6528AE8B-27E3-44B5-9348-B654556BE3F9`): **1 failed17.442s,exit65**. Center tap on visible36x36 native control; azure77 never appears. Failure hierarchy shows only native Diagnostic color button, value azure. `/private/tmp/pn-minimal-color.log`.
+- iPad Pro13 M5/iOS26.5 (`046CA563-2BFA-4051-9804-3D17C8E41FF6`): **1 failed11.886s,exit65**, but **picker opened, azure77 existed and was tapped, popover dismissed successfully**. Only final AX-value inequality failed: native color label stayed azure (initial blue and chosen shade share this coarse label). `/private/tmp/pn-minimal-color26.log`. This is not proof the bound color failed to change; diagnostic must expose actual bound RGB/state to test it.
+
+Both focused rebuilt tests bounded240s, parallel testing off, signing disabled. This comparison shows the observed iOS27 activation failure reproduces without Shape integration; avoid speculative product-sheet rewrites. It does not establish an OS bug (simulator/test delivery still possible). Next expose bound color state in isolated diagnostic and compare native activation on runtimes; native AX color-name inequality alone is insufficient. Prior missing-Close assertion also remains invalid on some iPad popovers.
+
+No diagnostic route/test remains in source. Last built app/test contain temporary route, so rebuild before normal testing. No staging/commits; scanner/other work preserved, Vault/VPN deferred. Original large-text/save flow remains unverified.
+
+## 2026-11-16 05:01 CST — Retained app diagnostics do not identify picker presentation failure (Codex heartbeat)
+
+Usage54% allowed; brief/current claims/latest matrix and empty staging reviewed. Exported diagnostics from `Test-PaperNest-iOS-2026.11.16_03-58-36--0600.xcresult` to `/private/tmp/pn-presentation-diagnostics` with xcresulttool (exit0). Read the captured application stdout/stderr (98,177 lines); searched for UIColorPicker, already-presenting, attempt-to-present, not-in-window, and presentation failure/error messages: **zero matches**. AX replies remain responsive and the azure77 query returns no matches. Absence of these diagnostics does not rule out a presentation or event-delivery issue.
+
+No new UI test or source change this turn; retained previous failure remains unresolved. Next actionable experiment remains minimal native ColorPicker outside Shape, with a disposable launch route and actual native-picker existence assertions; retain no diagnostic route in product. No more unchanged coordinate/duration retries. No staging/commits; other sessions' work preserved; Vault/VPN deferred.
+
+## 2026-11-16 04:01 CST — Longer native-well press does not resolve activation (Codex heartbeat)
+
+Usage53% allowed; brief/claims/latest results and empty staging checked. Temporary standard-text picker-only diagnostic used a retained before-tap screenshot and a 0.15-second press at the trailing well, with actual azure77 presence instead of Close. Focused rebuild/test on iPad Pro13 M5/iOS27, disposable library,240s bound, parallel testing off and signing disabled: **1 failed50.448s,exit65** waiting for azure77. `/private/tmp/pn-well-duration.log`. Longer contact did not resolve this failing activation; no successful color selection/save claimed. Failure includes full hierarchy for subsequent inspection. This single test does not isolate timing from screenshot overhead.
+
+Restored entire test exactly to pre-turn contents; no retained source/product edits, staging or commits. Avoid more coordinate/duration retries. Next useful isolation is a minimal native ColorPicker presentation comparison outside the current Shape sheet, or presentation diagnostics from this run, to distinguish native control/test infrastructure from sheet integration. No new UI feature selected while this verification remains open. Other sessions' work and scanner preserved; Vault/VPN deferred. Last compiled bundle is temporary diagnostic; rebuild for normal tests.
+
+## 2026-11-16 03:05 CST — Failed picker activation confirmed in recording and event (Codex heartbeat)
+
+Usage53% allowed; brief/current claims/latest evidence read, staging empty. Read-only inspection of retained `Test-PaperNest-iOS-2026.11.16_02-06-21--0600.xcresult`, attachments exported to `/private/tmp/pn-grid-evidence`. No new test run or source changes.
+
+Viewed recording frame36s (`/private/tmp/pn-grid36.png`, recording duration37.65s): Shape is still open with visible native color well at roughly(760,934.5) points; no native picker. Failure hierarchy `AC358126-F09F-450C-99CC-0A38E2F6A5E6.txt` likewise contains Custom Color at(258,920.5,516,28) but no Grid/Spectrum/Sliders picker. Parsed synthesized tap attachment `575627E4-99FE-4545-92A5-35C8416AF517` (binary plist): down/up both at(761.1,934.5). Therefore this failed run really did target the visible well, not the label center; missing azure77 was not merely a wrong query for an open picker. This does not prove delivery to the control or a product bug. Earlier run still proves the picker can open without Close.
+
+Next isolate the control's activation/presentation timing or inspect app presentation logs, with explicit before/after snapshots and actual picker-presence assertions; do not repeat the same geometry-only diagnostic. Color selection/save remains unverified. No commits/staging; scanner and other sessions' work preserved; Vault/VPN deferred.
+
+## 2026-11-16 02:09 CST — Native picker can open without a Close accessibility button (Codex heartbeat)
+
+Usage allowed53%; brief/claims/latest matrix reviewed; staging empty and no competing build at start. Claimed only existing shape-test diagnostics and these notes; no product/scanner changes.
+
+Standard-text picker-only diagnostic on iPad Pro13 M5/iOS27 (`6528AE8B-27E3-44B5-9348-B654556BE3F9`), tapping trailing native well at normalized(0.975,0.5): **1 failed48.050s,exit65** at expected Close. Crucially, failure AX **does contain native picker**: popover(345,643.5,401,582.5), Grid/Spectrum/Sliders, Color Spectrum and `azure 77`. No Close button is exposed. `/private/tmp/pn-standard-well.log`. Thus the previous Close assertion alone is not a reliable presentation check; native picker can open in this app on this simulator. Does not establish successful color selection/save.
+
+Follow-up diagnostic removed only Close assertion and waited for `azure 77`: **1 failed43.207s,exit65**, color query did not appear within5s. `/private/tmp/pn-standard-well-grid.log`. Both runs bounded240s, rebuilt, disposable libraries, parallel testing off, signing disabled. No root cause inferred for second failed activation; targeted well interaction is not yet repeatable. Next inspect second-run video/popover hierarchy before retaining any test change; use actual picker presence rather than Close as success criterion.
+
+Restored entire diagnostic test to its exact pre-turn contents (XXXL launch, slider/width checks, original tap and assertions). No retained source edits, staging or commits. Last built bundle is diagnostic; rebuild before normal testing. Largest-text native picker, color selection/persistence and remaining platform checks still open; Vault/VPN deferred.
+
+## 2026-11-16 01:02 CST — Standard-text native color picker diagnostic (Codex heartbeat)
+
+Usage allowed (52% used); current claims and empty staging checked. Temporary diagnostics only in the existing shape test, all restored afterward; no product edits or commits. iPad Pro 13-inch M5, iOS27, 6528AE8B-27E3-44B5-9348-B654556BE3F9, disposable library.
+
+- Warm build/test with standard text: **1 failed,95.233s,exit65**, bounded240s. Notebook creation and position slider reached, but the large-text-specific `Line width` StaticText query had no match at standard size. `/private/tmp/pn-standard-color-warm.log`. This was a test-query failure before the picker, not a product verdict.
+- Removed only position/width actions temporarily to isolate picker: **1 failed,43.436s,exit65**, bounded180s. Custom Color exists, passes viewport/hittability, is tapped at35.01s; native Close never appears. AX still shows Custom Color (258,920.5,516,28), value dark blue. `/private/tmp/pn-standard-picker-only.log`; result `Test-PaperNest-iOS-2026.11.16_00-59-33--0600.xcresult` in default DerivedData. Second build began while first run was finishing result cleanup; first had already reported its assertion failure, so avoid attributing any timing to product behavior.
+
+The same Close assertion fails at standard text, but a label-center tap may still miss the native well; this does not establish a product defect or explain the previous XXXL well-targeted failure. Next isolate native well activation at standard size and inspect presentation evidence. No additional unchanged retries. Original XXXL launch and slider/width assertions restored exactly; last built test bundle remains the temporary standard-text picker-only diagnostic, so rebuild before normal verification. Scanner work untouched; Vault/VPN remain deferred.
+
+## 2026-11-16 00:05 CST — Standard-text color-picker isolation interrupted during app launch (Codex heartbeat)
+
+Usage allowed (52% used); reviewed brief, latest claims and staged paths (none). Claude released Scan Studio functionality; preserved it and all unrelated edits.
+
+Temporarily changed only the existing shape-slider/color-picker test launch to standard text on iPad Pro 13-inch M5 / iOS 27 (`6528AE8B-27E3-44B5-9348-B654556BE3F9`). Rebuilt with focused `xcodebuild test`, parallel testing disabled, code signing disabled, 240-second process-group bound. **Timed out, exit124**. `/private/tmp/pn-standard-color.log` initially stalled at build settings, then built and started the test. At the timeout boundary app launch reported NSMachErrorDomain -308, “server died”; this may be a consequence of process-group termination. No picker verdict. Do not treat that launch error as a separately proven product fault.
+
+Restored original accessibilityXXXL launch arguments exactly. No retained source changes, staging or commits this turn. Standard-text isolation remains pending; next check should account for the cold build/startup time before another bounded UI run. Previous well-tap failure remains unresolved, not a confirmed product defect.
+
 ## 2026-11-15 — Scan Studio: presets and Cleanup change the page, and several pages can be edited together (Claude, owner in session)
 
 Owner: "Codex is designing and implementing additional scanning features, you have to implement functionality", then
@@ -249,6 +349,19 @@ shadows lightens it. A page with almost no paper in it, a photograph, is left al
 With Black & White the page is always evened out and taken to white, so those two sliders change nothing there;
 Sharpen text still does.
 
+## 2026-11-15 23:03 CST — Color-well geometry compared against recording (Codex heartbeat)
+
+- Exported the failed warm diagnostic result to `/private/tmp/pn-well-evidence`. Extracted retained recording frame at142.388s to `/private/tmp/pn-well-end.png`; inspected original2064x2752 image. Shape remains onscreen with Custom Color label and leading well visible.
+- Failure AX custom-color bounds are x258,y835,w309.5,h95.5 points. Temporary tap (0.05,0.85) computes approximately (273.5,916.2) points, matching the visible well center near (272,916) after accounting for2x screenshot scale. Thus the prior simple label-center miss is insufficient to explain the well-targeted failure. The recording alone does not establish delivered events or the underlying presentation cause.
+- No new test run/product change. Next isolate native picker in a simpler, standard-text interaction before further XXXL changes; inspect presentation logs if that also fails. Preserve the failing route's evidence rather than assume a renamed Close button. No commits/staging; Claude's active scanner work untouched. Scoped docs claim released.
+
+## 2026-11-15 22:08 CST — Color-well targeted tap remains inconclusive (Codex heartbeat)
+
+- Temporarily changed only the XXXL custom-color tap to element-relative (0.05,0.85), matching the prior retained screenshot's leading/bottom well. No scanner or product changes; Claude's active Scan Studio work preserved.
+- Initial build+test `/private/tmp/pn-color-well-tap.log` hit **240-second total bound,exit124**, before diagnostic verdict. Warm `test-without-building` `/private/tmp/pn-color-well-tap-warm.log` **1 failed,155.794s,exit65**, within240sec bound: still waiting native color-picker Close (temporary line1407). Slow/retried AX queries occurred; no successful color change or saved shape claimed.
+- The simple well-offset hypothesis did not produce a passing interaction. Reverted temporary test tap exactly; supported Notes setup remains. Next inspect this run's retained AX/screenshot geometry or isolate native color-picker activation in a smaller test, rather than repeat unchanged runs. No product defect/root cause inferred.
+- Owned iPad27 ended shut down. No staging/commits; scoped claims released. Source is restored, while the last built diagnostic test bundle contains the temporary tap: rebuild before running the restored test.
+
 ## 2026-11-15 21:39 CST — The iPad UI run on the committed editor fix: 27 passed, none failed (Claude)
 
 Closes the row left open in the entry below ("Still running when this was committed"). The same 28 tests on the same
@@ -319,6 +432,18 @@ modifiers are added, and the Simulator's device stack is what catches it.
 **Left on the iPad:** a 600 KB synthetic library in the app's `tmp` (`PaperNestUITest-F364B5C5-…`), copied there for a
 launch that the lock then refused. iOS clears `tmp`.
 
+## 2026-11-15 20:05 CST — Color-picker failure evidence reviewed (Codex heartbeat)
+
+- Exported prior xcresult attachments to `/private/tmp/pn-large-shape-evidence`; inspected width screenshot and extracted screen-recording frame114s at `/private/tmp/pn-large-shape-at114.png`. Shape remains presented after the custom-color tap; no native color-picker panel is visible. Thus a renamed Close button alone does not explain the failure.
+- At accessibilityXXXL, Custom Color label occupies a broad row while its small native color well wraps underneath at the leading edge. AX reports one button covering x258,y847.5,w309.5,h95.5; default center tap can target the label area rather than the well. This is a hypothesis for the next focused test: tap the observed well within the element bounds and verify native picker appears before changing product code. Do not infer a confirmed framework or save defect.
+- Background Document Tools heading and tiles visibly fragment/truncate at XXXL; retained screenshot documents an additional layout follow-up once current crash work is released. No new tests, source edits, staging or commits. Claude actively owns DocumentView.body physical-device crash fix; no build or edits to that work.
+
+## 2026-11-15 19:05 CST — Large-text shapes reach color-picker boundary (Codex heartbeat)
+
+- Updated only `testLargeTextShapeSlidersAndSystemColorPicker` setup to use existing supported Notes creation helper. Removed obsolete debug Home Tools route and its old notebook-toolbar/sidebar-width assumptions; shape slider, width, color and saving assertions preserved.
+- iPad6528AE8B/iOS27/accessibilityXXXL: **1 failed,120.906s,exit65**, `/private/tmp/pn-nov15-large-shapes.log`,240-second bound. Creation and editor/shape navigation succeed; position slider value changes and width4 Selected assertion pass. Failure at AppUITests.swift:1406 waits for native color picker button labelled Close after custom-color tap. No color change or saved-shape pass claimed.
+- Next inspect retained failure hierarchy/screenshots for custom-color presentation and current native picker semantics; this alone does not establish a product defect. No speculative product change. Retained supported-route test update, no staging/commits. Owned simulator ended shut down; own claims released.
+
 ## 2026-11-15 — Folders offer New Note beside Import File, on iPhone, iPad and Mac (Claude, owner in session)
 
 Owner: "When created new folder, along with import file, it should have option to create new Note", then "also on
@@ -368,6 +493,17 @@ PowerPoint, Pages, Numbers and Keynote stay files, not tried. Adding an Office f
 pages (`insertPages`) still says unsupported. The Mac was not looked at on screen. `--sanitize=thread` was not run on
 the Mac Word reading; the Mac test reads Word off the main thread and passed.
 
+## 2026-11-15 — Approved OCR and Signature panels (Codex)
+
+- Shared compact panel header, scrolling cards and pinned footer; trailing inspector on wide Mac/iPad, native sheet on iPhone. OCR exposes actual Vision-supported languages with preserved priority, All/Current/Range selection, validated ranges, real thumbnails, progress and committed completion counts. Signature keeps existing draft/store/gating/placement logic and adds the approved visual treatment. No schema, subscription or product-brief changes.
+- `GIT_DIR=/dev/null ./scripts/test.sh`: **passed, exit 0; 1,080 tests** across six reported target runs (346 + 49 + 191 + 187 + 179 + 128). Log `/tmp/pn-panels-all-tests.log`. After final presentation adjustments, focused OCR selection/workflow, recognition, signature/name-field and localization: **19 tests in 6 suites passed**, `/tmp/pn-panels-focused-last.log`.
+- Final `./scripts/build-mac-app.sh`: **passed**, `/tmp/pn-panels-mac-header.log`; app under `~/Library/Caches/PaperNest/build-17de0868e51d/dist/PaperNest.app`. Generic iOS Simulator `xcodebuild build-for-testing`: **passed**, `/tmp/pn-panels-ios-release-check.log`. No Swift compiler errors/warnings observed; Xcode emits optional AppIntents metadata diagnostics.
+- Native Mac, isolated ad-hoc signed app and `/tmp/pn-panel-design-mac-library`: selected pages 1 and 3, real OCR completed 2/2; drew signature, verified unnamed Save disabled, named/saved/placed it, undo/redo changed the page 1→0→1 stroke, reopened saved selection. Test app quit. No real user library used.
+- iPad Pro 13-inch (M5), iOS 26.5: `testOCRPanelSelectionAndRecognition` **passed 142.942 s**, exercising en/fr/es, empty-language disabled action, invalid/valid ranges, recognition result and close; `testSavedSignaturePlacesAndSurvivesReopen` **passed 60.438 s**, drawing/naming/saving/placement/undo/redo/reopen. Result `/tmp/pn-ocr-signature-ipad-final.xcresult`.
+- iPhone 17 Pro, iOS 26.5: OCR test **passed 182.919 s**, all three languages; `/tmp/pn-ocr-signature-phone-final.xcresult`. Signature final current-source build/run **passed 89.012 s**, `/tmp/pn-signature-phone-header.xcresult` (exit 0), including the compact-header regression, drawing, unnamed/named Save states, saved selection, placement, undo/redo and relaunch. Final screenshot verifies readable saved name and white primary-action label.
+- Initial checks retained: first focused run failed three French colon-spacing assertions and two incorrect new-test assumptions that background import OCR left page 1 empty; corrected localized spacing and asserted page 1 stays equal to its pre-operation recognition. Initial iPad OCR timed out at 45 s in French; failure hierarchy confirms completed 1/1 result appeared afterward. Rerun passed, timeout now 120 s. Initial iPhone Signature test failed before panel entry with a long notebook title. Opening UIKit’s `OverflowBarButtonItem` still exposed only Export: the custom Document Tools toggle was omitted entirely. The compact header now groups its 44-point Find/Export/Tools controls as one fixed-size toolbar item, preventing that automatic overflow loss; wide header behavior stays intact. iPad history helper now scrolls the actual horizontal toolbar instead of searching the PDF tools list.
+- Screenshot review caught dark primary-action text and cramped saved-signature names; final source uses white action labels and gives signature names a separate line below previews. Actual OCR en/fr/es and signature screenshots are in xcresult attachments. Physical devices, screen-reader operation, dark-mode and accessibility-size runtime checks were not performed in this slice. Semantic adaptive tokens, Dynamic Type, existing VoiceOver labels and en/fr/es localization remain in use. Full-tree diff-check still reports unrelated pre-existing trailing whitespace in `DocumentUtilitiesSidebar.swift:264`; untouched.
+
 ## 2026-11-15 — Text files import as pages that open ready to mark up (Claude, owner in session)
 
 Owner: "on iphone when i import any dicuments it does not open notes and pdf section rrady for edit", then, asked
@@ -406,6 +542,39 @@ route for these; its `NSAttributedString` reads Word but not Excel. Nothing of t
 
 **Not run.** The Mac was not looked at; the importer is shared, so a text file becomes pages there too, unverified on
 screen. No other UI test was run.
+
+## 2026-11-15 16:57 CST — iPad27 XXXL Notes creation passes on current tree (Codex heartbeat)
+
+## 2026-11-15 — Mobile tool-panel screenshot verification
+
+- `xcodebuild test ... -only-testing:PaperNest-iOSUITests/AppUITests/testCaptureUpdatedToolPanels`: iPad Pro 13-inch M5, iOS26.5, PASS (1 test, 41.570s), `/tmp/pn-ipad-panels-20261115.log`, `/tmp/pn-ipad-panels-20261115.xcresult`.
+- `xcodebuild test-without-building` with the same test: iPhone17Pro, iOS26.5, PASS (1 test); `/tmp/pn-iphone-panels-20261115.log`, `/tmp/pn-iphone-panels-20261115.xcresult`.
+- Opened Signature, canceled, opened Pages, closed, revealed Recognize Text. Exported and visually inspected all six actual screenshots. Disposable Crop target fixture only. OCR has an action in Document Tools, not a separate settings panel. This check does not exercise signature saving, page mutations or OCR execution. No product functionality changed.
+
+
+- Existing `AppUITests.testLargeTextNotebookCreationFromNotes` **1 passed,35.145s,exit0**, `/private/tmp/pn-nov15-creation-warm.log`,240-second bound. iPad6528AE8B/iOS27. Normal text-field focus/typing and identifier-based toolbar Create verified in log, followed by editor-text-box assertion. Disposable UUID library; no prefilling or diagnostic source changes.
+- Prior keyboard-associated failure is no longer reproduced by this route on current source after intervening panel/app changes. This result does not identify which change resolved it or prove every creation route. No speculative fix needed. Remaining shape/color accessibility checks should use supported Notes navigation; Home Tools entry was removed by owner instruction.
+- Earlier total-bound run remains incomplete, not a test failure. Owned simulator ended shut down; no other simulator touched. No source edits/staging/commits; scoped documentation claims released. Repaired the previous interrupted-baseline heading separation without changing another session's report.
+
+## 2026-11-15 — Document and utility panel visual redesign (Codex)
+
+Owner scope: approved panel styling on Mac/iPad/iPhone, presentation only. Shared semantic lavender chrome; rounded selection/paper cards; compact headers; scrolling native controls. Export/Compress use the existing wide editor inspector, with explicit close callbacks and separate embedded/sheet chrome. Signature/forms/pages retain inspectors. Other native placement/library sheets retain their routes. No processing/store/schema/subscription changes. Existing strings and accessibility identifiers preserved; added `export-close`.
+
+- `./scripts/build-mac-app.sh`: passed; final `GIT_DIR=/dev/null ./scripts/build-mac-app.sh` after the binding fix passed (31.17s), `/tmp/pn-panel-design-mac-final-pass.log`.
+- `./scripts/build-ios-sim-app.sh`: passed, log `/tmp/pn-panel-design-ios.log`; simulator-placeholder OS-version diagnostic from Xcode, no source compiler error.
+- `./scripts/test.sh --filter LocalizationTests`: passed, 5 tests / 1 suite, all en/fr/es key and argument checks. `/tmp/pn-panel-design-localization.log`.
+- iPhone 17 Pro / iOS26.5: export format/page selection + Copy confirmation passed (16.855s). Existing navigation test initially failed its outdated `panel.exists == isPad` assertion: Option6 now opens a phone drawer. Updated assertion to expect the revealed drawer. Final phone navigation/close-reopen rerun stalled before test launch in Xcode coordinated project-file read and was stopped; no pass claimed for that rerun. Logs `/tmp/pn-panel-design-phone-ui.log`, `/tmp/pn-panel-design-phone-final.log`.
+- iPad Pro13 / iOS26.5: initial embedded Export run stalled at app-idle, app ~100% CPU. Stopped the owned run; sampled `/tmp/pn-panel-ipad-sample.txt` shows repeated layout/sheet-presentation resolution. Removing embedded sheet traits and restoring original inspector width did not resolve it. Restoring the original direct inspector binding and using `.constant(false)` for suppressed sheets instead of custom closures capturing the entire editor resolved the loop; dismissal cleanup stays in `onChange`. Close/reopen regression test passed (15.705s), `/tmp/pn-panel-design-ipad-bindings.log`; export format/page selection + Copy passed (14.632s), `/tmp/pn-panel-design-ipad-final.log`. Both **TEST SUCCEEDED**.
+- Mac native disposable library `/tmp/pn-panel-design-mac-library`: Export inspector opened, PDF→JPEG selection updated, close restored editor controls; Compress inspector opened, Light selection and existing compression action returned no-gain Save/Share result, close restored editor. French compact-width Export/Compress visually checked. Full-width export actions fit French labels. Isolated verification app closed. No real library used.
+- Known limits: final phone navigation rerun blocked before launch; exhaustive panel-by-panel/Dynamic Type/VoiceOver/dark-appearance matrix not run. AppleInterfaceStyle launch argument did not change observed appearance, so no dark-mode visual pass claimed. No hardware camera/purchase testing required for this visual-only slice.
+- Filesystem: iCloud intermittently blocked source/Git/doc reads; downloaded requested files. Final retries use `GIT_DIR=/dev/null` to avoid optional root SCM metadata traversal; no Git config/index changes. Separate concurrent `DocumentUtilitiesSidebar.swift` edit left untouched (its whitespace issue is outside this slice).
+
+
+## 2026-11-15 — iPad27 notebook creation baseline interrupted (Codex heartbeat)
+
+- Usage available (0% used); read current Claude releases, shared claims and staged paths before work. No staged paths or concurrent xcodebuild observed. Rechecked existing AppUITests.testLargeTextNotebookCreationFromNotes on iPad6528AE8B/iOS27 after intervening app changes; no source edits.
+- `/private/tmp/pn-nov15-creation-baseline.log`: **240-second total bound,exit124; no completed test verdict**. Substantial dependency/app rebuild preceded runner startup; final UI log is Notes-create tap, before keyboard/Create diagnostic. Cannot count this as a new reproduction or pass of the prior keyboard issue. Next use the warmed build for one bounded baseline rerun before resuming focus-only/typing isolation.
+- Runner ended owned simulator shut down. Other booted simulators untouched. No source changes/staging/commits; scoped documentation claims released. Earlier successful prefilled/no-keyboard comparison remains the last conclusive diagnostic.
 
 ## 2026-11-15 — Document Tools on the Mac: the rest seen, two more Mac bugs fixed (Claude)
 
@@ -7219,3 +7388,40 @@ Notes/PDF redesign remains a design preview pending owner review; no PDF reliabi
 - A held-button drag built from separate `mouse_move` steps did *not* reorder. It most likely never sent real drag events, and it is not evidence against the app.
 - **Real clicks on thumbnails: passed.** They select the page; this is the tap-gesture path, not an accessibility press.
 - **Hover: passed.** With the real pointer resting on Rotate, the tile drew the light purple wash and border, and it cleared once the pointer moved off. The Annotate header showed the same wash. The tool's bare cursor moves do not trigger hover; a scroll event at the spot did. The page-3 highlight left stuck by the background drags was gone after the first real-pointer event.
+
+## Spacious Home — Codex, 2026-11-15
+
+Implemented the approved spacious Option A on iPhone, iPad and Mac: single greeting, existing brand, top-right Profile, library search, compact existing actions, actual recent previews and folder cards. Home returns clear the previous library search so folder navigation cannot inherit an invisible query. Existing All Documents sorting/selection and editor behavior remain unchanged.
+
+- `GIT_DIR=/dev/null ./scripts/build-mac-app.sh`: **passed**, final build 7.70 s, no compiler warnings (`/tmp/pn-home-mac-verified.log`).
+- `GIT_DIR=/dev/null ./scripts/test.sh --filter 'LocalizationTests|LibraryWorkflowTests'`: **17 tests passed** in 2 suites (`/tmp/pn-home-unit.log`).
+- Xcode iOS Simulator build/test, `PaperNest-iOS`, iPhone 17 Pro (63992C10-…): **3 tests passed**: `testHomeHasOneSetOfQuickActionsAndFourPhoneTabs` (18.796 s), `testSpaciousHomeProfileAndSearch` (65.744 s), `testStudioHomeLocalizedAndAccessible` (19.588 s). Results: `/tmp/pn-home-phone.xcresult`.
+- Same three tests on iPad Pro 13-inch M5 (046CA563-…): **3 tests passed** (16.359 s, 93.107 s, 22.490 s respectively). Includes search → document → Home → See All regression ensuring the old query is cleared. Results: `/tmp/pn-home-ipad.xcresult`.
+- Final iPad localized/accessibility test after layout refinement: **passed**, 25.183 s. English/French/Spanish launches, Spanish accessibility XXXL and opening New Note at that size verified. Results: `/tmp/pn-home-ipad-large.xcresult`.
+- Native Mac, isolated `com.example.papernest.homecheck` app and synthetic `/tmp/pn-panel-design-mac-library`: **passed** Profile open/close, search result opening, return Home, real empty-folder navigation with query cleared, recent context menu and reopening a 3-page document. Dark Home visually checked. Test app closed afterward.
+- Visually inspected normal iPhone/iPad and iPad Spanish XXXL screenshots. Initial iPhone XXXL brand wrapping prompted a dedicated full-width brand line; final phone check is recorded below.
+- One final iPhone search rerun stalled before any tests launched; stopped that owned run and restarted only its simulator before retrying. This attempt is **not a pass** (`/tmp/pn-home-phone-final.log`).
+- Scoped `git diff --check`: **passed**. No physical-device, live camera, VoiceOver speech or complete app regression claimed for this visual slice. Scan remains unavailable in Simulator as before. Tests used synthetic content only.
+- Final fresh iPhone build/test: **2 tests passed, 0 failures** (96.730 s): search/Profile/return-Home regression 75.613 s, localized/XXXL interaction 21.117 s. Result `/tmp/pn-home-phone-retry.xcresult`; visually confirmed full-width PaperNest brand now fits at XXXL. The preceding test-without-building attempt failed during runner preparation with signal TERM, before tests (`/tmp/pn-home-phone-verified.xcresult`); it is not an app assertion failure or a pass.
+
+
+## Home sample fidelity correction — Codex, 2026-11-15
+
+Owner reported that the initial implementation did not match the approved sample. Compared directly with the A boards; corrected oversized thumbnails, rounded/shadowed action cards, folder presentation, Profile glyph, subtitle and Home background. Home shows three recent items and two folder columns at normal sizes. The actual brand, native sidebar selection, real metadata and existing navigation remain; this is not a claim of pixel-identical native window chrome.
+
+- Mac build: initial 9.08 s and final folder-layout build 14.32 s passed. Final accessibility branch build recorded below.
+- LocalizationTests: **5 passed**, 0.055 s (`/tmp/pn-home-match-localization.log`).
+- iPad build/test: populated synthetic Home/folder test **passed** (44.415 s) and en/fr/es Profile/search regression **passed** (72.867 s), `/tmp/pn-home-match-ipad.xcresult`. Final folder layout populated test **passed**, 16.719 s (`/tmp/pn-home-match-ipad-final.xcresult`). Rotation was requested, but the screenshots remained portrait; landscape visual verification is not claimed.
+- iPhone populated Home/folder test **passed** on both runs (`/tmp/pn-home-match-phone.xcresult`, `/tmp/pn-home-match-phone-verified.xcresult`). The accompanying XXXL creation check failed. An attempted extra-scroll adjustment also failed; reverted it. Restored the prior full-width leading layout for accessibility action buttons, preserving centered compact styling at normal sizes. Final en/fr/es/XXXL interaction run **passed**, 21.884 s (`/tmp/pn-home-match-large.xcresult`). No deeper framework root-cause claim.
+- One intermediate UI test compile failed because Thread.sleep was used in an async screenshot test; changed it to Task.sleep and subsequent iOS builds passed.
+- Native Mac disposable `com.example.papernest.homematch`, synthetic `/tmp/pn-home-match-mac-library`: visually checked dark Home at 900×570 with all three cards and two folders visible; Profile open/close passed. Test app closed afterward. No user library accessed.
+- Actual populated phone/iPad screenshots: `docs/design/mockups/verification-2026-11-15/home-iphone-built.png` and `home-ipad-built.png`. Blank pages are synthetic notebook fixtures, not decorative content in the product.
+- Physical devices, VoiceOver speech and a full app regression were not run for this correction.
+- Final Mac build after accessibility action-layout correction: **passed**, 6.64 s, no compiler warnings (`/tmp/pn-home-match-mac-verified.log`). Scoped diff whitespace check passed.
+## 2026-11-15 21:33 CST — Scan Studio visual preview UI (Codex)
+
+- Added presentation-only Scan UI in `ScannerFeaturePreview.swift`: future Whiteboard and ID/Card mode chips, page preset strip, Cleanup sheet with local sliders, and batch-selection toolbar.
+- Wired the visual states into `ScannerWorkspaceView.swift`; no `ScannerPage`, capture engine, export, store, or persistence behavior changed.
+- Added en/fr/es localization keys for the new Scan UI.
+- `./scripts/build-ios-sim-app.sh` — **passed**, built `/Users/karanpatel/Library/Caches/PaperNest/build-17de0868e51d/dist/ios-simulator/PaperNest.app`.
+- UI tests and device interaction checks not run for this presentation-only slice.

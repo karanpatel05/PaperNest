@@ -3,12 +3,9 @@ import PaperNestStore
 import SwiftUI
 
 /// Home. One set of quick actions, the documents touched most recently and,
-/// on the wide layouts, the folders. Every count and row comes from the
-/// library store.
-///
-/// The phone keeps it short — greeting, three actions, five documents —
-/// because Scan and Files are one tap away in the bar underneath. iPad and
-/// Mac have the room for a banner, thumbnails or a table, and folder cards.
+/// folders. Every count and row comes from the library store.
+/// Phone uses recent rows; wider layouts use spacious preview cards.
+/// Scan and Files stay in the phone bar; iPad keeps its Scan action.
 struct DashboardView: View {
     @Bindable var model: LibraryModel
     var compact: Bool
@@ -23,29 +20,36 @@ struct DashboardView: View {
     /// Matches the `.title2` the name beside it is set in, and grows with it.
     @ScaledMetric(relativeTo: .title2) private var headerMarkSize: CGFloat = 29
     @State private var showProfile = false
+    @State private var homeSearch = ""
     @State private var creatingNotebook = false
     @State private var createdItemID: ItemID?
     @State private var renaming: LibraryStore.ItemSummary?
     @State private var renameText = ""
     @State private var exporting: LibraryStore.ItemSummary?
 
-    /// The phone shows five; the wide layouts have room for a few more.
+    /// The approved Home preview shows three; See All opens the complete library.
     private var recent: [LibraryStore.ItemSummary] {
-        Array(model.dashboardItems.prefix(compact ? 5 : LibraryModel.homeRecentLimit))
+        Array(model.dashboardItems.prefix(3))
     }
 
     /// How many folder cards Home shows before See All takes over.
     private static let folderLimit = 8
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 18 : 22) {
+        VStack(alignment: .leading, spacing: compact ? 16 : 16) {
             header
-            if compact { greeting } else { HomeBanner() }
+            if compact {
+                greeting
+                searchField
+            }
             HomeQuickActionsRow(actions: quickActions, tinted: compact)
             recentSection
-            if !compact && !model.folders.isEmpty { foldersSection }
+            if !model.folders.isEmpty { foldersSection }
         }
         .foregroundStyle(Theme.navy)
+        // A search submitted from Home belongs to that library visit. Returning
+        // Home must not leave an invisible filter on later folder navigation.
+        .onAppear { model.searchText = "" }
         .sheet(isPresented: $creatingNotebook, onDismiss: openCreatedNotebook) {
             NotebookCreationSheet(model: model) { createdItemID = $0 }
         }
@@ -81,38 +85,82 @@ struct DashboardView: View {
 
     private var header: some View {
         Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 10) {
-                    headerTitle
-                    HStack(spacing: 20) { headerControls }
+            if compact && dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        BrandMark.image(size: headerMarkSize).foregroundStyle(Theme.accent)
+                        Spacer(minLength: 12)
+                        headerControls
+                    }
+                    Text(verbatim: Brand.displayName).font(.title2.bold())
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("home-brand")
                 }
-            } else {
-                HStack(spacing: 10) {
-                    headerTitle
+            } else if compact {
+                HStack(spacing: 12) {
+                    HStack(spacing: 10) {
+                        BrandMark.image(size: headerMarkSize).foregroundStyle(Theme.accent)
+                        Text(verbatim: Brand.displayName).font(.title2.bold())
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("home-brand")
+                    }
                     Spacer(minLength: 8)
                     headerControls
+                }
+            } else if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack { greeting; Spacer(minLength: 8); headerControls }
+                    searchField
+                }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 20) {
+                        greeting
+                        Spacer(minLength: 16)
+                        searchField.frame(minWidth: 200, idealWidth: 260, maxWidth: 320)
+                        headerControls
+                    }
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack { greeting; Spacer(minLength: 8); headerControls }
+                        searchField
+                    }
                 }
             }
         }
     }
 
-    /// The phone has no sidebar to carry the brand, so Home does. On the wide
-    /// layouts the sidebar has it, and this is the screen's own title.
-    @ViewBuilder private var headerTitle: some View {
-        if compact {
-            HStack(spacing: 10) {
-                if !dynamicTypeSize.isAccessibilitySize {
-                    BrandMark.image(size: headerMarkSize).foregroundStyle(Theme.accent)
+    private var searchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass").foregroundStyle(Theme.secondaryText).accessibilityHidden(true)
+            TextField(L10n.homeSearchPlaceholder, text: $homeSearch)
+                .textFieldStyle(.plain)
+                .onSubmit(submitSearch)
+                .accessibilityIdentifier("home-search")
+                #if os(iOS)
+                .submitLabel(.search)
+                #endif
+            if !homeSearch.isEmpty {
+                Button(action: submitSearch) {
+                    Image(systemName: "arrow.right.circle.fill").font(.title3)
+                        .frame(width: 44, height: 44)
                 }
-                Text(verbatim: Brand.displayName).font(.title2.bold())
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("home-brand")
+                .buttonStyle(.plain).foregroundStyle(Theme.accent)
+                .accessibilityLabel(L10n.find)
+                .accessibilityIdentifier("home-search-submit")
             }
-        } else {
-            Text(L10n.homeTitle).font(.largeTitle.bold())
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("home-title")
         }
+        .font(.body)
+        .padding(.horizontal, 14).frame(minHeight: 48)
+        .background(Theme.lavender.opacity(0.5), in: RoundedRectangle(cornerRadius: 14))
+        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.border, lineWidth: 1) }
+    }
+
+    private func submitSearch() {
+        let query = homeSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+        model.contentKind = .all
+        model.searchText = query
+        showLibrary()
     }
 
     @ViewBuilder private var headerControls: some View {
@@ -122,9 +170,10 @@ struct DashboardView: View {
             CloudSyncStatusView(session: model.session, style: .compact)
         }
         Button { showProfile = true } label: {
-            Image(systemName: "person.crop.circle")
-                .font(.title)
+            Image(systemName: "person")
+                .font(.title2.weight(.regular))
                 .frame(minWidth: 44, minHeight: 44)
+                .background(Theme.lavender.opacity(0.65), in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -139,7 +188,7 @@ struct DashboardView: View {
     private var greeting: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             VStack(alignment: .leading, spacing: 4) {
-                Text(HomeGreeting.text(at: context.date)).font(.title2.bold())
+                Text(HomeGreeting.text(at: context.date)).font(compact ? .title2.bold() : .title.bold())
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("home-greeting")
@@ -165,13 +214,13 @@ struct DashboardView: View {
             })
         }
         #endif
-        actions.append(HomeQuickAction(id: "home-new-note", title: L10n.homeNewNote, symbol: "pencil.line") {
+        actions.append(HomeQuickAction(id: "home-new-note", title: L10n.homeNewNote, symbol: "doc.badge.plus") {
             creatingNotebook = true
         })
-        actions.append(HomeQuickAction(id: "home-import", title: L10n.homeImportFile, symbol: "square.and.arrow.down") {
+        actions.append(HomeQuickAction(id: "home-import", title: L10n.homeImportFile, symbol: "arrow.down.to.line") {
             model.isShowingFileImporter = true
         })
-        actions.append(HomeQuickAction(id: "home-new-folder", title: L10n.newFolder, symbol: "folder.badge.plus",
+        actions.append(HomeQuickAction(id: "home-new-folder", title: L10n.newFolder, symbol: "folder",
                                        action: newFolder))
         return actions
     }
@@ -210,34 +259,32 @@ struct DashboardView: View {
     }
 
     @ViewBuilder private var recentContent: some View {
-        #if os(macOS)
-        HomeRecentTable(items: recent, sizes: model.dashboardSizes, open: open, actions: actions)
-        #else
         if compact || dynamicTypeSize.isAccessibilitySize {
             HomeRecentList(items: recent, sizes: model.dashboardSizes, open: open, actions: actions)
         } else {
             HomeRecentCards(items: recent, open: open, actions: actions)
         }
-        #endif
     }
 
     // MARK: - Folders
 
     private var foldersSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(L10n.folders, identifier: "home-folders-heading") {
+            sectionHeader(L10n.homeMyFolders, identifier: "home-folders-heading") {
                 Button(action: showFolders) { seeAllLabel }
                     .buttonStyle(.plain)
                     .accessibilityLabel(L10n.homeSeeAll + ", " + L10n.folders)
                     .accessibilityIdentifier("home-folders-all")
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 170), spacing: 14)],
+            LazyVGrid(columns: dynamicTypeSize.isAccessibilitySize
+                      ? [GridItem(.flexible())]
+                      : [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)],
                       spacing: 14) {
                 ForEach(Array(model.folders.prefix(Self.folderLimit).enumerated()), id: \.element.id) { index, folder in
                     FolderCard(folder: folder, count: model.counts.folders[folder.id, default: 0],
                                tint: FolderTint.color(at: index),
                                open: { openFolder(folder) }, rename: { renameFolder(folder) },
-                               delete: { deleteFolder(folder) })
+                               delete: { deleteFolder(folder) }, homeStyle: true)
                 }
             }
         }

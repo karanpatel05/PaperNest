@@ -29,6 +29,9 @@ struct ImportLocationSheet: View {
                         .accessibilityIdentifier("import-location-new-folder")
                 }
             }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(EditorChrome.secondaryBackground)
             // The inline picker supplies the wrapping heading. A duplicate
             // large navigation title truncates in French and accessibility sizes.
             .toolbar {
@@ -50,6 +53,7 @@ struct ImportLocationSheet: View {
                 }
             }
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 400, idealWidth: 460, minHeight: 360, idealHeight: 440)
         #endif

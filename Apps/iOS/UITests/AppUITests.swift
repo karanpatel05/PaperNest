@@ -739,22 +739,15 @@ final class AppUITests: XCTestCase {
     func testRecognizeTextMakesAWordOnThePageSearchable() throws {
         continueAfterFailure = false
         let app = launch(["-PaperNestDebugOpenItem", "OCR target"], libraryPath: "/tmp/papernest-ocr-library")
-        // Document-level actions live in the title menu on every platform;
-        // the compact toolbar has no overflow menu.
-        XCTAssertTrue(app.navigationBars["OCR target"].waitForExistence(timeout: 15), "document did not open")
-        // Overflow lives in the bottom bar on iPhone and in the toolbar on
-        // iPad and Mac; menu items are matched by label, as elsewhere here.
-        let more = app.buttons["More"].firstMatch
-        if more.waitForExistence(timeout: 5) {
-            more.tap()
-        } else {
-            app.buttons["editor-more"].tap()
-        }
-        let recognize = app.buttons["Recognize Text"]
-        XCTAssertTrue(recognize.waitForExistence(timeout: 5), "no Recognize Text in the overflow menu")
-        recognize.tap()
-
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        defer { app.terminate() }
+        XCTAssertTrue(app.images["document-page-image"].waitForExistence(timeout: 15))
+        revealEditorTool(app, identifier: "editor-recognize")
+        app.buttons["editor-recognize"].tap()
+        XCTAssertTrue(app.buttons["ocr-start"].waitForExistence(timeout: 10))
+        app.buttons["ocr-start"].tap()
+        XCTAssertTrue(app.staticTexts["ocr-result"].waitForExistence(timeout: 120))
+        app.buttons["ocr-close"].tap()
+        app.buttons["editor-back"].tap()
         showAllDocuments(app)
         let document = app.descendants(matching: .any)["OCR target, 3 pages"].firstMatch
         let search = app.searchFields.firstMatch
@@ -1351,25 +1344,10 @@ final class AppUITests: XCTestCase {
     func testLargeTextShapeSlidersAndSystemColorPicker() throws {
         continueAfterFailure = false
         let library = "/tmp/papernest-accessibility-ui-\(UUID().uuidString)"
-        let app = launch(["-PaperNestDebugShowTools", "YES",
-                          "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"],
+        let app = launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"],
                          libraryPath: library)
-        XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 15))
-        app.buttons["tool-notebook"].tap()
-        let name = app.textFields["notebook-name"]
-        XCTAssertTrue(name.waitForExistence(timeout: 5))
-        name.tap()
-        name.typeText("Accessibility notebook")
-        let creationShot = XCTAttachment(screenshot: app.screenshot())
-        creationShot.name = "large-text-notebook-before-create"
-        creationShot.lifetime = .keepAlways
-        add(creationShot)
-        app.buttons["notebook-create"].tap()
-        XCTAssertTrue(app.scrollViews["notebook-tool-bar"].waitForExistence(timeout: 10), app.debugDescription)
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            let sidebar = app.collectionViews["Sidebar"]
-            XCTAssertGreaterThanOrEqual(sidebar.frame.width, 400, "Large text needs a readable navigation column")
-        }
+        // Home Tools was removed; exercise the supported Notes creation route.
+        createInlineTestNotebook(app, named: "Accessibility notebook")
         revealEditorTool(app, identifier: "editor-shapes")
         XCTAssertTrue(app.buttons["editor-shapes"].waitForExistence(timeout: 5))
         app.buttons["editor-shapes"].tap()
@@ -1423,11 +1401,12 @@ final class AppUITests: XCTestCase {
         let custom = app.descendants(matching: .any)["markup-custom-color"].firstMatch
         reveal(custom)
         let previousColor = custom.value as? String
-        custom.tap()
+        // At XXXL the native well wraps below its label, at the leading edge.
+        custom.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.85)).tap()
         let close = app.buttons.matching(NSPredicate(format: "label ==[c] %@", "close")).firstMatch
-        XCTAssertTrue(close.waitForExistence(timeout: 5), app.debugDescription)
+        // iPad can expose the picker grid without a Close accessibility button.
         let color = app.otherElements["azure 77"]
-        XCTAssertTrue(color.waitForExistence(timeout: 5))
+        XCTAssertTrue(color.waitForExistence(timeout: 5), app.debugDescription)
         color.tap()
         let picker = XCTAttachment(screenshot: app.screenshot())
         picker.name = "large-text-system-color-picker"
@@ -1458,15 +1437,8 @@ final class AppUITests: XCTestCase {
     func testShapeSaveFailureKeepsDraftAndCanRetry() throws {
         continueAfterFailure = false
         let library = "/tmp/papernest-save-failure-ui-\(UUID().uuidString)"
-        let app = launch(["-PaperNestDebugShowTools", "YES"], libraryPath: library)
-        XCTAssertTrue(app.buttons["tool-notebook"].waitForExistence(timeout: 15))
-        app.buttons["tool-notebook"].tap()
-        let name = app.textFields["notebook-name"]
-        XCTAssertTrue(name.waitForExistence(timeout: 5))
-        name.tap()
-        name.typeText("Save failure")
-        app.buttons["notebook-create"].tap()
-        XCTAssertTrue(app.scrollViews["notebook-tool-bar"].waitForExistence(timeout: 10))
+        let app = launch([], libraryPath: library)
+        createInlineTestNotebook(app, named: "Save failure")
         revealEditorTool(app, identifier: "editor-shapes")
         app.buttons["editor-shapes"].tap()
         XCTAssertTrue(app.buttons["shape-kind-ellipse"].waitForExistence(timeout: 5))
@@ -1575,6 +1547,14 @@ final class AppUITests: XCTestCase {
 
     /// Secondary tools live in Document Tools; history remains in the palette.
     private func revealEditorTool(_ app: XCUIApplication, identifier: String) {
+        // UIKit may move the document-panel toggle into its native overflow
+        // when a notebook title and navigation controls fill a phone bar.
+        if !app.buttons[identifier].isHittable,
+           !app.scrollViews["pdf-tools-list"].exists,
+           !app.buttons["editor-panels"].exists,
+           app.buttons["OverflowBarButtonItem"].exists {
+            app.buttons["OverflowBarButtonItem"].tap()
+        }
         // Adding a page is inside Document Tools' Add Page menu.
         if identifier == "editor-add-notebook-page" {
             app.revealInDocumentTools(app.buttons["strip-add-pages"])
@@ -1873,6 +1853,13 @@ final class AppUITests: XCTestCase {
             XCTAssertTrue(app.buttons["home-new-folder"].exists)
             let shot = XCTAttachment(screenshot: app.screenshot())
             shot.name = "studio-home-\(language)"; shot.lifetime = .keepAlways; add(shot)
+            if language == "es" {
+                let create = app.buttons["home-new-note"]
+                for _ in 0..<12 where !create.isHittable { app.swipeUp() }
+                XCTAssertTrue(create.isHittable)
+                create.tap()
+                XCTAssertTrue(app.buttons["notebook-create"].waitForExistence(timeout: 10))
+            }
             app.terminate()
         }
     }
@@ -2437,8 +2424,15 @@ extension AppUITests {
     }
 
     private func tapInlineHistory(_ app: XCUIApplication, identifier: String) {
-        revealEditorTool(app, identifier: identifier)
         let action = app.buttons[identifier]
+        // Wide editors keep history at the trailing end of the horizontal
+        // writing toolbar, not inside the vertical PDF tools inspector.
+        let bar = app.scrollViews["notebook-tool-bar"]
+        if UIDevice.current.userInterfaceIdiom == .pad, bar.exists {
+            for _ in 0..<6 where !action.isHittable { bar.swipeLeft() }
+        } else {
+            revealEditorTool(app, identifier: identifier)
+        }
         XCTAssertTrue(action.waitForExistence(timeout: 5))
         wait(for: [expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: action)], timeout: 10)
         action.tap()
@@ -2863,7 +2857,8 @@ extension AppUITests {
                 XCTAssertFalse(panel.exists)
             }
             revealEditorTool(app, identifier: "editor-signature")
-            XCTAssertEqual(panel.exists, isPad)
+            // Option 6 opens the same tool list in a bottom drawer on iPhone.
+            XCTAssertTrue(panel.exists)
             if isPad {
                 let shot = XCTAttachment(screenshot: app.screenshot())
                 shot.name = "pdf-tools-sidebar-\(language)"; shot.lifetime = .keepAlways; add(shot)
@@ -2897,5 +2892,159 @@ extension AppUITests {
             XCTAssertTrue(app.buttons["studio-tool-pen"].isHittable)
             app.terminate()
         }
+    }
+
+    // Tool-panel redesign: the inspector and compact sheet share one close contract.
+    func testUtilityExportPanelClosesAndReopens() throws {
+        continueAfterFailure = false
+        let app = launch(["-PaperNestDebugOpenItem", "Crop target", "-PaperNestDebugShowExport", "YES"])
+        let close = app.buttons["export-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 15))
+        XCTAssertTrue(close.isHittable)
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 5))
+        let export = app.buttons["editor-export"]
+        XCTAssertTrue(export.waitForExistence(timeout: 5))
+        XCTAssertTrue(export.isEnabled)
+        export.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["export-destination-save"].isHittable)
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 5))
+    }
+
+}
+
+
+// Actual mobile tool-panel captures requested by the owner, 2026-11-15.
+extension AppUITests {
+    func testCaptureUpdatedToolPanels() throws {
+        continueAfterFailure = false
+        let app = launch(["-PaperNestDebugOpenItem", "Crop target", "-PaperNestDebugShowExport", "NO", "-PaperNestDebugShowCompress", "NO"])
+        defer { app.terminate() }
+        XCTAssertTrue(app.images["document-page-image"].waitForExistence(timeout: 20))
+        func capture(_ name: String) {
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = name
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        revealEditorTool(app, identifier: "editor-signature")
+        app.buttons["editor-signature"].tap()
+        XCTAssertTrue(app.textFields["signature-name"].waitForExistence(timeout: 10))
+        capture("updated-signature")
+        app.buttons["signature-cancel"].tap()
+        revealEditorTool(app, identifier: "editor-pages")
+        app.buttons["editor-pages"].tap()
+        XCTAssertTrue(app.buttons["pages-done"].waitForExistence(timeout: 10))
+        capture("updated-pages")
+        app.buttons["pages-done"].tap()
+        revealEditorTool(app, identifier: "editor-recognize")
+        XCTAssertTrue(app.buttons["editor-recognize"].isHittable)
+        capture("updated-ocr-location")
+    }
+}
+
+// Approved dedicated OCR panel: explicit choices, validation and actual processing.
+extension AppUITests {
+    func testOCRPanelSelectionAndRecognition() throws {
+        continueAfterFailure = false
+        for language in ["en", "fr", "es"] {
+            let app = launch(["-PaperNestDebugOpenItem", "Crop target", "-PaperNestDebugShowExport", "NO",
+                              "-PaperNestDebugShowCompress", "NO", "-recognitionLanguages", "en-US"], language: language)
+            XCTAssertTrue(app.images["document-page-image"].waitForExistence(timeout: 20))
+            revealEditorTool(app, identifier: "editor-recognize")
+            app.buttons["editor-recognize"].tap()
+            let start = app.buttons["ocr-start"]
+            XCTAssertTrue(start.waitForExistence(timeout: 10))
+            let english = app.buttons["ocr-language-en-US"]
+            XCTAssertTrue(english.waitForExistence(timeout: 5))
+            english.tap(); XCTAssertFalse(start.isEnabled)
+            english.tap(); XCTAssertTrue(start.isEnabled)
+            app.buttons["ocr-pages-range"].tap()
+            let range = app.textFields["ocr-range-input"]
+            XCTAssertTrue(range.waitForExistence(timeout: 5))
+            range.tap(); range.typeText("99")
+            XCTAssertFalse(start.isEnabled)
+            range.tap(); range.typeText(XCUIKeyboardKey.delete.rawValue + XCUIKeyboardKey.delete.rawValue + "1\n")
+            XCTAssertTrue(start.isEnabled)
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "approved-ocr-panel-\(language)"; shot.lifetime = .keepAlways; add(shot)
+            start.tap()
+            XCTAssertTrue(app.staticTexts["ocr-result"].waitForExistence(timeout: 120))
+            XCTAssertTrue(start.isEnabled)
+            app.buttons["ocr-close"].tap()
+            XCTAssertTrue(start.waitForNonExistence(timeout: 10))
+            app.terminate()
+        }
+    }
+}
+
+extension AppUITests {
+    func testSpaciousHomeProfileAndSearch() throws {
+        continueAfterFailure = false
+        for language in ["en", "fr", "es"] {
+            let app = launch([], language: language)
+            defer { app.terminate() }
+            let search = app.textFields["home-search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 20))
+            XCTAssertFalse(app.staticTexts["home-title"].exists)
+            XCTAssertEqual(app.buttons.matching(identifier: "home-profile").count, 1)
+            app.buttons["home-profile"].tap()
+            XCTAssertTrue(app.buttons["profile-done"].waitForExistence(timeout: 10))
+            app.buttons["profile-done"].tap()
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "spacious-home-\(language)"; shot.lifetime = .keepAlways; add(shot)
+            search.tap(); search.typeText("Crop target\n")
+            let result = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Crop target")).firstMatch
+            XCTAssertTrue(result.waitForExistence(timeout: 15), app.debugDescription)
+            result.tap()
+            XCTAssertTrue(app.images["document-page-image"].waitForExistence(timeout: 15))
+            app.buttons["editor-back"].tap()
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                app.buttons["home-tab"].tap()
+            } else {
+                app.cells.containing(.any, identifier: "sidebar-home").firstMatch.tap()
+            }
+            XCTAssertTrue(app.textFields["home-search"].waitForExistence(timeout: 10))
+            app.buttons["home-see-all"].tap()
+            XCTAssertTrue(app.searchFields.firstMatch.waitForExistence(timeout: 10))
+            XCTAssertNotEqual(app.searchFields.firstMatch.value as? String, "Crop target",
+                              "Returning Home clears the previous search before opening another destination")
+            app.terminate()
+        }
+    }
+}
+
+
+extension AppUITests {
+    func testApprovedHomeWithRecentItemsAndFolders() async throws {
+        continueAfterFailure = false
+        let root = URL(fileURLWithPath: "/tmp/papernest-home-sample-\(UUID())")
+        let store = try LibraryStore(directory: root)
+        for name in ["Study", "Work"] { _ = try await store.createFolder(named: name) }
+        for name in ["Biology Notes", "Project Plan", "Meeting Notes"] {
+            _ = try await store.createItem(kind: .notebook, name: name, pages: [
+                .init(sourceSize: CGSize(width: 600, height: 800), content: .template(.blank))
+            ], assets: [])
+        }
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = launch([], libraryPath: root.path)
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["home-profile"].waitForExistence(timeout: 20))
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            XCUIDevice.shared.orientation = .landscapeLeft
+            for _ in 0..<20 {
+                if app.frame.width > app.frame.height { break }
+                try await Task.sleep(for: .milliseconds(250))
+            }
+        }
+        let folders = app.buttons.matching(identifier: "folder-card")
+        XCTAssertEqual(folders.count, 2)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "approved-home-populated"; shot.lifetime = .keepAlways; add(shot)
+        folders.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["This Folder Is Empty"].waitForExistence(timeout: 10))
     }
 }

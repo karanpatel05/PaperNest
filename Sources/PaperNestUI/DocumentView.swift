@@ -29,7 +29,8 @@ struct DocumentView: View {
     @State private var formSession: PDFFormSession?
     @State private var pageToolBusy = false
 
-    private enum InspectorTool { case signature(Page), form, pages }
+    private enum InspectorTool { case signature(Page), form, pages, ocr }
+    @State private var isShowingOCR = false
     @State private var stampPage: Page?
     @State private var shapePage: Page?
     @State private var commentsPage: Page?
@@ -301,6 +302,8 @@ struct DocumentView: View {
                 if presenting && !usesPDFToolsSidebar { isShowingPDFTools = false }
             }
             .toolbar { toolbar }
+            // Preserve the former sheet's transaction boundary while keeping the page visible.
+            .disabled(usesPDFToolsSidebar && (isShowingExport || isShowingCompress))
             .inspector(isPresented: inspectorBinding) {
                 PDFToolsSidebar(editor: self)
                     .inspectorColumnWidth(min: 280, ideal: 320, max: 400)
@@ -388,12 +391,24 @@ struct DocumentView: View {
     @inline(never)
     private func exportAndPictures<Content: View>(_ content: Content) -> some View {
         content
-            .sheet(isPresented: $isShowingCompress) { CompressSheet(itemID: model.itemID) }
+            .onChange(of: isShowingPDFTools) { _, showing in
+                if !showing && usesPDFToolsSidebar {
+                    isShowingExport = false
+                    isShowingCompress = false
+                }
+            }
+            .onChange(of: isShowingCompress) { _, showing in
+                if showing && usesPDFToolsSidebar { isShowingPDFTools = true }
+            }
+            .sheet(isPresented: usesPDFToolsSidebar ? .constant(false) : $isShowingCompress) { CompressSheet(itemID: model.itemID) }
             .alert(L10n.splitDoneTitle, isPresented: Binding(get: { splitCount != nil }, set: { if !$0 { splitCount = nil } })) {
                 Button(L10n.ok, role: .cancel) {}
             } message: { Text(L10n.splitDoneMessage(splitCount ?? 0)) }
-            .onChange(of: isShowingExport) { _, showing in if !showing { exportFormat = nil } }
-            .sheet(isPresented: $isShowingExport) {
+            .onChange(of: isShowingExport) { _, showing in
+                if !showing { exportFormat = nil }
+                else if usesPDFToolsSidebar { isShowingPDFTools = true }
+            }
+            .sheet(isPresented: usesPDFToolsSidebar ? .constant(false) : $isShowingExport) {
                 ExportLoader(itemID: model.itemID, currentPageID: model.selectedPageID, initialFormat: exportFormat)
             }
             .fileImporter(isPresented: $isShowingImagePicker,
@@ -461,6 +476,9 @@ struct DocumentView: View {
             }
             .sheet(item: $managedMarkupPage) { page in
                 MarkupManagerSheet(model: model, pageID: page.id, undoManager: undoManager)
+            }
+            .sheet(isPresented: $isShowingOCR) {
+                OCRPanel(model: model, beforeAction: { await finishTextForPanelAction() })
             }
             .sheet(isPresented: $isShowingPageOrganizer) {
                 DocumentPagesSheet(model: model, undoManager: undoManager)
@@ -637,14 +655,26 @@ struct DocumentView: View {
             } label: { Label(L10n.inlineBack, systemImage: "chevron.left") }
             .accessibilityIdentifier("editor-back")
         }
-        ToolbarItemGroup(placement: .primaryAction) {
-            // Saved-and-synced state, beside the title. Nothing in a build
-            // without iCloud.
-            CloudSyncStatusView(session: model.session, style: .compact)
-            findButton
-            exportButton
-            // The one control for everything beside the page, on every device.
-            UtilitiesToggleButton(isOn: $isShowingPDFTools).disabled(isToolBusy)
+        if isCompact {
+            // Keep the custom tools toggle in the bar: UIKit's automatic
+            // overflow menu can omit custom toolbar views for longer titles.
+            ToolbarItem(placement: .primaryAction) {
+                HStack(spacing: 4) {
+                    CloudSyncStatusView(session: model.session, style: .compact)
+                    findButton.frame(width: 44, height: 44)
+                    exportButton.frame(width: 44, height: 44)
+                    UtilitiesToggleButton(isOn: $isShowingPDFTools)
+                        .disabled(isToolBusy || isShowingExport || isShowingCompress)
+                }.labelStyle(.iconOnly).fixedSize()
+            }
+        } else {
+            ToolbarItemGroup(placement: .primaryAction) {
+                CloudSyncStatusView(session: model.session, style: .compact)
+                findButton
+                exportButton
+                UtilitiesToggleButton(isOn: $isShowingPDFTools)
+                    .disabled(isToolBusy || isShowingExport || isShowingCompress)
+            }
         }
     }
 
@@ -873,7 +903,7 @@ struct DocumentView: View {
             || managedMarkupPage != nil || signaturePage != nil || notebookPageRequest != nil
             || isShowingCrop || isShowingFilePicker || isShowingPDFForm || isShowingPageOrganizer
             || isShowingExport || isShowingAdjustments || isShowingOutline || isShowingImagePicker
-            || isShowingPhotoPicker || isShowingCompress
+            || isShowingPhotoPicker || isShowingCompress || isShowingOCR
         #if os(iOS)
         presenting = presenting || cameraPurpose != nil || photoCameraPage != nil
         #endif
@@ -1062,7 +1092,7 @@ struct DocumentView: View {
                 if let retainedState {
                     if retainedState.formSession == nil { retainedState.formSession = PDFFormSession(itemID: model.itemID, library: model.session) }
                 } else if formSession == nil { formSession = PDFFormSession(itemID: model.itemID, library: model.session) }
-            case .pages: break
+            case .pages, .ocr: break
             }
             if usesPDFToolsSidebar {
                 inspectorTool = tool
@@ -1072,6 +1102,7 @@ struct DocumentView: View {
                 case .signature(let page): signaturePage = page
                 case .form: isShowingPDFForm = true
                 case .pages: isShowingPageOrganizer = true
+                case .ocr: isShowingOCR = true
                 }
             }
         }
@@ -1083,6 +1114,21 @@ struct DocumentView: View {
         let editor: DocumentView
 
         var body: some View {
+            Group {
+                if editor.isShowingExport && editor.usesPDFToolsSidebar {
+                    ExportLoader(itemID: editor.model.itemID, currentPageID: editor.model.selectedPageID,
+                                 initialFormat: editor.exportFormat, isEmbedded: true,
+                                 onClose: { editor.isShowingExport = false })
+                } else if editor.isShowingCompress && editor.usesPDFToolsSidebar {
+                    CompressSheet(itemID: editor.model.itemID, isEmbedded: true,
+                                  onClose: { editor.isShowingCompress = false })
+                } else {
+                    inspectorContents
+                }
+            }
+        }
+
+        private var inspectorContents: some View {
             Group {
                 switch editor.inspectorTool {
                 case .signature(let page):
@@ -1101,6 +1147,10 @@ struct DocumentView: View {
                                        isEmbedded: true, onClose: { editor.inspectorTool = nil },
                                        beforeAction: { await editor.finishTextForPanelAction() },
                                        onBusyChange: { editor.pageToolBusy = $0; editor.retainedState?.pageToolBusy = $0 })
+                case .ocr:
+                    OCRPanel(model: editor.model, isEmbedded: true,
+                             onClose: { editor.inspectorTool = nil },
+                             beforeAction: { await editor.finishTextForPanelAction() })
                 case nil:
                     toolList
                 }
@@ -1282,7 +1332,7 @@ struct DocumentView: View {
             Text(L10n.recognizeProgress(min(progress.done + 1, max(progress.total, 1)), max(progress.total, 1)))
         } else {
             Button {
-                Task { await model.recognizeText() }
+                openInspectorTool(.ocr)
             } label: {
                 Label(L10n.recognizeText, systemImage: "text.viewfinder")
             }
@@ -2259,25 +2309,35 @@ private struct AdjustmentsPanel: View {
     @State private var contrast: Double = 1
 
     var body: some View {
-        Form {
-            Slider(value: $brightness, in: -0.5...0.5) { editing in
-                if !editing { commit() }
-            } label: {
-                Text(L10n.brightness)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                PanelSection(title: L10n.brightness) {
+                    Slider(value: $brightness, in: -0.5...0.5) { editing in
+                        if !editing { commit() }
+                    } label: {
+                        Text(L10n.brightness)
+                    }
+                }
+                PanelSection(title: L10n.contrast) {
+                    Slider(value: $contrast, in: 0.5...2) { editing in
+                        if !editing { commit() }
+                    } label: {
+                        Text(L10n.contrast)
+                    }
+                }
+                Button(L10n.resetAdjustments) {
+                    brightness = 0
+                    contrast = 1
+                    commit()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Slider(value: $contrast, in: 0.5...2) { editing in
-                if !editing { commit() }
-            } label: {
-                Text(L10n.contrast)
-            }
-            Button(L10n.resetAdjustments) {
-                brightness = 0
-                contrast = 1
-                commit()
-            }
+            .padding(16)
         }
-        .padding()
         .frame(minWidth: 300)
+        .toolPanelAppearance()
         .onAppear {
             brightness = model.selectedPage?.transform.brightness ?? 0
             contrast = model.selectedPage?.transform.contrast ?? 1

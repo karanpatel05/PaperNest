@@ -146,7 +146,10 @@ struct PDFFormSheet: View {
                         }
                         Section { Text(L10n.formExportHelp).font(.callout).foregroundStyle(.secondary) }
                         if draft.failed { Section { Label(L10n.saveFailed, systemImage: "exclamationmark.triangle") } }
-                    }.formStyle(.grouped)
+                    }
+                    .formStyle(.grouped)
+                    .scrollContentBackground(.hidden)
+                    .background(EditorChrome.secondaryBackground)
                 }
             }
             #if os(iOS)
@@ -162,8 +165,14 @@ struct PDFFormSheet: View {
                             Spacer()
                             closeButton
                         }
-                        saveButton.frame(maxWidth: .infinity, alignment: .trailing)
-                    }.padding(12).background(Theme.surface)
+                        saveButton
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .padding(16)
+                    .background(EditorChrome.surface)
+                    .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 0.5) }
                 }
             }
             .toolbar {
@@ -175,6 +184,7 @@ struct PDFFormSheet: View {
             .disabled(draft.saving)
             .interactiveDismissDisabled(draft.saving)
         }
+        .toolPanelAppearance(isEmbedded: isEmbedded)
         .task { await draft.load() }
         .proPaywall($proFeature)
     }

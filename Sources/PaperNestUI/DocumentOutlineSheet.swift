@@ -42,6 +42,7 @@ struct DocumentOutlineSheet: View {
                 // loading is read again once its pages arrive.
                 .task(id: model.pages.count) { await load() }
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 380, idealWidth: 420, minHeight: 320, idealHeight: 420)
         #endif
@@ -66,18 +67,33 @@ struct DocumentOutlineSheet: View {
                             if let pageID = Self.pageToSelect(entry, in: model.pages) { select(pageID) }
                             dismiss()
                         } label: {
-                            Text(entry.title)
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                Image(systemName: "text.alignleft")
+                                    .font(.caption).foregroundStyle(EditorChrome.purple)
+                                    .accessibilityHidden(true)
+                                Text(entry.title)
                                 .multilineTextAlignment(.leading)
                                 // The nesting the file declares, held to a few
                                 // steps so a deeply nested heading keeps a
                                 // readable text width on a phone.
                                 .padding(.leading, CGFloat(min(entry.depth, 4)) * 14)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 44)
+                            .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 12))
                         }
+                        .buttonStyle(.plain)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                         .accessibilityIdentifier("outline-entry-\(index)")
                         .accessibilityValue(entry.title)
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(EditorChrome.secondaryBackground)
             }
         } else {
             ProgressView().controlSize(.small)

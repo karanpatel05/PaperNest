@@ -16,26 +16,27 @@ struct FolderCard: View {
     let open: () -> Void
     let rename: () -> Void
     let delete: () -> Void
+    var homeStyle = false
 
     var body: some View {
         Button(action: open) {
             HStack(spacing: 12) {
-                Image(systemName: "folder.fill").font(.title).foregroundStyle(tint)
+                Image(systemName: homeStyle ? "folder" : "folder.fill").font(.title2).foregroundStyle(homeStyle ? Theme.accent : tint)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(folder.name).font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.navy).lineLimit(2).multilineTextAlignment(.leading)
-                    Text(L10n.itemCount(count)).font(.caption).foregroundStyle(Theme.secondaryText)
+                    if !homeStyle { Text(L10n.itemCount(count)).font(.caption).foregroundStyle(Theme.secondaryText) }
                 }
                 Spacer(minLength: 0)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius))
-            .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: Theme.radius))
-            .overlay { RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.border, lineWidth: 1) }
-            .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
-            .contentShape(RoundedRectangle(cornerRadius: Theme.radius))
+            .frame(maxWidth: .infinity, minHeight: homeStyle ? 48 : 64, alignment: .leading)
+            .background(Theme.surface.opacity(homeStyle ? 0 : 0.7), in: RoundedRectangle(cornerRadius: homeStyle ? 10 : Theme.radius))
+            .background(tint.opacity(homeStyle ? 0.12 : 0.10), in: RoundedRectangle(cornerRadius: homeStyle ? 10 : Theme.radius))
+            .overlay { RoundedRectangle(cornerRadius: homeStyle ? 10 : Theme.radius).strokeBorder(Theme.border, lineWidth: homeStyle ? 0 : 1) }
+            .shadow(color: .black.opacity(homeStyle ? 0 : 0.04), radius: 8, y: 3)
+            .contentShape(RoundedRectangle(cornerRadius: homeStyle ? 10 : Theme.radius))
         }
         .buttonStyle(PremiumButtonStyle())
         .contextMenu {

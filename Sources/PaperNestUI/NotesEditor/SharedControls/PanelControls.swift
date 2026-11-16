@@ -55,7 +55,9 @@ struct ToolPanelContainer<Content: View>: View {
                 .accessibilityLabel(L10n.done)
                 .accessibilityIdentifier("studio-settings-done")
             }
-            .padding(.leading, 16).padding(.trailing, 6).padding(.top, 8).padding(.bottom, 2)
+            .padding(.leading, 16).padding(.trailing, 6).padding(.vertical, 8)
+            .background(EditorChrome.surface)
+            Divider().overlay(EditorChrome.border)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     content()
@@ -80,7 +82,7 @@ struct ToolPanelContainer<Content: View>: View {
         // A popover takes the ideal size. A sheet is whatever width the
         // device is, and the panel fills it rather than sitting to one side.
         .frame(minWidth: 300, idealWidth: 384, maxWidth: .infinity, minHeight: 300, idealHeight: 580)
-        .background(EditorChrome.secondaryBackground)
+        .toolPanelAppearance()
     }
 }
 
@@ -570,5 +572,35 @@ struct PanelNote: View {
             .font(.caption)
             .foregroundStyle(EditorChrome.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+
+/// Shared presentation chrome. It deliberately owns no action or editing state.
+/// Native forms retain their focus, scrolling and accessibility semantics.
+private struct ToolPanelAppearance: ViewModifier {
+    var isEmbedded: Bool
+
+    func body(content: Content) -> some View {
+        let styled = content.tint(EditorChrome.purple).background(EditorChrome.secondaryBackground)
+        #if os(iOS)
+        if isEmbedded {
+            styled
+        } else {
+            styled
+                .presentationBackground(EditorChrome.secondaryBackground)
+                .presentationCornerRadius(24)
+                .presentationDragIndicator(.visible)
+                .presentationDetents([.large])
+        }
+        #else
+        styled
+        #endif
+    }
+}
+
+extension View {
+    func toolPanelAppearance(isEmbedded: Bool = false) -> some View {
+        modifier(ToolPanelAppearance(isEmbedded: isEmbedded))
     }
 }

@@ -174,7 +174,7 @@ public struct RootView: View {
             // row, so this has to read on the sidebar in both appearances.
             .tint(Theme.accent)
             .scrollContentBackground(.hidden)
-            .background(showsHome ? Theme.homeBackground : Theme.sidebar)
+            .background(showsHome ? Theme.libraryBackground : Theme.sidebar)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !showsHome {
                     CloudSyncCard(session: model.session, action: showSyncSettings)
@@ -217,10 +217,10 @@ public struct RootView: View {
                 Group {
                     if dashboardVisible && !showsHome {
                         ScrollView {
-                            dashboard(compact: false).padding(28)
+                            dashboard(compact: false).padding(24)
                                 .frame(maxWidth: 1400).frame(maxWidth: .infinity)
                         }
-                        .background(Theme.homeBackground)
+                        .background(Theme.libraryBackground)
                         // Home appears once in navigation on every platform.
                         .navigationTitle("")
                         #if os(iOS)

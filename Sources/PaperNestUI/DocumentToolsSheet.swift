@@ -58,7 +58,11 @@ struct DocumentToolsSheet: View {
                     Section(L10n.mergeOrder) {
                         ForEach(Array(orderedItems.enumerated()), id: \.element.id) { index, summary in
                             HStack(spacing: 12) {
-                                Text(verbatim: "\(index + 1)").monospacedDigit().foregroundStyle(.secondary)
+                                Text(verbatim: "\(index + 1)")
+                                    .font(.caption.weight(.semibold)).monospacedDigit()
+                                    .foregroundStyle(EditorChrome.purple)
+                                    .frame(width: 30, height: 30)
+                                    .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 9))
                                 VStack(alignment: .leading) {
                                     // Identified by position: a UI test matching the name
                                     // alone would find the library tile behind the sheet,
@@ -100,7 +104,12 @@ struct DocumentToolsSheet: View {
                                         Text(L10n.pageLabel(index + 1, of: pages.count)).foregroundStyle(.primary)
                                         Spacer()
                                         Image(systemName: selectedPages.contains(page.id) ? "checkmark.circle.fill" : "circle")
-                                    }.contentShape(Rectangle())
+                                            .foregroundStyle(EditorChrome.purple)
+                                    }
+                                    .padding(10)
+                                    .background(selectedPages.contains(page.id) ? EditorChrome.lavender : EditorChrome.surface,
+                                                in: RoundedRectangle(cornerRadius: 12))
+                                    .contentShape(RoundedRectangle(cornerRadius: 12))
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier("extract-page-\(index + 1)")
@@ -115,6 +124,8 @@ struct DocumentToolsSheet: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(EditorChrome.secondaryBackground)
             .disabled(isSaving)
             .navigationTitle(isMerge ? L10n.mergeTitle : L10n.extractTitle)
             #if os(iOS)
@@ -147,6 +158,7 @@ struct DocumentToolsSheet: View {
             }
             .interactiveDismissDisabled(isSaving)
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 460, idealWidth: 520, minHeight: 420, idealHeight: 560)
         #endif

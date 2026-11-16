@@ -10,6 +10,8 @@ struct ExportLoader: View {
     /// Opens with this format chosen — "Convert" in Document Tools opens
     /// here with Word selected. Every gate still applies when it exports.
     var initialFormat: ExportFormat? = nil
+    var isEmbedded = false
+    var onClose: (() -> Void)? = nil
     @Environment(LibrarySession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @State private var loaded: (PaperNestCore.LibraryItem, [Page], DocumentPermissions)?
@@ -19,11 +21,11 @@ struct ExportLoader: View {
         Group {
             if let (item, pages, permissions) = loaded {
                 ExportSheet(itemName: item.name, pages: pages, currentPageID: currentPageID, permissions: permissions,
-                            initialFormat: initialFormat)
+                            initialFormat: initialFormat, isEmbedded: isEmbedded, onClose: onClose)
             } else if failed {
                 VStack(spacing: 12) {
                     Text(L10n.exportFailed)
-                    Button(L10n.done) { dismiss() }
+                    Button(L10n.done) { close() }
                 }
                 .padding(40)
             } else {
@@ -44,6 +46,8 @@ struct ExportLoader: View {
             }
         }
     }
+    private func close() { if let onClose { onClose() } else { dismiss() } }
+
 }
 
 /// Export, laid out as in the owner's mockup (`ipad-notebook-export.png`):
@@ -59,6 +63,8 @@ struct ExportSheet: View {
     /// switched copying off can only leave as a PDF.
     var permissions = DocumentPermissions.unrestricted
     var initialFormat: ExportFormat? = nil
+    var isEmbedded = false
+    var onClose: (() -> Void)? = nil
 
     @Environment(LibrarySession.self) private var session
     @Environment(\.dismiss) private var dismiss
@@ -92,6 +98,26 @@ struct ExportSheet: View {
     }
 
     var body: some View {
+        Group {
+            if isEmbedded {
+                VStack(alignment: .leading, spacing: 0) {
+                    panelHeader
+                    form
+                    footer
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(EditorChrome.surface)
+                }
+            } else {
+                standalone
+            }
+        }
+        .toolPanelAppearance(isEmbedded: isEmbedded)
+        .modifier(lifecycle)
+        .proPaywall($proFeature)
+    }
+
+    private var standalone: some View {
         #if os(iOS)
         NavigationStack {
             form
@@ -99,33 +125,54 @@ struct ExportSheet: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(L10n.cancel) { dismiss() }
+                        Button { close() } label: { Image(systemName: "xmark") }
+                            .accessibilityLabel(L10n.cancel)
+                            .accessibilityIdentifier("export-close")
                     }
                 }
                 .safeAreaInset(edge: .bottom) {
                     footer
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
-                        .background(.bar)
+                        .background(EditorChrome.surface)
                 }
         }
-        .modifier(lifecycle)
-        .proPaywall($proFeature)
         #else
         VStack(alignment: .leading, spacing: 0) {
-            Text(L10n.exportTitle)
-                .font(.headline)
-                .padding([.horizontal, .top])
+            panelHeader
             form
-            footer
-                .padding()
+            footer.padding(16).background(EditorChrome.surface)
         }
-        // Sheets on macOS size to their content.
+        // A bounded sheet avoids content-driven AppKit constraint cycles.
         .frame(minWidth: 460, idealWidth: 540, minHeight: 360, idealHeight: 620, maxHeight: 680)
-        .modifier(lifecycle)
-        .proPaywall($proFeature)
         #endif
     }
+
+    private var panelHeader: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "square.and.arrow.up")
+                .font(.title3.weight(.medium))
+                .foregroundStyle(EditorChrome.purple)
+                .frame(width: 38, height: 38)
+                .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityHidden(true)
+            Text(L10n.exportTitle).font(.headline).accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            Button { close() } label: {
+                Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
+                    .frame(width: 30, height: 30)
+                    .background(EditorChrome.lavender, in: Circle())
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.cancel)
+            .accessibilityIdentifier("export-close")
+        }
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .background(EditorChrome.surface)
+    }
+
+    private func close() { if let onClose { onClose() } else { dismiss() } }
 
     private var lifecycle: ExportLifecycle {
         ExportLifecycle(onAppear: {
@@ -135,7 +182,7 @@ struct ExportSheet: View {
             exportTask?.cancel()
             if case .ready(let output) = phase { output.removeTemporaryFiles() }
         }, saver: SaveExportedFiles(isPresented: $isShowingSaver, output: readyOutput, format: options.format) {
-            dismiss()
+            close()
         })
     }
 
@@ -215,7 +262,7 @@ struct ExportSheet: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
-        .background(Theme.libraryBackground)
+        .background(EditorChrome.secondaryBackground)
         .tint(Theme.accent)
         .disabled(isBusyOrDone)
     }
@@ -224,12 +271,12 @@ struct ExportSheet: View {
         HStack(spacing: 12) {
             if let cover = pages.first {
                 PageImageView(page: cover, pixelSize: 240)
-                    .frame(width: 56, height: 76)
+                    .frame(width: 44, height: 60)
                     .clipShape(RoundedRectangle(cornerRadius: 5))
                     .shadow(color: Theme.paperShadow, radius: 5, y: 3)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(itemName).font(.headline).lineLimit(2)
+                Text(itemName).font(.headline).fixedSize(horizontal: false, vertical: true)
                 Text(L10n.pageCount(pages.count)).font(.subheadline).foregroundStyle(.secondary)
             }
         }
@@ -471,14 +518,14 @@ struct ExportSheet: View {
                     .foregroundStyle(.green)
                     .accessibilityIdentifier("export-copied")
                 Spacer()
-                Button(L10n.done) { dismiss() }
+                Button(L10n.done) { close() }
                     .keyboardShortcut(.defaultAction)
             }
         case .failed(let message):
             HStack {
                 Text(message).foregroundStyle(.red)
                 Spacer()
-                Button(L10n.done) { dismiss() }
+                Button(L10n.done) { close() }
             }
         }
     }
@@ -515,24 +562,56 @@ struct ExportSheet: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(L10n.exportDestination)
         #else
-        HStack {
-            Spacer()
-            if case .configuring = phase {
-                Button(L10n.cancel, role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
+        Group {
+            if isEmbedded {
+                VStack(spacing: 10) {
+                    Button { perform(.copy) } label: {
+                        Label(L10n.exportCopy, systemImage: "doc.on.doc")
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!actionsEnabled || producesArchive)
+                    .accessibilityIdentifier("export-destination-copy")
+                    Button { perform(.share) } label: {
+                        Label(L10n.exportShareTile, systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!actionsEnabled)
+                    .background(SystemSharePresenter(request: $shareRequest, finished: shareFinished))
+                    .accessibilityIdentifier("export-destination-share")
+                    Button { perform(.save) } label: {
+                        Label(L10n.exportToDisk, systemImage: "square.and.arrow.down")
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!actionsEnabled)
+                    .accessibilityIdentifier("export-destination-save")
+                }
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+            } else {
+                HStack {
+                    Spacer()
+                    if case .configuring = phase {
+                        Button(L10n.cancel, role: .cancel) { close() }
+                            .keyboardShortcut(.cancelAction)
+                    }
+                    Button(L10n.exportCopy) { perform(.copy) }
+                        .disabled(!actionsEnabled || producesArchive)
+                        .accessibilityIdentifier("export-destination-copy")
+                    Button(L10n.exportShareTile) { perform(.share) }
+                        .disabled(!actionsEnabled)
+                        .background(SystemSharePresenter(request: $shareRequest, finished: shareFinished))
+                        .accessibilityIdentifier("export-destination-share")
+                    // Return saves, as the Export button it replaces did.
+                    Button(L10n.exportToDisk) { perform(.save) }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(!actionsEnabled)
+                        .accessibilityIdentifier("export-destination-save")
+                }
             }
-            Button(L10n.exportCopy) { perform(.copy) }
-                .disabled(!actionsEnabled || producesArchive)
-                .accessibilityIdentifier("export-destination-copy")
-            Button(L10n.exportShareTile) { perform(.share) }
-                .disabled(!actionsEnabled)
-                .background(SystemSharePresenter(request: $shareRequest, finished: shareFinished))
-                .accessibilityIdentifier("export-destination-share")
-            // Return saves, as the Export button it replaces did.
-            Button(L10n.exportToDisk) { perform(.save) }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!actionsEnabled)
-                .accessibilityIdentifier("export-destination-save")
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(L10n.exportDestination)
@@ -578,7 +657,7 @@ struct ExportSheet: View {
     /// A share target has the files: the sheet's work is done. Closed without
     /// one, the export stays ready for another try.
     private func shareFinished(_ shared: Bool) {
-        if shared { dismiss() }
+        if shared { close() }
     }
 
     private var isBusyOrDone: Bool {
@@ -741,10 +820,10 @@ private struct ChoiceTileStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(Color.primary)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
+            .background(isSelected ? EditorChrome.lavender : EditorChrome.surface, in: RoundedRectangle(cornerRadius: 14))
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(isSelected ? Theme.accent : Theme.separator, lineWidth: isSelected ? 2 : 1)
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(isSelected ? Theme.accent.opacity(0.55) : Theme.separator, lineWidth: 1)
             }
             .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.4)
             .contentShape(RoundedRectangle(cornerRadius: 12))

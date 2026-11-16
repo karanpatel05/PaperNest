@@ -87,8 +87,8 @@ struct ToolsSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    Text(L10n.toolsCreate).font(.title2.weight(.semibold))
+                VStack(alignment: .leading, spacing: 18) {
+                    Text(L10n.toolsCreate).font(.headline)
                         .accessibilityAddTraits(.isHeader)
                     LazyVGrid(columns: columns, spacing: 14) {
                         createActions
@@ -98,7 +98,7 @@ struct ToolsSheet: View {
                         .buttonStyle(PremiumButtonStyle())
                         .accessibilityIdentifier("tool-photos")
                     }
-                    Text(L10n.toolsDocuments).font(.title2.weight(.semibold))
+                    Text(L10n.toolsDocuments).font(.headline)
                         .accessibilityAddTraits(.isHeader)
                     LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(Tool.allCases) { tool in
@@ -114,7 +114,7 @@ struct ToolsSheet: View {
                 .frame(maxWidth: 840)
                 .frame(maxWidth: .infinity)
             }
-            .background(Theme.libraryBackground)
+            .background(EditorChrome.secondaryBackground)
             .navigationTitle(L10n.toolsTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -135,7 +135,7 @@ struct ToolsSheet: View {
                         .keyboardShortcut(.defaultAction)
                 }
                 .padding()
-                .background(.bar)
+                .background(EditorChrome.surface)
             }
             #endif
             .onChange(of: photoSelection) { _, picked in
@@ -160,6 +160,7 @@ struct ToolsSheet: View {
         .sheet(item: $archiving) { request in
             BulkExportSheet(request: request)
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 460, idealWidth: 640, minHeight: 360, idealHeight: 620, maxHeight: 720)
         #endif
@@ -265,7 +266,11 @@ private struct DocumentPicker: View {
                             Image(systemName: selection.contains(summary.id) ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(selection.contains(summary.id) ? Theme.accent : .secondary)
                         }
-                        .contentShape(Rectangle())
+                        .frame(minHeight: 44)
+                        .padding(10)
+                        .background(selection.contains(summary.id) ? EditorChrome.lavender : EditorChrome.surface,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                        .contentShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
                     .disabled(!usable)
@@ -277,6 +282,8 @@ private struct DocumentPicker: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(EditorChrome.secondaryBackground)
         .navigationTitle(tool.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -292,7 +299,7 @@ private struct DocumentPicker: View {
                 continueButton.keyboardShortcut(.defaultAction)
             }
             .padding()
-            .background(.bar)
+            .background(EditorChrome.surface)
         }
         #endif
         .task {
@@ -335,9 +342,9 @@ private struct ToolCardLabel: View {
         VStack(alignment: .leading, spacing: 12) {
             Image(systemName: systemImage)
                 .font(.title2.weight(.medium))
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(EditorChrome.purple)
                 .frame(width: 44, height: 44)
-                .background(Theme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+                .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12))
                 .accessibilityHidden(true)
             Text(title)
                 .font(.headline)
@@ -352,14 +359,14 @@ private struct ToolCardLabel: View {
         }
         .multilineTextAlignment(.leading)
         .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
-        .padding(18)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius))
+        .padding(16)
+        .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay {
-            RoundedRectangle(cornerRadius: Theme.radius)
-                .strokeBorder(Theme.separator, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(EditorChrome.border, lineWidth: 0.75)
         }
         .opacity(isEnabled ? 1 : 0.45)
-        .contentShape(RoundedRectangle(cornerRadius: Theme.radius))
+        .contentShape(RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .combine)
     }
 }

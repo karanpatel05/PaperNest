@@ -53,7 +53,7 @@ struct HomeThumbnail: View {
     }
 }
 
-/// Recent documents as rows in one card: the phone's layout, and the wide
+/// Recent documents as rounded rows: the phone's layout, and the wide
 /// layout's at accessibility text sizes.
 struct HomeRecentList<Actions: View>: View {
     let items: [LibraryStore.ItemSummary]
@@ -62,7 +62,7 @@ struct HomeRecentList<Actions: View>: View {
     @ViewBuilder let actions: (LibraryStore.ItemSummary) -> Actions
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 4) {
             ForEach(items) { summary in
                 HStack(spacing: 0) {
                     Button { open(summary) } label: { row(summary) }
@@ -74,24 +74,24 @@ struct HomeRecentList<Actions: View>: View {
                     .foregroundStyle(Theme.navy)
                     .accessibilityLabel(L10n.more)
                 }
+                .padding(4)
+                .background(Theme.lavender.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+                .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.border, lineWidth: 1) }
                 .contextMenu { actions(summary) }
-                if summary.id != items.last?.id { Divider().padding(.leading, 70) }
             }
         }
-        .padding(4)
-        .modifier(PremiumCard())
     }
 
     private func row(_ summary: LibraryStore.ItemSummary) -> some View {
         HStack(spacing: 12) {
             HomeThumbnail(summary: summary)
-                .frame(width: 40, height: 48)
+                .frame(width: 36, height: 44)
                 .background(Theme.lavender, in: RoundedRectangle(cornerRadius: 8))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 3) {
                 Text(summary.item.name).font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.navy).lineLimit(2)
-                Text(HomeRecentText.detail(summary, bytes: sizes[summary.id])).font(.caption)
+                Text(HomeRecentText.modified(summary.item.modifiedAt)).font(.caption)
                     .foregroundStyle(Theme.secondaryText).lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -100,7 +100,7 @@ struct HomeRecentList<Actions: View>: View {
                     .accessibilityLabel(L10n.favorites)
             }
         }
-        .padding(.horizontal, 8).padding(.vertical, 8)
+        .padding(.horizontal, 8).padding(.vertical, 4)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(HomeRecentText.accessibilityLabel(summary))
@@ -108,45 +108,56 @@ struct HomeRecentList<Actions: View>: View {
     }
 }
 
-/// Recent documents as a strip of thumbnail cards: the iPad layout.
+/// Responsive preview cards for the spacious Mac and iPad Home.
 struct HomeRecentCards<Actions: View>: View {
     let items: [LibraryStore.ItemSummary]
     let open: (LibraryStore.ItemSummary) -> Void
     @ViewBuilder let actions: (LibraryStore.ItemSummary) -> Actions
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(alignment: .top, spacing: 14) {
-                ForEach(items) { summary in
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 360), spacing: 16)], spacing: 16) {
+            ForEach(items) { summary in
+                VStack(alignment: .leading, spacing: 0) {
                     Button { open(summary) } label: { card(summary) }
-                        .buttonStyle(PremiumButtonStyle())
-                        .contextMenu { actions(summary) }
+                        .buttonStyle(.plain)
+                    HStack(spacing: 4) {
+                        Text(HomeRecentText.modified(summary.item.modifiedAt))
+                            .font(.caption).foregroundStyle(Theme.secondaryText)
+                            .lineLimit(2)
+                        Spacer(minLength: 0)
+                        Menu { actions(summary) } label: {
+                            Image(systemName: "ellipsis").frame(width: 44, height: 44)
+                        }
+                        .menuStyle(.borderlessButton).fixedSize()
+                        .accessibilityLabel(L10n.more + ", " + summary.item.name)
+                    }.padding(.horizontal, 12)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(Theme.lavender.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+                .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.border, lineWidth: 1) }
+                .contextMenu { actions(summary) }
             }
-            .padding(.vertical, 4).padding(.horizontal, 2)
         }
     }
 
     private func card(_ summary: LibraryStore.ItemSummary) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HomeThumbnail(summary: summary, pixelSize: 360)
-                .frame(width: 132, height: 150)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.border, lineWidth: 1) }
-                .overlay(alignment: .topTrailing) {
-                    if summary.item.isFavorite {
-                        Image(systemName: "star.fill").font(.caption)
-                            .foregroundStyle(.yellow).padding(7)
-                    }
+            ZStack(alignment: .topTrailing) {
+                HomeThumbnail(summary: summary, pixelSize: 180)
+                    .frame(width: 60, height: 78)
+                    .shadow(color: Theme.paperShadow.opacity(0.5), radius: 3, y: 2)
+                    .frame(maxWidth: .infinity)
+                if summary.item.isFavorite {
+                    Image(systemName: "star.fill").font(.caption)
+                        .foregroundStyle(Theme.accent)
                 }
-                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+            }
+            .frame(height: 84)
             Text(summary.item.name).font(.footnote.weight(.semibold))
                 .foregroundStyle(Theme.navy).lineLimit(2).multilineTextAlignment(.leading)
-            Text(HomeRecentText.modified(summary.item.modifiedAt)).font(.caption2)
-                .foregroundStyle(Theme.secondaryText).lineLimit(1)
         }
-        .frame(width: 132, alignment: .leading)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(HomeRecentText.accessibilityLabel(summary))

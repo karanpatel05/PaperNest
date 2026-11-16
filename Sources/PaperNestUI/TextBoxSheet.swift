@@ -65,6 +65,8 @@ struct TextBoxSheet: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(EditorChrome.secondaryBackground)
             .navigationTitle(editing == nil ? L10n.textBox : L10n.textBoxEdit)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -87,6 +89,7 @@ struct TextBoxSheet: View {
                 Text(L10n.saveFailed)
             }
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 360, idealHeight: 420)
         #endif

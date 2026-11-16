@@ -905,7 +905,7 @@
 "sync.actionFailed" = "Cette action n’a pas pu aboutir. Rien n’a été supprimé. Réessayez quand iCloud sera joignable.";
 
 /* Home and scanner redesign */
-"home.subtitle" = "Vos notes, documents et fichiers au même endroit.";
+"home.subtitle" = "Un petit espace pour l’essentiel.";
 "home.newNote" = "Nouvelle note";
 "home.importFile" = "Importer un fichier";
 "home.recentDocuments" = "Documents récents";
@@ -968,6 +968,24 @@
 "display.twoPages.detail" = "Affiche un document deux pages côte à côte. Une page en largeur est affichée seule.";
 "display.twoPages.cover" = "Couverture seule";
 "display.twoPages.cover.detail" = "Affiche la première page seule, pour que les suivantes se répondent comme dans un livre imprimé.";
+
+/* Approved OCR and Signature panels */
+"ocr.panel.languages" = "Langues";
+"ocr.panel.languagesHelp" = "Choisissez les langues utilisées dans ce document.";
+"ocr.panel.moreLanguages" = "Autres langues";
+"ocr.panel.chooseLanguage" = "Sélectionnez au moins une langue.";
+"ocr.panel.rangeHint" = "Par exemple : 1–3, 5";
+"ocr.panel.invalidRange" = "Saisissez des numéros de page de ce document, par exemple 1–3, 5.";
+"ocr.panel.outputHelp" = "Extrayez le texte pour la recherche et la copie. Le PDF avec texte recherchable est une option d’exportation distincte.";
+"signature.saveThenPlace" = "Enregistrez d’abord, puis placez la signature sur la page.";
+"ocr.panel.selected" = "Pages sélectionnées : %d";
+"ocr.panel.start" = "Reconnaître %@";
+"ocr.panel.completed" = "Pages reconnues : %d sur %d";
+"ocr.panel.incomplete" = "Certaines pages n’ont pas pu être reconnues ou enregistrées. Réessayez.";
+
+/* Spacious Home */
+"home.searchLibrary" = "Rechercher dans la bibliothèque";
+"home.myFolders" = "Mes dossiers";
 
 /* Aperçu visuel de Scan Studio */
 "scanner.mode.whiteboard" = "Tableau blanc";

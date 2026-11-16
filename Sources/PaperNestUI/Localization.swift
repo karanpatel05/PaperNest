@@ -1100,6 +1100,28 @@ extension L10n {
     static var twoPagesCoverDetail: String { tr("display.twoPages.cover.detail") }
 }
 
+// Approved OCR and Signature panels.
+extension L10n {
+    static var ocrIncomplete: String { tr("ocr.panel.incomplete") }
+    static var ocrLanguages: String { tr("ocr.panel.languages") }
+    static var ocrLanguagesHelp: String { tr("ocr.panel.languagesHelp") }
+    static var ocrMoreLanguages: String { tr("ocr.panel.moreLanguages") }
+    static var ocrChooseLanguage: String { tr("ocr.panel.chooseLanguage") }
+    static var ocrRangeHint: String { tr("ocr.panel.rangeHint") }
+    static var ocrInvalidRange: String { tr("ocr.panel.invalidRange") }
+    static var ocrOutputHelp: String { tr("ocr.panel.outputHelp") }
+    static var signatureSaveThenPlace: String { tr("signature.saveThenPlace") }
+    static func ocrSelected(_ count: Int) -> String { tr("ocr.panel.selected", count) }
+    static func ocrStart(_ count: Int) -> String { tr("ocr.panel.start", pageCount(count)) }
+    static func ocrCompleted(_ count: Int, _ total: Int) -> String { tr("ocr.panel.completed", count, total) }
+}
+
+// Spacious Home, owner-approved sample.
+extension L10n {
+    static var homeSearchPlaceholder: String { tr("home.searchLibrary") }
+    static var homeMyFolders: String { tr("home.myFolders") }
+}
+
 // Scan Studio functionality: presets and Cleanup that change the page, and batch page actions.
 extension L10n {
     static var scannerBefore: String { tr("scanner.cleanup.before") }

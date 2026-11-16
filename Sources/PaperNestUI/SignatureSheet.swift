@@ -160,56 +160,16 @@ struct SignatureSheet: View {
     static var namePrompt: String { L10n.signatureName }
 
     var body: some View {
-        EditorToolNavigation(isEmbedded: isEmbedded, title: L10n.signatureTitle) {
-            Form {
-                savedSection
-                if draft.drawing { captureSection }
-                if let signature = draft.selected { placementSection(signature) }
-            }
-            .formStyle(.grouped)
+        DocumentToolPanel(title: L10n.signatureTitle, symbol: "signature", closeID: "signature-cancel",
+                          busy: draft.busy, close: { close() }) {
+            savedSection
+            if draft.drawing { captureSection }
+            if let signature = draft.selected { placementSection(signature) }
+        } footer: {
+            if draft.drawing { PanelNote(text: L10n.signatureSaveThenPlace) }
+            placeButton.buttonStyle(.borderedProminent).controlSize(.large)
+        }
             .disabled(draft.busy)
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if isEmbedded {
-                    VStack(spacing: 8) {
-                        if dynamicTypeSize.isAccessibilitySize {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(L10n.signatureTitle).font(.headline)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                cancelButton
-                            }.frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            HStack {
-                                Text(L10n.signatureTitle).font(.headline)
-                                Spacer()
-                                cancelButton
-                            }
-                        }
-                        placeButton.frame(maxWidth: .infinity, alignment: .trailing)
-                    }.padding(12).background(Theme.surface)
-                }
-            }
-            #if os(iOS)
-            .safeAreaInset(edge: .bottom) {
-                if !isEmbedded {
-                    placeButton
-                        .buttonStyle(.borderedProminent)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(.bar)
-                }
-            }
-            #endif
-            .toolbar {
-                if !isEmbedded {
-                    ToolbarItem(placement: .cancellationAction) { cancelButton }
-                    #if os(macOS)
-                    ToolbarItem(placement: .confirmationAction) { placeButton }
-                    #endif
-                }
-            }
             .interactiveDismissDisabled(draft.busy || (draft.drawing && (!draft.strokes.isEmpty || !draft.capturePoints.isEmpty)))
             .alert(L10n.genericErrorTitle, isPresented: $draft.failed) {
                 if draft.pageChanged {
@@ -220,7 +180,7 @@ struct SignatureSheet: View {
                 Text(draft.pageChanged ? L10n.markupChanged : L10n.signatureSaveFailed)
             }
             .task { await draft.load() }
-        }
+        .toolPanelAppearance(isEmbedded: isEmbedded)
         .proPaywall($proFeature)
         #if os(macOS)
         .frame(minWidth: isEmbedded ? nil : 460, idealWidth: isEmbedded ? nil : 560,
@@ -228,19 +188,18 @@ struct SignatureSheet: View {
         #endif
     }
 
-    private var cancelButton: some View {
-        Button(L10n.cancel) { close() }
-            .disabled(draft.busy).accessibilityIdentifier("signature-cancel")
-    }
-
     private var placeButton: some View {
-        Button(L10n.signaturePlace) {
+        Button {
             guard SubscriptionStore.shared.allows(.signature) else { proFeature = .signature; return }
             nameFocused = false
             Task {
                 guard await beforeAction?() ?? true else { return }
                 if await draft.place(undoManager: undoManager) { close() }
             }
+        }
+        label: {
+            Text(L10n.signaturePlace).foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: 36)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .disabled(draft.busy || draft.selected == nil || draft.model.isChangingNotebookPage)
         .accessibilityIdentifier("signature-place")
@@ -251,27 +210,35 @@ struct SignatureSheet: View {
     }
 
     private var savedSection: some View {
-        Section {
+        PanelSection(title: L10n.signatureSaved) {
             if draft.signatures.isEmpty {
-                Text(L10n.signatureNoSaved).foregroundStyle(Theme.secondaryText)
+                VStack(spacing: 8) {
+                    Image(systemName: "signature").font(.title2).foregroundStyle(Theme.accent).accessibilityHidden(true)
+                    Text(L10n.signatureNoSaved).font(.callout.weight(.medium))
+                    PanelNote(text: L10n.signatureHelp)
+                }.frame(maxWidth: .infinity).multilineTextAlignment(.center).padding(.vertical, 8)
             }
             ForEach(draft.signatures) { signature in
                 HStack(spacing: 12) {
                     Button { draft.select(signature) } label: {
-                        HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
                             SignatureInkPreview(strokes: signature.placed(in: .full, on: CGSize(width: 90, height: 36)),
                                                 sourceSize: CGSize(width: 90, height: 36))
                                 .frame(width: 90, height: 44)
                                 .background(Color.white, in: RoundedRectangle(cornerRadius: 8))
                                 .accessibilityHidden(true)
-                            Text(verbatim: signature.name).foregroundStyle(Theme.primaryText)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 4)
-                            if draft.selectedID == signature.id {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
+                            HStack(spacing: 8) {
+                                Text(verbatim: signature.name).foregroundStyle(Theme.primaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                if draft.selectedID == signature.id {
+                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
+                                }
                             }
                         }
+                        .padding(10)
                         .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .background(draft.selectedID == signature.id ? EditorChrome.lavender : Color.clear, in: RoundedRectangle(cornerRadius: 12))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -288,19 +255,22 @@ struct SignatureSheet: View {
                     .accessibilityIdentifier("signature-delete-\(signature.id)")
                 }
             }
+            if !draft.drawing || !draft.signatures.isEmpty {
             Button { draft.capturePoints = []; draft.beginDrawing() } label: {
                 Label(L10n.signatureNew, systemImage: "signature")
                     .frame(minHeight: 44)
             }
             .accessibilityIdentifier("signature-new")
-        } header: { Text(L10n.signatureSaved) }
-          footer: { Text(L10n.signatureHelp).fixedSize(horizontal: false, vertical: true) }
+            }
+        }
     }
 
     private var captureSection: some View {
-        Section {
+        PanelSection(title: L10n.signatureNew) {
             VStack(alignment: .leading, spacing: 6) {
+                Text(L10n.signatureName).font(.caption).foregroundStyle(Theme.secondaryText)
                 TextField(L10n.signatureName, text: $draft.name, prompt: Text(Self.namePrompt))
+                    .textFieldStyle(.roundedBorder)
                     .focused($nameFocused)
                     .onSubmit { nameFocused = false }
                     .accessibilityIdentifier("signature-name")
@@ -346,11 +316,13 @@ struct SignatureSheet: View {
                 .accessibilityValue(L10n.strokeCount(draft.strokes.count))
                 .accessibilityIdentifier("signature-canvas")
             }
-            .frame(height: 170)
+            .frame(height: 210)
             Button(L10n.signatureClear) { draft.strokes = []; draft.capturePoints = [] }
                 .disabled(draft.strokes.isEmpty && draft.capturePoints.isEmpty)
+                .buttonStyle(.plain).foregroundStyle(Theme.accent)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
                 .accessibilityIdentifier("signature-clear")
-            Button(L10n.signatureSave) {
+            Button {
                 guard SubscriptionStore.shared.allows(.signature) else { proFeature = .signature; return }
                 nameFocused = false
                 Task {
@@ -358,10 +330,14 @@ struct SignatureSheet: View {
                     await draft.saveReusable()
                 }
             }
-                .buttonStyle(.borderedProminent)
+            label: {
+                Text(L10n.signatureSave).frame(maxWidth: .infinity, minHeight: 36)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+                .buttonStyle(.bordered).controlSize(.large)
                 .disabled(!draft.canSave)
                 .accessibilityIdentifier("signature-save")
-        } header: { Text(L10n.signatureDraw) }
+        }
     }
 
     private var currentStroke: [InkStroke] {
@@ -369,8 +345,10 @@ struct SignatureSheet: View {
     }
 
     private func placementSection(_ signature: SavedSignature) -> some View {
-        Section {
+        PanelSection(title: L10n.signaturePreview) {
             placementPreview(signature).frame(height: 260)
+                .padding(12)
+                .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 16))
             DisclosureGroup(L10n.signaturePosition) {
                 positionSlider(L10n.signatureHorizontal, value: $draft.target.x, range: 0...max(0, 1 - draft.target.width), id: "x")
                 positionSlider(L10n.signatureVertical, value: $draft.target.y, range: 0...max(0, 1 - draft.target.height), id: "y")
@@ -379,8 +357,8 @@ struct SignatureSheet: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("signature-position")
-        } header: { Text(L10n.signaturePreview) }
-          footer: { Text(L10n.signatureDrag).fixedSize(horizontal: false, vertical: true) }
+            PanelNote(text: L10n.signatureDrag)
+        }
     }
 
     private func positionSlider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, id: String) -> some View {

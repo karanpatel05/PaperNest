@@ -34,7 +34,9 @@ struct TextAnnotationSheet: View {
                 if let page {
                     Section {
                         PageImageView(page: page, pixelSize: 480)
-                            .frame(maxWidth: .infinity).frame(height: 140)
+                            .frame(maxWidth: .infinity).frame(height: 160)
+                            .padding(12)
+                            .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 16))
                             .accessibilityHidden(true)
                     }
                 }
@@ -45,7 +47,11 @@ struct TextAnnotationSheet: View {
                                 Label(option.title, systemImage: option.symbol)
                                 Spacer()
                                 if style == option { Image(systemName: "checkmark") }
-                            }.contentShape(Rectangle())
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 44)
+                            .background(style == option ? EditorChrome.lavender : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("annotation-style-\(option.rawValue)")
@@ -68,7 +74,11 @@ struct TextAnnotationSheet: View {
                                     Spacer()
                                     Image(systemName: selection.contains(index) ? "checkmark.circle.fill" : "circle")
                                         .foregroundStyle(Theme.accent)
-                                }.contentShape(Rectangle())
+                                }
+                                .padding(10)
+                                .frame(minHeight: 44)
+                                .background(selection.contains(index) ? EditorChrome.lavender : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("annotation-line-\(index)")
@@ -92,6 +102,8 @@ struct TextAnnotationSheet: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(EditorChrome.secondaryBackground)
             .disabled(busy)
             .navigationTitle(L10n.annotateText)
             #if os(iOS)
@@ -118,6 +130,7 @@ struct TextAnnotationSheet: View {
                 Button(L10n.ok) { errorMessage = nil }
             } message: { Text(errorMessage ?? "") }
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 440, idealWidth: 520, minHeight: 480, idealHeight: 620)
         #endif

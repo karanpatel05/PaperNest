@@ -100,14 +100,32 @@ struct BulkExportSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    body(for: model?.phase ?? .idle)
-                } footer: {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "doc.zipper")
+                            .font(.title2.weight(.medium))
+                            .foregroundStyle(EditorChrome.purple)
+                            .frame(width: 48, height: 56)
+                            .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 14))
+                            .accessibilityHidden(true)
+                        Text(L10n.selectionCount(request.ids.count))
+                            .font(.headline)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                    VStack(alignment: .leading, spacing: 14) {
+                        body(for: model?.phase ?? .idle)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 16))
                     Text(L10n.exportZipFooter)
+                        .font(.footnote)
+                        .foregroundStyle(EditorChrome.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(20)
             }
-            .formStyle(.grouped)
             .navigationTitle(L10n.exportZipTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -127,8 +145,9 @@ struct BulkExportSheet: View {
                 model.start(request.ids, archiveName: L10n.exportZipArchiveName(date))
             }
         }
+        .toolPanelAppearance()
         #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 240, idealHeight: 280)
+        .frame(width: 460, height: 340)
         #endif
     }
 
@@ -151,16 +170,16 @@ struct BulkExportSheet: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(L10n.exportReady(ByteCountFormatter.string(fromByteCount: output.totalByteCount, countStyle: .file)))
                     .accessibilityIdentifier("bulk-export-status")
-                HStack {
+                VStack(alignment: .leading, spacing: 10) {
                     ShareLink(items: output.files) {
                         Label(L10n.exportShare, systemImage: "square.and.arrow.up")
                     }
                     .accessibilityIdentifier("bulk-export-share")
-                    Spacer()
                     Button(L10n.exportSave) { isShowingSaver = true }
                         .accessibilityIdentifier("bulk-export-save")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
             }
         case .failed:
             Text(L10n.exportFailed)

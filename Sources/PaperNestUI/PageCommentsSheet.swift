@@ -19,6 +19,7 @@ struct PageCommentsSheet: View {
                     Button { draft = PageCommentDraft(model: model, pageID: pageID, original: nil, undoManager: undoManager) } label: {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Image(systemName: "plus.bubble")
+                                .foregroundStyle(EditorChrome.purple)
                                 .accessibilityHidden(true)
                             Text(L10n.commentAdd)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -27,7 +28,9 @@ struct PageCommentsSheet: View {
                             .foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
+                            .padding(10)
+                            .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12))
+                            .contentShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("comment-add")
@@ -42,9 +45,14 @@ struct PageCommentsSheet: View {
                                 Text(comment.commentText ?? "").lineLimit(3)
                                     .multilineTextAlignment(.leading)
                                 Spacer()
-                                Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(EditorChrome.secondaryText)
                             }
-                            .contentShape(Rectangle())
+                            .frame(minHeight: 44)
+                            .padding(10)
+                            .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 12))
+                            .contentShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("comment-row-\(comment.id.rawValue)")
@@ -53,6 +61,8 @@ struct PageCommentsSheet: View {
                 } footer: { Text(L10n.commentPrivacy).foregroundStyle(Color.primary) }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(EditorChrome.secondaryBackground)
             .navigationTitle(L10n.comments)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -77,6 +87,7 @@ struct PageCommentsSheet: View {
                 Button(L10n.ok) {}
             } message: { Text(L10n.commentPageUnavailable) }
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 360)
         #endif
@@ -106,6 +117,10 @@ private struct CommentEditorSheet: View {
                 Section {
                     TextEditor(text: $draft.text)
                         .frame(minHeight: 180)
+                        .padding(8)
+                        .scrollContentBackground(.hidden)
+                        .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(EditorChrome.border, lineWidth: 1) }
                         .accessibilityLabel(L10n.commentBody)
                         .accessibilityIdentifier("comment-text")
                 } header: { Text(L10n.commentBody) }
@@ -118,6 +133,8 @@ private struct CommentEditorSheet: View {
                 } footer: { Text(L10n.commentPrivacy) }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(EditorChrome.secondaryBackground)
             .disabled(draft.saving)
             .navigationTitle(L10n.commentBody)
             #if os(iOS)
@@ -143,6 +160,7 @@ private struct CommentEditorSheet: View {
                 Button(L10n.ok, role: .cancel) {}
             } message: { Text(draft.errorMessage) }
         }
+        .toolPanelAppearance()
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 400)
         #endif

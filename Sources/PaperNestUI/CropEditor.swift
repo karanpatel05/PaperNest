@@ -54,7 +54,7 @@ struct CropEditor: View {
                     .accessibilityIdentifier("crop-area")
                     .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
                 }
-                .padding(24)
+                .padding(16)
                 .background(Color(white: 0.12))
 
                 HStack {
@@ -62,7 +62,10 @@ struct CropEditor: View {
                         .disabled(rect == bounds)
                     Spacer()
                 }
-                .padding()
+                .padding(16)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .background(EditorChrome.surface)
             }
             .navigationTitle(L10n.crop)
             #if os(iOS)
@@ -81,6 +84,7 @@ struct CropEditor: View {
                 }
             }
         }
+        .toolPanelAppearance()
         // A drag near the sheet's edge must crop, not dismiss.
         .interactiveDismissDisabled()
         #if os(iOS)

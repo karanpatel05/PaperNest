@@ -48,17 +48,18 @@ struct HomeQuickActionsRow: View {
         Group {
             if large {
                 HStack(spacing: 12) { icon(item); title(item); Spacer(minLength: 0) }
+            } else if !tinted {
+                HStack(spacing: 10) { icon(item); title(item) }
             } else {
                 VStack(spacing: 8) { icon(item); title(item) }
             }
         }
-        .padding(.horizontal, 10).padding(.vertical, 12)
-        .frame(maxWidth: .infinity, minHeight: large ? 56 : 76, maxHeight: large ? nil : .infinity)
-        .background(tinted ? Theme.lavender : Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius))
-        .overlay { RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.border, lineWidth: tinted ? 0.5 : 1) }
-        .shadow(color: .black.opacity(tinted ? 0 : 0.04), radius: 10, y: 3)
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: large || !tinted ? 44 : 72, maxHeight: large ? nil : .infinity)
+        .background(Theme.lavender.opacity(tinted ? 0.7 : 0.35), in: RoundedRectangle(cornerRadius: 10))
+        .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border, lineWidth: tinted ? 0.5 : 1) }
         .opacity(item.isEnabled ? 1 : 0.45)
-        .contentShape(RoundedRectangle(cornerRadius: Theme.radius))
+        .contentShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private func icon(_ item: HomeQuickAction) -> some View {
@@ -74,7 +75,7 @@ struct HomeQuickActionsRow: View {
             .font(.footnote.weight(.semibold))
             .foregroundStyle(Theme.navy)
             .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .center)
-            .lineLimit(2)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
             .minimumScaleFactor(0.8)
             .fixedSize(horizontal: false, vertical: true)
     }

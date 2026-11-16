@@ -1,4 +1,22 @@
+## Spacious Home — approved samples, 2026-11-15
+
+Owner approved building the Home samples on all three devices. Codex stated Option A (spacious) as the implementation choice. References: `docs/design/mockups/home-options-approved-2026-11-15.png` and `ipad-home-options-approved-2026-11-15.png` (left/top A).
+
+One time-aware greeting with no fabricated name; actual logo on phone, existing sidebar brand on wide devices, icon-only Profile at the top right. Home search submits to the existing all-content library search, preserving its existing search semantics. Returning Home clears the previous search filter. Compact New Note / Import / New Folder actions remain; only iPad adds Scan, phone retains Scan in its four-tab bar, Mac has no Scan. Home has no Tools hub. Phone recents are rounded rows; wide recents are adaptive preview cards with visible ellipsis actions. All Documents retains its existing sorting and selection. Real folder cards now appear on phone as well as wide Home, when folders exist. No placeholder collections, counts, people or sync success. Accessibility text switches actions and recents to vertical layouts. Semantic Theme colors, native fonts and en/fr/es strings.
+
+Fidelity correction after owner review: use 10–12 pt card corners, thin borders with minimal shadows, centered compact action labels, three recent previews with small paper thumbnails (not full-card previews), and two horizontal tinted folder tiles per row at normal text sizes. Accessibility uses one folder column. Profile uses the outlined person icon. The sidebar sync entry is a flat footer with a separator; native sidebar selection and the actual brand asset remain. Sample copy: “A little space for what matters.”
+
+This supersedes the older banner, Mac Home table, separate Home heading, and Home-without-search presentation below. Store, sync, subscriptions, Profile content and other navigation remain unchanged.
+
 ## Export: the ways out are the buttons — owner, 2026-11-13
+
+## Document and utility panel styling — owner approval, 2026-11-15
+
+Approved OCR and Signature follow-up: both use a compact icon/title/close header, scrollable rounded sections and a pinned action footer. On wide Mac/iPad editors they occupy the trailing inspector; iPhone uses the existing native sheet presentation. OCR has device-supported language choices, All/Current/Range page controls, real page previews, validation, progress and completed-page counts. It extracts searchable library text through the existing recognition pipeline; the panel does not claim to add a PDF text layer. Signature keeps reusable-signature selection, an explicitly labeled name field, drawing pad and Clear, Save Signature, page-placement preview and Position/Size controls, with Place on Page pinned below. Existing subscription gates, durable saves, draft retention and undo remain authoritative.
+
+Presentation-only pass: shared semantic lavender chrome, rounded selected rows and paper previews, compact headers, native grouped controls and scrollable content. Reuse existing L10n strings and accessibility identifiers. No processing, persistence, subscription or data-model changes.
+
+Export and Compress opened from the editor join the existing trailing inspector on wide Mac/iPad layouts. Signature, form filling and page organization retain their existing embedded inspector. iPhone keeps native rounded sheets. Library-level export and operations, crop and annotation placement retain their existing native presentations; their controls receive the same styling. Export still uses direct Save, Copy and Share actions; no extra Export button. Preserve bounded Mac compression-sheet sizing to avoid the previously observed constraint cycle.
 
 Owner: "In export feature Share button does not work directly on ipad and iphone and mac it should remove export button in pop up menu it has no use i guess". Share was not broken; it took three taps (choose the Share tile, press Export, press "Share…"). The Export button is gone. Save to Files (Mac: Save to Disk), Copy and Share sit in the bar along the bottom of the export sheet, and each one exports with the options above and hands the file over in the same tap. Share opens the system share sheet from code, pointing at the Share button (`SystemSharePresenter`), because a `ShareLink` cannot open after an export it has to wait for.
 

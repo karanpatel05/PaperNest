@@ -827,4 +827,37 @@ import UIKit
         XCTAssertEqual(app.buttons["scanner.mode"].value as? String, "Off")
     }
 
+    func testFrenchLargestTextScanSettingsRemainDismissible() throws {
+        continueAfterFailure = false
+        let picture = try fixture("french-settings", size: CGSize(width: 600, height: 800), shape: CGRect(x: 150, y: 320, width: 300, height: 189))
+        let app = XCUIApplication()
+        app.launchArguments = ["-PaperNestLibraryPath", "/tmp/pn-fr-scanner-\(UUID().uuidString)",
+            "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(fr)", "-AppleLocale", "fr_FR",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+            "-PaperNestDebugScannerImages", picture.path, "-PaperNestDebugScannerPendingCapture", "YES"] + Self.standardScanDefaults
+        app.launch()
+        defer { app.terminate() }
+        keepCapture(app)
+        XCTAssertTrue(app.buttons["scanner.more"].waitForExistence(timeout: 10))
+        app.buttons["scanner.more"].tap()
+        let settings = app.buttons["Réglages de numérisation"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        let done = app.buttons["scanner.settings.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        let toggle = app.switches["scanner.settings.auto"]
+        for _ in 0..<12 {
+            if toggle.exists && toggle.frame.maxY < done.frame.minY && toggle.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(toggle.exists)
+        XCTAssertLessThanOrEqual(toggle.frame.maxY, done.frame.minY)
+        XCTAssertTrue(done.isHittable)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "french-XXXL-scan-settings"; shot.lifetime = .keepAlways; add(shot)
+        done.tap()
+        XCTAssertTrue(done.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["scanner.shutter"].exists)
+    }
+
 }

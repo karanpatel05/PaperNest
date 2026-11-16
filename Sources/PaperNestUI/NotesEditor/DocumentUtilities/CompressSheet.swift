@@ -14,6 +14,8 @@ import SwiftUI
 /// A document that cannot get smaller gets its original back and says so.
 struct CompressSheet: View {
     let itemID: ItemID
+    var isEmbedded = false
+    var onClose: (() -> Void)? = nil
     @Environment(LibrarySession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @State private var preset: CompressionPreset = .strong
@@ -37,26 +39,35 @@ struct CompressSheet: View {
     private func size(_ bytes: Int64) -> String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }
 
     var body: some View {
-        #if os(macOS)
-        // A Mac sheet sizes itself to its content, and any wrapped text it had
-        // to measure for that looped forever ("AttributeGraph: cycle
-        // detected"), leaving the sheet on its spinner. Given a size of its
-        // own, with the content scrolling inside it, nothing has to be
-        // measured against the sheet and the text wraps freely.
-        ScrollView { content }
-            .frame(width: 460, height: 380)
-            .background(EditorChrome.secondaryBackground)
-        #else
-        content
-        #endif
+        Group {
+            if isEmbedded {
+                ScrollView { content }
+            } else {
+                #if os(macOS)
+                // Keep a bounded Mac sheet: self-sizing wrapped content previously
+                // caused an AppKit/SwiftUI constraint cycle.
+                ScrollView { content }.frame(width: 460, height: 480)
+                #else
+                ScrollView { content }
+                #endif
+            }
+        }
+        .toolPanelAppearance(isEmbedded: isEmbedded)
     }
+
+    private func close() { if let onClose { onClose() } else { dismiss() } }
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    .font(.title3.weight(.medium)).foregroundStyle(EditorChrome.purple)
+                    .frame(width: 38, height: 38)
+                    .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityHidden(true)
                 Text(L10n.compressTitle).font(.headline).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button { task?.cancel(); dismiss() } label: {
+                Button { task?.cancel(); close() } label: {
                     Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
                         .frame(width: 30, height: 30).background(EditorChrome.lavender, in: Circle())
                         .frame(width: 44, height: 44).contentShape(Rectangle())
@@ -67,9 +78,23 @@ struct CompressSheet: View {
                 .accessibilityIdentifier("compress-close")
             }
             if let loaded {
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.richtext")
+                        .font(.title2).foregroundStyle(EditorChrome.purple)
+                        .frame(width: 44, height: 56)
+                        .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 10))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(verbatim: loaded.name).font(.subheadline.weight(.semibold))
+                        note(L10n.compressCurrentSize(size(loaded.bytes)))
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(14)
+                .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityElement(children: .combine)
                 PanelSection(title: L10n.compressLevel) {
                     levelPicker.disabled(isWorking)
-                    note(L10n.compressCurrentSize(size(loaded.bytes)))
                     note(L10n.compressRule)
                 }
                 .onChange(of: preset) { _, _ in clearResult() }
@@ -85,7 +110,7 @@ struct CompressSheet: View {
         .foregroundStyle(EditorChrome.navy)
         .tint(EditorChrome.purple)
         #if os(iOS)
-        .frame(minWidth: 320, idealWidth: 420, maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         #endif
         .background(EditorChrome.secondaryBackground)
         .background(SystemSharePresenter(request: $shareRequest, finished: { _ in }))
@@ -150,6 +175,9 @@ struct CompressSheet: View {
                     Text(L10n.compressNoGain).font(.subheadline.weight(.semibold))
                 }
             }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 14))
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("compress-result")
         case .failed:
