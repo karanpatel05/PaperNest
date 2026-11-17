@@ -1033,3 +1033,25 @@
 "export.docxLayout.images" = "Page Images";
 "export.docxLayout.images.detail" = "Looks like the page";
 "export.docxImagesNote" = "Each page goes into the Word file as one picture, so it keeps its look, ink and marks. Its words are part of the picture: they can’t be edited or searched in Word. Choose Editable Text for that.";
+
+/* OCR correction */
+"ocr.correct.section" = "Recognized Text";
+"ocr.correct.open" = "Correct Text…";
+"ocr.correct.title" = "Correct Text";
+"ocr.correct.help" = "Each field is one line as it was read. Correct it against the page above, or clear it to remove the line. Search, find, read aloud and exports use the corrected words.";
+"ocr.correct.line" = "Line %lld";
+"ocr.correct.unsure" = "Recognition was unsure of this line";
+"ocr.correct.changed" = "Changed";
+"ocr.correct.changedCount" = "Lines changed: %lld";
+"ocr.correct.save" = "Save";
+"ocr.correct.discardTitle" = "Discard your corrections?";
+"ocr.correct.discard" = "Discard Changes";
+"ocr.correct.keepEditing" = "Keep Editing";
+"ocr.correct.changedElsewhere" = "This page’s text changed while you were correcting it (it was recognized again), so nothing was saved. Close and open Correct Text again to correct the new text.";
+"ocr.correct.historyChanged" = "This page’s text has changed since, so the correction can’t be undone.";
+"ocr.status.none" = "Page %lld hasn’t been recognized yet.";
+"ocr.status.failed" = "Page %lld couldn’t be read. Try again, perhaps with other languages.";
+"ocr.status.ownText" = "Page %lld carries its own text, so there’s nothing recognized to correct.";
+"ocr.status.recognized" = "Page %lld has recognized text.";
+"ocr.status.corrected" = "Page %lld has text you corrected.";
+"ocr.replacesCorrections" = "Some of these pages have text you corrected. Recognizing them again replaces it.";

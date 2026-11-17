@@ -478,7 +478,7 @@ struct DocumentView: View {
                 MarkupManagerSheet(model: model, pageID: page.id, undoManager: undoManager)
             }
             .sheet(isPresented: $isShowingOCR) {
-                OCRPanel(model: model, beforeAction: { await finishTextForPanelAction() })
+                OCRPanel(model: model, undoManager: undoManager, beforeAction: { await finishTextForPanelAction() })
             }
             .sheet(isPresented: $isShowingPageOrganizer) {
                 DocumentPagesSheet(model: model, undoManager: undoManager)
@@ -1148,7 +1148,7 @@ struct DocumentView: View {
                                        beforeAction: { await editor.finishTextForPanelAction() },
                                        onBusyChange: { editor.pageToolBusy = $0; editor.retainedState?.pageToolBusy = $0 })
                 case .ocr:
-                    OCRPanel(model: editor.model, isEmbedded: true,
+                    OCRPanel(model: editor.model, undoManager: editor.undoManager, isEmbedded: true,
                              onClose: { editor.inspectorTool = nil },
                              beforeAction: { await editor.finishTextForPanelAction() })
                 case nil:

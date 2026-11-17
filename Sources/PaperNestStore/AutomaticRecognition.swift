@@ -18,6 +18,11 @@ extension LibraryStore {
     /// is what earns another attempt. `engineVersion` is passed in because the
     /// store knows nothing about Vision.
     ///
+    /// A **corrected** result is left alone when only the engine changed: its
+    /// lines are what a person typed, and reading the page again would throw
+    /// them away for something no better. New paper (a stale revision) still
+    /// earns a reading, since the corrections describe paper that is gone.
+    ///
     /// Pages that already carry their own text are skipped. A digital PDF's
     /// words beat recognizing a raster of those same words, and an empty
     /// `pdfText` marker — a scan with no text layer — is precisely the case
@@ -41,7 +46,8 @@ extension LibraryStore {
                   r.page_id IS NULL
                   OR r.source_revision != p.revision
                   OR r.status = 'pending'
-                  OR r.engine_version != ?
+                  OR (r.engine_version != ?
+                      AND json_extract(r.result_json, '$.correctedAt') IS NULL)
               )
             ORDER BY i.modified_at DESC, p.sort_key
             LIMIT ?

@@ -1093,7 +1093,10 @@ public actor LibraryStore {
         try db.run("UPDATE items SET modified_at = ? WHERE id = ?", [.date(timestamp), .text(id.rawValue)])
     }
 
-    private func bumpRevision(_ page: Page) throws {
+    /// Internal so a store extension that changes what a page shows — a
+    /// corrected recognition — moves the revision the same way an object
+    /// edit does; the caller owns the transaction.
+    func bumpRevision(_ page: Page) throws {
         let timestamp = now()
         try db.run("UPDATE pages SET revision = revision + 1, modified_at = ? WHERE id = ?", [.date(timestamp), .text(page.id.rawValue)])
         // The three object-write paths all land here and nothing else does, so

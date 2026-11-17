@@ -1033,3 +1033,25 @@
 "export.docxLayout.images" = "Imágenes de página";
 "export.docxLayout.images.detail" = "Igual que la página";
 "export.docxImagesNote" = "Cada página entra en el archivo de Word como una imagen: conserva su aspecto, su tinta y sus marcas. Sus palabras forman parte de la imagen y no se pueden editar ni buscar en Word. Elige Texto editable para eso.";
+
+/* OCR correction */
+"ocr.correct.section" = "Texto reconocido";
+"ocr.correct.open" = "Corregir texto…";
+"ocr.correct.title" = "Corregir texto";
+"ocr.correct.help" = "Cada campo es una línea tal como se leyó. Corrígela comparándola con la página de arriba, o vacíala para eliminar la línea. La búsqueda, la lectura en voz alta y las exportaciones usan las palabras corregidas.";
+"ocr.correct.line" = "Línea %lld";
+"ocr.correct.unsure" = "El reconocimiento no estaba seguro de esta línea";
+"ocr.correct.changed" = "Modificada";
+"ocr.correct.changedCount" = "Líneas modificadas: %lld";
+"ocr.correct.save" = "Guardar";
+"ocr.correct.discardTitle" = "¿Descartar tus correcciones?";
+"ocr.correct.discard" = "Descartar cambios";
+"ocr.correct.keepEditing" = "Seguir editando";
+"ocr.correct.changedElsewhere" = "El texto de esta página cambió mientras lo corregías (se volvió a reconocer), así que no se guardó nada. Cierra y vuelve a abrir Corregir texto para corregir el texto nuevo.";
+"ocr.correct.historyChanged" = "El texto de esta página ha cambiado desde entonces, así que la corrección no se puede deshacer.";
+"ocr.status.none" = "La página %lld aún no se ha reconocido.";
+"ocr.status.failed" = "No se pudo leer la página %lld. Inténtalo de nuevo, quizá con otros idiomas.";
+"ocr.status.ownText" = "La página %lld tiene su propio texto, así que no hay nada reconocido que corregir.";
+"ocr.status.recognized" = "La página %lld tiene texto reconocido.";
+"ocr.status.corrected" = "La página %lld tiene texto que corregiste.";
+"ocr.replacesCorrections" = "Algunas de estas páginas tienen texto que corregiste. Volver a reconocerlas lo reemplaza.";

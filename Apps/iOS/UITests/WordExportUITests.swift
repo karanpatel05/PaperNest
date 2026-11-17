@@ -11,20 +11,16 @@ import PaperNestStore
 /// for a Word file of several pages — it is one file, not a ZIP, and the
 /// sheet used to refuse it.
 ///
-/// No `continueAfterFailure = false` here: in these async tests a failure
-/// with it set left the runner idle in tear-down on iPad (2026-11-16) instead
-/// of ending the test. A step that later steps depend on returns instead.
+/// No `continueAfterFailure = false` and no `async` `tearDown`: after a
+/// failure, either left the runner idle in tear-down (2026-11-16, iPad and
+/// iPhone) instead of ending the test. A step that later steps depend on
+/// returns instead, and the library goes in a teardown block.
 @MainActor final class WordExportUITests: XCTestCase {
-    private var library: URL?
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
-
-    override func tearDown() async throws {
-        if let library { try? FileManager.default.removeItem(at: library) }
-    }
 
     private func openExport(language: String = "en") async throws -> XCUIApplication {
         let directory = URL(fileURLWithPath: "/tmp/papernest-word-export-\(UUID())")
-        library = directory
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         let store = try LibraryStore(directory: directory)
         _ = try await store.createItem(kind: .notebook, name: "Sketches", pages: (0..<2).map { _ in
             .init(sourceSize: CGSize(width: 600, height: 800), content: .template(.blank))
@@ -126,7 +122,6 @@ import PaperNestStore
             XCTAssertTrue(app.staticTexts["export-docx-images-note"].waitForExistence(timeout: 5), language)
             snap(app, "word-page-images-\(language)")
             app.terminate()
-            if let library { try? FileManager.default.removeItem(at: library) }
         }
     }
 }

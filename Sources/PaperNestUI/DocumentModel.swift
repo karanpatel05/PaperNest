@@ -1185,6 +1185,87 @@ final class DocumentModel {
         }
     }
 
+    // MARK: - Correcting recognized text
+
+    /// What a page's recognized text is now, as the OCR panel says it.
+    enum RecognitionState: Equatable {
+        /// Never read, or read from paper the page no longer shows.
+        case none
+        case failed
+        /// A digital page's own text, which find and selection use instead of
+        /// anything recognized — so a correction would not show there.
+        case ownText
+        /// Read, and current. `correctedAt` says whether someone corrected it.
+        case recognized(PageRecognition)
+    }
+
+    func recognitionState(of pageID: PageID) async -> RecognitionState {
+        guard let store, let page = pages.first(where: { $0.id == pageID }) else { return .none }
+        if let own = try? await store.embeddedText(for: pageID), !own.isEmpty { return .ownText }
+        guard let result = try? await store.recognition(for: pageID), result.sourceRevision == page.revision else {
+            return .none
+        }
+        switch result.status {
+        case .completed: return .recognized(result)
+        case .failed: return .failed
+        case .pending: return .none
+        }
+    }
+
+    /// How many of these pages hold text someone corrected, which recognizing
+    /// them again would replace.
+    func correctedPageCount(among pageIDs: Set<PageID>) async -> Int {
+        var count = 0
+        for id in pageIDs {
+            if case .recognized(let result) = await recognitionState(of: id), result.correctedAt != nil { count += 1 }
+        }
+        return count
+    }
+
+    /// Saves corrected lines for a page. False when nothing changed, so there
+    /// is nothing to save or undo. Throws `StoreError.recognitionChanged`
+    /// when the page was recognized again, or got new paper, while the
+    /// editor was open; the editor says so rather than overwrite it.
+    @discardableResult
+    func correctRecognition(on pageID: PageID, expected: PageRecognition, texts: [String],
+                            undoManager: UndoManager?) async throws -> Bool {
+        await finishPendingHistory()
+        guard let store, let page = try await store.page(pageID), page.itemID == itemID else {
+            throw StoreError.pageNotFound
+        }
+        guard let change = try await store.correctRecognition(on: pageID, expected: expected, texts: texts) else {
+            return false
+        }
+        registerRecognitionUndo(change.inverse, undoManager: undoManager)
+        await load()
+        session.didChange()
+        return true
+    }
+
+    private func registerRecognitionUndo(_ change: LibraryStore.RecognitionCorrection, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                model.registerRecognitionUndo(change.inverse, undoManager: undoManager)
+                model.enqueueHistory(undoManager: undoManager) {
+                    do {
+                        guard let store = model.store else { throw StoreError.pageNotFound }
+                        try await store.applyRecognitionCorrection(change)
+                        model.selectedPageID = change.pageID
+                        await model.load()
+                        model.session.didChange()
+                        return true
+                    } catch {
+                        await model.load()
+                        model.presentedError = PresentedError(title: L10n.genericErrorTitle,
+                                                              message: L10n.ocrCorrectionHistoryChanged)
+                        return false
+                    }
+                }
+            }
+        }
+        undoManager?.setActionName(L10n.ocrCorrectionAction)
+    }
+
     private func replace(_ page: Page) {
         if let index = pages.firstIndex(where: { $0.id == page.id }) {
             pages[index] = page

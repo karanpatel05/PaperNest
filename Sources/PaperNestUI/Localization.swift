@@ -1158,3 +1158,29 @@ extension L10n {
     static var exportDocxLayoutImagesDetail: String { tr("export.docxLayout.images.detail") }
     static var exportDocxImagesNote: String { tr("export.docxImagesNote") }
 }
+
+// OCR correction: correcting recognized text, and the page's recognition state.
+extension L10n {
+    static var ocrCorrectSection: String { tr("ocr.correct.section") }
+    static var ocrCorrectOpen: String { tr("ocr.correct.open") }
+    static var ocrCorrectTitle: String { tr("ocr.correct.title") }
+    /// The undo menu's name for a correction: the same words as the title.
+    static var ocrCorrectionAction: String { tr("ocr.correct.title") }
+    static var ocrCorrectHelp: String { tr("ocr.correct.help") }
+    static func ocrCorrectLine(_ number: Int) -> String { tr("ocr.correct.line", number) }
+    static var ocrCorrectUnsure: String { tr("ocr.correct.unsure") }
+    static var ocrCorrectChanged: String { tr("ocr.correct.changed") }
+    static func ocrCorrectChangedCount(_ count: Int) -> String { tr("ocr.correct.changedCount", count) }
+    static var ocrCorrectSave: String { tr("ocr.correct.save") }
+    static var ocrCorrectDiscardTitle: String { tr("ocr.correct.discardTitle") }
+    static var ocrCorrectDiscard: String { tr("ocr.correct.discard") }
+    static var ocrCorrectKeepEditing: String { tr("ocr.correct.keepEditing") }
+    static var ocrCorrectionChanged: String { tr("ocr.correct.changedElsewhere") }
+    static var ocrCorrectionHistoryChanged: String { tr("ocr.correct.historyChanged") }
+    static func ocrStatusNone(_ page: Int) -> String { tr("ocr.status.none", page) }
+    static func ocrStatusFailed(_ page: Int) -> String { tr("ocr.status.failed", page) }
+    static func ocrStatusOwnText(_ page: Int) -> String { tr("ocr.status.ownText", page) }
+    static func ocrStatusRecognized(_ page: Int) -> String { tr("ocr.status.recognized", page) }
+    static func ocrStatusCorrected(_ page: Int) -> String { tr("ocr.status.corrected", page) }
+    static var ocrReplacesCorrections: String { tr("ocr.replacesCorrections") }
+}

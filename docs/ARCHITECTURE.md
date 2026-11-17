@@ -80,6 +80,8 @@ Pages (and later page objects) use **fractional-index sort keys** (`SortKey`, ba
 
 Each page has a `revision` that increments on every committed change. Thumbnails (in-memory LRU) are keyed by `(page, revision, size)`. OCR results record the `source_revision` they came from, and a newer page revision marks them stale. Exports are separate temporary files and never written back.
 
+**Corrected recognition** (since 2026-11-16). A person can correct a page's current result line by line (`LibraryStore.correctRecognition`, `RecognitionCorrection.swift`): each line keeps its box, a changed line keeps its word boxes only when it still has as many words, and an emptied line is removed. The result gets `correctedAt`, and the write is a compare-and-swap token whose inverse is the undo; "the same result" ignores `sourceRevision`, because drawing on a page carries a current result forward without changing a word. A correction **moves the page's revision**, as any edit of what the page shows does: find and text selection re-read a page only when its revision changes. A revision-only page change is not synced, and recognition is not synced at all, so corrections stay on the device where they were made. `pagesNeedingRecognition` leaves a corrected result alone when only the engine changed (`json_extract(result_json, '$.correctedAt') IS NULL`), and reads it again when the paper changed. Recognize Text chosen by hand still replaces it; the OCR panel says so first.
+
 ## Page coordinates
 
 `PageGeometry` is the only mapping between spaces:

@@ -1033,3 +1033,25 @@
 "export.docxLayout.images" = "Images des pages";
 "export.docxLayout.images.detail" = "Identique à la page";
 "export.docxImagesNote" = "Chaque page devient une image dans le fichier Word : elle garde son apparence, son encre et ses annotations. Ses mots font partie de l’image et ne peuvent être ni modifiés ni recherchés dans Word. Choisissez Texte modifiable pour cela.";
+
+/* OCR correction */
+"ocr.correct.section" = "Texte reconnu";
+"ocr.correct.open" = "Corriger le texte…";
+"ocr.correct.title" = "Corriger le texte";
+"ocr.correct.help" = "Chaque champ est une ligne telle qu’elle a été lue. Corrigez-la d’après la page ci-dessus, ou videz-la pour supprimer la ligne. La recherche, la lecture à voix haute et les exportations utilisent les mots corrigés.";
+"ocr.correct.line" = "Ligne %lld";
+"ocr.correct.unsure" = "La reconnaissance n’était pas sûre de cette ligne";
+"ocr.correct.changed" = "Modifiée";
+"ocr.correct.changedCount" = "Lignes modifiées : %lld";
+"ocr.correct.save" = "Enregistrer";
+"ocr.correct.discardTitle" = "Abandonner vos corrections ?";
+"ocr.correct.discard" = "Abandonner les modifications";
+"ocr.correct.keepEditing" = "Continuer la correction";
+"ocr.correct.changedElsewhere" = "Le texte de cette page a changé pendant la correction (il a été reconnu de nouveau), donc rien n’a été enregistré. Fermez puis rouvrez Corriger le texte pour corriger le nouveau texte.";
+"ocr.correct.historyChanged" = "Le texte de cette page a changé depuis, donc la correction ne peut pas être annulée.";
+"ocr.status.none" = "La page %lld n’a pas encore été reconnue.";
+"ocr.status.failed" = "La page %lld n’a pas pu être lue. Réessayez, éventuellement avec d’autres langues.";
+"ocr.status.ownText" = "La page %lld contient son propre texte, il n’y a donc rien de reconnu à corriger.";
+"ocr.status.recognized" = "La page %lld contient du texte reconnu.";
+"ocr.status.corrected" = "La page %lld contient du texte que vous avez corrigé.";
+"ocr.replacesCorrections" = "Certaines de ces pages contiennent du texte que vous avez corrigé. Les reconnaître de nouveau le remplace.";

@@ -215,17 +215,38 @@ public struct PageRecognition: Hashable, Codable, Sendable {
     public var status: Status
     public var languages: [String]
     public var lines: [RecognizedLine]
+    /// When someone last corrected these lines by hand; nil for what the
+    /// engine read and nobody has touched.
+    ///
+    /// A corrected result is the person's text, not the engine's, so a newer
+    /// engine is no reason to read the page again and throw the corrections
+    /// away (`pagesNeedingRecognition` leaves it alone). New paper is: a
+    /// result from an older revision is stale whoever wrote it. Optional, so
+    /// every result stored before corrections existed decodes as untouched.
+    public var correctedAt: Date?
 
-    public init(pageID: PageID, sourceRevision: Int, engineVersion: String, status: Status, languages: [String], lines: [RecognizedLine]) {
+    public init(pageID: PageID, sourceRevision: Int, engineVersion: String, status: Status, languages: [String],
+                lines: [RecognizedLine], correctedAt: Date? = nil) {
         self.pageID = pageID
         self.sourceRevision = sourceRevision
         self.engineVersion = engineVersion
         self.status = status
         self.languages = languages
         self.lines = lines
+        self.correctedAt = correctedAt
     }
 
     public var text: String { lines.map(\.text).joined(separator: "\n") }
+
+    /// Whether this is the same result as `other` apart from the revision it
+    /// is pinned to. Drawing on a page carries a current result forward to
+    /// the new revision without changing a word of it (`bumpRevision`), so a
+    /// correction's undo must still recognize it afterwards.
+    public func isSameResult(as other: PageRecognition) -> Bool {
+        var pinned = other
+        pinned.sourceRevision = sourceRevision
+        return pinned == self
+    }
 }
 
 /// One word of a recognised line, with its own place on the page.

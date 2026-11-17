@@ -4,6 +4,9 @@ import SwiftUI
 
 struct OCRPanel: View {
     let model: DocumentModel
+    /// The document's own, so a correction is undone with the rest of its
+    /// edits: on the Mac a sheet is a window of its own with another one.
+    var undoManager: UndoManager?
     var isEmbedded = false
     var onClose: (() -> Void)?
     var beforeAction: (() async -> Bool)?
@@ -17,7 +20,25 @@ struct OCRPanel: View {
     @State private var running = false
     @State private var result: String?
     @State private var proFeature: ProFeature?
+    /// What the page on screen holds, and how many chosen pages hold
+    /// corrected text: read from the store, refreshed when either changes.
+    @State private var currentState = DocumentModel.RecognitionState.none
+    @State private var correctedInSelection = 0
+    @State private var editing: CorrectionTarget?
     private enum PageChoice { case all, current, range }
+
+    private struct CorrectionTarget: Identifiable {
+        let page: Page
+        let number: Int
+        let recognition: PageRecognition
+        var id: PageID { page.id }
+    }
+
+    private struct StatusKey: Hashable {
+        let page: Page?
+        let recognizing: Bool
+        let selection: [Int]
+    }
 
     private var indices: [Int]? {
         switch choice {
@@ -70,6 +91,11 @@ struct OCRPanel: View {
                 Text(L10n.ocrSelected(selectedCount)).font(.caption).foregroundStyle(EditorChrome.secondaryText)
                     .accessibilityIdentifier("ocr-page-count")
                     .accessibilityValue(String(selectedCount))
+                if correctedInSelection > 0 {
+                    PanelNote(text: L10n.ocrReplacesCorrections)
+                        .accessibilityIdentifier("ocr-replaces-corrections")
+                        .accessibilityValue(String(correctedInSelection))
+                }
             }.disabled(busy)
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 8) {
@@ -89,6 +115,7 @@ struct OCRPanel: View {
                     }
                 }
             }
+            PanelSection(title: L10n.ocrCorrectSection) { currentPageStatus }
             PanelNote(text: L10n.ocrOutputHelp)
         } footer: {
             if let progress = model.recognitionProgress {
@@ -111,10 +138,69 @@ struct OCRPanel: View {
         .toolPanelAppearance(isEmbedded: isEmbedded)
         .interactiveDismissDisabled(busy)
         .proPaywall($proFeature)
+        .task(id: StatusKey(page: model.selectedPage, recognizing: model.isRecognizing, selection: indices ?? [])) {
+            await refreshStatus()
+        }
+        .sheet(item: $editing) { target in
+            RecognizedTextEditor(model: model, page: target.page, pageNumber: target.number,
+                                 pageCount: model.pages.count, recognition: target.recognition,
+                                 undoManager: undoManager)
+        }
         #if os(macOS)
         .frame(minWidth: isEmbedded ? nil : 360, idealWidth: isEmbedded ? nil : 440,
                minHeight: isEmbedded ? nil : 560, idealHeight: isEmbedded ? nil : 720)
         #endif
+    }
+
+    /// The page on screen: whether it has been read, and the way to correct
+    /// what was read. Offered only where a correction will show: a page with
+    /// text of its own is found and selected by that text, not by anything
+    /// recognized, so it gets no editor.
+    @ViewBuilder private var currentPageStatus: some View {
+        let number = (model.selectedIndex ?? 0) + 1
+        Text(verbatim: statusText(number))
+            .font(.callout)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("ocr-current-status")
+            .accessibilityValue(statusValue)
+        if case .recognized(let result) = currentState, let page = model.selectedPage {
+            Button {
+                editing = CorrectionTarget(page: page, number: number, recognition: result)
+            } label: {
+                Label(L10n.ocrCorrectOpen, systemImage: "character.cursor.ibeam")
+                    .frame(maxWidth: .infinity, minHeight: 36)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .buttonStyle(.bordered)
+            .disabled(busy)
+            .accessibilityIdentifier("ocr-correct-open")
+        }
+    }
+
+    private func statusText(_ number: Int) -> String {
+        switch currentState {
+        case .none: L10n.ocrStatusNone(number)
+        case .failed: L10n.ocrStatusFailed(number)
+        case .ownText: L10n.ocrStatusOwnText(number)
+        case .recognized(let result):
+            result.correctedAt == nil ? L10n.ocrStatusRecognized(number) : L10n.ocrStatusCorrected(number)
+        }
+    }
+
+    /// Language-free, for tests.
+    private var statusValue: String {
+        switch currentState {
+        case .none: "none"
+        case .failed: "failed"
+        case .ownText: "ownText"
+        case .recognized(let result): result.correctedAt == nil ? "recognized" : "corrected"
+        }
+    }
+
+    private func refreshStatus() async {
+        currentState = if let id = model.selectedPageID { await model.recognitionState(of: id) } else { .none }
+        let ids = Set((indices ?? []).filter { model.pages.indices.contains($0) }.map { model.pages[$0].id })
+        correctedInSelection = await model.correctedPageCount(among: ids)
     }
 
     private func languageRow(_ code: String) -> some View {
