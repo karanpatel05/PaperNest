@@ -31,9 +31,7 @@ struct NotebookPageSheet: View {
                     ForEach(PageTemplate.allCases, id: \.self) { paper in
                         Button { template = paper } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: paper == .blank ? "doc" : (paper == .grid ? "square.grid.3x3" : "doc.text"))
-                                    .font(.title3)
-                                    .foregroundStyle(EditorChrome.purple)
+                                PageTemplateGlyph(template: paper)
                                     .frame(width: 40, height: 44)
                                     .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 8))
                                     .accessibilityHidden(true)

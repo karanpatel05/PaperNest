@@ -83,6 +83,12 @@ extension PageTemplate {
         case .blank: L10n.notebookBlank
         case .lined: L10n.notebookLined
         case .grid: L10n.notebookGrid
+        case .dotted: L10n.notebookDotted
+        case .cornell: L10n.notebookCornell
+        case .checklist: L10n.notebookChecklist
+        case .meeting: L10n.notebookMeeting
+        case .planner: L10n.notebookPlanner
+        case .form: L10n.notebookForm
         }
     }
 }

@@ -568,31 +568,31 @@ public struct PageRenderer: Sendable {
         ctx.restoreGState()
     }
 
+    /// Draws a paper's printed lines (`PageTemplateLayout`) in source space.
+    /// Rules and boxes are one stroked path and dots one filled path: the
+    /// same drawing goes into every exported PDF, and dotted paper has some
+    /// 1,500 dots.
     static func drawTemplate(_ template: PageTemplate, size: CGSize, in ctx: CGContext) {
-        let spacing: CGFloat
-        switch template {
-        case .blank: return
-        case .lined: spacing = 24
-        case .grid: spacing = 18
-        }
+        let layout = PageTemplateLayout.layout(for: template, size: size)
+        guard !layout.isEmpty else { return }
+        let color = CGColor(red: 0.62, green: 0.72, blue: 0.85, alpha: 1)
         ctx.saveGState()
-        ctx.setStrokeColor(CGColor(red: 0.62, green: 0.72, blue: 0.85, alpha: 1))
-        ctx.setLineWidth(0.5)
-        var y = template == .lined ? spacing * 3 : spacing
-        while y < size.height {
-            ctx.move(to: CGPoint(x: 0, y: y))
-            ctx.addLine(to: CGPoint(x: size.width, y: y))
-            y += spacing
-        }
-        if template == .grid {
-            var x = spacing
-            while x < size.width {
-                ctx.move(to: CGPoint(x: x, y: 0))
-                ctx.addLine(to: CGPoint(x: x, y: size.height))
-                x += spacing
+        if !layout.segments.isEmpty || !layout.boxes.isEmpty {
+            ctx.setStrokeColor(color)
+            ctx.setLineWidth(0.5)
+            for segment in layout.segments {
+                ctx.move(to: segment.from)
+                ctx.addLine(to: segment.to)
             }
+            for box in layout.boxes { ctx.addRect(box) }
+            ctx.strokePath()
         }
-        ctx.strokePath()
+        if !layout.dots.isEmpty {
+            let r = PageTemplateLayout.dotRadius
+            ctx.setFillColor(color)
+            for dot in layout.dots { ctx.addEllipse(in: CGRect(x: dot.x - r, y: dot.y - r, width: 2 * r, height: 2 * r)) }
+            ctx.fillPath()
+        }
         ctx.restoreGState()
     }
 }

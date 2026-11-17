@@ -508,11 +508,11 @@ public final class LibraryModel {
     /// Creates the notebook and its first A4 page together before publishing.
     func createNotebook(named name: String, template: PageTemplate) async throws -> ItemID {
         guard let env = environment else { throw CocoaError(.fileReadUnknown) }
+        // The paper's headings (a meeting's, a planner's days) go in with the page.
+        let headings = TemplateHeadings.textBoxes(for: template)
+        let folderID = currentFolderID
         let item = try await SubscriptionStore.shared.withNotebookAllowance(in: env.store, additional: 1) {
-            try await env.store.createItem(kind: .notebook, name: name,
-            folderID: currentFolderID,
-            pages: [.init(sourceSize: CGSize(width: 595.28, height: 841.89), content: .template(template))],
-            assets: [])
+            try await env.store.createNotebook(named: name, folderID: folderID, template: template, headings: headings)
         }
         session.didChange()
         await reload()

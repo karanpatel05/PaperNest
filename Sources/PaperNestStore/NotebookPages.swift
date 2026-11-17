@@ -14,14 +14,48 @@ extension LibraryStore {
         fileprivate let surroundingOrder: [String]
     }
 
-    public func addNotebookPage(_ template: PageTemplate, to itemID: ItemID, after anchor: PageID?) throws -> NotebookPageChange {
+    /// The size of every new notebook page: A4, in points.
+    public static let notebookPageSize = CGSize(width: 595.28, height: 841.89)
+
+    /// A new page of `template`, with `headings` written on it as ordinary
+    /// text boxes in the same transaction, so the page never exists without
+    /// them and undo, which restores the page with its objects, brings back
+    /// exactly these.
+    public func addNotebookPage(_ template: PageTemplate, to itemID: ItemID, after anchor: PageID?,
+                                headings: [TextBox] = []) throws -> NotebookPageChange {
         try db.transaction {
             try requireActiveNotebook(itemID)
             let inserted = try insertPages([
-                .init(sourceSize: CGSize(width: 595.28, height: 841.89), content: .template(template))
+                .init(sourceSize: Self.notebookPageSize, content: .template(template))
             ], into: itemID, after: anchor, assets: [])
+            try writeHeadings(headings, on: inserted[0])
+            // After the headings, so the undo token carries them.
             return try notebookPageChange(inserted[0], deleted: false)
         }
+    }
+
+    /// A new notebook and its first page of `template`, with that page's
+    /// headings, in one transaction.
+    public func createNotebook(named name: String, folderID: FolderID?, template: PageTemplate,
+                               headings: [TextBox] = []) throws -> LibraryItem {
+        try db.transaction {
+            let item = try createItem(kind: .notebook, name: name, folderID: folderID,
+                                      pages: [.init(sourceSize: Self.notebookPageSize, content: .template(template))],
+                                      assets: [])
+            if let first = try pages(of: item.id).first { try writeHeadings(headings, on: first) }
+            return item
+        }
+    }
+
+    /// Typed text like any other: editable, exported as real text, and
+    /// findable. The caller owns the transaction.
+    private func writeHeadings(_ headings: [TextBox], on page: Page) throws {
+        guard !headings.isEmpty else { return }
+        let timestamp = now()
+        for (box, key) in zip(headings, SortKey.evenlySpaced(count: headings.count)) {
+            try upsertObjectRow(PageObject(pageID: page.id, zKey: key, payload: .text(box), modifiedAt: timestamp))
+        }
+        try reindexTypedText(on: page)
     }
 
     /// Append a fresh sheet, not a duplicate of its writing. Checking the tail

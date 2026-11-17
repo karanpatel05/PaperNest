@@ -64,8 +64,13 @@ public enum PageContent: Hashable, Codable, Sendable {
     }
 }
 
+/// The paper a notebook page is drawn on. Stored by its raw value: an older
+/// build reads a paper it does not know as `.blank`, and sync refuses a page
+/// whose paper it does not understand rather than writing it back as blank.
+/// Where each line goes is `PageTemplateLayout`.
 public enum PageTemplate: String, Codable, Sendable, CaseIterable {
     case blank, lined, grid
+    case dotted, cornell, checklist, meeting, planner, form
 }
 
 /// Non-destructive edits applied over the original. The original asset is

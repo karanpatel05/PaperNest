@@ -345,11 +345,56 @@ struct PageTemplateGlyph: View {
                     let x = page.minX + page.width * Double(column) / 4
                     ruling.move(to: CGPoint(x: x, y: page.minY)); ruling.addLine(to: CGPoint(x: x, y: page.maxY))
                 }
+            case .dotted:
+                for row in 1...5 {
+                    for column in 1...3 {
+                        let dot = CGPoint(x: page.minX + page.width * Double(column) / 4, y: page.minY + page.height * Double(row) / 6)
+                        ruling.addEllipse(in: CGRect(x: dot.x - 0.9, y: dot.y - 0.9, width: 1.8, height: 1.8))
+                    }
+                }
+            case .cornell:
+                let cue = page.minX + page.width * 0.32, top = page.minY + page.height * 0.18, foot = page.minY + page.height * 0.78
+                line(&ruling, page.minX, page.maxX, top)
+                ruling.move(to: CGPoint(x: cue, y: top)); ruling.addLine(to: CGPoint(x: cue, y: foot))
+                line(&ruling, page.minX, page.maxX, foot)
+                for row in 1...3 { line(&ruling, cue + 2, page.maxX - 3, top + (foot - top) * Double(row) / 4) }
+            case .checklist:
+                for row in 1...4 { checkRow(&ruling, page, page.minY + page.height * Double(row) / 5) }
+            case .meeting:
+                line(&ruling, page.minX + 3, page.maxX - 3, page.minY + page.height * 0.16)
+                line(&ruling, page.minX + 3, page.midX - 2, page.minY + page.height * 0.3)
+                line(&ruling, page.midX + 2, page.maxX - 3, page.minY + page.height * 0.3)
+                line(&ruling, page.minX + 3, page.maxX - 3, page.minY + page.height * 0.45)
+                line(&ruling, page.minX + 3, page.maxX - 3, page.minY + page.height * 0.57)
+                checkRow(&ruling, page, page.minY + page.height * 0.74)
+                checkRow(&ruling, page, page.minY + page.height * 0.88)
+            case .planner:
+                let cellWidth = (page.width - 6) / 2, cellHeight = (page.height - 9) / 4
+                for index in 0..<8 {
+                    ruling.addRect(CGRect(x: page.minX + 2 + Double(index % 2) * (cellWidth + 2),
+                                          y: page.minY + 2 + Double(index / 2) * (cellHeight + 1.5),
+                                          width: cellWidth, height: cellHeight))
+                }
+            case .form:
+                for row in 1...5 {
+                    let y = page.minY + page.height * Double(row) / 6
+                    line(&ruling, page.minX + 3, page.minX + page.width * 0.35, y)
+                    line(&ruling, page.minX + page.width * 0.42, page.maxX - 3, y)
+                }
             }
             context.stroke(ruling, with: .color(EditorChrome.purple.opacity(0.45)), lineWidth: 0.75)
             context.stroke(sheet, with: .color(EditorChrome.border), lineWidth: 1)
         }
         .accessibilityHidden(true)
+    }
+
+    private func line(_ path: inout Path, _ x0: Double, _ x1: Double, _ y: Double) {
+        path.move(to: CGPoint(x: x0, y: y)); path.addLine(to: CGPoint(x: x1, y: y))
+    }
+
+    private func checkRow(_ path: inout Path, _ page: CGRect, _ y: Double) {
+        path.addRect(CGRect(x: page.minX + 3, y: y - 3, width: 3, height: 3))
+        line(&path, page.minX + 8, page.maxX - 3, y)
     }
 }
 
@@ -357,28 +402,26 @@ struct InsertSettingsPanel: View {
     let actions: InsertToolActions
     let close: () -> Void
 
-    private func title(_ template: PageTemplate) -> String {
-        switch template {
-        case .blank: L10n.notebookBlank
-        case .lined: L10n.notebookLined
-        case .grid: L10n.notebookGrid
-        }
-    }
-
     var body: some View {
         ToolPanelContainer(tool: .insert, close: close) {
             if let addPage = actions.addPage {
                 PanelSection(title: L10n.addNotebookPage) {
-                    HStack(spacing: 8) {
-                        ForEach(PageTemplate.allCases, id: \.self) { template in
-                            ToolPresetCard(title: title(template), selected: false,
-                                           id: "insert-page-\(template.rawValue)") {
-                                addPage(template)
-                            } preview: {
-                                PageTemplateGlyph(template: template)
+                    // One row that scrolls sideways: nine papers in a grid
+                    // pushed the panel's other tools below the fold.
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(PageTemplate.allCases, id: \.self) { template in
+                                ToolPresetCard(title: template.notebookTitle, selected: false,
+                                               id: "insert-page-\(template.rawValue)") {
+                                    addPage(template)
+                                } preview: {
+                                    PageTemplateGlyph(template: template)
+                                }
+                                .frame(width: 96)
                             }
                         }
                     }
+                    .accessibilityIdentifier("insert-page-papers")
                     PanelNote(text: L10n.insertPageDetail)
                 }
             }

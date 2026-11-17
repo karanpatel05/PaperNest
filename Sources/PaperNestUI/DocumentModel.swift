@@ -1074,7 +1074,8 @@ final class DocumentModel {
         guard !isChangingNotebookPage, let store else { throw StoreError.pageNotFound }
         isChangingNotebookPage = true
         defer { isChangingNotebookPage = pendingHistory > 0 }
-        let change = try await store.addNotebookPage(template, to: itemID, after: anchor)
+        let change = try await store.addNotebookPage(template, to: itemID, after: anchor,
+                                                     headings: TemplateHeadings.textBoxes(for: template))
         registerNotebookPageUndo(NotebookUndoStep(change), undoManager: undoManager)
         selectedPageID = change.page.id
         await load()

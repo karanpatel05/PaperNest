@@ -1322,4 +1322,19 @@ extension L10n {
     static var compareNext: String { tr("compare.next") }
     static var compareLimits: String { tr("compare.limits") }
     static var compareFailed: String { tr("compare.failed") }
+
+    // MARK: Stationery
+
+    static var notebookDotted: String { tr("notebook.dotted") }
+    static var notebookCornell: String { tr("notebook.cornell") }
+    static var notebookChecklist: String { tr("notebook.checklist") }
+    static var notebookMeeting: String { tr("notebook.meeting") }
+    static var notebookPlanner: String { tr("notebook.planner") }
+    static var notebookForm: String { tr("notebook.form") }
+    static var templateMeetingTitle: String { tr("template.meetingTitle") }
+    static var templateDate: String { tr("template.date") }
+    static var templateAttendees: String { tr("template.attendees") }
+    static var templateNotes: String { tr("template.notes") }
+    static var templateActionItems: String { tr("template.actionItems") }
+    static var templateWeekOf: String { tr("template.weekOf") }
 }

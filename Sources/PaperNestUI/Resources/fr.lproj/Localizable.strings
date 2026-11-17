@@ -1180,3 +1180,17 @@
 "compare.next" = "Suivante";
 "compare.limits" = "Les pages sont comparées par leurs mots et par leur apparence. Deux scans distincts du même papier diffèrent partout, et un fichier qui enregistre ses mots dans un autre ordre montre des modifications là où rien ne se voit.";
 "compare.failed" = "Impossible de comparer les documents.";
+
+/* Stationery */
+"notebook.dotted" = "Pointillé";
+"notebook.cornell" = "Cornell";
+"notebook.checklist" = "Liste à cocher";
+"notebook.meeting" = "Réunion";
+"notebook.planner" = "Semainier";
+"notebook.form" = "Formulaire";
+"template.meetingTitle" = "Réunion";
+"template.date" = "Date";
+"template.attendees" = "Participants";
+"template.notes" = "Notes";
+"template.actionItems" = "Actions à mener";
+"template.weekOf" = "Semaine du";

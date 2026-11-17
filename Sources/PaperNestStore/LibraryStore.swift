@@ -951,7 +951,9 @@ public actor LibraryStore {
         }
     }
 
-    private func upsertObjectRow(_ object: PageObject) throws {
+    /// Internal so a store extension can write objects inside its own
+    /// transaction (a new notebook page's headings).
+    func upsertObjectRow(_ object: PageObject) throws {
         try db.run("INSERT OR REPLACE INTO page_objects (id, page_id, z_key, kind, payload_json, modified_at) VALUES (?, ?, ?, ?, ?, ?)", [
             .text(object.id.rawValue), .text(object.pageID.rawValue), .text(object.zKey), .text(object.payload.kind),
             .text(try json(object.payload)), .date(object.modifiedAt),
