@@ -16,43 +16,8 @@ struct ScannerCapturePolicyTests {
     }
 }
 
-struct ScannerAutomaticCaptureTests {
-    let rectangle = [CGPoint(x: 0.1, y: 0.1), CGPoint(x: 0.9, y: 0.1), CGPoint(x: 0.9, y: 0.9), CGPoint(x: 0.1, y: 0.9)]
-
-    @Test func stableSheetCapturesOnlyOnceUntilRemoved() {
-        var policy = ScannerCapturePolicy()
-        var captures = 0
-        for frame in 0..<40 {
-            if policy.observe(rectangle, at: Double(frame)) { captures += 1 }
-        }
-        #expect(captures == 1)
-        for frame in 40..<43 { let result = policy.observe([], at: Double(frame)); #expect(!result) }
-        for frame in 43..<60 {
-            if policy.observe(rectangle, at: Double(frame)) { captures += 1 }
-        }
-        #expect(captures == 2)
-    }
-
-    @Test func keepingReviewWaitsForTheNextSheet() {
-        var policy = ScannerCapturePolicy()
-        policy.waitForNextSheet()
-        for frame in 0..<20 { let result = policy.observe(rectangle, at: Double(frame)); #expect(!result) }
-        for frame in 20..<23 { let result = policy.observe([], at: Double(frame)); #expect(!result) }
-        var captured = false
-        for frame in 23..<40 { captured = policy.observe(rectangle, at: Double(frame)) || captured }
-        #expect(captured)
-    }
-
-    @Test func motionAndInterruptionResetStability() {
-        var policy = ScannerCapturePolicy()
-        for frame in 0..<6 { let result = policy.observe(rectangle, at: Double(frame)); #expect(!result) }
-        policy.reset()
-        for frame in 6..<12 { let result = policy.observe(rectangle, at: Double(frame)); #expect(!result) }
-        let moved = rectangle.map { CGPoint(x: $0.x + 0.1, y: $0.y) }
-        let result = policy.observe(moved, at: 12)
-        #expect(!result)
-    }
-}
+// The automatic shutter's rule moved to `ScanCaptureGuide` in PaperNestCore,
+// with these three tests: `ScanCaptureGuideTests`.
 
 struct ScannerSessionIntentTests {
     @Test func pendingPermissionCannotRestartDismissedCamera() {

@@ -1092,3 +1092,10 @@
 "search.source.pageText" = "Texte du PDF";
 "search.source.typed" = "Texte saisi";
 "search.source.title" = "Nom du document";
+
+/* Scanner capture feedback */
+"scanner.feedback.lighting" = "Améliorez l’éclairage";
+"scanner.feedback.moveBack" = "Reculez";
+"scanner.feedback.moveCloser" = "Rapprochez-vous";
+"scanner.feedback.holdSteady" = "Ne bougez plus";
+"scanner.feedback.ready" = "Prêt";

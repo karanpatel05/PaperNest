@@ -19,12 +19,16 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
     private var capturing = false
     private var intent = ScannerSessionIntent()
     private var automatic = false
-    private var capturePolicy = ScannerCapturePolicy()
+    /// What to say about each look and when the automatic shutter fires,
+    /// decided together (`ScanCaptureGuide`). Only touched on `queue`.
+    private var guide = ScanCaptureGuide(detection: ScanCaptureMode.document.detection)
     /// What the mode looks for in each frame. Nil keeps the whole frame: no outline, no automatic shutter.
     private var detection: ScanDetection? = ScanCaptureMode.document.detection
     private var frame = 0
     private var observers: [NSObjectProtocol] = []
-    @MainActor var onOutline: (@MainActor @Sendable ([CGPoint]) -> Void)?
+    /// Each look: the outline found and what to tell the person, in one hop
+    /// so the two never arrive out of step.
+    @MainActor var onObservation: (@MainActor @Sendable ([CGPoint], ScanCaptureFeedback?) -> Void)?
     @MainActor var onAutoCapture: (@MainActor @Sendable () -> Void)?
     @MainActor var onPhoto: (@MainActor @Sendable (Data?) -> Void)?
     @MainActor var onStatus: (@MainActor @Sendable (Bool, Bool) -> Void)?
@@ -32,7 +36,7 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
     func start(waitForNextSheet: Bool = false) {
         queue.async { [self] in
             intent.start()
-            if waitForNextSheet { capturePolicy.waitForNextSheet() }
+            if waitForNextSheet { guide.waitForNextSheet() }
         }
         Task {
             let allowed = await AVCaptureDevice.requestAccess(for: .video)
@@ -74,7 +78,7 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
         for name in [AVCaptureSession.wasInterruptedNotification, AVCaptureSession.runtimeErrorNotification] {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: session, queue: nil) { [weak self] _ in
                 self?.queue.async { [weak self] in
-                    self?.capturePolicy.reset()
+                    self?.guide.reset()
                     if self?.capturing == true {
                         Task { @MainActor [weak self] in self?.onPhoto?(nil) }
                     }
@@ -100,7 +104,8 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
     func stop() {
         queue.async { [self] in
             intent.stop()
-            capturePolicy.reset()
+            guide.reset()
+            Task { @MainActor [weak self] in self?.onObservation?([], nil) }
             report(false)
             if session.isRunning { session.stopRunning() }
             if let device, device.hasTorch, (try? device.lockForConfiguration()) != nil {
@@ -122,7 +127,7 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
         queue.async { [self] in
             guard rotation != angle else { return }
             rotation = angle
-            capturePolicy.reset()
+            guide.reset()
             if let connection = frames?.connection(with: .video), connection.isVideoRotationAngleSupported(angle) {
                 connection.videoRotationAngle = angle
             }
@@ -130,13 +135,13 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
     }
 
     func setAutomatic(_ enabled: Bool) {
-        queue.async { [self] in automatic = enabled; capturePolicy.reset() }
+        queue.async { [self] in automatic = enabled; guide.reset() }
     }
 
     /// A change of mode. What was held still under the last mode's rule says
     /// nothing under this one, so the automatic shutter starts over.
     func setDetection(_ detection: ScanDetection?) {
-        queue.async { [self] in self.detection = detection; capturePolicy.reset() }
+        queue.async { [self] in self.detection = detection; guide = ScanCaptureGuide(detection: detection) }
     }
 
     func capture() {
@@ -169,12 +174,29 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
             let aspect = Double(CVPixelBufferGetWidth(buffer)) / Double(max(1, CVPixelBufferGetHeight(buffer)))
             points = ScanEdgeDetector.chosen(from: request, for: detection, imageAspect: aspect)?.corners ?? []
         }
-        Task { @MainActor [weak self] in self?.onOutline?(points) }
-        if automatic, intent.wantsRunning, !capturing, capturePolicy.observe(points, at: ProcessInfo.processInfo.systemUptime) {
+        process(ScanFrameObservation(corners: points, luminance: ScanFrameLuminance.mean(of: buffer)),
+                at: ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// One look: the outline, what to say, and whether to take the picture —
+    /// one decision, so the label never says Ready over a page the shutter
+    /// will not take. On `queue`.
+    private func process(_ look: ScanFrameObservation, at time: Double) {
+        let decision = guide.observe(look, at: time, automatic: automatic && intent.wantsRunning && !capturing)
+        Task { @MainActor [weak self] in self?.onObservation?(look.corners, decision.feedback) }
+        if decision.fire {
             Task { @MainActor [weak self] in self?.onAutoCapture?() }
             capture()
         }
     }
+
+    #if DEBUG
+    /// For UI tests on a simulator, which has no camera: a recorded look,
+    /// through exactly the processing a real frame gets.
+    func debugObserve(_ look: ScanFrameObservation) {
+        queue.async { [self] in process(look, at: ProcessInfo.processInfo.systemUptime) }
+    }
+    #endif
 
     deinit { observers.forEach(NotificationCenter.default.removeObserver) }
 }

@@ -1092,3 +1092,10 @@
 "search.source.pageText" = "Text in the PDF";
 "search.source.typed" = "Typed text";
 "search.source.title" = "Document name";
+
+/* Scanner capture feedback */
+"scanner.feedback.lighting" = "Improve lighting";
+"scanner.feedback.moveBack" = "Move back";
+"scanner.feedback.moveCloser" = "Move closer";
+"scanner.feedback.holdSteady" = "Hold steady";
+"scanner.feedback.ready" = "Ready";

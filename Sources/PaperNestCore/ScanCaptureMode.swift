@@ -23,17 +23,17 @@ public enum ScanCaptureMode: String, Sendable, CaseIterable {
             // Exactly what the scanner has always asked for: one rectangle,
             // the detector's own range of shapes.
             ScanDetection(minimumSize: 0.2, minimumConfidence: 0.7, candidates: 1, aspectRatios: nil,
-                          quadratureTolerance: nil, preference: .mostConfident)
+                          quadratureTolerance: nil, preference: .mostConfident, readyArea: 0.2)
         case .whiteboard:
             // Boards are photographed from the side of a room, so corners
             // are allowed further from square, and what is wanted is the
             // board, not a sheet pinned to it.
             ScanDetection(minimumSize: 0.3, minimumConfidence: 0.6, candidates: 6, aspectRatios: 0.3...1,
-                          quadratureTolerance: 40, preference: .largest)
+                          quadratureTolerance: 40, preference: .largest, readyArea: 0.2)
         case .card:
             // 85.6 by 54 mm. A card fills less of the frame than a page does.
             ScanDetection(minimumSize: 0.1, minimumConfidence: 0.6, candidates: 6, aspectRatios: 0.5...0.8,
-                          quadratureTolerance: nil, preference: .aspectRatio(54 / 85.6))
+                          quadratureTolerance: nil, preference: .aspectRatio(54 / 85.6), readyArea: 0.03)
         case .photo:
             nil
         }
@@ -125,15 +125,24 @@ public struct ScanDetection: Equatable, Sendable {
     /// How far, in degrees, a corner may be from square. Nil leaves the detector's own.
     public var quadratureTolerance: Double?
     public var preference: Preference
+    /// The share of the frame the thing must cover before a capture is worth
+    /// taking; smaller, and the scanner says to move closer.
+    ///
+    /// Above what the detector can find at all (`minimumSize`), or the advice
+    /// could never be given: measured on drawn scenes through the real
+    /// detector, the smallest found was about 5% of the frame for a sheet,
+    /// 11% for a board and 1% for a card (`ScanFeedbackDetectionTests`).
+    public var readyArea: Double
 
     public init(minimumSize: Double, minimumConfidence: Double, candidates: Int, aspectRatios: ClosedRange<Double>?,
-                quadratureTolerance: Double?, preference: Preference) {
+                quadratureTolerance: Double?, preference: Preference, readyArea: Double = 0.2) {
         self.minimumSize = minimumSize
         self.minimumConfidence = minimumConfidence
         self.candidates = candidates
         self.aspectRatios = aspectRatios
         self.quadratureTolerance = quadratureTolerance
         self.preference = preference
+        self.readyArea = readyArea
     }
 
     /// The quad to crop to, or nil when nothing found is of a shape this

@@ -595,6 +595,8 @@ public struct RootView: View {
             return
         }
         if UserDefaults.standard.string(forKey: "PaperNestDebugScannerImages") != nil { model.isShowingScanner = true }
+        // The capture screen with recorded looks instead of a camera (`ScannerWorkspaceView`).
+        if UserDefaults.standard.string(forKey: "PaperNestDebugScannerFrames") != nil { model.isShowingScanner = true }
         if UserDefaults.standard.bool(forKey: "PaperNestDebugShowTools") { model.isShowingTools = true }
         guard let name = UserDefaults.standard.string(forKey: "PaperNestDebugOpenItem"),
               let store = model.session.environment?.store,

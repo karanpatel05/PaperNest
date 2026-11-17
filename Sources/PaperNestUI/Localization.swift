@@ -1227,3 +1227,12 @@ extension L10n {
     static var searchSourceTyped: String { tr("search.source.typed") }
     static var searchSourceTitle: String { tr("search.source.title") }
 }
+
+// Scanner capture feedback: what the camera sees, while it is pointed.
+extension L10n {
+    static var scannerFeedbackLighting: String { tr("scanner.feedback.lighting") }
+    static var scannerFeedbackMoveBack: String { tr("scanner.feedback.moveBack") }
+    static var scannerFeedbackMoveCloser: String { tr("scanner.feedback.moveCloser") }
+    static var scannerFeedbackHoldSteady: String { tr("scanner.feedback.holdSteady") }
+    static var scannerFeedbackReady: String { tr("scanner.feedback.ready") }
+}

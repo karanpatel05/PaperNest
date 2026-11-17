@@ -18,6 +18,8 @@ struct ScannerWorkspaceView: View {
     @State private var hasTorch = false
     @State private var torch = false
     @State private var outline: [CGPoint] = []
+    /// What the camera's last look says to do; nil says nothing.
+    @State private var feedback: ScanCaptureFeedback?
     @State private var pages: [ScannerPage] = []
     @State private var selected = 0
     @State private var reviewing = false
@@ -73,7 +75,10 @@ struct ScannerWorkspaceView: View {
                 guard captureReview.pending == nil, !native, !reviewing, !photoPickerPresented, !completed else { return }
                 busy = true
             }
-            camera.onOutline = { outline = $0 }
+            camera.onObservation = { corners, said in
+                outline = corners
+                withAnimation(.easeInOut(duration: 0.2)) { feedback = said }
+            }
             camera.onPhoto = { data in
                 guard captureReview.pending == nil, !completed, !native, !reviewing, !photoPickerPresented else { return }
                 guard let data else { busy = false; failed = true; return }
@@ -99,11 +104,16 @@ struct ScannerWorkspaceView: View {
             }
             #endif
             if canRunCamera { camera.start() }
+            #if DEBUG
+            if let path = UserDefaults.standard.string(forKey: "PaperNestDebugScannerFrames") {
+                await playDebugLooks(at: path)
+            }
+            #endif
         }
         .onDisappear {
             stopCamera()
             camera.onStatus = nil
-            camera.onOutline = nil
+            camera.onObservation = nil
             camera.onPhoto = nil
             camera.onAutoCapture = nil
         }
@@ -244,6 +254,69 @@ struct ScannerWorkspaceView: View {
         if canRunCamera && scenePhase == .active { camera.start(waitForNextSheet: keep) }
     }
 
+    // MARK: - Capture feedback
+
+    /// What the camera sees, in a word or two: under the top bar, clear of
+    /// the middle of the page and of the shutter. Ready is in the accent.
+    private func feedbackLabel(_ feedback: ScanCaptureFeedback) -> some View {
+        Label(Self.feedbackText(feedback), systemImage: Self.feedbackSymbol(feedback))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(feedback == .ready ? ScannerChrome.purple : Color.black.opacity(0.65), in: Capsule())
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("scanner.feedback")
+            // Language-free, for tests.
+            .accessibilityValue(feedback.rawValue)
+            .transition(.opacity)
+    }
+
+    static func feedbackText(_ feedback: ScanCaptureFeedback) -> String {
+        switch feedback {
+        case .improveLighting: L10n.scannerFeedbackLighting
+        case .moveBack: L10n.scannerFeedbackMoveBack
+        case .moveCloser: L10n.scannerFeedbackMoveCloser
+        case .holdSteady: L10n.scannerFeedbackHoldSteady
+        case .ready: L10n.scannerFeedbackReady
+        }
+    }
+
+    static func feedbackSymbol(_ feedback: ScanCaptureFeedback) -> String {
+        switch feedback {
+        case .improveLighting: "lightbulb"
+        case .moveBack: "arrow.down.right.and.arrow.up.left"
+        case .moveCloser: "arrow.up.left.and.arrow.down.right"
+        case .holdSteady: "hand.raised"
+        case .ready: "checkmark.circle.fill"
+        }
+    }
+
+    #if DEBUG
+    /// UI tests: a simulator has no camera, so a recorded run of looks is
+    /// played through the camera's own processing — the same guide and the
+    /// same callback a real frame goes through. The file is JSON:
+    /// `{"interval": seconds, "looks": [{"corners": [[x, y], …], "luminance": 0.5}, …]}`.
+    private func playDebugLooks(at path: String) async {
+        struct Recording: Decodable {
+            struct Look: Decodable {
+                let corners: [[Double]]
+                let luminance: Double?
+            }
+            let interval: Double
+            let looks: [Look]
+        }
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let recording = try? JSONDecoder().decode(Recording.self, from: data) else { return }
+        for look in recording.looks {
+            guard !Task.isCancelled else { return }
+            let corners = look.corners.compactMap { $0.count == 2 ? CGPoint(x: $0[0], y: $0[1]) : nil }
+            camera.debugObserve(ScanFrameObservation(corners: corners, luminance: look.luminance))
+            try? await Task.sleep(for: .seconds(recording.interval))
+        }
+    }
+    #endif
+
     // MARK: - Capture
 
     private var capture: some View {
@@ -277,6 +350,7 @@ struct ScannerWorkspaceView: View {
                     .accessibilityIdentifier("scanner.more")
                 }
                 .padding(.horizontal, 8).background(.black.opacity(0.8))
+                if let feedback { feedbackLabel(feedback).padding(.top, 14) }
                 Spacer()
                 if !ready {
                     VStack(spacing: 12) {
