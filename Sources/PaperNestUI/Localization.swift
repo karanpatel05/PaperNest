@@ -1304,6 +1304,7 @@ extension L10n {
     static func compareSummaryPicture(_ value0: Int) -> String { tr("compare.summary.picture", value0) }
     static func compareSummaryPages(_ value0: Int, _ value1: Int, _ value2: Int) -> String { tr("compare.summary.pages", value0, value1, value2) }
     static var compareIdentical: String { tr("compare.identical") }
+    static var compareIdenticalByLook: String { tr("compare.identicalByLook") }
     static var compareMethodText: String { tr("compare.method.text") }
     static var compareMethodRecognized: String { tr("compare.method.recognized") }
     static var compareMethodPictureBoth: String { tr("compare.method.pictureBoth") }

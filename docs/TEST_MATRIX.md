@@ -1,3 +1,19 @@
+## 2026-11-17 — Compare: matched pages compared larger, so a small change on a scan is found (Claude, follow-up to the entry below)
+
+Found in review after the comparison was committed: pages compared only by picture were drawn 400 pixels long, where body-size print is about five pixels tall. **A probe confirmed it**: two scans nobody had read, in 18-pixel type on a 1000 × 1400 page, differing by one character — "42.10"/"42.70", "3 March"/"8 March", "1234567"/"1234561" — **came back "Same"**; "4.20"/"42.0" and every pair at 24 pixels were caught. Now pages are still matched at 400 pixels, and each matched pair is compared again at 1,600 pixels in 8-pixel cells (cells within two of each other are one region); word boxes are widened by 30% of their height before picture differences under them are left to the words. Also: the identical message no longer says "the same words" when some pages were compared only by how they look (it says those pages were compared by look and a very small or faint mark can be missed), and closing the sheet cancels a comparison still running.
+
+| Check | Result |
+|---|---|
+| The probe again, after the change | All eight pairs (four pairs at 18 and 24 pixels) **changed**, one region each. |
+| New `DocumentComparerTests.aOneCharacterChangeInBodySizePrintIsFoundByThePicture` (3 cases, the three pairs the old code called Same) | **Pass**: each is compared by picture (no text on either page), changed, one picture difference. |
+| Existing comparison tests | **Pass**, including a changed word in a digital PDF with **no** picture difference (the widened word boxes cover its ink) and a stroke over identical text found where it is. |
+| `./scripts/test.sh`, clean worktree (`5e73951` + this change) | **1,358 tests, 0 failures, 0 warnings** (382 + 49 + 226 + 230 + 246 + 225). |
+| `./scripts/build-mac-app.sh`; `xcodebuild build-for-testing` (iOS Simulator) | Both succeeded, no compiler warnings. |
+| `CompareUITests` (2), iPhone 17 / iOS 26.5 | **2/2 pass in one run** (66.5 s and 58.9 s): still `picture:0` for one changed word, the overlay, the text change, the added page, French and Spanish. |
+| `CompareUITests`, iPad | **Not run, no verdict**, for the second time: on an idle iPad Air 11-inch (M4) the runner timed out waiting for the AX loaded notification as the host's load rose to 177. The iPad layout is still unverified. |
+
+**Cost:** each matched pair is drawn twice more, at 1,600 pixels; a long document's speed is still not measured. **Still a limit:** a very small or faint mark can be missed by a picture comparison, and two separate scans of the same paper still differ everywhere.
+
 ## 2026-11-17 — Compare two documents: side by side, overlay and text changes; added, removed and moved pages (Claude, roadmap item 5)
 
 Owner in session ("Start the next slice, PDF comparison"). Document Tools → Process → **Compare** opens a screen with this document as the Original and a New one chosen from the library (Swap turns them round). It counts text changes, picture differences and pages added, removed and moved, opens on the first page that differs, and shows each page **side by side** (removed words in red on the original, added words in green on the new page, picture differences in amber), **overlaid** (what only the original has in red, what only the new one has in green) or as **text** ("Removed: March", "Added: April"). Every page says how it was compared: by its words; by words read from a scan, where a misread word shows as a change; or by how it looks only, and why (which page has no text). Design: `docs/ARCHITECTURE.md` → Rendering, "Comparing two documents".

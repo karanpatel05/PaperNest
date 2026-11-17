@@ -168,7 +168,7 @@ import Testing
         let comparison = DocumentComparison.compare(old: pages, new: pages)
         #expect(comparison.isIdentical)
         #expect(comparison.textChangeCount == 0 && comparison.pictureDifferenceCount == 0)
-        #expect(!comparison.comparedOnlyByPicture)
+        #expect(!comparison.comparedOnlyByPicture && !comparison.anyComparedOnlyByPicture)
     }
 
     @Test func countsAreKeptApart() {

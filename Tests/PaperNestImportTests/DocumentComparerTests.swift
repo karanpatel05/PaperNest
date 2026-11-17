@@ -99,6 +99,23 @@ import PaperNestTestSupport
         #expect(read.usesRecognizedText)
     }
 
+    /// One character changed in body-size print on a scan nobody has read.
+    /// Compared at the small size pages are matched by, each of these came
+    /// back "Same"; the pair is now compared drawn larger.
+    @Test(arguments: [("Total 42.10 due", "Total 42.70 due"), ("Paid 3 March", "Paid 8 March"),
+                      ("Ref 1234567", "Ref 1234561")])
+    func aOneCharacterChangeInBodySizePrintIsFoundByThePicture(_ pair: (String, String)) async throws {
+        let lib = try TestLibrary()
+        let old = try await pages(lib, SyntheticDocuments.textImage(lines: [pair.0], fontSize: 18), "Old")
+        let new = try await pages(lib, SyntheticDocuments.textImage(lines: [pair.1], fontSize: 18), "New")
+
+        let page = try #require(try await compare(lib, old, new).pages.first)
+
+        #expect(page.method == .picture(.noTextOnEither))
+        #expect(page.kind == .changed, "\(pair.0) → \(pair.1) was called the same")
+        #expect(page.pictureDifferenceCount == 1)
+    }
+
     @Test func aDocumentComparedWithItselfIsIdentical() async throws {
         let lib = try TestLibrary()
         let pagesOf = try await pages(lib, SyntheticDocuments.textPDF(pages: ["First page words here", "Second page words here"]), "Doc")

@@ -62,8 +62,12 @@ public struct GrayPicture: Hashable, Sendable {
 /// taken separately, differ everywhere, because nothing lines them up; and a
 /// page of a different shape is stretched onto the other before comparing.
 public enum PictureDifference {
-    /// Columns of cells across the page; rows follow the page's shape.
+    /// Columns of cells across the page, unless a caller asks for more;
+    /// rows follow the page's shape.
     public static let columns = 40
+    /// Cells this close (in cells) are one region, so a changed word drawn
+    /// in fine cells is one rectangle rather than one per letter.
+    public static let mergeDistance = 2
     /// A cell differs when its pixels differ by this much on average (of 255)…
     public static let meanThreshold = 6.0
     /// …and at least one of them by this much.
@@ -72,10 +76,10 @@ public enum PictureDifference {
     /// Rectangles normalized to the page (top-left origin, 0…1), in reading
     /// order. `b` is stretched onto `a`'s size first. Cells touching any of
     /// `ignoring` (normalized the same way) are not counted.
-    public static func regions(_ a: GrayPicture, _ b: GrayPicture,
+    public static func regions(_ a: GrayPicture, _ b: GrayPicture, columns requested: Int = Self.columns,
                                ignoring: [NormalizedRect] = []) -> [NormalizedRect] {
         let other = b.resized(width: a.width, height: a.height)
-        let columns = min(Self.columns, a.width)
+        let columns = max(1, min(requested, a.width))
         let rows = max(1, min(a.height, Int((Double(columns) * Double(a.height) / Double(a.width)).rounded())))
         var differs = [Bool](repeating: false, count: columns * rows)
         for row in 0..<rows {
@@ -101,7 +105,7 @@ public enum PictureDifference {
         return merged(differs, columns: columns, rows: rows, width: a.width, height: a.height)
     }
 
-    /// Joins touching cells (sides and corners) into their bounding rectangles.
+    /// Joins cells within `mergeDistance` of each other into their bounding rectangles.
     private static func merged(_ differs: [Bool], columns: Int, rows: Int, width: Int, height: Int) -> [NormalizedRect] {
         var seen = [Bool](repeating: false, count: differs.count)
         var result: [NormalizedRect] = []
@@ -113,8 +117,8 @@ public enum PictureDifference {
                 let row = cell / columns, column = cell % columns
                 minColumn = min(minColumn, column); maxColumn = max(maxColumn, column)
                 minRow = min(minRow, row); maxRow = max(maxRow, row)
-                for dy in -1...1 {
-                    for dx in -1...1 {
+                for dy in -mergeDistance...mergeDistance {
+                    for dx in -mergeDistance...mergeDistance {
                         let r = row + dy, c = column + dx
                         guard r >= 0, r < rows, c >= 0, c < columns else { continue }
                         let next = r * columns + c

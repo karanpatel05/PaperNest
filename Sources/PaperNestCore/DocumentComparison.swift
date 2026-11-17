@@ -174,8 +174,16 @@ public struct PageComparison: Hashable, Sendable {
     /// photo or drawing is a change. On a page compared by words, picture
     /// differences under any word on either page are left to the words —
     /// two files can draw the same letters slightly differently.
+    ///
+    /// `detail`, when given, is the two pages drawn larger for comparing
+    /// their pictures (the pages' own pictures, drawn small, are for matching
+    /// them), divided into `columns` cells across. A picture too small for
+    /// its print misses a changed digit: at 400 pixels on Letter, body text
+    /// is five pixels tall.
     public static func compare(_ old: ComparedPage, _ new: ComparedPage,
-                               oldIndex: Int, newIndex: Int, moved: Bool) -> PageComparison {
+                               oldIndex: Int, newIndex: Int, moved: Bool,
+                               detail: (old: GrayPicture, new: GrayPicture)? = nil,
+                               columns: Int = PictureDifference.columns) -> PageComparison {
         var method: Method
         var changes: [TextChange] = []
         var ignoring: [NormalizedRect] = []
@@ -186,13 +194,15 @@ public struct PageComparison: Hashable, Sendable {
             }
             // Word boxes in each page's picture, normalized to it; the new
             // picture is stretched onto the old one's frame, so the two agree.
-            ignoring = old.text.words.map { normalizedPageRect($0.box, old.geometry) }
-                + new.text.words.map { normalizedPageRect($0.box, new.geometry) }
+            // With a margin: a word's box may not quite reach its letters' ink.
+            ignoring = (old.text.words.map { normalizedPageRect($0.box, old.geometry) }
+                + new.text.words.map { normalizedPageRect($0.box, new.geometry) }).map(widened)
         } else {
             method = .picture(old.text.source == nil && new.text.source == nil ? .noTextOnEither
                               : (old.text.source == nil ? .noTextOnOld : .noTextOnNew))
         }
-        let regions = PictureDifference.regions(old.picture, new.picture, ignoring: ignoring)
+        let regions = PictureDifference.regions(detail?.old ?? old.picture, detail?.new ?? new.picture,
+                                                columns: columns, ignoring: ignoring)
         let oldSize = old.geometry.pageSize, newSize = new.geometry.pageSize
         let sizesDiffer = oldSize.height > 0 && newSize.height > 0
             && abs(oldSize.width / oldSize.height - newSize.width / newSize.height) > 0.02 * (oldSize.width / oldSize.height)
@@ -201,6 +211,11 @@ public struct PageComparison: Hashable, Sendable {
             oldPictureRegions: regions.map { old.geometry.normalizedSourceRect(forPageRect: $0.denormalized(in: oldSize)) },
             newPictureRegions: regions.map { new.geometry.normalizedSourceRect(forPageRect: $0.denormalized(in: newSize)) },
             sizesDiffer: sizesDiffer)
+    }
+
+    private static func widened(_ box: NormalizedRect) -> NormalizedRect {
+        let margin = max(box.height * 0.3, 0.003)
+        return .exact(x: box.x - margin, y: box.y - margin, width: box.width + 2 * margin, height: box.height + 2 * margin)
     }
 
     private static func normalizedPageRect(_ source: NormalizedRect, _ geometry: PageGeometry) -> NormalizedRect {
@@ -243,6 +258,11 @@ public struct DocumentComparison: Hashable, Sendable {
     /// Whether any compared words were read off pixels.
     public var usesRecognizedText: Bool {
         pages.contains { $0.method == .text(.recognized) }
+    }
+
+    /// Whether any matched pair was compared only as pictures.
+    public var anyComparedOnlyByPicture: Bool {
+        pages.contains { if case .picture = $0.method { true } else { false } }
     }
 
     /// Whether every matched pair was compared only as pictures.

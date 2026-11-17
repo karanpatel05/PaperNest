@@ -3,8 +3,9 @@ import Foundation
 import PaperNestCore
 import PaperNestStore
 
-/// Compares two documents' pages: reads each page's words, draws each page
-/// once, small and in grey, and hands both to `DocumentComparison`.
+/// Compares two documents' pages: reads each page's words and draws each
+/// page small and in grey to match the pages up (`PageAlignment`), then draws
+/// each matched pair larger to compare their pictures.
 ///
 /// Nothing is stored. Each page is read and drawn as it is now, marks
 /// included, so a drawing someone added shows as a difference in the picture
@@ -12,10 +13,15 @@ import PaperNestStore
 public struct DocumentComparer: Sendable {
     private let renderer: PageRenderer
 
-    /// The longer side, in pixels, of the picture each page is compared at.
-    /// About 2.6 pixels per millimetre on Letter: enough to see a changed
-    /// stamp or signature, and a page drawn this small costs little.
+    /// The longer side, in pixels, of the picture each page is matched by:
+    /// about 1.4 pixels per millimetre on Letter, enough to tell pages apart.
     public static let pictureSide: CGFloat = 400
+    /// The longer side of the pictures a matched pair is compared by: about
+    /// 5.7 pixels per millimetre on Letter, so 10-point print is some 20
+    /// pixels tall. At `pictureSide`, a changed digit in body text was missed.
+    public static let detailSide: CGFloat = 1600
+    /// Cells of the picture comparison, in pixels of the detail pictures.
+    public static let cellSide = 8
 
     public init(renderer: PageRenderer) {
         self.renderer = renderer
@@ -33,10 +39,12 @@ public struct DocumentComparer: Sendable {
         return ComparedPage(text: layout.comparisonText, picture: picture, geometry: page.geometry)
     }
 
-    /// `progress` is told the share done, from 0 to 1, after each page.
+    /// `progress` is told the share done, from 0 to 1, after each page read
+    /// and each pair compared.
     public func compare(old: [Page], new: [Page],
                         progress: @Sendable (Double) async -> Void = { _ in }) async throws -> DocumentComparison {
-        let total = Double(max(1, old.count + new.count))
+        // Reading a page counts once; comparing a pair, drawn twice and larger, four times.
+        var total = Double(max(1, old.count + new.count + 4 * min(old.count, new.count)))
         var done = 0.0
         var oldPages: [ComparedPage] = [], newPages: [ComparedPage] = []
         for page in old {
@@ -50,7 +58,31 @@ public struct DocumentComparer: Sendable {
             done += 1; await progress(done / total)
         }
         try Task.checkCancellation()
-        return DocumentComparison.compare(old: oldPages, new: newPages)
+        let entries = PageAlignment.align(old: oldPages.map(\.signature), new: newPages.map(\.signature))
+        let pairs = entries.filter { if case .matched = $0 { true } else { false } }.count
+        total = Double(old.count + new.count + 4 * pairs)
+        var pages: [PageComparison] = []
+        for entry in entries {
+            try Task.checkCancellation()
+            switch entry {
+            case .matched(let i, let j, let moved):
+                let detailOld = try await detailPicture(old[i])
+                let detailNew = try await detailPicture(new[j])
+                pages.append(PageComparison.compare(oldPages[i], newPages[j], oldIndex: i, newIndex: j, moved: moved,
+                                                    detail: (detailOld, detailNew),
+                                                    columns: max(1, detailOld.width / Self.cellSide)))
+                done += 4; await progress(min(1, done / total))
+            case .removed(let i): pages.append(PageComparison(oldIndex: i, newIndex: nil))
+            case .added(let j): pages.append(PageComparison(oldIndex: nil, newIndex: j))
+            }
+        }
+        return DocumentComparison(pages: pages)
+    }
+
+    private func detailPicture(_ page: Page) async throws -> GrayPicture {
+        let image = try await renderer.renderThumbnail(page, maxPixelSize: Self.detailSide)
+        guard let picture = Self.gray(image) else { throw RenderError.contextCreationFailed }
+        return picture
     }
 
     /// The picture in shades of grey, row by row from the top, on white.

@@ -1162,6 +1162,7 @@
 "compare.summary.picture" = "Différences d’apparence : %lld";
 "compare.summary.pages" = "Pages ajoutées : %lld · supprimées : %lld · déplacées : %lld";
 "compare.identical" = "Les deux documents sont identiques : mêmes mots et même apparence sur chaque page.";
+"compare.identicalByLook" = "Les deux documents ont la même apparence sur chaque page. Les pages sans texte n’ont été comparées que par leur apparence, et une marque très petite ou pâle peut passer inaperçue.";
 "compare.method.text" = "Comparée par ses mots, et par son apparence en dehors d’eux.";
 "compare.method.recognized" = "Comparée par des mots lus sur un scan : un mot mal lu apparaît comme une modification.";
 "compare.method.pictureBoth" = "Comparée par son apparence seulement : aucune des deux pages n’a de texte, les mots modifiés ne peuvent donc pas être nommés.";

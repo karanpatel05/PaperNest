@@ -188,6 +188,7 @@ struct CompareSheet: View {
                 }
             }
             .task { await model.loadCandidates() }
+            .onDisappear { model.cancel() }
             .task(id: "\(model.generation)-\(model.position)") { await model.loadImages() }
         }
         #if os(macOS)
@@ -231,7 +232,9 @@ struct CompareSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             summary(comparison)
             if comparison.isIdentical {
-                Text(L10n.compareIdentical).accessibilityIdentifier("compare-identical")
+                // Only claim the same words where words were compared.
+                Text(comparison.anyComparedOnlyByPicture ? L10n.compareIdenticalByLook : L10n.compareIdentical)
+                    .accessibilityIdentifier("compare-identical")
             }
             Picker(L10n.compareTitle, selection: $model.mode) {
                 ForEach(CompareModel.Mode.allCases) { Text(verbatim: $0.title).tag($0) }

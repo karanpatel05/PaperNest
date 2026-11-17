@@ -1162,6 +1162,7 @@
 "compare.summary.picture" = "Picture differences: %lld";
 "compare.summary.pages" = "Pages added: %lld · removed: %lld · moved: %lld";
 "compare.identical" = "The two documents are the same: the same words and the same look on every page.";
+"compare.identicalByLook" = "The two documents look the same on every page. Pages without text were compared only by how they look, and a very small or faint mark can be missed.";
 "compare.method.text" = "Compared by its words, and by how it looks away from them.";
 "compare.method.recognized" = "Compared by words read from a scan: a misread word shows as a change.";
 "compare.method.pictureBoth" = "Compared by how it looks only: neither page has text, so changed words can’t be named.";
