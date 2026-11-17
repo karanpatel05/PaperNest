@@ -1388,4 +1388,31 @@ extension L10n {
     static var detailsShareCSV: String { tr("details.shareCSV") }
     static var detailsFailed: String { tr("details.failed") }
     static func detailsReplaces(_ value0: Int) -> String { tr("details.replaces", value0) }
+
+    // MARK: Cleanup
+
+    static var cleanupButton: String { tr("cleanup.button") }
+    static var cleanupTitle: String { tr("cleanup.title") }
+    static var cleanupLooking: String { tr("cleanup.looking") }
+    static var cleanupSuggestions: String { tr("cleanup.suggestions") }
+    static var cleanupNone: String { tr("cleanup.none") }
+    static func cleanupBlank(_ value0: Int) -> String { tr("cleanup.blank", value0) }
+    static func cleanupLooksBlank(_ value0: Int) -> String { tr("cleanup.looksBlank", value0) }
+    static func cleanupDuplicate(_ value0: Int, _ value1: Int) -> String { tr("cleanup.duplicate", value0, value1) }
+    static func cleanupSimilar(_ value0: Int, _ value1: Int) -> String { tr("cleanup.similar", value0, value1) }
+    static var cleanupWithComment: String { tr("cleanup.with.comment") }
+    static var cleanupWithBookmark: String { tr("cleanup.with.bookmark") }
+    static var cleanupWithKeptDetails: String { tr("cleanup.with.keptDetails") }
+    static func cleanupSelected(_ value0: Int) -> String { tr("cleanup.selected", value0) }
+    static var cleanupReview: String { tr("cleanup.review") }
+    static var cleanupAllPages: String { tr("cleanup.allPages") }
+    static var cleanupConfirmTitle: String { tr("cleanup.confirmTitle") }
+    static var cleanupConfirmDetail: String { tr("cleanup.confirmDetail") }
+    static var cleanupDelete: String { tr("cleanup.delete") }
+    static var cleanupCopies: String { tr("cleanup.copies") }
+    static var cleanupCopiesNote: String { tr("cleanup.copiesNote") }
+    static var cleanupMoveCopy: String { tr("cleanup.moveCopy") }
+    static func cleanupMoveCopyTitle(_ value0: String) -> String { tr("cleanup.moveCopyTitle", value0) }
+    static var cleanupOnDevice: String { tr("cleanup.onDevice") }
+    static var cleanupFailed: String { tr("cleanup.failed") }
 }

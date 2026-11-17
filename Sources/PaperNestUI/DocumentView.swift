@@ -76,6 +76,8 @@ struct DocumentView: View {
     @State private var isShowingCompare = false
     /// Reading a receipt's, card's or invoice's details off the page.
     @State private var isShowingDetails = false
+    /// Blank and repeated pages, offered for removal.
+    @State private var isShowingCleanup = false
     /// Saving the page as a template: asking for its name.
     @State private var isNamingTemplate = false
     @State private var templateName = ""
@@ -457,6 +459,9 @@ struct DocumentView: View {
     @inline(never)
     private func templateDialogs<Content: View>(_ content: Content) -> some View {
         content
+            .sheet(isPresented: $isShowingCleanup) {
+                CleanupSheet(document: model, undoManager: undoManager)
+            }
             .sheet(isPresented: $isShowingDetails) {
                 if let page = model.selectedPage {
                     DetailsSheet(itemID: model.itemID, pageID: page.id, session: model.session)
@@ -999,7 +1004,7 @@ struct DocumentView: View {
             || managedMarkupPage != nil || signaturePage != nil || notebookPageRequest != nil
             || isShowingCrop || isShowingFilePicker || isShowingPDFForm || isShowingPageOrganizer
             || isShowingExport || isShowingAdjustments || isShowingOutline || isShowingImagePicker
-            || isShowingPhotoPicker || isShowingCompress || isShowingOCR || isShowingRedact || isShowingCompare || isShowingDetails
+            || isShowingPhotoPicker || isShowingCompress || isShowingOCR || isShowingRedact || isShowingCompare || isShowingDetails || isShowingCleanup
         #if os(iOS)
         presenting = presenting || cameraPurpose != nil || photoCameraPage != nil
         #endif
@@ -1121,6 +1126,11 @@ struct DocumentView: View {
             }
             .disabled(model.selectedPage == nil)
             .accessibilityIdentifier("utilities-extract-details")
+            Button { finishThen { isShowingCleanup = true } } label: {
+                Label(L10n.cleanupButton, systemImage: "sparkles.rectangle.stack")
+            }
+            .disabled(model.pages.count < 2)
+            .accessibilityIdentifier("utilities-cleanup")
             Button { finishThen { openProTool(.redact) { isShowingRedact = true } } } label: {
                 Label(L10n.redactTitle, systemImage: "eye.slash")
             }

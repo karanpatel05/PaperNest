@@ -1243,3 +1243,29 @@
 "details.shareCSV" = "Share as CSV";
 "details.failed" = "The details couldn’t be read or saved.";
 "details.replaces" = "Saving replaces the details kept from page %lld.";
+
+/* Cleanup */
+"cleanup.button" = "Clean Up Pages";
+"cleanup.title" = "Clean Up";
+"cleanup.looking" = "Looking through the pages…";
+"cleanup.suggestions" = "Suggestions";
+"cleanup.none" = "No blank or repeated pages were found.";
+"cleanup.blank" = "Page %lld: blank";
+"cleanup.looksBlank" = "Page %lld: looks blank (check it)";
+"cleanup.duplicate" = "Page %lld: duplicate of page %lld";
+"cleanup.similar" = "Page %lld: similar to page %lld (check it)";
+"cleanup.with.comment" = "Its private comment goes with it.";
+"cleanup.with.bookmark" = "Its bookmark goes with it.";
+"cleanup.with.keptDetails" = "The details kept from it go with it.";
+"cleanup.selected" = "Selected: %lld";
+"cleanup.review" = "Review";
+"cleanup.allPages" = "A document keeps at least one page: leave one unselected.";
+"cleanup.confirmTitle" = "Delete the selected pages?";
+"cleanup.confirmDetail" = "Undo brings them back until PaperNest quits.";
+"cleanup.delete" = "Delete Pages";
+"cleanup.copies" = "Copies of This Document";
+"cleanup.copiesNote" = "These documents have the same pages and marks. A copy moved to Recently Deleted stays there for 30 days, with its bookmarks and details.";
+"cleanup.moveCopy" = "Move to Recently Deleted";
+"cleanup.moveCopyTitle" = "Move “%@” to Recently Deleted?";
+"cleanup.onDevice" = "Looked for on this device. Nothing is deleted until you confirm. Scans whose text has not been recognized are compared only by how they look.";
+"cleanup.failed" = "The pages couldn’t be looked through.";

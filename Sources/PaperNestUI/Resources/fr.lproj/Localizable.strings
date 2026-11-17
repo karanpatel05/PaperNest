@@ -1243,3 +1243,29 @@
 "details.shareCSV" = "Partager en CSV";
 "details.failed" = "Impossible de lire ou d’enregistrer les détails.";
 "details.replaces" = "Enregistrer remplace les détails conservés de la page %lld.";
+
+/* Cleanup */
+"cleanup.button" = "Nettoyer les pages";
+"cleanup.title" = "Nettoyage";
+"cleanup.looking" = "Examen des pages…";
+"cleanup.suggestions" = "Suggestions";
+"cleanup.none" = "Aucune page vierge ou répétée n’a été trouvée.";
+"cleanup.blank" = "Page %lld : vierge";
+"cleanup.looksBlank" = "Page %lld : semble vierge (à vérifier)";
+"cleanup.duplicate" = "Page %lld : doublon de la page %lld";
+"cleanup.similar" = "Page %lld : semblable à la page %lld (à vérifier)";
+"cleanup.with.comment" = "Son commentaire privé disparaît avec elle.";
+"cleanup.with.bookmark" = "Son signet disparaît avec elle.";
+"cleanup.with.keptDetails" = "Les détails conservés de cette page disparaissent avec elle.";
+"cleanup.selected" = "Sélectionnées : %lld";
+"cleanup.review" = "Vérifier";
+"cleanup.allPages" = "Un document garde au moins une page : laissez-en une non sélectionnée.";
+"cleanup.confirmTitle" = "Supprimer les pages sélectionnées ?";
+"cleanup.confirmDetail" = "Annuler les ramène tant que PaperNest n’est pas quitté.";
+"cleanup.delete" = "Supprimer les pages";
+"cleanup.copies" = "Copies de ce document";
+"cleanup.copiesNote" = "Ces documents ont les mêmes pages et annotations. Une copie placée dans Supprimés récemment y reste 30 jours, avec ses signets et ses détails.";
+"cleanup.moveCopy" = "Placer dans Supprimés récemment";
+"cleanup.moveCopyTitle" = "Placer « %@ » dans Supprimés récemment ?";
+"cleanup.onDevice" = "Recherche faite sur cet appareil. Rien n’est supprimé sans votre confirmation. Les scans dont le texte n’a pas été reconnu ne sont comparés que par leur apparence.";
+"cleanup.failed" = "Impossible d’examiner les pages.";

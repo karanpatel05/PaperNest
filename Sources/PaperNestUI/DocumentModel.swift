@@ -963,6 +963,17 @@ final class DocumentModel {
         registerDeleteUndo(deleted, undoManager: undoManager)
     }
 
+    /// Deletes several pages as one step, undone and redone together, as the
+    /// cleanup does after someone confirms. Refuses to empty the document.
+    func deletePages(_ ids: [PageID], undoManager: UndoManager?) async -> Bool {
+        await finishPendingHistory()
+        let wanted = Set(ids)
+        guard !wanted.isEmpty, pages.contains(where: { !wanted.contains($0.id) }),
+              let deleted = await commitDelete(ids) else { return false }
+        registerDeleteUndo(deleted, undoManager: undoManager)
+        return true
+    }
+
     private func registerDeleteUndo(_ deleted: [LibraryStore.DeletedPage], undoManager: UndoManager?) {
         undoManager?.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated {

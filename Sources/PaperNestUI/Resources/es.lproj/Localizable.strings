@@ -1243,3 +1243,29 @@
 "details.shareCSV" = "Compartir como CSV";
 "details.failed" = "No se pudieron leer ni guardar los datos.";
 "details.replaces" = "Al guardar se sustituyen los datos guardados de la página %lld.";
+
+/* Cleanup */
+"cleanup.button" = "Limpiar páginas";
+"cleanup.title" = "Limpieza";
+"cleanup.looking" = "Revisando las páginas…";
+"cleanup.suggestions" = "Sugerencias";
+"cleanup.none" = "No se encontraron páginas en blanco ni repetidas.";
+"cleanup.blank" = "Página %lld: en blanco";
+"cleanup.looksBlank" = "Página %lld: parece en blanco (revísala)";
+"cleanup.duplicate" = "Página %lld: duplicado de la página %lld";
+"cleanup.similar" = "Página %lld: parecida a la página %lld (revísala)";
+"cleanup.with.comment" = "Su comentario privado se elimina con ella.";
+"cleanup.with.bookmark" = "Su marcador se elimina con ella.";
+"cleanup.with.keptDetails" = "Los datos guardados de ella se eliminan con ella.";
+"cleanup.selected" = "Seleccionadas: %lld";
+"cleanup.review" = "Revisar";
+"cleanup.allPages" = "Un documento conserva al menos una página: deja una sin seleccionar.";
+"cleanup.confirmTitle" = "¿Eliminar las páginas seleccionadas?";
+"cleanup.confirmDetail" = "Deshacer las recupera mientras PaperNest siga abierto.";
+"cleanup.delete" = "Eliminar páginas";
+"cleanup.copies" = "Copias de este documento";
+"cleanup.copiesNote" = "Estos documentos tienen las mismas páginas y marcas. Una copia movida a Eliminados recientemente se conserva allí 30 días, con sus marcadores y datos.";
+"cleanup.moveCopy" = "Mover a Eliminados recientemente";
+"cleanup.moveCopyTitle" = "¿Mover «%@» a Eliminados recientemente?";
+"cleanup.onDevice" = "Búsqueda hecha en este dispositivo. No se elimina nada sin tu confirmación. Los escaneos cuyo texto no se ha reconocido solo se comparan por su aspecto.";
+"cleanup.failed" = "No se pudieron revisar las páginas.";

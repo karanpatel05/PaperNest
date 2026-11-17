@@ -79,7 +79,8 @@ public struct DocumentComparer: Sendable {
         return DocumentComparison(pages: pages)
     }
 
-    private func detailPicture(_ page: Page) async throws -> GrayPicture {
+    /// A page drawn at `detailSide`, in grey; internal so the cleanup confirms with the same picture.
+    func detailPicture(_ page: Page) async throws -> GrayPicture {
         let image = try await renderer.renderThumbnail(page, maxPixelSize: Self.detailSide)
         guard let picture = Self.gray(image) else { throw RenderError.contextCreationFailed }
         return picture
