@@ -22,6 +22,8 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
     /// What to say about each look and when the automatic shutter fires,
     /// decided together (`ScanCaptureGuide`). Only touched on `queue`.
     private var guide = ScanCaptureGuide(detection: ScanCaptureMode.document.detection)
+    /// The advice last sent, kept while a picture is being taken.
+    private var said: ScanCaptureFeedback?
     /// What the mode looks for in each frame. Nil keeps the whole frame: no outline, no automatic shutter.
     private var detection: ScanDetection? = ScanCaptureMode.document.detection
     private var frame = 0
@@ -105,6 +107,7 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
         queue.async { [self] in
             intent.stop()
             guide.reset()
+            said = nil
             Task { @MainActor [weak self] in self?.onObservation?([], nil) }
             report(false)
             if session.isRunning { session.stopRunning() }
@@ -182,7 +185,17 @@ final class ScannerCamera: NSObject, @unchecked Sendable, AVCaptureVideoDataOutp
     /// one decision, so the label never says Ready over a page the shutter
     /// will not take. On `queue`.
     private func process(_ look: ScanFrameObservation, at time: Double) {
-        let decision = guide.observe(look, at: time, automatic: automatic && intent.wantsRunning && !capturing)
+        // A picture is being taken: the decision about this sheet is made.
+        // Move the outline, keep what was said, and leave the guide alone —
+        // as the shutter's old rule was not fed then either — so the label
+        // neither falls back to Hold steady nor says Ready with nothing taken.
+        guard !capturing else {
+            let kept = said
+            Task { @MainActor [weak self] in self?.onObservation?(look.corners, kept) }
+            return
+        }
+        let decision = guide.observe(look, at: time, automatic: automatic && intent.wantsRunning)
+        said = decision.feedback
         Task { @MainActor [weak self] in self?.onObservation?(look.corners, decision.feedback) }
         if decision.fire {
             Task { @MainActor [weak self] in self?.onAutoCapture?() }
