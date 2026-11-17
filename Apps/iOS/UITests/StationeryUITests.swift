@@ -12,7 +12,7 @@ import PaperNestStore
 @MainActor final class StationeryUITests: XCTestCase {
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
-    private func open(language: String) async throws -> (XCUIApplication, LibraryStore, ItemID) {
+    private func open(language: String, region: String? = nil) async throws -> (XCUIApplication, LibraryStore, ItemID) {
         let directory = URL(fileURLWithPath: "/tmp/papernest-stationery-\(UUID())")
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         let store = try LibraryStore(directory: directory)
@@ -22,7 +22,7 @@ import PaperNestStore
         let app = XCUIApplication()
         app.launchArguments = ["-PaperNestLibraryPath", directory.path, "-PaperNestDebugSkipWelcome", "YES",
                                "-PaperNestDebugOpenItem", "Stationery", "-AppleLanguages", "(\(language))",
-                               "-AppleLocale", language == "en" ? "en_US" : language]
+                               "-AppleLocale", region ?? (language == "en" ? "en_US" : language)]
         app.launch()
         XCTAssertTrue(app.buttons["studio-tool-lasso"].waitForExistence(timeout: 30))
         return (app, store, item.id)
@@ -101,6 +101,33 @@ import PaperNestStore
 
     func testAMeetingPageArrivesWithItsHeadings() async throws {
         try await addMeetingPage(language: "en", title: "Meeting")
+    }
+
+    /// A French reader in the US, the usual way a language is set: the
+    /// language changed, the region kept. The days are French, and the week
+    /// starts on Sunday.
+    func testAPlannerPageForAFrenchReaderInTheUS() async throws {
+        let (app, store, item) = try await open(language: "fr", region: "en_US")
+        defer { app.terminate() }
+        tool("studio-tool-insert", in: app).tap()
+        let row = app.scrollViews["insert-page-papers"]
+        let planner = app.buttons["insert-page-planner"]
+        XCTAssertTrue(planner.waitForExistence(timeout: 10), "the Insert panel did not open")
+        bringIntoView(planner, in: row)
+        planner.tap()
+        var pages: [Page] = []
+        for _ in 0..<40 {
+            pages = try await store.pages(of: item)
+            if pages.count == 2 { break }
+            try await Task.sleep(for: .milliseconds(250))
+        }
+        guard pages.count == 2, let added = pages.last else { return XCTFail("no page was added") }
+        XCTAssertEqual(added.content, .template(.planner))
+        let written = try await headings(store, added.id)
+        XCTAssertEqual(Array(written.prefix(3)), ["Semaine du", "Dimanche", "Lundi"], "\(written)")
+        XCTAssertEqual(written.count, 9)
+        try await Task.sleep(for: .milliseconds(600))
+        snap(app, "planner-page-fr-US")
     }
 
     func testTheHeadingsAreInTheReadersLanguage() async throws {

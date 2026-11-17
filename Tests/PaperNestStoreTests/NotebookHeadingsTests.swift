@@ -34,6 +34,7 @@ import PaperNestCore
         _ = try await store.toggleNotebookPage(undone)
         #expect(try await store.pages(of: book.id).count == 2)
         #expect(try await texts(store, change.page.id) == ["Meeting", "Attendees"], "redo brings back the headings, once")
+        #expect(try await store.search("attendees") == [book.id], "and they answer a search again")
     }
 
     @Test func aNewNotebooksFirstPageHasItsHeadings() async throws {

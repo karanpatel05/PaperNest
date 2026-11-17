@@ -22,6 +22,16 @@ import PaperNestCore
         #expect(TemplateHeadings.dayName(0, calendar: calendar("es_ES")) == "Lunes")
     }
 
+    /// A French reader in the US: French day names, the US week. A reader
+    /// whose language the app does not have: the headings' fallback, English.
+    @Test func theDaysAreInTheHeadingsLanguageAndTheRegionsWeek() {
+        let frenchInTheUS = TemplateHeadings.readersWeek(language: "fr", firstWeekday: 1)
+        #expect(TemplateHeadings.dayName(0, calendar: frenchInTheUS) == "Dimanche")
+        #expect(TemplateHeadings.dayName(1, calendar: frenchInTheUS) == "Lundi")
+        let englishInFrance = TemplateHeadings.readersWeek(language: "en", firstWeekday: 2)
+        #expect(TemplateHeadings.dayName(0, calendar: englishInFrance) == "Monday")
+    }
+
     @Test func aMeetingAndAPlannerHaveHeadingsAndOtherPapersNone() {
         let meeting = TemplateHeadings.textBoxes(for: .meeting, calendar: calendar("en_US"))
         #expect(meeting.map(\.text) == [L10n.templateMeetingTitle, L10n.templateDate, L10n.templateAttendees,

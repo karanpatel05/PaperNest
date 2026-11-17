@@ -35,10 +35,24 @@ enum TemplateHeadings {
         return name.capitalized(with: calendar.locale ?? .current)
     }
 
+    /// The reader's week for headings: day names in the language the other
+    /// headings resolved to (`L10n`'s, from the app's own localizations, so a
+    /// French reader in the US gets "Dimanche" and a German one, whose
+    /// headings fall back to English, gets "Sunday"), starting on the day
+    /// the reader's region starts the week.
+    static func readersWeek(language: String = ResourceBundle.ui.preferredLocalizations.first ?? "en",
+                            firstWeekday: Int = Calendar.autoupdatingCurrent.firstWeekday) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: language)
+        // After the locale, which would otherwise bring its own first day.
+        calendar.firstWeekday = firstWeekday
+        return calendar
+    }
+
     /// `text` says each heading (by default from `L10n`); a nil or empty
     /// answer leaves that heading out.
     static func textBoxes(for template: PageTemplate, size: CGSize = LibraryStore.notebookPageSize,
-                          calendar: Calendar = .autoupdatingCurrent,
+                          calendar: Calendar = readersWeek(),
                           text: ((PageTemplateLayout.HeadingRole) -> String?)? = nil) -> [TextBox] {
         let say = text ?? { role in key(for: role).map { L10n.tr($0) } }
         let gray = PageTemplateLayout.headingGray

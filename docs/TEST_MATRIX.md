@@ -1,3 +1,17 @@
+## 2026-11-17 — Stationery: a planner's days in the headings' language, with the reader's week (Claude, follow-up to the entry below)
+
+Found in review after the stationery commit: the planner's day names came from the calendar's locale while every other heading comes from `L10n`, which resolves through the app's own localizations. The usual way someone sets a language is to change it and keep their region, so the two can disagree: French with a US region, or a German phone whose headings fall back to English while the days would have been German. Now the day names are in the language the headings resolved to, and the week starts on the reader's region's first day (`TemplateHeadings.readersWeek`).
+
+| Check | Result |
+|---|---|
+| New `TemplateHeadingsTests.theDaysAreInTheHeadingsLanguageAndTheRegionsWeek` | **Pass.** French in the US: Dimanche, then Lundi; English in France: Monday first. |
+| `NotebookHeadingsTests`: search after redo (one more expectation) | **Pass.** Redone headings answer a search again: the undo path re-indexes typed text. |
+| `./scripts/test.sh`, clean worktree (`ae9d080` + this change) | **1,382 tests, 0 failures, 0 warnings** (389 + 49 + 230 + 233 + 246 + 235). |
+| `./scripts/build-mac-app.sh`; `xcodebuild build-for-testing` (iOS Simulator) | Both succeeded, no compiler warnings. |
+| `StationeryUITests` (3, with the new `testAPlannerPageForAFrenchReaderInTheUS`), iPhone 17 / iOS 26.5 | **3/3 pass** (33.0 s, 24.2 s, 59.1 s). Launched with the language French and the region en_US, a planner page's headings read "Semaine du", "Dimanche", "Lundi" … (nine in all). Whether the earlier code would have failed this test was not checked. Screenshot looked at: "Semaine du" over its rule, then Dimanche to Samedi and Notes in eight ruled boxes, two by four. |
+
+**Not checked:** Night Mode, where grey (45%) headings on dark paper may be faint; dark mode; large text; the Mac.
+
 ## 2026-11-17 — Stationery: nine papers, and meeting and planner pages that arrive with their headings (Claude, roadmap item 8)
 
 Owner in session ("Start the next slice, templates and stationery"). Notebook pages can now be **dotted**, **Cornell**, **checklist**, **meeting**, **weekly planner** or **form** as well as blank, lined and grid, from New Note, the add-page sheet and the Insert tool. A **meeting** page arrives with Meeting, Date, Attendees, Notes and Action Items; a **planner** page with Week of, the seven days from the reader's calendar (Sunday first in the US, Monday in France) and Notes. The headings are ordinary grey text boxes in the reader's language, written in the same transaction as the page, so they can be edited, moved or deleted and undo takes them away with the page. Each paper's lines come from one place (`PageTemplateLayout`), for the screen and every export. Design: `docs/ARCHITECTURE.md` → Rendering, "Template pages".
