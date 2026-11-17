@@ -87,7 +87,19 @@ struct ExportSheet: View {
     /// Whether the small PaperNest mark goes on each page: on for a free
     /// user, who meets the paywall on switching it off; off for Pro.
     @State private var includesBrandMark = false
+    /// How large the export will be, worked out from the options as they are.
+    @State private var sizeEstimate: SizeEstimate = .none
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    enum SizeEstimate: Equatable { case none, working, ready(ExportSizeEstimate) }
+
+    /// Everything the size depends on. A change to any of it — or an export
+    /// starting — cancels the estimate under way and starts another.
+    struct EstimateRequest: Hashable {
+        var options: ExportOptions
+        var pages: [PageID]
+        var revisions: [Int]
+    }
 
     enum PageChoice: Hashable { case all, current, range }
 
@@ -600,12 +612,63 @@ struct ExportSheet: View {
             status
             if showsActions { actions }
         }
+        .task(id: estimateRequest) { await estimateSize(estimateRequest) }
+    }
+
+    /// What to estimate, or nil when there is nothing to: no pages, a range
+    /// that does not hold, a watermark that cannot export, or an export
+    /// already under way (which would compete with it for the same pages).
+    private var estimateRequest: EstimateRequest? {
+        guard case .configuring = phase, rangeIsValid, watermarkProblem == nil else { return nil }
+        let chosen = selectedPages
+        guard !chosen.isEmpty else { return nil }
+        // The options the export itself would use, the PaperNest mark included.
+        let options = Self.optionsToExport(options, watermark: watermarkDraft, includesBrandMark: Self.brandMarkToExport(
+            switchOn: includesBrandMark, allowsRemoval: SubscriptionStore.shared.allows(.removeWatermark)))
+        return EstimateRequest(options: options, pages: chosen.map(\.id), revisions: chosen.map(\.revision))
+    }
+
+    /// Exports a few of the chosen pages, after a pause so a slider being
+    /// dragged does not start one per step, and says how large the whole
+    /// will be. A refusal shows nothing: the export itself explains it.
+    private func estimateSize(_ request: EstimateRequest?) async {
+        sizeEstimate = .none
+        guard let request, let exporter = session.environment?.exporter else { return }
+        do { try await Task.sleep(for: .milliseconds(400)) } catch { return }
+        let chosen = selectedPages
+        guard chosen.map(\.id) == request.pages else { return }
+        sizeEstimate = .working
+        do {
+            let estimate = try await exporter.estimateSize(itemName: itemName, pages: chosen, options: request.options)
+            if !Task.isCancelled { sizeEstimate = .ready(estimate) }
+        } catch {
+            if !Task.isCancelled { sizeEstimate = .none }
+        }
+    }
+
+    @ViewBuilder
+    private var sizeRow: some View {
+        switch sizeEstimate {
+        case .none:
+            EmptyView()
+        case .working:
+            Text(L10n.exportSizeWorking)
+                .font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("export-size-estimate")
+        case .ready(let estimate):
+            let size = ByteCountFormatter.string(fromByteCount: estimate.byteCount, countStyle: .file)
+            Text(estimate.isExact ? L10n.exportSizeExact(size) : L10n.exportSizeAbout(size))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("export-size-estimate")
+        }
     }
 
     @ViewBuilder
     private var status: some View {
         switch phase {
         case .configuring:
+            sizeRow
             if !rangeIsValid {
                 Text(L10n.exportInvalidRange).font(.caption).foregroundStyle(.red)
             }

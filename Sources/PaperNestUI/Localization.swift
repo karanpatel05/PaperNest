@@ -1445,4 +1445,10 @@ extension L10n {
     static var textStampMissing: String { tr("stamp.text.missing") }
     static var textStampFailed: String { tr("stamp.text.failed") }
     static var textStampKeepFailed: String { tr("stamp.text.keepFailed") }
+
+    // MARK: Export size estimate
+
+    static var exportSizeWorking: String { tr("export.size.working") }
+    static func exportSizeExact(_ value0: String) -> String { tr("export.size.exact", value0) }
+    static func exportSizeAbout(_ value0: String) -> String { tr("export.size.about", value0) }
 }

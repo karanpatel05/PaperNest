@@ -1298,3 +1298,8 @@
 "stamp.text.missing" = "Type the words for your stamp.";
 "stamp.text.failed" = "The stamp couldn’t be placed.";
 "stamp.text.keepFailed" = "The stamp couldn’t be kept in Your Stamps, so it wasn’t placed.";
+
+/* Export size estimate */
+"export.size.working" = "Working out the size…";
+"export.size.exact" = "Size: %@";
+"export.size.about" = "Size: about %@, worked out from a few pages";

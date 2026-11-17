@@ -1298,3 +1298,8 @@
 "stamp.text.missing" = "Saisissez le texte du tampon.";
 "stamp.text.failed" = "Impossible de placer le tampon.";
 "stamp.text.keepFailed" = "Le tampon n’a pas pu être gardé dans vos tampons, il n’a donc pas été placé.";
+
+/* Export size estimate */
+"export.size.working" = "Calcul de la taille…";
+"export.size.exact" = "Taille : %@";
+"export.size.about" = "Taille : environ %@, d’après quelques pages";
