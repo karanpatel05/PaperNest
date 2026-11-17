@@ -140,8 +140,11 @@ import PaperNestStore
         save.tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 10), "the editor stayed open after saving")
 
-        // The panel says so, and the library holds it.
+        // The panel says so, warns that recognizing the page again would
+        // replace the correction, and the library holds it.
         waitForValue(app.descendants(matching: .any)["ocr-current-status"], "corrected")
+        XCTAssertTrue(app.descendants(matching: .any)["ocr-replaces-corrections"].waitForExistence(timeout: 5),
+                      "the panel does not warn before recognizing a corrected page again")
         let store = try LibraryStore(directory: directory)
         let stored = try await store.recognition(for: pageID)
         XCTAssertEqual(stored?.lines.map(\.text), ["Invoice total 42", "Thank you"])

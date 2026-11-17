@@ -1264,6 +1264,10 @@ final class DocumentModel {
             }
         }
         undoManager?.setActionName(L10n.ocrCorrectionAction)
+        // Registered from a Task, which the undo manager's notifications do
+        // not cover: without this the Undo buttons go on showing the state
+        // from before the correction.
+        historyDidChange()
     }
 
     private func replace(_ page: Page) {
