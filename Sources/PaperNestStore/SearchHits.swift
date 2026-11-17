@@ -140,12 +140,23 @@ extension LibraryStore {
     /// recognized text, then what was typed.
     ///
     /// - Parameters:
+    ///   - items: only these documents — the ones on screen. **Narrowed
+    ///     before any cap**, so the hits of a folder or a kind are not
+    ///     crowded out by newer documents elsewhere that will not be shown.
+    ///     Nil means the whole library.
     ///   - perItem: at most this many page hits per document, so one long
     ///     document cannot fill the list. Its title hit is not counted.
     ///   - limit: at most this many page hits in all.
-    public func searchHits(_ text: String, perItem: Int = 3, limit: Int = 60) throws -> [SearchHit] {
+    public func searchHits(_ text: String, among items: Set<ItemID>? = nil,
+                           perItem: Int = 3, limit: Int = 60) throws -> [SearchHit] {
         guard let match = Self.ftsQuery(text), perItem > 0, limit > 0 else { return [] }
+        if let items, items.isEmpty { return [] }
+        // One parameter however many documents: a JSON array, read back by
+        // `json_each`, rather than a variable per document.
+        let among = try items.map { String(decoding: try JSONEncoder().encode($0.map(\.rawValue).sorted()), as: UTF8.self) }
         let open = String(SearchSnippet.openMark), close = String(SearchSnippet.closeMark)
+        var parameters: [SQLValue] = [.text(open), .text(close), .text(match)]
+        if let among { parameters.append(.text(among)) }
         // Every matching row; the page number counts the live pages before
         // this one in `(sort_key, id)`, the order pages are shown in.
         let rows = try db.query("""
@@ -159,9 +170,10 @@ extension LibraryStore {
             FROM search_index s
             JOIN items i ON i.id = s.item_id
             WHERE search_index MATCH ? AND i.deleted_at IS NULL AND \(Self.livePageRow)
+              \(among == nil ? "" : "AND s.item_id IN (SELECT value FROM json_each(?))")
             ORDER BY i.modified_at DESC, s.item_id
             LIMIT 2000
-            """, [.text(open), .text(close), .text(match)]) { row in
+            """, parameters) { row in
             (item: ItemID(rawValue: row.text(0)), page: row.optionalText(1).map(PageID.init(rawValue:)),
              field: row.text(2), snippet: row.text(3), number: row.isNull(4) ? nil : row.int(4))
         }

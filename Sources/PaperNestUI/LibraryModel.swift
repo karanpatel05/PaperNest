@@ -149,8 +149,10 @@ public final class LibraryModel {
             var hits: [SearchHit] = []
             if !query.isEmpty, requestedScope != .recentlyDeleted {
                 let matches = Set(try await env.store.search(query))
-                summaries = summaries.filter { matches.contains($0.id) }
-                hits = try await env.store.searchHits(query)
+                summaries = summaries.filter { matches.contains($0.id) && requestedKind.includes($0.item.kind) }
+                // Only the documents about to be shown, so other folders'
+                // and kinds' hits cannot use up the caps first.
+                hits = try await env.store.searchHits(query, among: Set(summaries.map(\.id)))
             }
             summaries = summaries.filter { requestedKind.includes($0.item.kind) }
             let loadedFolders = try await env.store.folders()

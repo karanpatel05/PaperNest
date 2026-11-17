@@ -81,6 +81,34 @@ import PaperNestStore
         #expect(library.pageHits.map(\.pageNumber) == [1, 2, 1])
     }
 
+    /// Searching inside a folder: the folder's document is the oldest, and
+    /// twenty-five newer documents elsewhere match on three pages each — more
+    /// than the sixty hits allowed. The folder's page must still be listed.
+    @Test func aFoldersHitsAreNotCrowdedOutByDocumentsElsewhere() async throws {
+        let (root, session) = try await ready()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try #require(session.environment?.store)
+        let folder = try await store.createFolder(named: "Taxes")
+        let item = try await store.createItem(kind: .document, name: "Old return", folderID: folder.id, pages: [
+            .init(sourceSize: CGSize(width: 600, height: 800), content: .template(.blank)),
+        ], assets: [])
+        let page = try await store.pages(of: item.id)[0]
+        try await store.saveRecognition(PageRecognition(
+            pageID: page.id, sourceRevision: page.revision, engineVersion: "test", status: .completed,
+            languages: ["en-US"], lines: [RecognizedLine(text: "Invoice from last year",
+                                                         box: .exact(x: 0.1, y: 0.1, width: 0.5, height: 0.03),
+                                                         confidence: 0.9)]))
+        for index in 0..<25 { _ = try await document(store, "Newer \(index)", ["Invoice a", "Invoice b", "Invoice c"]) }
+        let library = LibraryModel(session: session)
+        library.sidebarSelection = .folder(folder.id)
+        library.searchText = "invoice"
+
+        await library.reload()
+
+        #expect(library.items.map(\.id) == [item.id])
+        #expect(library.pageHits.map(\.pageID) == [page.id], "the folder's page was crowded out")
+    }
+
     /// The document is not open yet: the request waits for its first load.
     @Test func aDocumentOpenedFromAHitShowsThatPage() async throws {
         let (root, session) = try await ready()

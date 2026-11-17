@@ -101,6 +101,31 @@ import PaperNestStore
         waitForPage(app, "Page 2 of 3")
     }
 
+    /// The document is already open — its tab is kept after going back, with
+    /// its page 1 showing — and the hit still takes it to page 2.
+    func testAHitTakesAnAlreadyOpenDocumentToThePage() async throws {
+        let directory = try await seed()
+        let app = XCUIApplication()
+        app.launchArguments = ["-PaperNestLibraryPath", directory.path, "-PaperNestDebugSkipWelcome", "YES",
+                               "-PaperNestDebugOpenItem", "Statements", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { app.terminate() }
+        waitForPage(app, "Page 1 of 3")
+        let back = app.buttons["editor-back"]
+        guard back.waitForExistence(timeout: 10) else { return XCTFail("no way back from the document") }
+        back.tap()
+        if isPad {
+            app.cells.containing(.any, identifier: "sidebar-home").firstMatch.tap()
+        } else if app.buttons["home-tab"].waitForExistence(timeout: 5) {
+            app.buttons["home-tab"].tap()
+        }
+        guard let hit = search(app, "invoice") else { return }
+        XCTAssertEqual(hit.value as? String, "2")
+
+        hit.tap()
+        waitForPage(app, "Page 2 of 3")
+    }
+
     func testTheHitsInFrenchAndSpanish() async throws {
         for (language, page) in [("fr", "Page 2"), ("es", "Página 2")] {
             let directory = try await seed()

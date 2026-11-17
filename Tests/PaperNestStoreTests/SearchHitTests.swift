@@ -209,6 +209,20 @@ import PaperNestCore
         #expect(Set(itemsInOrder) == [older.id, newer.id])
     }
 
+    /// The screen asks only for the documents it shows. They are narrowed to
+    /// before the caps, or newer documents elsewhere would use them up.
+    @Test func hitsAreNarrowedToTheGivenDocumentsBeforeAnyCap() async throws {
+        let dir = TempDirectory()
+        let store = try LibraryStore(directory: dir.url)
+        let (wanted, _) = try await scan(store, name: "Wanted", ["Invoice in the folder"])
+        for index in 0..<2 { _ = try await scan(store, name: "Other \(index)", ["Invoice A", "Invoice B", "Invoice C"]) }
+
+        let narrowed = pageHits(try await store.searchHits("invoice", among: [wanted.id], limit: 3))
+
+        #expect(narrowed.map(\.itemID) == [wanted.id])
+        #expect(try await store.searchHits("invoice", among: []).isEmpty)
+    }
+
     // MARK: - Only current words
 
     @Test func wordsReadOffPaperThatIsGoneAreNotHitsButCorrectionsAre() async throws {
