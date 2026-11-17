@@ -1277,4 +1277,48 @@ extension L10n {
 
     static var proFeatureCompress: String { tr("pro.feature.compress") }
     static var proFeatureRedact: String { tr("pro.feature.redact") }
+
+    // MARK: Compare
+
+    static var compareTitle: String { tr("compare.title") }
+    static var compareOriginal: String { tr("compare.original") }
+    static var compareNew: String { tr("compare.new") }
+    static var compareChoose: String { tr("compare.choose") }
+    static var compareChooseTitle: String { tr("compare.chooseTitle") }
+    static var compareNoDocuments: String { tr("compare.noDocuments") }
+    static var compareSwap: String { tr("compare.swap") }
+    static var compareComparing: String { tr("compare.comparing") }
+    static var compareModeSideBySide: String { tr("compare.mode.sideBySide") }
+    static var compareModeOverlay: String { tr("compare.mode.overlay") }
+    static var compareModeText: String { tr("compare.mode.text") }
+    static func comparePosition(_ value0: Int, _ value1: Int) -> String { tr("compare.position", value0, value1) }
+    static func comparePages(_ value0: Int, _ value1: Int) -> String { tr("compare.pages", value0, value1) }
+    static func compareOnlyOriginal(_ value0: Int) -> String { tr("compare.onlyOriginal", value0) }
+    static func compareOnlyNew(_ value0: Int) -> String { tr("compare.onlyNew", value0) }
+    static var compareKindSame: String { tr("compare.kind.same") }
+    static var compareKindChanged: String { tr("compare.kind.changed") }
+    static var compareKindAdded: String { tr("compare.kind.added") }
+    static var compareKindRemoved: String { tr("compare.kind.removed") }
+    static var compareMoved: String { tr("compare.moved") }
+    static func compareSummaryText(_ value0: Int) -> String { tr("compare.summary.text", value0) }
+    static func compareSummaryPicture(_ value0: Int) -> String { tr("compare.summary.picture", value0) }
+    static func compareSummaryPages(_ value0: Int, _ value1: Int, _ value2: Int) -> String { tr("compare.summary.pages", value0, value1, value2) }
+    static var compareIdentical: String { tr("compare.identical") }
+    static var compareMethodText: String { tr("compare.method.text") }
+    static var compareMethodRecognized: String { tr("compare.method.recognized") }
+    static var compareMethodPictureBoth: String { tr("compare.method.pictureBoth") }
+    static var compareMethodPictureOld: String { tr("compare.method.pictureOld") }
+    static var compareMethodPictureNew: String { tr("compare.method.pictureNew") }
+    static var compareSizesDiffer: String { tr("compare.sizesDiffer") }
+    static var compareLegendRemoved: String { tr("compare.legend.removed") }
+    static var compareLegendAdded: String { tr("compare.legend.added") }
+    static var compareLegendPicture: String { tr("compare.legend.picture") }
+    static var compareMissing: String { tr("compare.missing") }
+    static func compareRemovedWords(_ value0: String) -> String { tr("compare.removedWords", value0) }
+    static func compareAddedWords(_ value0: String) -> String { tr("compare.addedWords", value0) }
+    static var compareNoTextChanges: String { tr("compare.noTextChanges") }
+    static var comparePrevious: String { tr("compare.previous") }
+    static var compareNext: String { tr("compare.next") }
+    static var compareLimits: String { tr("compare.limits") }
+    static var compareFailed: String { tr("compare.failed") }
 }

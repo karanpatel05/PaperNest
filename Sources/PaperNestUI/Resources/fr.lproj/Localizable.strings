@@ -1136,3 +1136,46 @@
 /* Pro tools */
 "pro.feature.compress" = "Compresser des documents";
 "pro.feature.redact" = "Caviarder des pages";
+
+/* Compare */
+"compare.title" = "Comparer";
+"compare.original" = "Original";
+"compare.new" = "Nouveau";
+"compare.choose" = "Choisir un document";
+"compare.chooseTitle" = "Comparer avec";
+"compare.noDocuments" = "Il n’y a aucun autre document à comparer.";
+"compare.swap" = "Inverser";
+"compare.comparing" = "Comparaison…";
+"compare.mode.sideBySide" = "Côte à côte";
+"compare.mode.overlay" = "Superposé";
+"compare.mode.text" = "Texte";
+"compare.position" = "%lld sur %lld";
+"compare.pages" = "Page originale %lld · nouvelle page %lld";
+"compare.onlyOriginal" = "Page originale %lld";
+"compare.onlyNew" = "Nouvelle page %lld";
+"compare.kind.same" = "Identique";
+"compare.kind.changed" = "Modifiée";
+"compare.kind.added" = "Ajoutée";
+"compare.kind.removed" = "Supprimée";
+"compare.moved" = "Déplacée";
+"compare.summary.text" = "Modifications du texte : %lld";
+"compare.summary.picture" = "Différences d’apparence : %lld";
+"compare.summary.pages" = "Pages ajoutées : %lld · supprimées : %lld · déplacées : %lld";
+"compare.identical" = "Les deux documents sont identiques : mêmes mots et même apparence sur chaque page.";
+"compare.method.text" = "Comparée par ses mots, et par son apparence en dehors d’eux.";
+"compare.method.recognized" = "Comparée par des mots lus sur un scan : un mot mal lu apparaît comme une modification.";
+"compare.method.pictureBoth" = "Comparée par son apparence seulement : aucune des deux pages n’a de texte, les mots modifiés ne peuvent donc pas être nommés.";
+"compare.method.pictureOld" = "Comparée par son apparence seulement : la page originale n’a pas de texte. S’il s’agit d’un scan, reconnaissez d’abord son texte.";
+"compare.method.pictureNew" = "Comparée par son apparence seulement : la nouvelle page n’a pas de texte. S’il s’agit d’un scan, reconnaissez d’abord son texte.";
+"compare.sizesDiffer" = "Les pages n’ont pas la même taille. L’une a été étirée sur l’autre pour comparer leur apparence.";
+"compare.legend.removed" = "Seulement dans l’original";
+"compare.legend.added" = "Seulement dans le nouveau";
+"compare.legend.picture" = "Apparence différente";
+"compare.missing" = "Absente de ce document";
+"compare.removedWords" = "Supprimé : %@";
+"compare.addedWords" = "Ajouté : %@";
+"compare.noTextChanges" = "Aucune modification du texte sur cette page.";
+"compare.previous" = "Précédente";
+"compare.next" = "Suivante";
+"compare.limits" = "Les pages sont comparées par leurs mots et par leur apparence. Deux scans distincts du même papier diffèrent partout, et un fichier qui enregistre ses mots dans un autre ordre montre des modifications là où rien ne se voit.";
+"compare.failed" = "Impossible de comparer les documents.";

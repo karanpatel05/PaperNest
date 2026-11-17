@@ -116,9 +116,9 @@ ink and OCR already use.
 | R7 | Screens for Compress and Redact | **Done** (Compress 2026-11-14 in Document Tools; Redact 2026-11-17, Claude: mark areas, review the engine's own picture with every warning, apply; marks over the areas are removed with it; see `docs/TEST_MATRIX.md`) | Both engines exist and are tested (rows 26 and 35). Both keep an author's limits already: the Redact engine refuses a page from a restricted PDF (2026-11-14), compression goes through Export or refuses an encrypted file |
 
 **Not in this list, deliberately.** Editing a PDF's existing text is still the open build-or-license decision
-(inventory row 25). Office conversion was dropped by the owner on 2026-10-28. Certificate signatures, comparing two
-files, watermarks and Bates numbering are Acrobat Pro features rather than Reader's and have not been asked for by
-name; they are not planned until they are.
+(inventory row 25). Office conversion was dropped by the owner on 2026-10-28. Certificate signatures and Bates numbering
+are Acrobat Pro features rather than Reader's and have not been asked for by name; they are not planned until they
+are. (Watermarks and comparing two documents were asked for and are built, 2026-11-16 and 2026-11-17.)
 
 ## Architecture and quality gates
 

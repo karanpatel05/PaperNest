@@ -1136,3 +1136,46 @@
 /* Pro tools */
 "pro.feature.compress" = "Comprimir documentos";
 "pro.feature.redact" = "Censurar páginas";
+
+/* Compare */
+"compare.title" = "Comparar";
+"compare.original" = "Original";
+"compare.new" = "Nuevo";
+"compare.choose" = "Elegir un documento";
+"compare.chooseTitle" = "Comparar con";
+"compare.noDocuments" = "No hay ningún otro documento con el que comparar.";
+"compare.swap" = "Intercambiar";
+"compare.comparing" = "Comparando…";
+"compare.mode.sideBySide" = "En paralelo";
+"compare.mode.overlay" = "Superpuesto";
+"compare.mode.text" = "Texto";
+"compare.position" = "%lld de %lld";
+"compare.pages" = "Página original %lld · página nueva %lld";
+"compare.onlyOriginal" = "Página original %lld";
+"compare.onlyNew" = "Página nueva %lld";
+"compare.kind.same" = "Igual";
+"compare.kind.changed" = "Cambiada";
+"compare.kind.added" = "Añadida";
+"compare.kind.removed" = "Eliminada";
+"compare.moved" = "Movida";
+"compare.summary.text" = "Cambios de texto: %lld";
+"compare.summary.picture" = "Diferencias de aspecto: %lld";
+"compare.summary.pages" = "Páginas añadidas: %lld · eliminadas: %lld · movidas: %lld";
+"compare.identical" = "Los dos documentos son iguales: las mismas palabras y el mismo aspecto en cada página.";
+"compare.method.text" = "Comparada por sus palabras y, fuera de ellas, por su aspecto.";
+"compare.method.recognized" = "Comparada por palabras leídas de un escaneo: una palabra mal leída aparece como un cambio.";
+"compare.method.pictureBoth" = "Comparada solo por su aspecto: ninguna de las dos páginas tiene texto, así que no se pueden nombrar las palabras cambiadas.";
+"compare.method.pictureOld" = "Comparada solo por su aspecto: la página original no tiene texto. Si es un escaneo, reconoce primero su texto.";
+"compare.method.pictureNew" = "Comparada solo por su aspecto: la página nueva no tiene texto. Si es un escaneo, reconoce primero su texto.";
+"compare.sizesDiffer" = "Las páginas tienen tamaños distintos, así que una se estiró sobre la otra para comparar su aspecto.";
+"compare.legend.removed" = "Solo en el original";
+"compare.legend.added" = "Solo en el nuevo";
+"compare.legend.picture" = "Aspecto distinto";
+"compare.missing" = "No está en este documento";
+"compare.removedWords" = "Eliminado: %@";
+"compare.addedWords" = "Añadido: %@";
+"compare.noTextChanges" = "No hay cambios de texto en esta página.";
+"compare.previous" = "Anterior";
+"compare.next" = "Siguiente";
+"compare.limits" = "Las páginas se comparan por sus palabras y por su aspecto. Dos escaneos distintos del mismo papel difieren en todas partes, y un archivo que guarda sus palabras en otro orden muestra cambios donde no se ve ninguno.";
+"compare.failed" = "No se pudieron comparar los documentos.";

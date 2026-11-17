@@ -72,6 +72,8 @@ struct DocumentView: View {
     @State private var isShowingCrop = false
     /// The Redact screen, for the page on screen.
     @State private var isShowingRedact = false
+    /// Comparing this document with another.
+    @State private var isShowingCompare = false
     @State private var annotationPage: Page?
     /// Which mark the recognised-text sheet opens on.
     @State private var annotationStyle: TextMarkupStyle = .highlight
@@ -379,6 +381,7 @@ struct DocumentView: View {
                 isShowingExport = UserDefaults.standard.bool(forKey: "PaperNestDebugShowExport")
                 isShowingCrop = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCrop")
                 isShowingRedact = UserDefaults.standard.bool(forKey: "PaperNestDebugShowRedact")
+                isShowingCompare = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCompare")
                 isShowingCompress = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCompress")
                 if UserDefaults.standard.bool(forKey: "PaperNestDebugShowMarkup") { isMarkingUp = true }
                 isShowingOutline = UserDefaults.standard.bool(forKey: "PaperNestDebugShowOutline")
@@ -454,6 +457,9 @@ struct DocumentView: View {
                         Task { await model.setCrop(crop, undoManager: undoManager) }
                     }
                 }
+            }
+            .sheet(isPresented: $isShowingCompare) {
+                CompareSheet(originalID: model.itemID, session: model.session)
             }
             .sheet(isPresented: $isShowingRedact) {
                 if let page = model.selectedPage {
@@ -920,7 +926,7 @@ struct DocumentView: View {
             || managedMarkupPage != nil || signaturePage != nil || notebookPageRequest != nil
             || isShowingCrop || isShowingFilePicker || isShowingPDFForm || isShowingPageOrganizer
             || isShowingExport || isShowingAdjustments || isShowingOutline || isShowingImagePicker
-            || isShowingPhotoPicker || isShowingCompress || isShowingOCR || isShowingRedact
+            || isShowingPhotoPicker || isShowingCompress || isShowingOCR || isShowingRedact || isShowingCompare
         #if os(iOS)
         presenting = presenting || cameraPurpose != nil || photoCameraPage != nil
         #endif
@@ -1032,6 +1038,11 @@ struct DocumentView: View {
             }
             .disabled(model.pages.isEmpty)
             .accessibilityIdentifier("utilities-convert")
+            Button { finishThen { isShowingCompare = true } } label: {
+                Label(L10n.compareTitle, systemImage: "rectangle.split.2x1")
+            }
+            .disabled(model.pages.isEmpty)
+            .accessibilityIdentifier("utilities-compare")
             Button { finishThen { openProTool(.redact) { isShowingRedact = true } } } label: {
                 Label(L10n.redactTitle, systemImage: "eye.slash")
             }

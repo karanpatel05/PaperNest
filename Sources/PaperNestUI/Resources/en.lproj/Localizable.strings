@@ -1136,3 +1136,46 @@
 /* Pro tools */
 "pro.feature.compress" = "Compress documents";
 "pro.feature.redact" = "Redact pages";
+
+/* Compare */
+"compare.title" = "Compare";
+"compare.original" = "Original";
+"compare.new" = "New";
+"compare.choose" = "Choose a Document";
+"compare.chooseTitle" = "Compare With";
+"compare.noDocuments" = "There is no other document to compare with.";
+"compare.swap" = "Swap";
+"compare.comparing" = "Comparing…";
+"compare.mode.sideBySide" = "Side by Side";
+"compare.mode.overlay" = "Overlay";
+"compare.mode.text" = "Text";
+"compare.position" = "%lld of %lld";
+"compare.pages" = "Original page %lld · New page %lld";
+"compare.onlyOriginal" = "Original page %lld";
+"compare.onlyNew" = "New page %lld";
+"compare.kind.same" = "Same";
+"compare.kind.changed" = "Changed";
+"compare.kind.added" = "Added";
+"compare.kind.removed" = "Removed";
+"compare.moved" = "Moved";
+"compare.summary.text" = "Text changes: %lld";
+"compare.summary.picture" = "Picture differences: %lld";
+"compare.summary.pages" = "Pages added: %lld · removed: %lld · moved: %lld";
+"compare.identical" = "The two documents are the same: the same words and the same look on every page.";
+"compare.method.text" = "Compared by its words, and by how it looks away from them.";
+"compare.method.recognized" = "Compared by words read from a scan: a misread word shows as a change.";
+"compare.method.pictureBoth" = "Compared by how it looks only: neither page has text, so changed words can’t be named.";
+"compare.method.pictureOld" = "Compared by how it looks only: the original page has no text. If it’s a scan, recognize its text first.";
+"compare.method.pictureNew" = "Compared by how it looks only: the new page has no text. If it’s a scan, recognize its text first.";
+"compare.sizesDiffer" = "The pages are different sizes, so one was stretched onto the other to compare how they look.";
+"compare.legend.removed" = "Only in the original";
+"compare.legend.added" = "Only in the new";
+"compare.legend.picture" = "Looks different";
+"compare.missing" = "Not in this document";
+"compare.removedWords" = "Removed: %@";
+"compare.addedWords" = "Added: %@";
+"compare.noTextChanges" = "No text changes on this page.";
+"compare.previous" = "Previous";
+"compare.next" = "Next";
+"compare.limits" = "Pages are compared by their words and by how they look. Two separate scans of the same paper look different everywhere, and a file that stores its words in another order shows changes where none can be seen.";
+"compare.failed" = "The documents couldn’t be compared.";
