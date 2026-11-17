@@ -1387,4 +1387,5 @@ extension L10n {
     static var detailsShareCard: String { tr("details.shareCard") }
     static var detailsShareCSV: String { tr("details.shareCSV") }
     static var detailsFailed: String { tr("details.failed") }
+    static func detailsReplaces(_ value0: Int) -> String { tr("details.replaces", value0) }
 }

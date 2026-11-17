@@ -41,6 +41,56 @@ import PaperNestTestSupport
         #expect(!reopened.isStale)
     }
 
+    /// One set per document: opened on page 2, the review says Save replaces page 1's.
+    @Test func savingOnAnotherPageSaysItReplacesTheKeptDetails() async throws {
+        let (root, session) = try await library()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try #require(session.environment?.store)
+        let item = try await DocumentImporter(store: store).importItem(.data(SyntheticDocuments.textPDF(pages: [
+            "Total 10.00", "Total 20.00"]), name: "Two receipts"))
+        let pages = try await store.pages(of: item.id)
+        let first = DetailsModel(itemID: item.id, pageID: pages[0].id, session: session)
+        await first.load()
+        #expect(first.replacesPage == nil)
+        #expect(await first.save())
+
+        let second = DetailsModel(itemID: item.id, pageID: pages[1].id, session: session)
+        await second.load()
+
+        #expect(second.replacesPage == 1)
+        #expect(second.texts[.total] == "20.00", "a fresh reading of this page")
+    }
+
+    /// Details read from an earlier version and edited without reading the
+    /// page again are still from that version; reading it again makes them current.
+    @Test func editedStaleDetailsStayStaleUntilThePageIsReadAgain() async throws {
+        let (root, session) = try await library()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try #require(session.environment?.store)
+        let item = try await DocumentImporter(store: store).importItem(.data(SyntheticDocuments.textPDF(pages: ["Total 10.00"]),
+                                                                             name: "Receipt"))
+        let page = try #require(try await store.pages(of: item.id).first)
+        let model = DetailsModel(itemID: item.id, pageID: page.id, session: session)
+        await model.load()
+        #expect(await model.save())
+        // New paper: a rescan with another total.
+        let rescan = try store.assets.store(SyntheticDocuments.textPDF(pages: ["Total 30.00"]), kind: .pdf, originalFilename: "r.pdf")
+        _ = try await store.replacePageContent(page.id, with: .init(sourceSize: page.sourceSize, content: .pdfPage(rescan.id, index: 0),
+                                                                    transform: page.transform), assets: [rescan])
+
+        let stale = DetailsModel(itemID: item.id, pageID: page.id, session: session)
+        await stale.load()
+        #expect(stale.isStale)
+        stale.texts[.merchant] = "Corner Cafe"
+        #expect(await stale.save())
+        #expect(try await store.documentDetails(of: item.id)?.isStale == true, "saving an edit does not make old details current")
+
+        await stale.readAgain()
+        #expect(stale.texts[.total] == "30.00")
+        #expect(await stale.save())
+        #expect(try await store.documentDetails(of: item.id)?.isStale == false)
+    }
+
     @Test func choosingAnotherKindReadsThePageForItsFields() async throws {
         let (root, session) = try await library()
         defer { try? FileManager.default.removeItem(at: root) }

@@ -1242,3 +1242,4 @@
 "details.shareCard" = "Partager la fiche contact";
 "details.shareCSV" = "Partager en CSV";
 "details.failed" = "Impossible de lire ou d’enregistrer les détails.";
+"details.replaces" = "Enregistrer remplace les détails conservés de la page %lld.";

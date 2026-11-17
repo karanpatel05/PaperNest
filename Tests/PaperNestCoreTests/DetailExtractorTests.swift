@@ -25,12 +25,23 @@ import Testing
 
     @Test(arguments: [("42.18", "42.18", nil), ("42,18 €", "42.18", "€"), ("1,234.56", "1234.56", nil),
                       ("1.234,56", "1234.56", nil), ("1\u{00A0}234,56", "1234.56", nil), ("1 234,56 €", "1234.56", "€"),
-                      ("EUR 42.18", "42.18", "EUR"), ("42.18 USD", "42.18", "USD"), ("$42.18", "42.18", "$")] as [(String, String, String?)])
+                      ("EUR 42.18", "42.18", "EUR"), ("42.18 USD", "42.18", "USD"), ("$42.18", "42.18", "$"),
+                      ("-12.00", "-12.00", nil), ("\u{2212}12,00 €", "-12.00", "€"), ("(12.00)", "-12.00", nil),
+                      ("-$5.50", "-5.50", "$")] as [(String, String, String?)])
     func everyWayOfWritingAnAmountIsReadExactly(_ written: String, _ value: String, _ currency: String?) throws {
         let money = try #require(DetailExtractor.amounts(in: "Total \(written)").first)
         #expect(money.value == Decimal(string: value, locale: Locale(identifier: "en_US_POSIX")))
         #expect(money.currency == currency, "the currency as written, never inferred")
         #expect(money.text == written, "kept as read")
+    }
+
+    /// A range or a date with a hyphen is not a negative amount.
+    @Test func aHyphenBetweenNumbersIsNotAMinus() throws {
+        let range = DetailExtractor.amounts(in: "Pages 10-12.00")
+        #expect(range.allSatisfy { $0.value >= 0 })
+        let refund = try #require(DetailExtractor.amounts(in: "Refund (4.20) issued").first)
+        #expect(refund.value == Decimal(string: "-4.20", locale: Locale(identifier: "en_US_POSIX")))
+        #expect(refund.text == "(4.20)")
     }
 
     @Test func ratesDatesAndWholeNumbersAreNotAmounts() {
@@ -186,6 +197,19 @@ import Testing
         #expect(physical.allSatisfy { $0.utf8.count <= 75 })
         let unfolded = card.replacingOccurrences(of: "\r\n ", with: "")
         #expect(unfolded.contains("ADR;TYPE=WORK:;;Résidence Les Érables\\, 1 234 avenue de la République Française\\, 75011 Paris;;;;"))
+    }
+
+    /// Text read off a page someone sent must not become a formula in a spreadsheet.
+    @Test func aCSVCellCannotBeAFormula() {
+        #expect(DetailFormats.quote(#"=HYPERLINK("http://x.example","Pay")"#) == #""'=HYPERLINK(""http://x.example"",""Pay"")""#)
+        #expect(DetailFormats.quote("+1-555") == "'+1-555")
+        #expect(DetailFormats.quote("@SUM(A1)") == "'@SUM(A1)")
+        #expect(DetailFormats.quote("-1+2") == "'-1+2")
+        #expect(DetailFormats.quote("\tcmd") == "'\tcmd")
+        // An amount stays an amount.
+        #expect(DetailFormats.quote("-12.00") == "-12.00")
+        #expect(DetailFormats.quote("-12.00 EUR") == "-12.00 EUR")
+        #expect(DetailFormats.quote("Acme Market") == "Acme Market")
     }
 
     @Test func aCSVQuotesWhatNeedsQuotingAndListsLineItems() {

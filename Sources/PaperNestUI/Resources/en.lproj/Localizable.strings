@@ -1242,3 +1242,4 @@
 "details.shareCard" = "Share Contact Card";
 "details.shareCSV" = "Share as CSV";
 "details.failed" = "The details couldn’t be read or saved.";
+"details.replaces" = "Saving replaces the details kept from page %lld.";

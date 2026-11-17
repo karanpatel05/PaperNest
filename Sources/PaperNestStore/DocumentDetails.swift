@@ -20,14 +20,17 @@ extension LibraryStore {
     }
 
     /// Keeps `details` for `itemID`, replacing any it had, as read from
-    /// `pageID` at its current revision.
-    public func saveDocumentDetails(_ details: CapturedDetails, for itemID: ItemID, readFrom pageID: PageID) throws {
+    /// `pageID` at its current revision — or at `keepingRevision`, for details
+    /// read from an earlier version and edited without reading the page again,
+    /// which must stay marked as such.
+    public func saveDocumentDetails(_ details: CapturedDetails, for itemID: ItemID, readFrom pageID: PageID,
+                                    keepingRevision: Int? = nil) throws {
         try db.transaction {
             guard let page = try page(pageID), page.itemID == itemID else { throw StoreError.pageNotFound }
             try db.run("""
                 INSERT OR REPLACE INTO document_details (item_id, page_id, page_revision, kind, details_json, modified_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-                """, [.text(itemID.rawValue), .text(pageID.rawValue), .int(Int64(page.revision)),
+                """, [.text(itemID.rawValue), .text(pageID.rawValue), .int(Int64(keepingRevision ?? page.revision)),
                       .text(details.kind.rawValue), .text(try json(details)), .date(now())])
         }
     }

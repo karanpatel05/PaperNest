@@ -1242,3 +1242,4 @@
 "details.shareCard" = "Compartir tarjeta de contacto";
 "details.shareCSV" = "Compartir como CSV";
 "details.failed" = "No se pudieron leer ni guardar los datos.";
+"details.replaces" = "Al guardar se sustituyen los datos guardados de la página %lld.";

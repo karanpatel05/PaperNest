@@ -60,9 +60,10 @@ public enum DetailExtractor {
     /// 42.18, 42,18 €, 1,234.56, 1.234,56, 1 234,56, EUR 42.18, 42.18 USD.
     /// A number followed by "%" is a rate, not an amount.
     public static func amounts(in text: String) -> [Money] {
-        // Not inside a longer number or a date (16.11.2026 has no amount in it).
-        let pattern = #"(?<pre>[$€£¥]|\b(?:"# + currencyCodes + #")\b)?[ \x{00A0}]?(?<!\d)(?<!\d[.,/\-])(?<num>\d{1,3}(?:[ \x{00A0}\x{202F}.,]\d{3})+[.,]\d{2}|\d+[.,]\d{2})(?![.,/\-]?\d)(?!\s?%)(?:[ \x{00A0}]?(?<post>[$€£¥]|\b(?:"# + currencyCodes + #")\b))?"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        // Not inside a longer number or a date (16.11.2026 has no amount in it). A minus
+        // (- or −) before the currency or the digits, or accounting parentheses, keep the sign.
+        let pattern = #"(?<open>\()?(?<sign>[-\x{2212}])?(?<pre>[$€£¥]|\b(?:"# + currencyCodes + #")\b)?[ \x{00A0}]?(?<sign2>[-\x{2212}])?(?<!\d)(?<!\d[.,/\-])(?<num>\d{1,3}(?:[ \x{00A0}\x{202F}.,]\d{3})+[.,]\d{2}|\d+[.,]\d{2})(?![.,/\-]?\d)(?!\s?%)(?:[ \x{00A0}]?(?<post>[$€£¥]|\b(?:"# + currencyCodes + #")\b))?(?<close>\))?"#
+        guard let regex = regex(pattern) else { return [] }
         let ns = text as NSString
         return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).compactMap { match in
             func group(_ name: String) -> String? {
@@ -74,8 +75,14 @@ public enum DetailExtractor {
             let whole = digits.dropLast(3).filter(\.isNumber)
             let cents = digits.suffix(2)
             guard separator == "." || separator == ",",
-                  let value = Decimal(string: "\(whole).\(cents)", locale: Locale(identifier: "en_US_POSIX")) else { return nil }
-            return Money(text: ns.substring(with: match.range).trimmingCharacters(in: .whitespaces), value: value,
+                  let magnitude = Decimal(string: "\(whole).\(cents)", locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+            // A refund, a credit note, a discount: the sign is part of what was read.
+            let negative = group("sign") != nil || group("sign2") != nil || (group("open") != nil && group("close") != nil)
+            var text = ns.substring(with: match.range).trimmingCharacters(in: .whitespaces)
+            // A lone bracket belongs to the sentence around the amount, not to it.
+            if group("open") != nil, group("close") == nil { text.removeFirst() }
+            if group("close") != nil, group("open") == nil { text.removeLast() }
+            return Money(text: text.trimmingCharacters(in: .whitespaces), value: negative ? -magnitude : magnitude,
                          currency: group("pre") ?? group("post"))
         }
     }
@@ -130,7 +137,7 @@ public enum DetailExtractor {
         var taken = IndexSet()
         let ns = folded as NSString, original = text as NSString
         for (pattern, resolve) in patterns {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            guard let regex = regex(pattern) else { continue }
             for match in regex.matches(in: folded, range: NSRange(location: 0, length: ns.length)) {
                 let range = match.range
                 guard !taken.intersects(integersIn: range.location..<(range.location + range.length)) else { continue }
@@ -165,14 +172,44 @@ public enum DetailExtractor {
         text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil).lowercased()
     }
 
-    /// Whether `text` holds any of `phrases` as whole words.
+    /// Whether `text` holds any of `phrases` as whole words: one pattern per
+    /// list, compiled once.
     static func contains(_ text: String, any phrases: [String]) -> Bool {
-        let folded = fold(text)
-        return phrases.contains { phrase in
-            folded.range(of: #"(?<![\p{L}\p{N}])"# + NSRegularExpression.escapedPattern(for: phrase) + #"(?![\p{L}\p{N}])"#,
-                         options: .regularExpression) != nil
+        let pattern = #"(?<![\p{L}\p{N}])(?:"# + phrases.map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|")
+            + #")(?![\p{L}\p{N}])"#
+        guard let regex = regex(pattern) else { return false }
+        let folded = fold(text) as NSString
+        return regex.firstMatch(in: folded as String, range: NSRange(location: 0, length: folded.length)) != nil
+    }
+
+    // MARK: - Compiled once
+
+    /// Every pattern here is compiled the first time it is needed and kept:
+    /// compiling them on every call made an 80-line invoice take over a
+    /// second. `NSRegularExpression` is immutable and safe to share.
+    private final class Compiled: @unchecked Sendable {
+        private let lock = NSLock()
+        private var patterns: [String: NSRegularExpression] = [:]
+
+        func regex(_ pattern: String, _ options: NSRegularExpression.Options) -> NSRegularExpression? {
+            let key = "\(options.rawValue)|\(pattern)"
+            lock.lock(); defer { lock.unlock() }
+            if let compiled = patterns[key] { return compiled }
+            guard let compiled = try? NSRegularExpression(pattern: pattern, options: options) else { return nil }
+            patterns[key] = compiled
+            return compiled
         }
     }
+
+    private static let compiled = Compiled()
+
+    static func regex(_ pattern: String, _ options: NSRegularExpression.Options = []) -> NSRegularExpression? {
+        compiled.regex(pattern, options)
+    }
+
+    /// Phone numbers, links and postal addresses; never dates.
+    private static let detector = try? NSDataDetector(
+        types: NSTextCheckingResult.CheckingType([.phoneNumber, .link, .address]).rawValue)
 
     static let strongTotal = ["grand total", "total ttc", "total a payer", "net a payer", "montant total", "amount due",
                               "balance due", "total due", "total a pagar", "importe total", "total amount"]
@@ -295,7 +332,7 @@ public enum DetailExtractor {
 
     private static func invoiceNumber(_ rows: [Row]) -> DetailValue? {
         let pattern = #"(?:invoice|facture|factura)\s*(?:no\.?|number|num(?:ero|\.)?|n[°º.]?|#)?\s*(?:de\s+facture\s*)?[:#]?\s*([A-Z0-9][A-Z0-9\-/]*\d[A-Z0-9\-/]*)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return nil }
+        guard let regex = regex(pattern, .caseInsensitive) else { return nil }
         for row in rows {
             let text = row.text, ns = text as NSString
             if let match = regex.firstMatch(in: text, range: NSRange(location: 0, length: ns.length)) {
@@ -337,12 +374,11 @@ public enum DetailExtractor {
     static func detected(in text: String) -> Detected {
         var found = Detected()
         let ns = text as NSString
-        if let email = try? NSRegularExpression(pattern: #"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}"#, options: .caseInsensitive)
+        if let email = regex(#"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}"#, .caseInsensitive)?
             .firstMatch(in: text, range: NSRange(location: 0, length: ns.length)) {
             found.email = ns.substring(with: email.range)
         }
-        let types: NSTextCheckingResult.CheckingType = [.phoneNumber, .link, .address]
-        guard let detector = try? NSDataDetector(types: types.rawValue) else { return found }
+        guard let detector = Self.detector else { return found }
         for match in detector.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
             let written = ns.substring(with: match.range)
             switch match.resultType {

@@ -65,8 +65,20 @@ public enum DetailFormats {
         return rows.map { $0.map(quote).joined(separator: ",") }.joined(separator: "\r\n") + "\r\n"
     }
 
+    /// RFC 4180 quoting, after defusing formulas. These cells hold text read
+    /// off pages anyone can send: one starting with `=`, `+`, `@`, a tab or a
+    /// carriage return is a formula to Excel and Numbers, and so is one
+    /// starting with `-` unless it is plainly an amount ("-12.00 EUR"). Such a
+    /// cell starts with `'`, which spreadsheets show as text.
     static func quote(_ value: String) -> String {
-        guard value.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" }) else { return value }
-        return "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        var cell = value
+        if let first = cell.first {
+            let amount = #"^[-\x{2212}]?[$€£¥]?\s?[\d\s\x{00A0}\x{202F}.,]+(\s?([$€£¥]|[A-Z]{3}))?$"#
+            let looksLikeFormula = "=+@\t\r".contains(first)
+                || (first == "-" && cell.range(of: amount, options: .regularExpression) == nil)
+            if looksLikeFormula { cell = "'" + cell }
+        }
+        guard cell.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" }) else { return cell }
+        return "\"" + cell.replacingOccurrences(of: "\"", with: "\"\"") + "\""
     }
 }

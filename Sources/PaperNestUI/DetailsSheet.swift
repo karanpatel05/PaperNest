@@ -19,6 +19,11 @@ final class DetailsModel {
     var texts: [DetailField: String] = [:]
     var lineItems: [LineItem] = []
     private(set) var isStale = false
+    /// Details kept from another page of the document, which Save replaces.
+    private(set) var replacesPage: Int?
+    /// The revision kept details were read at, while they are shown without
+    /// reading the page again: saving them keeps them marked as old.
+    private var keptRevision: Int?
     /// What was read, to tell a value someone typed from one that was read.
     private var read = CapturedDetails(kind: .receipt)
     private var lines: [CaptureLine] = []
@@ -34,8 +39,14 @@ final class DetailsModel {
     /// Shows the details kept for this page, or reads them.
     func load() async {
         guard let store else { phase = .failed; return }
-        if let kept = try? await store.documentDetails(of: itemID), kept.pageID == pageID {
+        let kept = try? await store.documentDetails(of: itemID)
+        if let kept, kept.pageID != pageID, let pages = try? await store.pages(of: itemID),
+           let index = pages.firstIndex(where: { $0.id == kept.pageID }) {
+            replacesPage = index + 1
+        }
+        if let kept, kept.pageID == pageID {
             isStale = kept.isStale
+            keptRevision = kept.isStale ? kept.pageRevision : nil
             show(kept.details)
             _ = await readLines()
             phase = .ready
@@ -49,6 +60,7 @@ final class DetailsModel {
         guard await readLines() else { return }
         let chosen = guessing ? DetailExtractor.guessKind(lines) : kind
         isStale = false
+        keptRevision = nil
         show(DetailExtractor.extract(chosen, from: lines))
         phase = .ready
     }
@@ -95,7 +107,7 @@ final class DetailsModel {
     func save() async -> Bool {
         guard let store else { return false }
         do {
-            try await store.saveDocumentDetails(reviewed, for: itemID, readFrom: pageID)
+            try await store.saveDocumentDetails(reviewed, for: itemID, readFrom: pageID, keepingRevision: keptRevision)
             return true
         } catch {
             phase = .failed
@@ -237,6 +249,9 @@ struct DetailsSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(L10n.detailsOnDevice)
                 if model.isStale { Text(L10n.detailsStale).foregroundStyle(.orange).accessibilityIdentifier("details-stale") }
+                if let page = model.replacesPage {
+                    Text(L10n.detailsReplaces(page)).foregroundStyle(.orange).accessibilityIdentifier("details-replaces")
+                }
             }
         }
     }
