@@ -1,3 +1,14 @@
+## 2026-11-17 — Compare on iPad: 2/2 (Claude, completes the two entries below)
+
+The iPad run the entries below could not make, done on the committed code (`7c5ad32`) in a clean worktree once the host was quiet (load 35 at the start, against 180–700 during the earlier attempts).
+
+| Check | Result |
+|---|---|
+| `CompareUITests` (2), iPad Air 13-inch (M4) / iOS 26.5 | **2/2 pass** (113.7 s and 106.1 s): summary `text:1 picture:0 added:1 removed:0 moved:0`, opens on 2/3 Changed by its words with one mark on each page, the overlay, the text change naming March and April, Next to 3/3 Added with the original missing, Done; French and Spanish with the three views and Done hittable. |
+| Screenshot looked at (`/tmp/pn-compare-shots/ipad-side-by-side-fr.png`) | The sheet over Document Tools: "Modifications du texte : 1", the three views, "2 sur 3 · Modifiée", "March" boxed in red on the original and "April" in green on the new page, nothing truncated. **Seen:** in the iPad form sheet the two pages fill its lower half, so the legend, Précédente / Suivante and the limits line are reached by scrolling; a larger sheet would show them at once. |
+
+**Still not verified:** the Mac screen (built, not opened), dark mode, large text, VoiceOver, a long document's speed.
+
 ## 2026-11-17 — Compare: matched pages compared larger, so a small change on a scan is found (Claude, follow-up to the entry below)
 
 Found in review after the comparison was committed: pages compared only by picture were drawn 400 pixels long, where body-size print is about five pixels tall. **A probe confirmed it**: two scans nobody had read, in 18-pixel type on a 1000 × 1400 page, differing by one character — "42.10"/"42.70", "3 March"/"8 March", "1234567"/"1234561" — **came back "Same"**; "4.20"/"42.0" and every pair at 24 pixels were caught. Now pages are still matched at 400 pixels, and each matched pair is compared again at 1,600 pixels in 8-pixel cells (cells within two of each other are one region); word boxes are widened by 30% of their height before picture differences under them are left to the words. Also: the identical message no longer says "the same words" when some pages were compared only by how they look (it says those pages were compared by look and a very small or faint mark can be missed), and closing the sheet cancels a comparison still running.
