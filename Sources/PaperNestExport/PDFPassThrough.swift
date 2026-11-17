@@ -42,6 +42,8 @@ extension Exporter {
         guard case .pdfPage = page.content else { return false }
         guard page.transform == .identity else { return false }
         guard options.paperSize == .original else { return false }
+        // A copied page cannot carry a watermark: it has to be drawn on.
+        guard options.watermark?.isVisible != true else { return false }
         guard !hasPaintedObjects, !hasTextLayer else { return false }
         return true
     }

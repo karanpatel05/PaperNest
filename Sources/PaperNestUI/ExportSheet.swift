@@ -80,6 +80,10 @@ struct ExportSheet: View {
     @State private var proFeature: ProFeature?
     /// Empty means no password, which is not the same as an empty one.
     @State private var password = ""
+    /// The watermark being set up. Forgotten when the sheet closes, and
+    /// handed to every export the sheet makes, so Save, Copy and Share
+    /// draw the same one.
+    @State private var watermarkDraft = WatermarkDraft()
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum PageChoice: Hashable { case all, current, range }
@@ -236,6 +240,23 @@ struct ExportSheet: View {
             }
             docxLayoutSection
             passwordSection
+            if options.canCarryWatermark {
+                ExportWatermarkSection(draft: $watermarkDraft, previewPage: selectedPages.first ?? pages.first,
+                                       paper: options.format == .pdf ? options.paperSize : .original,
+                                       isPDF: options.format == .pdf)
+            } else if watermarkDraft.preset != nil {
+                // Chosen, then a format with nowhere to draw it: said where
+                // the section was, rather than exporting without it in
+                // silence. The choice is kept for a format that can.
+                Section {
+                    Label(L10n.exportWatermarkNotSupported, systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("export-watermark-unsupported")
+                } header: {
+                    Text(L10n.exportWatermarkTitle)
+                }
+            }
             Section(L10n.exportPages) {
                 tileRow {
                     ChoiceTile(title: L10n.exportAllPages, subtitle: L10n.pageCount(pages.count),
@@ -445,12 +466,23 @@ struct ExportSheet: View {
         Self.passwordProblem(in: password, format: options.format)
     }
 
+    /// The options an export is made with: the sheet's, carrying the
+    /// watermark being set up when the format can hold one. Save, Copy and
+    /// Share all export through here, so all three draw the same mark.
+    nonisolated static func optionsToExport(_ options: ExportOptions, watermark draft: WatermarkDraft,
+                                            on date: Date = Date()) -> ExportOptions {
+        var configured = options
+        configured.watermark = options.canCarryWatermark ? draft.watermark(on: date) : nil
+        return configured
+    }
+
     /// What each refusal means to someone reading it, rather than its name.
     nonisolated static func message(for error: ExportError) -> String {
         switch error {
         case .noTextToExport: L10n.exportNoTextToExport
         case .passwordNotRepresentable: L10n.exportPasswordNotRepresentable
         case .passwordNotSupported: L10n.exportPasswordNotSupported
+        case .watermarkNotSupported: L10n.exportWatermarkNotSupported
         case .emptyPassword: L10n.exportPasswordEmpty
         case .copyingNotAllowed: L10n.restrictedExportRefused
         case .printingNotAllowed: L10n.restrictedPrintRefused
@@ -736,7 +768,11 @@ struct ExportSheet: View {
     }
 
     /// Nothing is exported while the sheet is showing a reason it cannot be.
-    private var canExport: Bool { rangeIsValid && passwordProblem == nil }
+    private var canExport: Bool { rangeIsValid && passwordProblem == nil && watermarkProblem == nil }
+
+    /// A watermark chosen with nothing to draw: said in the section, and
+    /// nothing exported until it is fixed or None is chosen.
+    private var watermarkProblem: String? { options.canCarryWatermark ? watermarkDraft.problem : nil }
 
     private var rangeIsValid: Bool {
         pageChoice != .range || (1...pages.count).contains(rangeStart) && (rangeStart...pages.count).contains(rangeEnd)
@@ -770,7 +806,7 @@ struct ExportSheet: View {
         if let needed, !SubscriptionStore.shared.allows(needed) { proFeature = needed; return }
         guard let exporter = session.environment?.exporter else { return }
         let selection = selectedPages
-        let options = options
+        let options = Self.optionsToExport(options, watermark: watermarkDraft)
         let name = itemName
         let password = Self.passwordToUse(password)
         phase = .exporting(ExportProgress(completedPages: 0, totalPages: selection.count))

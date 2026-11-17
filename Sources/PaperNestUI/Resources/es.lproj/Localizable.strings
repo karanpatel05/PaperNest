@@ -1034,6 +1034,34 @@
 "export.docxLayout.images.detail" = "Igual que la página";
 "export.docxImagesNote" = "Cada página entra en el archivo de Word como una imagen: conserva su aspecto, su tinta y sus marcas. Sus palabras forman parte de la imagen y no se pueden editar ni buscar en Word. Elige Texto editable para eso.";
 
+/* Export watermark */
+"export.watermark.title" = "Marca de agua";
+"export.watermark.none" = "Ninguna";
+"export.watermark.preset.confidential" = "Confidencial";
+"export.watermark.preset.draft" = "Borrador";
+"export.watermark.preset.approved" = "Aprobado";
+"export.watermark.preset.custom" = "Personalizada";
+"export.watermark.word.confidential" = "CONFIDENCIAL";
+"export.watermark.word.draft" = "BORRADOR";
+"export.watermark.word.approved" = "APROBADO";
+"export.watermark.text" = "Texto de la marca de agua";
+"export.watermark.text.placeholder" = "Tu texto";
+"export.watermark.text.missing" = "Escribe el texto que se mostrará en cada página.";
+"export.watermark.text.undrawable" = "Estos caracteres no se pueden dibujar en una marca de agua. Usa letras o números.";
+"export.watermark.placement" = "Posición";
+"export.watermark.placement.center" = "Centro";
+"export.watermark.placement.topRight" = "Arriba a la derecha";
+"export.watermark.placement.bottomRight" = "Abajo a la derecha";
+"export.watermark.placement.tiled" = "En mosaico";
+"export.watermark.opacity" = "Opacidad";
+"export.watermark.rotation" = "Rotación";
+"export.watermark.includeDate" = "Incluir la fecha de hoy";
+"export.watermark.preview" = "Vista previa de la marca de agua";
+"export.watermark.preview.value" = "%1$@, %2$@, opacidad %3$@";
+"export.watermark.note" = "La marca de agua pasa a formar parte del archivo exportado y no se puede quitar de él. Tu documento original no cambia.";
+"export.watermark.pdfNote" = "Las páginas con marca de agua se vuelven a dibujar, así que los enlaces y los campos de formulario del PDF original no se conservan en ellas.";
+"export.watermark.notSupported" = "Solo se puede añadir una marca de agua a un PDF o a una imagen.";
+
 /* OCR correction */
 "ocr.correct.section" = "Texto reconocido";
 "ocr.correct.open" = "Corregir texto…";

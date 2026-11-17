@@ -134,6 +134,12 @@ public struct ExportOptions: Hashable, Sendable {
     public var includesRecognizedText: Bool
     /// Word only: words to edit, or pictures of the pages.
     public var docxLayout: DocxLayout
+    /// A mark drawn over every exported page, or nil for none.
+    ///
+    /// Nil unless the export sheet sets it, so the backup, printing, the
+    /// form workspace and Compress — which build their own options — never
+    /// draw one. It lives only here: the library stores nothing about it.
+    public var watermark: Watermark?
 
     public init(
         format: ExportFormat = .pdf,
@@ -143,7 +149,8 @@ public struct ExportOptions: Hashable, Sendable {
         jpegQuality: Double = 0.85,
         packaging: ImagePackaging = .zip,
         includesRecognizedText: Bool = true,
-        docxLayout: DocxLayout = .editableText
+        docxLayout: DocxLayout = .editableText,
+        watermark: Watermark? = nil
     ) {
         self.format = format
         self.paperSize = paperSize
@@ -153,6 +160,7 @@ public struct ExportOptions: Hashable, Sendable {
         self.packaging = packaging
         self.includesRecognizedText = includesRecognizedText
         self.docxLayout = docxLayout
+        self.watermark = watermark
     }
 
     public static let imageDPIChoices = [72, 150, 200, 300]
@@ -260,6 +268,10 @@ public enum ExportError: Error, Equatable, Sendable {
     /// builds the screen has to say so rather than rejecting their password
     /// with a generic error.
     case passwordNotRepresentable
+    /// A watermark was asked for in a format with no picture of the page to
+    /// draw it on — plain text or editable Word. Writing the file without it
+    /// would be a silent false promise, so it is refused, as a password is.
+    case watermarkNotSupported
 }
 
 /// Filenames for exported files.

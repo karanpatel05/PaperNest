@@ -1034,6 +1034,34 @@
 "export.docxLayout.images.detail" = "Looks like the page";
 "export.docxImagesNote" = "Each page goes into the Word file as one picture, so it keeps its look, ink and marks. Its words are part of the picture: they can’t be edited or searched in Word. Choose Editable Text for that.";
 
+/* Export watermark */
+"export.watermark.title" = "Watermark";
+"export.watermark.none" = "None";
+"export.watermark.preset.confidential" = "Confidential";
+"export.watermark.preset.draft" = "Draft";
+"export.watermark.preset.approved" = "Approved";
+"export.watermark.preset.custom" = "Custom";
+"export.watermark.word.confidential" = "CONFIDENTIAL";
+"export.watermark.word.draft" = "DRAFT";
+"export.watermark.word.approved" = "APPROVED";
+"export.watermark.text" = "Watermark text";
+"export.watermark.text.placeholder" = "Your text";
+"export.watermark.text.missing" = "Enter the text to show on each page.";
+"export.watermark.text.undrawable" = "These characters can’t be drawn in a watermark. Use letters or numbers.";
+"export.watermark.placement" = "Placement";
+"export.watermark.placement.center" = "Center";
+"export.watermark.placement.topRight" = "Top right";
+"export.watermark.placement.bottomRight" = "Bottom right";
+"export.watermark.placement.tiled" = "Tiled";
+"export.watermark.opacity" = "Opacity";
+"export.watermark.rotation" = "Rotation";
+"export.watermark.includeDate" = "Include today’s date";
+"export.watermark.preview" = "Watermark preview";
+"export.watermark.preview.value" = "%1$@, %2$@, opacity %3$@";
+"export.watermark.note" = "The watermark becomes part of the exported file and can’t be removed from it. Your original document doesn’t change.";
+"export.watermark.pdfNote" = "Pages with a watermark are redrawn, so links and fillable form fields from the original PDF aren’t kept on them.";
+"export.watermark.notSupported" = "A watermark can be added only to a PDF or an image.";
+
 /* OCR correction */
 "ocr.correct.section" = "Recognized Text";
 "ocr.correct.open" = "Correct Text…";

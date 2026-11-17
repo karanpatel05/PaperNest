@@ -1159,6 +1159,38 @@ extension L10n {
     static var exportDocxImagesNote: String { tr("export.docxImagesNote") }
 }
 
+// Export watermark: Confidential, Draft, Approved and Custom marks drawn into an export.
+extension L10n {
+    static var exportWatermarkTitle: String { tr("export.watermark.title") }
+    static var exportWatermarkNone: String { tr("export.watermark.none") }
+    static var exportWatermarkConfidential: String { tr("export.watermark.preset.confidential") }
+    static var exportWatermarkDraft: String { tr("export.watermark.preset.draft") }
+    static var exportWatermarkApproved: String { tr("export.watermark.preset.approved") }
+    static var exportWatermarkCustom: String { tr("export.watermark.preset.custom") }
+    static var exportWatermarkWordConfidential: String { tr("export.watermark.word.confidential") }
+    static var exportWatermarkWordDraft: String { tr("export.watermark.word.draft") }
+    static var exportWatermarkWordApproved: String { tr("export.watermark.word.approved") }
+    static var exportWatermarkText: String { tr("export.watermark.text") }
+    static var exportWatermarkTextPlaceholder: String { tr("export.watermark.text.placeholder") }
+    static var exportWatermarkTextMissing: String { tr("export.watermark.text.missing") }
+    static var exportWatermarkTextUndrawable: String { tr("export.watermark.text.undrawable") }
+    static var exportWatermarkPlacement: String { tr("export.watermark.placement") }
+    static var exportWatermarkPlacementCenter: String { tr("export.watermark.placement.center") }
+    static var exportWatermarkPlacementTopRight: String { tr("export.watermark.placement.topRight") }
+    static var exportWatermarkPlacementBottomRight: String { tr("export.watermark.placement.bottomRight") }
+    static var exportWatermarkPlacementTiled: String { tr("export.watermark.placement.tiled") }
+    static var exportWatermarkOpacity: String { tr("export.watermark.opacity") }
+    static var exportWatermarkRotation: String { tr("export.watermark.rotation") }
+    static var exportWatermarkIncludeDate: String { tr("export.watermark.includeDate") }
+    static var exportWatermarkPreview: String { tr("export.watermark.preview") }
+    static func exportWatermarkPreviewValue(_ preset: String, _ placement: String, _ opacity: String) -> String {
+        tr("export.watermark.preview.value", preset, placement, opacity)
+    }
+    static var exportWatermarkNote: String { tr("export.watermark.note") }
+    static var exportWatermarkPDFNote: String { tr("export.watermark.pdfNote") }
+    static var exportWatermarkNotSupported: String { tr("export.watermark.notSupported") }
+}
+
 // OCR correction: correcting recognized text, and the page's recognition state.
 extension L10n {
     static var ocrCorrectSection: String { tr("ocr.correct.section") }

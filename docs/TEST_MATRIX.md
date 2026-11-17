@@ -1,3 +1,86 @@
+## 2026-11-16 — Export watermarks: Confidential, Draft, Approved and Custom (Claude, owner in session)
+
+Owner: "Read docs/WATERMARK_DESIGN_CLAUDE.md and implement the PaperNest watermark feature … one real slice with
+Confidential, Draft, Approved, and Custom watermark presets". How it works: `docs/ARCHITECTURE.md` → Rendering,
+"Export watermarks". Built on `1900a73` (Word page images) once that claim was released; verified on `ae3a9c7`.
+
+**What works.** The export sheet has a Watermark section for PDF, JPEG, PNG and HEIC: None (the default),
+Confidential, Draft, Approved and Custom. A preset fills in its own word in the reader's language (CONFIDENTIEL,
+BORRADOR, APPROUVÉ…), placement (Center, Top right, Bottom right, Tiled), opacity, rotation and an optional
+date line, all editable. A preview draws the first exported page on its paper with the mark, through the export's
+own drawing function. Save, Copy and Share all export through `ExportSheet.optionsToExport`, so all three carry the
+same mark; closing the sheet forgets it. TXT and Word refuse a watermark (`ExportError.watermarkNotSupported`), and
+the sheet says so where the section was if one had been chosen. Nothing is stored; the library is never changed.
+
+**Engine** (`PaperNestExport`): `Watermark`, `WatermarkPreset`, `WatermarkPlacement` (`Watermark.swift`);
+`WatermarkDrawing` (layout, glyph-outline drawing, `applying(_:to:pageSize:)` for pictures). `ExportOptions.watermark`
+(nil by default); `Exporter` draws it after each PDF page's content and OCR layer, on the paper, and over each
+picture; `isUntouched` stands pass-through down when a visible watermark is set.
+
+**Verification**, in a clean detached worktree outside iCloud: `ae3a9c7` plus exactly the committed watermark files
+(each compared with `cmp` before committing).
+- `./scripts/test.sh`: **1,229 passed, 0 failed, 0 warnings.** 43 are new: `WatermarkModelTests`,
+  `WatermarkLayoutTests`, `WatermarkDrawingTests` (22, `Tests/PaperNestExportTests/WatermarkTests.swift`),
+  `WatermarkExportTests` (10, through the real exporter: the mark is in every PDF page and picture, the page's own
+  text and a scan's OCR layer stay selectable and the watermark's words are not in the text, an untouched PDF is no
+  longer handed back byte for byte, an empty or emoji-only watermark changes nothing, Letter paper puts a corner mark
+  in the paper's corner, a copy-restricted PDF keeps its limit, TXT and both Word layouts refuse, one export draws
+  the mark once, the library is unchanged) and `WatermarkDraftTests` (11: what the sheet hands the export).
+  `LocalizationTests` passes with the 26 new keys in en/fr/es. The first full run had **1 failure**,
+  `oneExportDrawsTheMarkOnce`: it read the fixture's black orientation square in the page's corner as the mark's
+  darkest pixel (green 0). A test bug: it now reads only the middle of the page, and the rerun above is clean.
+- Engine tests were first shown to fail: with `draw` stubbed to return early, the Confidential, Draft, Approved and
+  tiled drawing tests failed, and the opacity test crashed on an arithmetic overflow in the test itself (fixed).
+  The same run exposed a real fault: `sizesFollowThePageNotThePoint` failed because the system font's optical sizes
+  changed the letters with size; letters are now shaped at one reference size and scaled.
+- `./scripts/build-mac-app.sh`: **passed, 0 warnings.** Mac interaction was not exercised.
+- `xcodebuild build-for-testing -scheme PaperNest-iOS` (fresh derived data): **TEST BUILD SUCCEEDED**, no warnings
+  from the watermark or export-sheet files (the one warning is the unrelated appintents metadata note).
+- `WatermarkExportUITests` (9 tests, `xcodebuild test-without-building -only-testing`, not `ui-test-ios.sh`), run by a
+  subagent on simulators no other session was using:
+  - **iPhone 17 Pro, iOS 26.5: 9 passed, 0 failures** (962 s; load 40–88 during the run).
+  - **iPad Pro 13-inch (M5), iOS 26.5: first run 8 passed, 1 failed** — `testCopyExportsWithTheWatermark`,
+    "confidential did not become the selected watermark" at the preset tap. The recording shows the tap on the
+    Confidential tile and no change on screen; XCTest spent 1.7 s and 3.4 s in its pre-tap idle checks for that one
+    tap against 0.1–0.2 s for every other. Judged a dropped tap during a stall, not proven. **Rerun: 9 passed,
+    0 failures** (268 s, load 2).
+  - Before the review fixes, the first eight tests had passed 8/8 on the same two devices after test-only fixes
+    (scrolling past the sheet's top bar, and the tearDown below).
+  - Screenshots: `/tmp/pn-watermark-shots/{iphone,ipad}-{confidential-en,draft-moved-en,draft-share-en,approved-fr-xxxl}.png`,
+    viewed: presets, placement tiles, sliders, date switch and the two notes fit at iPhone and iPad width in English;
+    French at accessibility XXXL keeps every control reachable.
+
+**Independent review** (a fresh subagent, read-only, with a throwaway compile harness) found seven issues, all
+fixed before the final runs: emoji-only text counted as a watermark but drew nothing (now judged from the glyph
+outlines, and the sheet names it); the preview could compose one page's picture at another's size; a corner radius
+beyond half the width for one narrow letter; an unbounded transparency layer (now bounded to the marks); a format
+switch silently dropping a chosen mark (now a note); re-tapping the selected preset wiping edits; long tiled text
+making three marks (tiles now at most half the page). Its test critiques led to `oneExportDrawsTheMarkOnce` (a
+darkness check rather than byte equality), `aRestrictedPDFKeepsItsLimitsUnderTheMark`, the Word page-images
+refusal and `everyExportCarriesTheDraftWhereItCanBeDrawn`.
+
+**UI test infrastructure found on the way:** an `async` `@MainActor` `tearDown` deadlocks the XCTest runner when a
+test is interrupted (reading `isSelected` on a missing element interrupts regardless of `continueAfterFailure`):
+the runner waits on the main thread for a tearDown that needs it, until XCTest times out — 8–12 minutes. The new
+class cleans up with `addTeardownBlock` instead. `WordExportUITests.swift` still has the async tearDown.
+
+**Not done / limitations.**
+- No physical device, no VoiceOver pass (accessibility values and labels are set and asserted, not listened to), no
+  Mac interaction (built, not used), no Spanish UI run (strings present; French XXXL run only).
+- The PaperNest branded preset in the design doc is not built (the request named four presets); nor a logo image,
+  colour choice for Custom, or the free-version forced watermark the owner decided on 2026-11-15.
+- A watermark on Word page images is refused, not drawn.
+- Pages with a watermark are redrawn, so an imported PDF's links and fillable fields are not kept on them (said
+  under a PDF in the sheet). Tiled marks repeat their outlines on every page: about 80 KB per Letter page for
+  "Acme Holdings Ltd" tiled.
+- Mixed text such as "TOP 🔒 SECRET" keeps the emoji's width as a gap.
+- A picture export still holds the rendered page and the watermarked copy at once (two full-size bitmaps).
+- Seen, not fixed (outside this slice): the export sheet's bottom bar truncates its French labels at accessibility
+  XXXL, and the review saw a tile report Selected when it was not; the watermark tiles now also say Selected / Not
+  selected as an accessibility value.
+- Design acceptance test 9 (a failed export keeps the sheet usable for a retry) is not met by the sheet as it is:
+  after a failure it offers only Done.
+
 ## 2026-11-16 — OCR text correction: a page's recognized lines can be corrected, and every reader gets the corrections (Claude, roadmap item 1)
 
 Owner in session ("Yes, start it"), the slice recommended after Word page images: roadmap item 1's "OCR correction/editor view with page-level previews". In the OCR panel, under a new **Recognized Text** section, the page on screen now says whether it has been read (not yet / could not be read / has its own text / recognized / corrected), and a recognized page offers **Correct Text…**: a sheet with the page above its lines, the line being edited outlined on the page (mapped through `PageGeometry`), one field per line, lines recognition was unsure of marked, a count of changed lines, Cancel (asks before discarding) and Save. Saving goes through a new guarded store call and is one step of the document's undo history. The corrected words are what search, find, selection, read aloud, TXT and Word export and the searchable PDF use. Automatic recognition after an engine update leaves corrected pages alone; Recognize Text chosen by hand still replaces them, and the panel says so first when the chosen pages include corrected ones. Design: `docs/ARCHITECTURE.md` → "Revisions and derived data".

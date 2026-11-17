@@ -1034,6 +1034,34 @@
 "export.docxLayout.images.detail" = "Identique à la page";
 "export.docxImagesNote" = "Chaque page devient une image dans le fichier Word : elle garde son apparence, son encre et ses annotations. Ses mots font partie de l’image et ne peuvent être ni modifiés ni recherchés dans Word. Choisissez Texte modifiable pour cela.";
 
+/* Export watermark */
+"export.watermark.title" = "Filigrane";
+"export.watermark.none" = "Aucun";
+"export.watermark.preset.confidential" = "Confidentiel";
+"export.watermark.preset.draft" = "Brouillon";
+"export.watermark.preset.approved" = "Approuvé";
+"export.watermark.preset.custom" = "Personnalisé";
+"export.watermark.word.confidential" = "CONFIDENTIEL";
+"export.watermark.word.draft" = "BROUILLON";
+"export.watermark.word.approved" = "APPROUVÉ";
+"export.watermark.text" = "Texte du filigrane";
+"export.watermark.text.placeholder" = "Votre texte";
+"export.watermark.text.missing" = "Saisissez le texte à afficher sur chaque page.";
+"export.watermark.text.undrawable" = "Ces caractères ne peuvent pas être dessinés dans un filigrane. Utilisez des lettres ou des chiffres.";
+"export.watermark.placement" = "Position";
+"export.watermark.placement.center" = "Au centre";
+"export.watermark.placement.topRight" = "En haut à droite";
+"export.watermark.placement.bottomRight" = "En bas à droite";
+"export.watermark.placement.tiled" = "En mosaïque";
+"export.watermark.opacity" = "Opacité";
+"export.watermark.rotation" = "Rotation";
+"export.watermark.includeDate" = "Ajouter la date du jour";
+"export.watermark.preview" = "Aperçu du filigrane";
+"export.watermark.preview.value" = "%1$@, %2$@, opacité %3$@";
+"export.watermark.note" = "Le filigrane fait partie du fichier exporté et ne peut pas en être retiré. Votre document d’origine ne change pas.";
+"export.watermark.pdfNote" = "Les pages avec un filigrane sont redessinées : les liens et les champs de formulaire du PDF d’origine n’y sont pas conservés.";
+"export.watermark.notSupported" = "Un filigrane ne peut être ajouté qu’à un PDF ou à une image.";
+
 /* OCR correction */
 "ocr.correct.section" = "Texte reconnu";
 "ocr.correct.open" = "Corriger le texte…";
