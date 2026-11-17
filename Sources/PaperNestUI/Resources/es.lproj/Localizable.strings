@@ -1271,3 +1271,29 @@
 "cleanup.failed" = "No se pudieron revisar las páginas.";
 "cleanup.with.correctedText" = "Su texto corregido se elimina con ella.";
 "cleanup.lookedAgain" = "El documento cambió después de revisarlo, así que no se eliminó nada y se ha vuelto a revisar.";
+
+/* Text stamps */
+"stamp.text.title" = "Sello de texto";
+"stamp.text.presets" = "Sellos";
+"stamp.text.word.paid" = "PAGADO";
+"stamp.text.word.received" = "RECIBIDO";
+"stamp.text.word.reviewed" = "REVISADO";
+"stamp.text.word.rejected" = "RECHAZADO";
+"stamp.text.saved" = "Tus sellos";
+"stamp.text.custom" = "Tus propias palabras";
+"stamp.text.custom.placeholder" = "Texto del sello";
+"stamp.text.style" = "Estilo";
+"stamp.text.outlined" = "Contorno";
+"stamp.text.filled" = "Fondo de color";
+"stamp.text.keep" = "Guardar en tus sellos";
+"stamp.text.date" = "Añadir la fecha de hoy";
+"stamp.text.size" = "Tamaño";
+"stamp.text.small" = "Pequeño";
+"stamp.text.medium" = "Mediano";
+"stamp.text.large" = "Grande";
+"stamp.text.placement" = "Posición";
+"stamp.text.place" = "Colocar";
+"stamp.text.note" = "Un sello pasa a formar parte de la página: puedes moverlo, editarlo o eliminarlo más tarde, y toda exportación e impresión lo incluye. Su texto y su fecha se escriben al colocarlo. Una marca de agua de exportación solo marca la copia exportada.";
+"stamp.text.missing" = "Escribe el texto del sello.";
+"stamp.text.failed" = "No se pudo colocar el sello.";
+"stamp.text.keepFailed" = "El sello no se pudo guardar en tus sellos, así que no se colocó.";

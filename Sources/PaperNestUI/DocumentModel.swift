@@ -368,20 +368,78 @@ final class DocumentModel {
         session.didChange()
     }
 
+    /// A text stamp on `page` as it is shown, in `placement`'s corner: an
+    /// ordinary text box with a stamp style, so it moves, edits, undoes and
+    /// exports like one. Its words and date are written in now, in the
+    /// reader's language, and stay as written. Stamps are markup, so Pro.
+    func placeStamp(_ design: StampDesign, size: StampSize, placement: StampPlacement, on page: Page,
+                    date: Date = .now, undoManager: UndoManager?) async throws {
+        try SubscriptionStore.shared.require(.markup)
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID, !design.isEmpty else { throw StoreError.pageNotFound }
+        let box = Self.stampBox(design, size: size, placement: placement, on: page, date: date)
+        let result = try await store.placeText(box.text, on: page.id, frame: box.frame, fontSize: box.fontSize,
+                                               color: box.color, alignment: box.alignment, isBold: box.isBold,
+                                               stamp: box.stamp)
+        replace(result.page)
+        let change = InkChange(pageID: page.id, saved: [result.object], replaced: [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.textStampTitle)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    /// The text box a stamp is on `page`: its words and date line, its type
+    /// size for the page, measured, and placed. The stamp sheet previews
+    /// exactly this. A stamp wider than the page as shown (less its margins)
+    /// gets smaller type rather than running off the page.
+    nonisolated static func stampBox(_ design: StampDesign, size: StampSize, placement: StampPlacement,
+                                     on page: Page, date: Date, locale: Locale = stampLocale) -> TextBox {
+        let dateLine = design.includesDate
+            ? date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale)) : nil
+        let shown = page.geometry.pageSize
+        var box = design.textBox(dateLine: dateLine, fontSize: size.fontSize(on: shown))
+        var measured = PageRenderer.stampSize(for: box)
+        // Along the words: across the page as shown, or down it when the page is turned.
+        let room = (page.geometry.rotation.swapsAxes ? shown.height : shown.width) * 0.9
+        // A few rounds: the slack and the rounding up do not shrink with the type.
+        for _ in 0..<4 where measured.width > room {
+            box.fontSize *= Double(room / measured.width) * 0.99
+            measured = PageRenderer.stampSize(for: box)
+        }
+        box.frame = placement.frame(size: measured, on: page.geometry)
+        return box
+    }
+
+    /// The reader's language for a stamp's date, with their own region's
+    /// way of writing it when the two agree (17 Nov 2026 in Britain, Nov 17,
+    /// 2026 in the US).
+    nonisolated static var stampLocale: Locale {
+        let language = ResourceBundle.ui.preferredLocalizations.first ?? "en"
+        return Locale.current.language.languageCode?.identifier == Locale(identifier: language).language.languageCode?.identifier
+            ? Locale.current : Locale(identifier: language)
+    }
+
     /// Changes a text box that is already on a page.
     ///
     /// Keeps where it is — the origin and the width it was dragged to — and
     /// only grows its **height** with the type size, because a box that moved
-    /// itself when its words changed would be worse than one that clips.
+    /// itself when its words changed would be worse than one that clips. A
+    /// stamp is measured again instead, so its border still fits its words.
     func editTextBox(_ object: PageObject, on page: Page, text: String, fontSize: Double,
                      color: RGBAColor, alignment: TextBox.Alignment,
                      undoManager: UndoManager?) async throws {
         await finishPendingHistory()
         guard let store, page.itemID == itemID, object.pageID == page.id,
               case .text(let box) = object.payload else { throw StoreError.pageNotFound }
-        let frame = CGRect(x: box.frame.minX, y: box.frame.minY, width: box.frame.width,
+        var frame = CGRect(x: box.frame.minX, y: box.frame.minY, width: box.frame.width,
                            height: Self.textBoxHeight(forFontSize: fontSize,
                                                       pageHeight: page.sourceSize.height))
+        if box.stamp != nil {
+            var edited = box
+            edited.text = text
+            edited.fontSize = fontSize
+            frame = CGRect(origin: box.frame.origin, size: PageRenderer.stampSize(for: edited))
+        }
         let result = try await store.updateText(object, text: text, frame: frame,
                                                 fontSize: fontSize, color: color,
                                                 alignment: alignment)

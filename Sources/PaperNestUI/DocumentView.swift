@@ -32,6 +32,7 @@ struct DocumentView: View {
     private enum InspectorTool { case signature(Page), form, pages, ocr }
     @State private var isShowingOCR = false
     @State private var stampPage: Page?
+    @State private var textStampPage: Page?
     @State private var shapePage: Page?
     @State private var commentsPage: Page?
     @State private var signaturePage: Page?
@@ -461,6 +462,9 @@ struct DocumentView: View {
         content
             .sheet(isPresented: $isShowingCleanup) {
                 CleanupSheet(document: model, undoManager: undoManager)
+            }
+            .sheet(item: $textStampPage) { page in
+                StampSheet(document: model, page: page, undoManager: undoManager)
             }
             .sheet(isPresented: $isShowingDetails) {
                 if let page = model.selectedPage {
@@ -1000,7 +1004,7 @@ struct DocumentView: View {
     /// Whether something that presents itself — a sheet, a picker, a camera —
     /// has been asked for. On a phone the utilities drawer steps aside for it.
     private var isPresentingOverUtilities: Bool {
-        var presenting = shapePage != nil || stampPage != nil || commentsPage != nil || annotationPage != nil
+        var presenting = shapePage != nil || stampPage != nil || textStampPage != nil || commentsPage != nil || annotationPage != nil
             || managedMarkupPage != nil || signaturePage != nil || notebookPageRequest != nil
             || isShowingCrop || isShowingFilePicker || isShowingPDFForm || isShowingPageOrganizer
             || isShowingExport || isShowingAdjustments || isShowingOutline || isShowingImagePicker
@@ -1097,6 +1101,7 @@ struct DocumentView: View {
                 .accessibilityIdentifier("utilities-insert-image")
             shapeButton
             stampButton
+            textStampButton
         }
         ToolGridSection(title: L10n.toolsProcess, systemImage: "gearshape.2",
                         storageKey: DocumentUtilitiesStorage.processExpanded, id: "utilities-section-process") {
@@ -1435,6 +1440,7 @@ struct DocumentView: View {
             manageMarkupButton
             shapeButton
             stampButton
+            textStampButton
             textBoxButton
             imageButton
             commentsButton
@@ -1476,6 +1482,15 @@ struct DocumentView: View {
         }
         .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
         .accessibilityIdentifier("editor-stamps")
+    }
+
+    /// Approved, Paid, a saved stamp or one's own words, as an editable text box.
+    private var textStampButton: some View {
+        Button { textStampPage = model.selectedPage } label: {
+            Label(L10n.textStampTitle, systemImage: "checkmark.seal")
+        }
+        .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
+        .accessibilityIdentifier("editor-text-stamps")
     }
 
     private var shapeButton: some View {
@@ -1644,6 +1659,7 @@ struct DocumentView: View {
             manageMarkupButton
             shapeButton
             stampButton
+            textStampButton
             textBoxButton
             imageButton
             commentsButton

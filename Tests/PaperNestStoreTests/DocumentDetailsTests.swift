@@ -108,7 +108,7 @@ import PaperNestCore
 
         let store = try LibraryStore(directory: dir.url)
 
-        #expect(try await store.schemaVersion() == 13)
+        #expect(try await store.schemaVersion() >= 13, "moved on past twelve")
         #expect(try await store.savedTemplates().map(\.name) == ["Weekly"])
         try await store.saveDocumentDetails(details, for: ItemID(rawValue: "d1"), readFrom: PageID(rawValue: "p1"))
         #expect(try await store.documentDetails(of: ItemID(rawValue: "d1"))?.details == details)

@@ -399,8 +399,12 @@ public struct PageRenderer: Sendable {
     ///
     /// Text longer than its box is **clipped** by the frame path, with nothing
     /// to say so.
+    ///
+    /// A stamp draws its border or tint first, then its words centred inside
+    /// it (`textLayout`), still as real text.
     static func drawTextBox(_ textBox: TextBox, in ctx: CGContext) {
-        guard let frame = textFrame(textBox) else { return }
+        if textBox.stamp != nil { drawStampBackground(textBox, in: ctx) }
+        guard let frame = textLayout(textBox)?.frame else { return }
         ctx.saveGState()
         defer { ctx.restoreGState() }
         ctx.translateBy(x: textBox.frame.minX, y: textBox.frame.maxY)
@@ -408,17 +412,79 @@ public struct PageRenderer: Sendable {
         CTFrameDraw(frame, ctx)
     }
 
+    /// A stamp's border (outlined) or tint (filled), under its words, in the
+    /// box's frame in source space. The border sits inside the frame, so a
+    /// stamp's frame is everything it paints.
+    private static func drawStampBackground(_ box: TextBox, in ctx: CGContext) {
+        guard let style = box.stamp, box.frame.width > 0, box.frame.height > 0 else { return }
+        let color = box.color
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
+        switch style {
+        case .outlined:
+            let line = CGFloat(box.stampLineWidth)
+            let rect = box.frame.insetBy(dx: line / 2, dy: line / 2)
+            guard rect.width > 0, rect.height > 0 else { return }
+            let radius = min(CGFloat(box.stampCornerRadius), rect.width / 2, rect.height / 2)
+            ctx.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
+            ctx.setStrokeColor(CGColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: color.alpha))
+            ctx.setLineWidth(line)
+            ctx.strokePath()
+        case .filled:
+            let radius = min(CGFloat(box.stampCornerRadius), box.frame.width / 2, box.frame.height / 2)
+            ctx.addPath(CGPath(roundedRect: box.frame, cornerWidth: radius, cornerHeight: radius, transform: nil))
+            ctx.setFillColor(CGColor(srgbRed: color.red, green: color.green, blue: color.blue,
+                                     alpha: color.alpha * Self.stampTint))
+            ctx.fillPath()
+        }
+    }
+
+    /// How strongly a filled stamp's colour tints the paper behind its words.
+    static let stampTint = 0.14
+
+    /// The frame a stamp needs: its words on their lines, unwrapped, plus its
+    /// padding and border. Measured with the same layout it is drawn with, so
+    /// "APPROUVÉ" gets the room "APPROVED" does not need.
+    public static func stampSize(for box: TextBox) -> CGSize {
+        var measured = box
+        measured.stamp = box.stamp ?? .outlined
+        guard !measured.text.isEmpty, measured.fontSize > 0 else { return .zero }
+        let setter = CTFramesetterCreateWithAttributedString(attributedText(measured))
+        let fitted = CTFramesetterSuggestFrameSizeWithConstraints(
+            setter, CFRange(location: 0, length: 0), nil,
+            CGSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude), nil)
+        let pad = measured.stampPadding
+        let line = measured.stamp == .outlined ? CGFloat(measured.stampLineWidth) : 0
+        // A point of slack each way, so the layout never wraps a word it was measured unwrapped.
+        return CGSize(width: ceil(fitted.width) + 2 + 2 * (pad.width + line),
+                      height: ceil(fitted.height) + 2 + 2 * (pad.height + line))
+    }
+
+    /// A picture of a stamp alone, drawn by `drawTextBox` — what the stamp
+    /// sheet previews is what is placed. `scale` pixels per source point.
+    public static func stampPicture(_ box: TextBox, scale: CGFloat) throws -> CGImage {
+        var placed = box
+        placed.frame.origin = .zero
+        let width = max(1, Int((box.frame.width * scale).rounded(.up)))
+        let height = max(1, Int((box.frame.height * scale).rounded(.up)))
+        return try bitmap(width: width, height: height, transparent: true) { ctx in
+            ctx.scaleBy(x: scale, y: scale)
+            ctx.concatenate(PageGeometry.yUpToYDown(in: CGRect(origin: .zero, size: box.frame.size)))
+            drawTextBox(placed, in: ctx)
+        }
+    }
+
     /// Visible glyph bounds in the same upright source space as the text box.
     /// Selection must not require enclosing its unused width/height. Shared
     /// CoreText layout preserves wrapping, alignment, styles and font fallback.
     public static func textSelectionRects(_ textBox: TextBox) -> [CGRect] {
-        guard textBox.color.alpha > 0, let frame = textFrame(textBox),
+        guard textBox.color.alpha > 0, let layout = textLayout(textBox),
               let context = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8,
                                       bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return [] }
-        let lines = CTFrameGetLines(frame) as! [CTLine]
+        let lines = CTFrameGetLines(layout.frame) as! [CTLine]
         var origins = [CGPoint](repeating: .zero, count: lines.count)
-        CTFrameGetLineOrigins(frame, CFRange(location: 0, length: 0), &origins)
+        CTFrameGetLineOrigins(layout.frame, CFRange(location: 0, length: 0), &origins)
         let mapping = PageGeometry.yUpToYDown(in: CGRect(origin: .zero, size: textBox.frame.size))
             .concatenating(CGAffineTransform(translationX: textBox.frame.minX, y: textBox.frame.minY))
         var result: [CGRect] = []
@@ -427,7 +493,9 @@ public struct PageRenderer: Sendable {
                 for index in 0..<CTRunGetGlyphCount(run) {
                     let bounds = CTRunGetImageBounds(run, context, CFRange(location: index, length: 1))
                     guard !bounds.isNull, !bounds.isEmpty else { continue }
-                    let rect = bounds.offsetBy(dx: origin.x, dy: origin.y).applying(mapping).intersection(textBox.frame)
+                    // Line origins are relative to the path's rectangle, which a stamp insets.
+                    let rect = bounds.offsetBy(dx: origin.x + layout.origin.x, dy: origin.y + layout.origin.y)
+                        .applying(mapping).intersection(textBox.frame)
                     if !rect.isNull, !rect.isEmpty { result.append(rect) }
                 }
             }
@@ -435,9 +503,33 @@ public struct PageRenderer: Sendable {
         return result
     }
 
-    private static func textFrame(_ textBox: TextBox) -> CTFrame? {
+    /// The laid-out words and the rectangle they were laid out in, in the
+    /// box's own y-up coordinates. An ordinary box fills its frame from the
+    /// top; a stamp's words are centred inside its border and padding.
+    private static func textLayout(_ textBox: TextBox) -> (frame: CTFrame, origin: CGPoint)? {
         guard !textBox.text.isEmpty, textBox.fontSize > 0,
               textBox.frame.width > 0, textBox.frame.height > 0 else { return nil }
+        let setter = CTFramesetterCreateWithAttributedString(attributedText(textBox))
+        var rect = CGRect(origin: .zero, size: textBox.frame.size)
+        if textBox.stamp != nil {
+            // The insets are the same on opposite sides, so this y-down
+            // rectangle is also the right one in y-up coordinates.
+            let content = textBox.stampContentRect
+            guard content.width > 0, content.height > 0 else { return nil }
+            let fitted = CTFramesetterSuggestFrameSizeWithConstraints(
+                setter, CFRange(location: 0, length: 0), nil,
+                CGSize(width: content.width, height: .greatestFiniteMagnitude), nil)
+            let height = min(content.height, ceil(fitted.height) + 1)
+            rect = CGRect(x: content.minX, y: content.minY + (content.height - height) / 2,
+                          width: content.width, height: height)
+        }
+        let path = CGPath(rect: rect, transform: nil)
+        return (CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), path, nil), rect.origin)
+    }
+
+    /// The box's words with its font, colour and alignment. A stamp's lines
+    /// after the first (its date) are smaller and not bold.
+    private static func attributedText(_ textBox: TextBox) -> NSAttributedString {
         let font = CTFontCreateWithName(textBox.postScriptFontName as CFString, CGFloat(textBox.fontSize), nil)
         var alignment: CTTextAlignment = switch textBox.alignment {
         case .leading: .left
@@ -451,15 +543,22 @@ public struct PageRenderer: Sendable {
             return CTParagraphStyleCreate(&setting, 1)
         }
         let color = textBox.color
-        let attributed = NSAttributedString(string: textBox.text, attributes: [
+        let attributed = NSMutableAttributedString(string: textBox.text, attributes: [
             NSAttributedString.Key(kCTFontAttributeName as String): font,
             NSAttributedString.Key(kCTForegroundColorAttributeName as String):
                 CGColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: color.alpha),
             NSAttributedString.Key(kCTParagraphStyleAttributeName as String): style,
         ])
-        let path = CGPath(rect: CGRect(origin: .zero, size: textBox.frame.size), transform: nil)
-        return CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(attributed),
-                                        CFRange(location: 0, length: 0), path, nil)
+        let firstBreak = (textBox.text as NSString).rangeOfCharacter(from: .newlines).location
+        if textBox.stamp != nil, firstBreak != NSNotFound {
+            var detail = textBox
+            detail.isBold = false
+            let detailFont = CTFontCreateWithName(detail.postScriptFontName as CFString,
+                                                  CGFloat(textBox.fontSize * TextBox.stampDetailScale), nil)
+            let rest = NSRange(location: firstBreak, length: (textBox.text as NSString).length - firstBreak)
+            attributed.addAttribute(NSAttributedString.Key(kCTFontAttributeName as String), value: detailFont, range: rest)
+        }
+        return attributed
     }
 
     /// Draws a placed image into its frame in source space.

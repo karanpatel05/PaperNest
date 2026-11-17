@@ -1417,4 +1417,31 @@ extension L10n {
     static var cleanupFailed: String { tr("cleanup.failed") }
     static var cleanupWithCorrectedText: String { tr("cleanup.with.correctedText") }
     static var cleanupLookedAgain: String { tr("cleanup.lookedAgain") }
+
+    // MARK: Text stamps
+
+    static var textStampTitle: String { tr("stamp.text.title") }
+    static var textStampPresets: String { tr("stamp.text.presets") }
+    static var textStampWordPaid: String { tr("stamp.text.word.paid") }
+    static var textStampWordReceived: String { tr("stamp.text.word.received") }
+    static var textStampWordReviewed: String { tr("stamp.text.word.reviewed") }
+    static var textStampWordRejected: String { tr("stamp.text.word.rejected") }
+    static var textStampSaved: String { tr("stamp.text.saved") }
+    static var textStampCustom: String { tr("stamp.text.custom") }
+    static var textStampCustomPlaceholder: String { tr("stamp.text.custom.placeholder") }
+    static var textStampStyle: String { tr("stamp.text.style") }
+    static var textStampOutlined: String { tr("stamp.text.outlined") }
+    static var textStampFilled: String { tr("stamp.text.filled") }
+    static var textStampKeep: String { tr("stamp.text.keep") }
+    static var textStampDate: String { tr("stamp.text.date") }
+    static var textStampSize: String { tr("stamp.text.size") }
+    static var textStampSmall: String { tr("stamp.text.small") }
+    static var textStampMedium: String { tr("stamp.text.medium") }
+    static var textStampLarge: String { tr("stamp.text.large") }
+    static var textStampPlacement: String { tr("stamp.text.placement") }
+    static var textStampPlace: String { tr("stamp.text.place") }
+    static var textStampNote: String { tr("stamp.text.note") }
+    static var textStampMissing: String { tr("stamp.text.missing") }
+    static var textStampFailed: String { tr("stamp.text.failed") }
+    static var textStampKeepFailed: String { tr("stamp.text.keepFailed") }
 }

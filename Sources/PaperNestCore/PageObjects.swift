@@ -137,10 +137,15 @@ public struct TextBox: Hashable, Codable, Sendable {
     public var fontFamily: FontFamily
     public var isBold: Bool
     public var isItalic: Bool
+    /// Drawn as a stamp: its words inside a border or on a tint, the first
+    /// line large and any further line (a date) smaller. Nil for an ordinary
+    /// text box — every box saved before stamps — which encodes exactly as
+    /// it did. An older build ignores the key and shows the words alone.
+    public var stamp: StampStyle?
 
     public init(frame: CGRect, text: String, fontSize: Double = 14, color: RGBAColor = .black,
                 alignment: Alignment = .leading, fontFamily: FontFamily = .sans,
-                isBold: Bool = false, isItalic: Bool = false) {
+                isBold: Bool = false, isItalic: Bool = false, stamp: StampStyle? = nil) {
         self.frame = frame
         self.text = text
         self.fontSize = fontSize
@@ -149,6 +154,7 @@ public struct TextBox: Hashable, Codable, Sendable {
         self.fontFamily = fontFamily
         self.isBold = isBold
         self.isItalic = isItalic
+        self.stamp = stamp
     }
 
     /// Shared by the native editor and CoreText rendering/export.
@@ -170,7 +176,7 @@ public struct TextBox: Hashable, Codable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case frame, text, fontSize, color, alignment, fontFamily, isBold, isItalic
+        case frame, text, fontSize, color, alignment, fontFamily, isBold, isItalic, stamp
     }
 
     /// Old libraries have no font keys; their Helvetica appearance is retained.
@@ -184,6 +190,9 @@ public struct TextBox: Hashable, Codable, Sendable {
         fontFamily = try values.decodeIfPresent(FontFamily.self, forKey: .fontFamily) ?? .sans
         isBold = try values.decodeIfPresent(Bool.self, forKey: .isBold) ?? false
         isItalic = try values.decodeIfPresent(Bool.self, forKey: .isItalic) ?? false
+        // A style a later build adds reads as plain text here rather than
+        // failing the whole page.
+        stamp = (try? values.decodeIfPresent(StampStyle.self, forKey: .stamp)) ?? nil
     }
 }
 

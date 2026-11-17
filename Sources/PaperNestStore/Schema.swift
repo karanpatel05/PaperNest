@@ -311,5 +311,15 @@ enum Schema {
             modified_at REAL NOT NULL
         );
         """),
+        // Stamps someone made and kept to place again (`SavedStamps.swift`):
+        // words, style and colour only, so nothing here keeps an original
+        // alive. A new table, nothing rebuilt, not synced, not indexed.
+        Migration(version: 14, sql: """
+        CREATE TABLE saved_stamps (
+            id TEXT PRIMARY KEY NOT NULL,
+            design_json TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
+        """),
     ]
 }

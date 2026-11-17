@@ -1271,3 +1271,29 @@
 "cleanup.failed" = "The pages couldn’t be looked through.";
 "cleanup.with.correctedText" = "Its corrected text goes with it.";
 "cleanup.lookedAgain" = "The document changed after it was looked through, so nothing was deleted and it was looked through again.";
+
+/* Text stamps */
+"stamp.text.title" = "Text Stamp";
+"stamp.text.presets" = "Stamps";
+"stamp.text.word.paid" = "PAID";
+"stamp.text.word.received" = "RECEIVED";
+"stamp.text.word.reviewed" = "REVIEWED";
+"stamp.text.word.rejected" = "REJECTED";
+"stamp.text.saved" = "Your Stamps";
+"stamp.text.custom" = "Your Own Words";
+"stamp.text.custom.placeholder" = "Words on the stamp";
+"stamp.text.style" = "Style";
+"stamp.text.outlined" = "Outlined";
+"stamp.text.filled" = "Filled";
+"stamp.text.keep" = "Keep in Your Stamps";
+"stamp.text.date" = "Add Today’s Date";
+"stamp.text.size" = "Size";
+"stamp.text.small" = "Small";
+"stamp.text.medium" = "Medium";
+"stamp.text.large" = "Large";
+"stamp.text.placement" = "Position";
+"stamp.text.place" = "Place";
+"stamp.text.note" = "A stamp becomes part of the page: you can move, edit or delete it later, and every export and printout includes it. Its words and date are written in when you place it. An export watermark marks only the exported copy.";
+"stamp.text.missing" = "Type the words for your stamp.";
+"stamp.text.failed" = "The stamp couldn’t be placed.";
+"stamp.text.keepFailed" = "The stamp couldn’t be kept in Your Stamps, so it wasn’t placed.";

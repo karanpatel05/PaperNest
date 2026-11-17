@@ -1271,3 +1271,29 @@
 "cleanup.failed" = "Impossible d’examiner les pages.";
 "cleanup.with.correctedText" = "Son texte corrigé disparaît avec elle.";
 "cleanup.lookedAgain" = "Le document a changé après l’examen : rien n’a été supprimé et il a été examiné de nouveau.";
+
+/* Text stamps */
+"stamp.text.title" = "Tampon texte";
+"stamp.text.presets" = "Tampons";
+"stamp.text.word.paid" = "PAYÉ";
+"stamp.text.word.received" = "REÇU";
+"stamp.text.word.reviewed" = "VÉRIFIÉ";
+"stamp.text.word.rejected" = "REFUSÉ";
+"stamp.text.saved" = "Vos tampons";
+"stamp.text.custom" = "Vos propres mots";
+"stamp.text.custom.placeholder" = "Texte du tampon";
+"stamp.text.style" = "Style";
+"stamp.text.outlined" = "Contour";
+"stamp.text.filled" = "Fond coloré";
+"stamp.text.keep" = "Garder dans vos tampons";
+"stamp.text.date" = "Ajouter la date du jour";
+"stamp.text.size" = "Taille";
+"stamp.text.small" = "Petit";
+"stamp.text.medium" = "Moyen";
+"stamp.text.large" = "Grand";
+"stamp.text.placement" = "Position";
+"stamp.text.place" = "Placer";
+"stamp.text.note" = "Un tampon fait partie de la page : vous pourrez le déplacer, le modifier ou le supprimer plus tard, et chaque export et impression l’inclut. Son texte et sa date sont écrits au moment où vous le placez. Un filigrane d’export ne marque que la copie exportée.";
+"stamp.text.missing" = "Saisissez le texte du tampon.";
+"stamp.text.failed" = "Impossible de placer le tampon.";
+"stamp.text.keepFailed" = "Le tampon n’a pas pu être gardé dans vos tampons, il n’a donc pas été placé.";

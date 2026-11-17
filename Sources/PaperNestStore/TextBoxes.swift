@@ -28,7 +28,7 @@ extension LibraryStore {
     public func placeText(_ text: String, on pageID: PageID, frame: CGRect,
                           fontSize: Double, color: RGBAColor,
                           alignment: TextBox.Alignment, fontFamily: TextBox.FontFamily = .sans,
-                          isBold: Bool = false, isItalic: Bool = false,
+                          isBold: Bool = false, isItalic: Bool = false, stamp: StampStyle? = nil,
                           preserveWhitespace: Bool = false) throws -> (page: Page, object: PageObject) {
         // Inline typing retains indentation and trailing newlines; older callers
         // retain the established trimmed behavior. Invisible boxes are refused.
@@ -51,7 +51,7 @@ extension LibraryStore {
                 pageID: pageID, zKey: key,
                 payload: .text(TextBox(frame: frame, text: words, fontSize: fontSize,
                                        color: color, alignment: alignment, fontFamily: fontFamily,
-                                       isBold: isBold, isItalic: isItalic)),
+                                       isBold: isBold, isItalic: isItalic, stamp: stamp)),
                 modifiedAt: timestamp)
             return (try applyObjectChanges(on: pageID, saving: [object], deleting: []), object)
         }
@@ -75,6 +75,9 @@ extension LibraryStore {
     ///
     /// The same write rebuilds the page's `text` index row, so the old words
     /// stop being findable as the new ones start.
+    ///
+    /// A stamp stays a stamp: its style is carried over from the box being
+    /// changed, which no caller passes back in.
     @discardableResult
     public func updateText(_ object: PageObject, text: String, frame: CGRect, fontSize: Double,
                            color: RGBAColor, alignment: TextBox.Alignment,
@@ -96,7 +99,8 @@ extension LibraryStore {
         updated.payload = .text(TextBox(frame: frame, text: words, fontSize: fontSize,
                                         color: color, alignment: alignment,
                                         fontFamily: fontFamily ?? previous.fontFamily,
-                                        isBold: isBold ?? previous.isBold, isItalic: isItalic ?? previous.isItalic))
+                                        isBold: isBold ?? previous.isBold, isItalic: isItalic ?? previous.isItalic,
+                                        stamp: previous.stamp))
         updated.modifiedAt = Date()
         return (try applyInkChanges(on: object.pageID, saving: [updated],
                                     replacing: [object], deleting: []), updated)
