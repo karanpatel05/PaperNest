@@ -1,3 +1,81 @@
+## 2026-11-16 — The PaperNest watermark: a branded preset, and a small mark on free exports that Pro removes (Claude, owner in session)
+
+Owner: "Yes, build it" (the PaperNest branded watermark), then, asked whether free exports should carry it
+automatically, chose **"Automatic on free exports"** — the Nov 15 decision "free version will have papernest
+watermark and paid will have option to remove". How it works: `docs/ARCHITECTURE.md` → Rendering, "The PaperNest mark".
+
+**What works.**
+- A **PaperNest** tile among the watermark presets: the app's real mark (`BrandMark`) beside its name, centred,
+  −32°, 14%, in the deep accent. The name is the brand's and cannot be retyped.
+- **Free exports carry a small PaperNest mark** in the bottom-left corner of every page, beside any chosen
+  watermark: the export sheet (a "PaperNest mark" switch, on for a free user, whose switching off opens the paywall
+  for the new Pro feature "Exports without the PaperNest mark"), bulk export and Compress. Pro starts with it off and
+  may turn it on. Nothing is marked until App Store products are configured, like the rest of Pro.
+- Never marked: the library backup, printing and the form workspace's saved copy.
+
+**Calls made here, for the owner to check.** The free mark is a separate small badge (brand mark and name,
+bottom-left, 55%), not the large diagonal preset, so the chosen Confidential/Draft/Approved/Custom stay free and the
+two never collide; "choosing None opens the paywall" became "switching the PaperNest mark off opens the paywall".
+**Two exemptions the owner should decide on:** the free library backup gives every document as an unmarked PDF in a
+ZIP, and printing (whose panel can save a PDF) is unmarked; both make "remove the mark" easy to get round.
+
+**Verification**, in clean detached worktrees outside iCloud. Final: `20b01bd` plus exactly the committed files.
+- `./scripts/test.sh` on the final tree: **1,315 passed, 0 failed, 0 warnings.** 20 are new: `WatermarkTests` 22 → 29,
+  `WatermarkExportTests` 10 → 17, `WatermarkDraftTests` 11 → 17. `LocalizationTests` passes with the 9 new keys in
+  en/fr/es; `SubscriptionStateTests` covers `removeWatermark` with every Pro feature.
+- **Shown to fail:** with the logo's fill and the attribution both stubbed out, 7 of the new tests failed (the logo
+  colour test and every free-mark export test).
+- `./scripts/build-mac-app.sh`: **passed, 0 warnings.** Mac interaction not exercised.
+- `xcodebuild build-for-testing -scheme PaperNest-iOS`: **TEST BUILD SUCCEEDED**, no warnings from the slice's files.
+- `WatermarkExportUITests`, 12 tests (3 new), run by a subagent on iPhone 17 Pro and iPad Pro 13-inch (M5), iOS 26.5,
+  with `xcodebuild test-without-building -only-testing`, in four rounds on the slice as it changed:
+  - Round 1 (before the review fixes): iPad 12/12; iPhone 11/12, the opacity drag lost its touch in a load spike
+    (recording: released after 15 of 178 points), 1/1 alone.
+  - Round 2 (review fixes, tiles two to a row): iPhone 12/12; iPad 11/12, `testWithoutProductsTheMarkStartsOff`
+    looked for the switch after the new preview had pushed it under the bar (a test scroll; fixed), then **12/12**.
+  - Round 3 (switch moved above the preview, reveal helper stops when the form will not move): iPhone 11/12 and iPad
+    10/12. Two were accessibility stalls at a load of about 160 that passed alone; the third, on the iPad in both runs,
+    was the rotation slider not taking XCUITest's `adjust` gesture when it was the last row, 30 points above the bar.
+  - Round 4: with the sliders scrolled 80 points clear of the bar, the slider test **passed on both devices**. A
+    diagnostic at the low position showed a plain press-and-drag moves the slider (0° → 74°): XCUITest's adjust
+    gesture, not the layout. The diagnostic was removed; the test file was compared with `cmp` afterwards.
+  - The other 11 tests' last results are round 3's on the same helper: all passed on both devices, two of them on a
+    rerun after a load stall. The scanner and Redact commits since (`ff24675`…`20b01bd`) touch none of the export files.
+- Screenshots seen: the PaperNest tile carries the brand mark; the switch is on with the free note; the preview shows
+  the small bottom-left mark; the paywall says "Included in PaperNest Pro: Exports without the PaperNest mark". No
+  hyphenation at two tiles to a row on iPad. A runtime log line predates this slice ("content type com.adobe.pdf not
+  included in its writableContentTypes", from the export sheet's save dialog).
+
+**Independent review** (a fresh subagent, read-only) found no route a free user can take to an unmarked PDF or
+picture besides the deliberate ones, and five faults, fixed before the final runs:
+- A paying user could be marked: entitlements load after launch, and buying Pro from the sheet left the switch on.
+  The switch now follows the entitlement (`onChange`), the export checks it again as it starts
+  (`ExportSheet.brandMarkToExport`), and bulk export and Compress wait for entitlements to load (and stop if cancelled
+  while waiting).
+- Compress said "The copy is the original size" for a marked copy, and neither it nor bulk export warned that the
+  mark redraws every page; both now say so, and Compress names the mark as the reason a copy is no smaller.
+- A picture with two marks was copied twice in memory; now one pass.
+- The Mac picked an upsampled logo; it now takes the asset's largest picture as it is.
+- Tests that proved less than they claimed: the corner check passed on the letters alone and the test logo was a
+  symmetric disc. New: a lopsided logo must come out upright on a picture and through a real PDF's soft mask;
+  `optionsToExport` no longer defaults to unmarked; the export-time recheck is tested.
+
+**Found on the way:** my own deliberate red run (attribution stubbed out) left a `PaperNestExport-…/Doc.txt` in the
+shared temp folder, because a refusal test discards output it did not expect; `BulkExportTests` then failed every
+time on that leftover. Removed it; the three refusal tests now clean up even when they fail.
+
+**Not done / limitations.**
+- No physical device, no VoiceOver pass, no Mac interaction (built, not used), no French or Spanish screenshot of
+  the new switch or tile.
+- The large branded preset's logo comes from a 144-pixel picture (96 on a thinned 2x iPad) and is soft at print
+  resolution; a vector logo would fix it.
+- The logo-loading code is tested on the Mac (`scripts/test.sh`); on iOS it is exercised only by the UI tests' tile
+  and preview, not asserted.
+- No end-to-end check reads a free user's exported file; the engine tests prove the mark is drawn when asked, the
+  sheet tests prove it is asked for.
+- The mark is vector and mask objects at the end of each PDF page: any PDF editor can remove it. It is attribution
+  and an upgrade nudge, not protection.
+
 ## 2026-11-17 — The Redact screen: mark areas, see the page as it will be written, apply; marks over the areas go with it (Claude, roadmap item 4)
 
 Owner in session ("Start doing it"): roadmap item 4's "manual redaction tool with a review-before-apply step", on the engine from 2026-10-27. Document Tools → Process → **Redact** opens a screen where areas are dragged across the page. **Review** shows the page drawn by the redaction engine itself, as it will be written, and says what goes with it. **Redact Page** applies it. The engine now also removes the ink, text boxes and placed pictures drawn over the areas, in the same operation: they are drawn over the page in every export, and a text box's words answer searches, so leaving them would show what was redacted. Private comments are never drawn and stay. Applying clears the document's Undo, because an Undo could put a removed mark back. Design: `docs/ARCHITECTURE.md` → Rendering, "Redaction".

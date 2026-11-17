@@ -19,6 +19,8 @@ enum ProFeature: String, CaseIterable, Identifiable, Sendable {
     case signature
     /// Saving a filled PDF form.
     case forms
+    /// Exporting without the small PaperNest mark free exports carry.
+    case removeWatermark
 
     static let freeNotebookAllowance = 3
 
@@ -34,6 +36,7 @@ enum ProFeature: String, CaseIterable, Identifiable, Sendable {
         case .markup: L10n.proFeatureMarkup
         case .signature: L10n.proFeatureSignature
         case .forms: L10n.proFeatureForms
+        case .removeWatermark: L10n.proFeatureRemoveWatermark
         }
     }
 
@@ -47,6 +50,7 @@ enum ProFeature: String, CaseIterable, Identifiable, Sendable {
         case .markup: "highlighter"
         case .signature: "signature"
         case .forms: "list.bullet.rectangle"
+        case .removeWatermark: "eye.slash"
         }
     }
 }

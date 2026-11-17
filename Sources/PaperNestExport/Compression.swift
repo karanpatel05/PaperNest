@@ -103,9 +103,12 @@ extension Exporter {
         pages: [Page],
         originalByteCount: Int64,
         preset: CompressionPreset,
+        attribution: Watermark? = nil,
         progress: @Sendable (ExportProgress) -> Void = { _ in }
     ) async throws -> CompressionResult {
-        let options = ExportOptions(format: .pdf, paperSize: .original)
+        // `attribution`: the PaperNest mark a free user's compressed copy
+        // carries, like any other export of theirs.
+        let options = ExportOptions(format: .pdf, paperSize: .original, attribution: attribution)
         let output = try await export(itemName: itemName, pages: pages, options: options,
                                       rasterQuality: preset.rasterQuality, progress: progress)
         return CompressionResult(preset: preset, originalByteCount: originalByteCount, output: output)

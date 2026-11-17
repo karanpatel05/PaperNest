@@ -78,7 +78,7 @@ public struct Exporter: Sendable {
                 throw ExportError.passwordNotRepresentable
             }
         }
-        if let watermark = options.watermark, watermark.isVisible, !options.canCarryWatermark {
+        if !options.drawnMarks.isEmpty, !options.canCarryWatermark {
             throw ExportError.watermarkNotSupported
         }
         let directory = temporaryRoot.appendingPathComponent("PaperNestExport-\(UUID().uuidString)", isDirectory: true)
@@ -288,7 +288,7 @@ public struct Exporter: Sendable {
             if !textLayer.isEmpty {
                 Self.drawSearchableText(textLayer, geometry: page.geometry, pageToContext: pageToContext, in: ctx)
             }
-            if let watermark = options.watermark, watermark.isVisible {
+            if !options.drawnMarks.isEmpty {
                 // Over the paper, not the page fitted onto it: a corner mark
                 // belongs in the corner of what the reader holds. Drawn as
                 // outlines, after the invisible text layer, so a search or a
@@ -296,7 +296,7 @@ public struct Exporter: Sendable {
                 ctx.saveGState()
                 ctx.translateBy(x: 0, y: layout.paperSize.height)
                 ctx.scaleBy(x: 1, y: -1)
-                WatermarkDrawing.draw(watermark, pageSize: layout.paperSize, in: ctx)
+                for mark in options.drawnMarks { WatermarkDrawing.draw(mark, pageSize: layout.paperSize, in: ctx) }
                 ctx.restoreGState()
             }
             ctx.endPDFPage()
@@ -476,8 +476,8 @@ public struct Exporter: Sendable {
             // app is paper: the page's annotations follow the author's print
             // flags, as they do in a PDF export of the same page.
             var image = try await renderer.renderImage(page, pixelsPerPoint: pixelsPerPoint, annotations: .paper)
-            if let watermark = options.watermark {
-                image = try WatermarkDrawing.applying(watermark, to: image, pageSize: page.geometry.pageSize)
+            if !options.drawnMarks.isEmpty {
+                image = try WatermarkDrawing.applying(options.drawnMarks, to: image, pageSize: page.geometry.pageSize)
             }
             guard let data = Self.encode(image, type: type, quality: options.jpegQuality, dpi: options.imageDPI) else {
                 throw ExportError.writeFailed

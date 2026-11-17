@@ -1174,6 +1174,17 @@ extension L10n {
     static var exportWatermarkTextPlaceholder: String { tr("export.watermark.text.placeholder") }
     static var exportWatermarkTextMissing: String { tr("export.watermark.text.missing") }
     static var exportWatermarkTextUndrawable: String { tr("export.watermark.text.undrawable") }
+    static var exportWatermarkPlacementBottomLeft: String { tr("export.watermark.placement.bottomLeft") }
+    static var exportWatermarkMark: String { tr("export.watermark.mark", Brand.displayName) }
+    static var exportWatermarkMarkFree: String { tr("export.watermark.mark.free", Brand.displayName) }
+    static var exportWatermarkMarkPro: String { tr("export.watermark.mark.pro", Brand.displayName) }
+    static var exportWatermarkPreviewMarkOnly: String { tr("export.watermark.preview.markOnly", Brand.displayName) }
+    static func exportWatermarkPreviewValueWithMark(_ preset: String, _ placement: String, _ opacity: String) -> String {
+        tr("export.watermark.preview.valueWithMark", preset, placement, opacity, Brand.displayName)
+    }
+    static var proFeatureRemoveWatermark: String { tr("pro.feature.removeWatermark", Brand.displayName) }
+    static var exportWatermarkFreeRedrawNote: String { tr("export.watermark.freeRedrawNote", Brand.displayName) }
+    static var exportWatermarkCompressNoGainMarked: String { tr("export.watermark.compressNoGainMarked", Brand.displayName) }
     static var exportWatermarkPlacement: String { tr("export.watermark.placement") }
     static var exportWatermarkPlacementCenter: String { tr("export.watermark.placement.center") }
     static var exportWatermarkPlacementTopRight: String { tr("export.watermark.placement.topRight") }

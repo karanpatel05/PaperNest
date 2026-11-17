@@ -140,6 +140,11 @@ public struct ExportOptions: Hashable, Sendable {
     /// form workspace and Compress — which build their own options — never
     /// draw one. It lives only here: the library stores nothing about it.
     public var watermark: Watermark?
+    /// The small PaperNest mark a free export carries (`Watermark.attribution`),
+    /// drawn after `watermark`. Set by the export sheet, bulk export and
+    /// Compress for someone without Pro; nil everywhere else, the backup and
+    /// printing included.
+    public var attribution: Watermark?
 
     public init(
         format: ExportFormat = .pdf,
@@ -150,7 +155,8 @@ public struct ExportOptions: Hashable, Sendable {
         packaging: ImagePackaging = .zip,
         includesRecognizedText: Bool = true,
         docxLayout: DocxLayout = .editableText,
-        watermark: Watermark? = nil
+        watermark: Watermark? = nil,
+        attribution: Watermark? = nil
     ) {
         self.format = format
         self.paperSize = paperSize
@@ -161,6 +167,7 @@ public struct ExportOptions: Hashable, Sendable {
         self.includesRecognizedText = includesRecognizedText
         self.docxLayout = docxLayout
         self.watermark = watermark
+        self.attribution = attribution
     }
 
     public static let imageDPIChoices = [72, 150, 200, 300]

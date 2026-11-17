@@ -38,20 +38,36 @@ import PaperNestStore
     /// half under the sheet's navigation bar still reports itself hittable,
     /// but a tap on it lands on the bar. Short drags that stop dead, so the
     /// form never flies past the element; and if it does go past, the next
-    /// drags come back for it.
-    private func reveal(_ element: XCUIElement, in app: XCUIApplication, upward: Bool = false) {
+    /// drags come back for it. A drag that leaves the element where it was
+    /// means the form is already at its end that way, so the next drags go
+    /// the other way; if it will not move either way, it stops.
+    /// `margin`: how far above the bottom bar the element must end. A
+    /// slider dragged as the last row, about 30 points above the bar on an
+    /// iPad, did not take XCUITest's drag (round 3, two runs); higher up it
+    /// does.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, upward: Bool = false, margin: CGFloat = 0) {
         let bar = app.buttons["export-destination-save"]
         var upward = upward
         var seen = false
+        var lastMinY: CGFloat?
+        var turnsAtAnEnd = 0
         for _ in 0..<16 {
             if element.exists {
+                let frame = element.frame
                 // The close button is the top bar's own, so it is never below it.
-                let clearOfTop = element.identifier == "export-close" || element.frame.minY >= formTop(in: app)
-                if element.isHittable, clearOfTop, !bar.exists || element.frame.maxY < bar.frame.minY { return }
+                let clearOfTop = element.identifier == "export-close" || frame.minY >= formTop(in: app)
+                if element.isHittable, clearOfTop, !bar.exists || frame.maxY < bar.frame.minY - margin { return }
+                if let lastMinY, abs(frame.minY - lastMinY) < 0.5 {
+                    turnsAtAnEnd += 1
+                    if turnsAtAnEnd > 1 { return }
+                    upward.toggle()
+                }
+                lastMinY = frame.minY
                 seen = true
             } else if seen {
                 upward.toggle()
                 seen = false
+                lastMinY = nil
             }
             dragForm(in: app, upward: upward)
         }
@@ -157,7 +173,7 @@ import PaperNestStore
         XCTAssertTrue(previewValue(app).contains("Bottom right"), "the preview did not follow the placement")
 
         let opacity = app.sliders["export-watermark-opacity"]
-        reveal(opacity, in: app)
+        reveal(opacity, in: app, margin: 80)
         let before = opacity.value as? String
         opacity.adjust(toNormalizedSliderPosition: 0.2)
         // Read before scrolling up to the preview, which can take the slider
@@ -168,7 +184,7 @@ import PaperNestStore
                       "the preview does not say the new opacity")
 
         let rotation = app.sliders["export-watermark-rotation"]
-        reveal(rotation, in: app)
+        reveal(rotation, in: app, margin: 80)
         let turned = rotation.value as? String
         rotation.adjust(toNormalizedSliderPosition: 0.8)
         XCTAssertNotEqual(rotation.value as? String, turned, "the rotation slider did not move")
@@ -211,6 +227,60 @@ import PaperNestStore
         reveal(confidential, in: app)
         XCTAssertTrue(confidential.waitForExistence(timeout: 5))
         XCTAssertTrue(confidential.isSelected, "the watermark was forgotten on the way back to PDF")
+    }
+
+    /// The branded preset shows the brand's name and offers nothing to retype.
+    func testThePaperNestPresetHasNoTextToChange() async throws {
+        let app = try await openExport()
+        defer { app.terminate() }
+        _ = choose("paperNest", in: app)
+        XCTAssertTrue(previewValue(app).contains("PaperNest"), "the preview does not say PaperNest")
+        XCTAssertFalse(app.textFields["export-watermark-text"].exists, "the brand's name can be retyped")
+        let center = app.buttons["export-watermark-placement-center"]
+        reveal(center, in: app)
+        XCTAssertTrue(center.isSelected, "the branded preset starts in the middle")
+    }
+
+    /// With no App Store products configured nobody is held to Free, so the
+    /// PaperNest mark starts off and switches on and off freely.
+    func testWithoutProductsTheMarkStartsOff() async throws {
+        let app = try await openExport()
+        defer { app.terminate() }
+        let mark = app.switches["export-watermark-brand-mark"]
+        reveal(mark, in: app)
+        XCTAssertTrue(mark.waitForExistence(timeout: 5), "the export sheet has no PaperNest mark switch")
+        XCTAssertEqual(mark.value as? String, "0", "the mark is on in a build with no products")
+        XCTAssertFalse(app.descendants(matching: .any)["export-watermark-preview"].exists)
+        (mark.switches.firstMatch.exists ? mark.switches.firstMatch : mark).tap()
+        // Switching the mark on adds the preview above the switch, which can
+        // push the switch below the bottom bar and out of the form's rows.
+        reveal(mark, in: app)
+        XCTAssertEqual(mark.value as? String, "1", "the mark could not be switched on")
+        XCTAssertTrue(previewValue(app).contains("PaperNest"), "the preview does not show the mark")
+    }
+
+    /// A free user's export carries the mark: the switch starts on, and
+    /// switching it off opens the paywall for that feature and leaves it on.
+    func testAFreeUserKeepsTheMarkUntilPro() async throws {
+        let app = try await openExport(extra: ["-PaperNestDebugProProducts", "test.papernest.pro.monthly"])
+        defer { app.terminate() }
+        let mark = app.switches["export-watermark-brand-mark"]
+        reveal(mark, in: app)
+        XCTAssertTrue(mark.waitForExistence(timeout: 5))
+        XCTAssertEqual(mark.value as? String, "1", "a free user's export is not marked")
+        (mark.switches.firstMatch.exists ? mark.switches.firstMatch : mark).tap()
+        let locked = app.descendants(matching: .any)["pro-locked-feature"]
+        XCTAssertTrue(locked.waitForExistence(timeout: 10), "switching the mark off did not open the paywall")
+        XCTAssertEqual(locked.value as? String, "removeWatermark")
+        snap(app, "free-mark-paywall-en")
+        let close = app.buttons["pro-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+        XCTAssertTrue(locked.waitForNonExistence(timeout: 10))
+        reveal(mark, in: app)
+        XCTAssertEqual(mark.value as? String, "1", "the mark came off without Pro")
+        XCTAssertTrue(previewValue(app).contains("PaperNest"), "the preview does not show the free mark")
+        snap(app, "free-mark-en")
     }
 
     func testCopyExportsWithTheWatermark() async throws {

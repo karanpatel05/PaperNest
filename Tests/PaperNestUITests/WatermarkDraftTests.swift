@@ -100,15 +100,15 @@ import PaperNestExport
         draft.placement = .tiled
         let day = Date(timeIntervalSince1970: 1_800_000_000)
         for format in [ExportFormat.pdf, .jpeg, .png, .heic] {
-            let options = ExportSheet.optionsToExport(ExportOptions(format: format), watermark: draft, on: day)
+            let options = ExportSheet.optionsToExport(ExportOptions(format: format), watermark: draft, includesBrandMark: false, on: day)
             #expect(options.watermark == draft.watermark(on: day), "\(format) lost the watermark")
             #expect(options.watermark?.placement == .tiled)
         }
         for options in [ExportOptions(format: .txt), ExportOptions(format: .docx),
                         ExportOptions(format: .docx, docxLayout: .pageImages)] {
-            #expect(ExportSheet.optionsToExport(options, watermark: draft).watermark == nil)
+            #expect(ExportSheet.optionsToExport(options, watermark: draft, includesBrandMark: false).watermark == nil)
         }
-        #expect(ExportSheet.optionsToExport(ExportOptions(format: .pdf), watermark: WatermarkDraft()).watermark == nil)
+        #expect(ExportSheet.optionsToExport(ExportOptions(format: .pdf), watermark: WatermarkDraft(), includesBrandMark: false).watermark == nil)
     }
 
     @Test func theDateIsWrittenInTheReadersLanguage() throws {
@@ -133,6 +133,82 @@ import PaperNestExport
         #expect(said.contains(WatermarkDraft.percent(draft.opacity)))
     }
 
+    // MARK: - The PaperNest watermark
+
+    /// The branded preset stamps the brand's own name beside its real mark,
+    /// and offers nothing to retype.
+    @Test func thePaperNestPresetUsesTheBrandsNameAndMark() throws {
+        var draft = WatermarkDraft()
+        draft.choose(.paperNest)
+        #expect(draft.text == Brand.displayName)
+        #expect(draft.problem == nil)
+        let mark = try #require(draft.watermark())
+        #expect(mark.shape == .brand)
+        #expect(mark.text == Brand.displayName)
+        #expect(mark.logo != nil, "the brand mark's logo did not load")
+        // Even if the text were changed under it, the name stays the brand's.
+        draft.text = "Someone else"
+        #expect(draft.watermark()?.text == Brand.displayName)
+    }
+
+    /// The app's real mark loads as a mask: some of it paints, some does not.
+    @Test func theBrandLogoLoadsAsAMask() throws {
+        let logo = try #require(BrandMark.watermarkLogo)
+        let mask = logo.mask
+        var buffer = [UInt8](repeating: 0, count: mask.width * mask.height)
+        let ctx = try #require(CGContext(data: &buffer, width: mask.width, height: mask.height, bitsPerComponent: 8,
+                                         bytesPerRow: mask.width, space: CGColorSpaceCreateDeviceGray(),
+                                         bitmapInfo: CGImageAlphaInfo.none.rawValue))
+        ctx.draw(mask, in: CGRect(x: 0, y: 0, width: mask.width, height: mask.height))
+        #expect(buffer.contains { $0 > 240 }, "no part of the mark paints")
+        #expect(buffer.contains { $0 < 15 }, "every part of the mark paints")
+        #expect(mask.width >= 64, "the logo is a thumbnail")
+    }
+
+    /// The mark free exports carry goes on every format that can hold one,
+    /// and only when the sheet's switch is on.
+    @Test func theFreeMarkReachesEveryExportThatCanCarryIt() throws {
+        for format in [ExportFormat.pdf, .jpeg, .png, .heic] {
+            let options = ExportSheet.optionsToExport(ExportOptions(format: format), watermark: WatermarkDraft(),
+                                                      includesBrandMark: true)
+            let mark = try #require(options.attribution, "\(format) lost the PaperNest mark")
+            #expect(mark.placement == .bottomLeft)
+            #expect(mark.text == Brand.displayName)
+            #expect(mark.logo != nil)
+            #expect(options.watermark == nil, "None is still None beside the mark")
+        }
+        for options in [ExportOptions(format: .txt), ExportOptions(format: .docx)] {
+            #expect(ExportSheet.optionsToExport(options, watermark: WatermarkDraft(), includesBrandMark: true).attribution == nil)
+        }
+        #expect(ExportSheet.optionsToExport(ExportOptions(format: .pdf), watermark: WatermarkDraft(), includesBrandMark: false).attribution == nil)
+    }
+
+    /// Where the switch starts, and what bulk export and Compress are given.
+    @Test func freeUsersAreMarkedAndProIsNot() {
+        #expect(ExportSheet.defaultIncludesBrandMark(allowsRemoval: false))
+        #expect(!ExportSheet.defaultIncludesBrandMark(allowsRemoval: true))
+        #expect(Watermark.freeExportMark(allowsRemoval: true) == nil)
+        #expect(Watermark.freeExportMark(allowsRemoval: false)?.placement == .bottomLeft)
+    }
+
+    /// The export checks the entitlement again as it starts: a switch left
+    /// off by someone whose subscription has since lapsed still marks.
+    @Test func theExportChecksTheEntitlementAgain() {
+        #expect(ExportSheet.brandMarkToExport(switchOn: true, allowsRemoval: true))
+        #expect(!ExportSheet.brandMarkToExport(switchOn: false, allowsRemoval: true))
+        #expect(ExportSheet.brandMarkToExport(switchOn: false, allowsRemoval: false))
+        #expect(ExportSheet.brandMarkToExport(switchOn: true, allowsRemoval: false))
+    }
+
+    @Test func thePreviewSaysWhenTheMarkIsThere() {
+        var draft = WatermarkDraft()
+        #expect(draft.previewDescription(includesBrandMark: true) == L10n.exportWatermarkPreviewMarkOnly)
+        draft.choose(.draft)
+        let said = draft.previewDescription(includesBrandMark: true)
+        #expect(said.contains(L10n.exportWatermarkDraft))
+        #expect(said.contains(Brand.displayName))
+    }
+
     /// The preview is the page on its paper with the export's own drawing
     /// over the paper: on Letter, a Draft capsule sits in the paper's corner,
     /// above a square page that does not reach it.
@@ -144,7 +220,7 @@ import PaperNestExport
         page.fill(CGRect(x: 0, y: 0, width: 300, height: 300))
         let layout = PaperLayout(pageSize: CGSize(width: 600, height: 600), paper: .usLetter)
         let mark = Watermark(preset: .draft, text: "DRAFT")
-        let composed = try #require(WatermarkPreview.draw(page.makeImage()!, layout: layout, watermark: mark))
+        let composed = try #require(WatermarkPreview.draw(page.makeImage()!, layout: layout, marks: [mark]))
         #expect(abs(Double(composed.width) / Double(composed.height) - 612.0 / 792.0) < 0.01)
 
         var buffer = [UInt8](repeating: 0, count: composed.width * composed.height * 4)

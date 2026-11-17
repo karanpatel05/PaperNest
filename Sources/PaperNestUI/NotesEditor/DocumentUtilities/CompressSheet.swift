@@ -24,6 +24,9 @@ struct CompressSheet: View {
     @State private var task: Task<Void, Never>?
     @State private var isSaving = false
     @State private var shareRequest: ShareRequest?
+    /// Whether the last copy made carries the PaperNest mark, which redraws
+    /// every page: such a copy is never "the original size".
+    @State private var lastCopyMarked = false
 
     enum Phase {
         case choosing
@@ -96,6 +99,9 @@ struct CompressSheet: View {
                 PanelSection(title: L10n.compressLevel) {
                     levelPicker.disabled(isWorking)
                     note(L10n.compressRule)
+                    if !SubscriptionStore.shared.allows(.removeWatermark) {
+                        note(L10n.exportWatermarkFreeRedrawNote).accessibilityIdentifier("compress-mark-note")
+                    }
                 }
                 .onChange(of: preset) { _, _ in clearResult() }
                 status
@@ -172,7 +178,8 @@ struct CompressSheet: View {
                                              (result.savedFraction ?? 0).formatted(.percent.precision(.fractionLength(0)))))
                         .font(.subheadline.weight(.semibold))
                 } else {
-                    Text(L10n.compressNoGain).font(.subheadline.weight(.semibold))
+                    Text(lastCopyMarked ? L10n.exportWatermarkCompressNoGainMarked : L10n.compressNoGain)
+                        .font(.subheadline.weight(.semibold))
                 }
             }
             .padding(14)
@@ -243,8 +250,15 @@ struct CompressSheet: View {
         phase = .working(0)
         task = Task {
             do {
+                // A free user's compressed copy carries the PaperNest mark too,
+                // decided once entitlements have loaded.
+                if !SubscriptionStore.shared.hasLoaded { await SubscriptionStore.shared.refresh() }
+                try Task.checkCancellation()
+                let freeMark = Watermark.freeExportMark
+                lastCopyMarked = freeMark != nil
                 let result = try await exporter.compress(itemName: loaded.name, pages: loaded.pages,
-                                                         originalByteCount: loaded.bytes, preset: preset) { progress in
+                                                         originalByteCount: loaded.bytes, preset: preset,
+                                                         attribution: freeMark) { progress in
                     let fraction = progress.totalPages > 0 ? Double(progress.completedPages) / Double(progress.totalPages) : 0
                     Task { @MainActor in if case .working = phase { phase = .working(fraction) } }
                 }

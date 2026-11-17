@@ -155,16 +155,16 @@ import PaperNestTestSupport
         let (item, pages) = try await f.importPDF(["Words only"])
         for format in [ExportFormat.txt, .docx] {
             await #expect(throws: ExportError.watermarkNotSupported) {
-                _ = try await f.exporter.export(itemName: item.name, pages: pages,
-                                                options: ExportOptions(format: format, watermark: confidential))
+                try await f.exporter.export(itemName: item.name, pages: pages,
+                                        options: ExportOptions(format: format, watermark: confidential)).removeTemporaryFiles()
             }
         }
         // Word's page pictures could carry one, but drawing on them is not
         // built, so that layout refuses too rather than leaving it off.
         await #expect(throws: ExportError.watermarkNotSupported) {
-            _ = try await f.exporter.export(
+            try await f.exporter.export(
                 itemName: item.name, pages: pages,
-                options: ExportOptions(format: .docx, docxLayout: .pageImages, watermark: confidential))
+                options: ExportOptions(format: .docx, docxLayout: .pageImages, watermark: confidential)).removeTemporaryFiles()
         }
         // With nothing to draw there is nothing to refuse.
         let output = try await f.exporter.export(
@@ -212,6 +212,131 @@ import PaperNestTestSupport
         let document = try pdf(output)
         #expect(!document.allowsCopying, "the watermark wrote the author's limit away")
         #expect(try middle(of: Data(contentsOf: output.files[0])).count > 1_000, "the closed PDF carries no mark")
+    }
+
+    // MARK: - The mark free exports carry
+
+    private let freeMark = Watermark.attribution(name: "PaperNest", logo: syntheticLogo())
+
+    /// How much of the bottom-left corner is coloured, and with what.
+    private func corner(of image: CGImage) -> (count: Int, red: Double, green: Double, blue: Double) {
+        let bitmap = WatermarkBitmap(image)
+        let w = CGFloat(bitmap.width), h = CGFloat(bitmap.height)
+        return bitmap.marked(in: CGRect(x: 0, y: h * 0.93, width: w * 0.26, height: h * 0.07))
+    }
+
+    @Test func theFreeMarkIsOnEveryPageBesideTheChosenWatermark() async throws {
+        let f = try ExportFixture()
+        let (item, pages) = try await f.importPDF(["", ""])
+        let output = try await f.exporter.export(
+            itemName: item.name, pages: pages,
+            options: ExportOptions(format: .pdf, watermark: confidential, attribution: freeMark))
+        defer { output.removeTemporaryFiles() }
+        let data = try Data(contentsOf: output.files[0])
+        for index in 0..<2 {
+            let image = try #require(PixelProbe.renderPDFPage(data, index: index, scale: 1))
+            let mark = corner(of: image)
+            #expect(mark.count > 100, "page \(index + 1) has no PaperNest mark")
+            #expect(mark.blue > mark.green + 20, "page \(index + 1)'s mark is not the brand's purple")
+            #expect(try middle(of: data, page: index).count > 1_000, "the chosen watermark went missing beside it")
+        }
+        // Outlines, like every watermark: never found in the page's text.
+        #expect(try pdf(output).string?.contains("PaperNest") != true)
+    }
+
+    /// Through a real PDF — the logo goes through a soft mask there — the
+    /// logo is painted, in its square, the right way up.
+    @Test func aPDFPaintsTheLogoUpright() async throws {
+        let f = try ExportFixture()
+        let (item, pages) = try await f.importPDF([""])
+        let side = 64
+        let ctx = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: side / 2, width: side, height: side / 2))
+        let topHalf = try #require(WatermarkLogo(name: "top-half", template: ctx.makeImage()!))
+        let mark = Watermark(preset: .paperNest, text: "PaperNest", opacity: 1, rotation: 0, logo: topHalf)
+        let output = try await f.exporter.export(itemName: item.name, pages: pages,
+                                                 options: ExportOptions(format: .pdf, watermark: mark))
+        defer { output.removeTemporaryFiles() }
+        let laid = try #require(WatermarkDrawing.marks(for: mark, pageSize: CGSize(width: 612, height: 792)).first)
+        let image = try #require(PixelProbe.renderPDFPage(try Data(contentsOf: output.files[0]), index: 0, scale: 1))
+        let bitmap = WatermarkBitmap(image)
+        let s = CGFloat(bitmap.width) / 612
+        let square = CGRect(x: laid.boundingBox.minX * s, y: laid.boundingBox.minY * s,
+                            width: laid.boundingBox.height * s, height: laid.boundingBox.height * s)
+        let top = bitmap.marked(in: CGRect(x: square.minX + 2, y: square.minY + 2, width: square.width - 4, height: square.height / 2 - 4))
+        let bottom = bitmap.marked(in: CGRect(x: square.minX + 2, y: square.midY + 2, width: square.width - 4, height: square.height / 2 - 4))
+        #expect(top.count > Int(square.width * square.height * 0.3), "the logo is not painted in a PDF")
+        #expect(top.count > bottom.count * 10, "the logo is upside down in a PDF (top \(top.count), bottom \(bottom.count))")
+    }
+
+    @Test func picturesCarryTheFreeMarkToo() async throws {
+        let f = try ExportFixture()
+        let (item, pages) = try await f.importPDF([""])
+        let output = try await f.exporter.export(itemName: item.name, pages: pages,
+                                                 options: ExportOptions(format: .png, imageDPI: 72, attribution: freeMark))
+        defer { output.removeTemporaryFiles() }
+        let image = try #require(PixelProbe.decode(try Data(contentsOf: output.files[0])))
+        #expect(corner(of: image).count > 100)
+    }
+
+    @Test func theFreeMarkStopsAnUntouchedPDFBeingHandedBack() async throws {
+        let f = try ExportFixture()
+        let source = SyntheticDocuments.textPDF(pages: ["Untouched page"])
+        let item = try await f.importer.importItem(.data(source, name: "Plain"))
+        let pages = try await f.store.pages(of: item.id)
+        let output = try await f.exporter.export(itemName: item.name, pages: pages,
+                                                 options: ExportOptions(format: .pdf, attribution: freeMark))
+        defer { output.removeTemporaryFiles() }
+        #expect(try Data(contentsOf: output.files[0]) != source)
+        #expect(try pdf(output).page(at: 0)?.string?.contains("Untouched page") == true)
+    }
+
+    /// Bulk export marks its PDFs when asked; the backup, which asks for
+    /// nothing, is never marked.
+    @Test func archivesCarryTheFreeMarkOnlyWhenAsked() async throws {
+        let f = try ExportFixture()
+        let (item, pages) = try await f.importPDF([""])
+        let entry = LibraryExportEntry.document(LibraryExportItem(name: item.name, pages: pages))
+        func firstPage(_ output: ExportOutput) throws -> CGImage {
+            let unpacked = output.directory.appendingPathComponent("unpacked", isDirectory: true)
+            _ = try unzip(["-q", output.files[0].path, "-d", unpacked.path])
+            let data = try Data(contentsOf: unpacked.appendingPathComponent("\(item.name).pdf"))
+            return try #require(PixelProbe.renderPDFPage(data, index: 0, scale: 1))
+        }
+        let marked = try await f.exporter.exportArchive(
+            [entry], archiveName: "Selection",
+            pdfOptions: ExportOptions(format: .pdf, paperSize: .original, pdfImageQuality: .balanced, attribution: freeMark))
+        defer { marked.removeTemporaryFiles() }
+        #expect(corner(of: try firstPage(marked)).count > 100, "a free user's bulk export is unmarked")
+        let backup = try await f.exporter.exportArchive([entry], archiveName: "Backup")
+        defer { backup.removeTemporaryFiles() }
+        #expect(corner(of: try firstPage(backup)).count == 0, "the backup was marked")
+    }
+
+    @Test func compressedCopiesCarryTheFreeMarkOnlyWhenAsked() async throws {
+        let f = try ExportFixture()
+        let (item, pages) = try await f.importPDF([""])
+        let marked = try await f.exporter.compress(itemName: item.name, pages: pages, originalByteCount: 1,
+                                                   preset: .strong, attribution: freeMark)
+        defer { marked.output.removeTemporaryFiles() }
+        let markedPage = try #require(PixelProbe.renderPDFPage(try Data(contentsOf: marked.output.files[0]), index: 0, scale: 1))
+        #expect(corner(of: markedPage).count > 100)
+        let plain = try await f.exporter.compress(itemName: item.name, pages: pages, originalByteCount: 1, preset: .strong)
+        defer { plain.output.removeTemporaryFiles() }
+        let plainPage = try #require(PixelProbe.renderPDFPage(try Data(contentsOf: plain.output.files[0]), index: 0, scale: 1))
+        #expect(corner(of: plainPage).count == 0)
+    }
+
+    @Test func aTextFileRefusesTheFreeMarkToo() async throws {
+        let f = try ExportFixture()
+        let (item, pages) = try await f.importPDF(["Words only"])
+        await #expect(throws: ExportError.watermarkNotSupported) {
+            try await f.exporter.export(itemName: item.name, pages: pages,
+                                        options: ExportOptions(format: .txt, attribution: freeMark)).removeTemporaryFiles()
+        }
     }
 
     /// The editable original and its pages are exactly as they were.

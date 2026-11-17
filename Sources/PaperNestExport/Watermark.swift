@@ -6,6 +6,10 @@ import PaperNestCore
 /// colour; text, placement, opacity, rotation and the date line are the
 /// person's, starting from the preset's defaults.
 public enum WatermarkPreset: String, CaseIterable, Codable, Sendable {
+    /// The app's own mark and name, large and diagonal across the page in
+    /// PaperNest's deep accent; also, small in a corner, the mark free
+    /// exports carry (`Watermark.attribution`).
+    case paperNest
     /// Large diagonal word across the page, in a muted red.
     case confidential
     /// Small tinted capsule in the top-right corner, in PaperNest's accent.
@@ -20,6 +24,7 @@ public enum WatermarkPreset: String, CaseIterable, Codable, Sendable {
         case .confidential, .custom: .text
         case .draft: .capsule
         case .approved: .stamp
+        case .paperNest: .brand
         }
     }
 
@@ -34,12 +39,14 @@ public enum WatermarkPreset: String, CaseIterable, Codable, Sendable {
         case .draft: RGBAColor(red: 0.459, green: 0.271, blue: 0.973)
         case .approved: RGBAColor(red: 0.176, green: 0.541, blue: 0.404)
         case .custom: RGBAColor(red: 0.20, green: 0.25, blue: 0.40)
+        // `Theme.deepAccent` (#5521CB), as the design asks for the brand.
+        case .paperNest: RGBAColor(red: 0.333, green: 0.129, blue: 0.796)
         }
     }
 
     public var defaultPlacement: WatermarkPlacement {
         switch self {
-        case .confidential, .custom: .center
+        case .confidential, .custom, .paperNest: .center
         case .draft: .topRight
         case .approved: .bottomRight
         }
@@ -49,6 +56,8 @@ public enum WatermarkPreset: String, CaseIterable, Codable, Sendable {
         switch self {
         case .confidential: 0.18
         case .custom: 0.16
+        // Inside the design's 0.10–0.16.
+        case .paperNest: 0.14
         case .draft: 0.9
         case .approved: 0.85
         }
@@ -57,7 +66,7 @@ public enum WatermarkPreset: String, CaseIterable, Codable, Sendable {
     /// Degrees, turning clockwise as seen on the page: −32 rises to the right.
     public var defaultRotation: Double {
         switch self {
-        case .confidential, .custom: -32
+        case .confidential, .custom, .paperNest: -32
         case .draft, .approved: 0
         }
     }
@@ -71,10 +80,15 @@ public enum WatermarkShape: Sendable {
     case capsule
     /// Letters inside an outlined rounded rectangle, like a rubber stamp.
     case stamp
+    /// A logo beside the letters, with nothing behind them.
+    case brand
 }
 
 public enum WatermarkPlacement: String, CaseIterable, Codable, Sendable {
     case center, topRight, bottomRight
+    /// Where free exports carry the PaperNest mark, clear of every preset's
+    /// own corner. Not offered in the export sheet for that reason.
+    case bottomLeft
     /// The mark repeated across the whole page.
     case tiled
 }
@@ -100,15 +114,26 @@ public struct Watermark: Hashable, Sendable {
     public var rotation: Double { didSet { rotation = Self.clamp(rotation, to: Self.rotationRange) } }
     /// A second, smaller line under the text, such as a date. Nil for none.
     public var dateLine: String?
+    /// Drawn beside the letters by the `.brand` shape; other shapes ignore it.
+    public var logo: WatermarkLogo?
 
     public init(preset: WatermarkPreset, text: String, placement: WatermarkPlacement? = nil,
-                opacity: Double? = nil, rotation: Double? = nil, dateLine: String? = nil) {
+                opacity: Double? = nil, rotation: Double? = nil, dateLine: String? = nil,
+                logo: WatermarkLogo? = nil) {
         self.preset = preset
         self.text = Self.limited(text)
         self.placement = placement ?? preset.defaultPlacement
         self.opacity = Self.clamp(opacity ?? preset.defaultOpacity, to: Self.opacityRange)
         self.rotation = Self.clamp(rotation ?? preset.defaultRotation, to: Self.rotationRange)
         self.dateLine = dateLine
+        self.logo = logo
+    }
+
+    /// The mark free exports carry: the app's mark and name, small, in the
+    /// bottom-left corner of every page, upright and half-strength. One
+    /// definition, so the export sheet, bulk export and Compress agree.
+    public static func attribution(name: String, logo: WatermarkLogo?) -> Watermark {
+        Watermark(preset: .paperNest, text: name, placement: .bottomLeft, opacity: 0.55, rotation: 0, logo: logo)
     }
 
     public var shape: WatermarkShape { preset.shape }
@@ -147,7 +172,51 @@ extension ExportFormat {
     public var canCarryWatermark: Bool { !keepsOnlyWords }
 }
 
+/// A logo for the `.brand` shape, kept as a mask so it takes the
+/// watermark's colour: white paints, black leaves the page as it is.
+///
+/// Built from a **template** image — white pixels whose alpha is the shape,
+/// which is how `BrandMark` stores the app's mark — by drawing it over black
+/// in grey: what comes out is the alpha. Equal when built from the same named
+/// image at the same size, so a `Watermark` stays cheap to compare.
+public struct WatermarkLogo: Hashable, Sendable {
+    public let name: String
+    public let mask: CGImage
+
+    public init?(name: String, template: CGImage) {
+        let width = template.width, height = template.height
+        guard width > 0, height > 0,
+              let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)
+        else { return nil }
+        let whole = CGRect(x: 0, y: 0, width: width, height: height)
+        ctx.setFillColor(gray: 0, alpha: 1)
+        ctx.fill(whole)
+        ctx.draw(template, in: whole)
+        guard let mask = ctx.makeImage() else { return nil }
+        self.name = name
+        self.mask = mask
+    }
+
+    public static func == (lhs: WatermarkLogo, rhs: WatermarkLogo) -> Bool {
+        lhs.name == rhs.name && lhs.mask.width == rhs.mask.width && lhs.mask.height == rhs.mask.height
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(name)
+        hasher.combine(mask.width)
+        hasher.combine(mask.height)
+    }
+}
+
 extension ExportOptions {
+    /// What this export draws over each page, in order: the person's
+    /// watermark, then the PaperNest mark a free export carries. Only marks
+    /// with something to draw.
+    public var drawnMarks: [Watermark] {
+        [watermark, attribution].compactMap { $0 }.filter(\.isVisible)
+    }
+
     /// Whether this export can carry a watermark: PDF, JPEG, PNG and HEIC.
     /// Word is left out in both layouts for now — editable text has no
     /// page to draw on, and drawing on Word's page pictures is not built.

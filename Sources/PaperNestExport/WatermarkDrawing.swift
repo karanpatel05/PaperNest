@@ -82,7 +82,15 @@ public enum WatermarkDrawing {
     /// export draws through this, and so does the export sheet's preview.
     /// The picture is returned unchanged when there is nothing to draw.
     public static func applying(_ watermark: Watermark, to image: CGImage, pageSize: CGSize) throws -> CGImage {
-        guard watermark.isVisible, pageSize.width > 0, pageSize.height > 0 else { return image }
+        try applying([watermark], to: image, pageSize: pageSize)
+    }
+
+    /// Every mark in `marks` over one copy of the picture, in order. One copy
+    /// rather than one per mark: a picture of a large page is hundreds of
+    /// megabytes, and a free export with a watermark chosen draws two.
+    public static func applying(_ marks: [Watermark], to image: CGImage, pageSize: CGSize) throws -> CGImage {
+        let marks = marks.filter(\.isVisible)
+        guard !marks.isEmpty, pageSize.width > 0, pageSize.height > 0 else { return image }
         let width = image.width, height = image.height
         // Opaque, like the picture it is drawn over: a page picture leaving
         // the app is already on white paper (`renderImage`).
@@ -95,7 +103,7 @@ public enum WatermarkDrawing {
         // Bitmap space is y-up in pixels; page space is y-down in points.
         ctx.translateBy(x: 0, y: CGFloat(height))
         ctx.scaleBy(x: CGFloat(width) / pageSize.width, y: -CGFloat(height) / pageSize.height)
-        draw(watermark, pageSize: pageSize, in: ctx)
+        for mark in marks { draw(mark, pageSize: pageSize, in: ctx) }
         guard let result = ctx.makeImage() else { throw ExportError.writeFailed }
         return result
     }
@@ -114,7 +122,7 @@ public enum WatermarkDrawing {
         // most of the page in the middle, inside the margins in a corner.
         let room: CGSize = switch watermark.placement {
         case .center: CGSize(width: pageSize.width * 0.85, height: pageSize.height * 0.85)
-        case .topRight, .bottomRight:
+        case .topRight, .bottomRight, .bottomLeft:
             CGSize(width: pageSize.width - 2 * margin, height: pageSize.height - 2 * margin)
         case .tiled:
             // Half the page at most, so long text still repeats rather than
@@ -139,6 +147,8 @@ public enum WatermarkDrawing {
         case .bottomRight:
             return (art, [mark(at: CGPoint(x: pageSize.width - margin - box.width / 2,
                                            y: pageSize.height - margin - box.height / 2))])
+        case .bottomLeft:
+            return (art, [mark(at: CGPoint(x: margin + box.width / 2, y: pageSize.height - margin - box.height / 2))])
         case .tiled:
             // Rows offset by half a step, like brickwork, starting beyond the
             // page's edges so the paper is covered right to its corners.
@@ -163,16 +173,15 @@ public enum WatermarkDrawing {
 
     /// Starting letter height in units, before a mark is made smaller to fit.
     private static func baseFontSize(_ shape: WatermarkShape, placement: WatermarkPlacement) -> CGFloat {
-        switch (placement, shape) {
-        case (.center, .text): 120
-        case (.center, .capsule): 40
-        case (.center, .stamp): 56
-        case (.tiled, .text): 30
-        case (.tiled, .capsule): 14
-        case (.tiled, .stamp): 20
-        case (.topRight, .text), (.bottomRight, .text): 16
-        case (.topRight, .capsule), (.bottomRight, .capsule): 12
-        case (.topRight, .stamp), (.bottomRight, .stamp): 18
+        switch placement {
+        case .center:
+            switch shape { case .text: 120; case .capsule: 40; case .stamp: 56; case .brand: 64 }
+        case .tiled:
+            switch shape { case .text: 30; case .capsule: 14; case .stamp: 20; case .brand: 22 }
+        case .topRight, .bottomRight, .bottomLeft:
+            // The brand in a corner is the free-export mark: small enough to
+            // leave the page usable, large enough to read.
+            switch shape { case .text: 16; case .capsule: 12; case .stamp: 18; case .brand: 11 }
         }
     }
 
@@ -196,27 +205,44 @@ public enum WatermarkDrawing {
         let date: GlyphRun?
         let mainOrigin: CGPoint
         let dateOrigin: CGPoint
+        /// The `.brand` shape's logo and where it sits; nil for other shapes
+        /// or a brand mark built without one.
+        let logo: (mask: CGImage, frame: CGRect)?
 
         init(_ watermark: Watermark, fontSize: CGFloat) {
             self.fontSize = fontSize
             let shape = watermark.shape
             // Spaced capitals for a large word across the page, as the design
-            // asks for CONFIDENTIAL; a little for the smaller shapes.
-            let tracking: CGFloat = shape == .text ? 0.08 : 0.04
+            // asks for CONFIDENTIAL; a little for the smaller shapes; the
+            // brand's name keeps its own spacing.
+            let tracking: CGFloat = switch shape { case .text: 0.08; case .capsule, .stamp: 0.04; case .brand: 0.01 }
             main = GlyphRun(watermark.drawnText, fontSize: fontSize, emphasized: true, tracking: tracking)
             date = watermark.drawnDateLine.map { GlyphRun($0, fontSize: fontSize * 0.5, emphasized: false, tracking: 0.02) }
             let gap = date == nil ? 0 : fontSize * 0.18
-            let contentWidth = max(main.size.width, date?.size.width ?? 0)
-            let contentHeight = main.size.height + gap + (date?.size.height ?? 0)
+            let textWidth = max(main.size.width, date?.size.width ?? 0)
+            let textHeight = main.size.height + gap + (date?.size.height ?? 0)
+            // The logo is a square as tall as the name's line, set before it.
+            let logoSide: CGFloat = shape == .brand && watermark.logo != nil ? main.size.height * 1.1 : 0
+            let logoGap: CGFloat = logoSide > 0 ? fontSize * 0.3 : 0
+            let contentWidth = logoSide + logoGap + textWidth
+            let contentHeight = max(textHeight, logoSide)
             let padding: CGSize = switch shape {
-            case .text: .zero
+            case .text, .brand: .zero
             case .capsule: CGSize(width: fontSize * 0.85, height: fontSize * 0.55)
             case .stamp: CGSize(width: fontSize * 0.75, height: fontSize * 0.5)
             }
             size = CGSize(width: contentWidth + 2 * padding.width, height: contentHeight + 2 * padding.height)
-            mainOrigin = CGPoint(x: padding.width + (contentWidth - main.size.width) / 2, y: padding.height)
-            dateOrigin = CGPoint(x: padding.width + (contentWidth - (date?.size.width ?? 0)) / 2,
-                                 y: padding.height + main.size.height + gap)
+            let textLeft = padding.width + logoSide + logoGap
+            let textTop = padding.height + (contentHeight - textHeight) / 2
+            mainOrigin = CGPoint(x: textLeft + (textWidth - main.size.width) / 2, y: textTop)
+            dateOrigin = CGPoint(x: textLeft + (textWidth - (date?.size.width ?? 0)) / 2,
+                                 y: textTop + main.size.height + gap)
+            if logoSide > 0, let mark = watermark.logo {
+                logo = (mark.mask, CGRect(x: padding.width, y: padding.height + (contentHeight - logoSide) / 2,
+                                          width: logoSide, height: logoSide))
+            } else {
+                logo = nil
+            }
         }
 
         func draw(shape: WatermarkShape, color: RGBAColor, in ctx: CGContext) {
@@ -225,6 +251,19 @@ public enum WatermarkDrawing {
             switch shape {
             case .text:
                 break
+            case .brand:
+                if let logo {
+                    // The mask is an image, drawn y-up: flip within its own
+                    // square, then paint the watermark's colour through it.
+                    ctx.saveGState()
+                    ctx.translateBy(x: logo.frame.minX, y: logo.frame.maxY)
+                    ctx.scaleBy(x: 1, y: -1)
+                    let square = CGRect(origin: .zero, size: logo.frame.size)
+                    ctx.clip(to: square, mask: logo.mask)
+                    ctx.setFillColor(ink)
+                    ctx.fill(square)
+                    ctx.restoreGState()
+                }
             case .capsule:
                 // Never more than half the shorter side: one narrow letter
                 // ("I", "1") makes a capsule narrower than it is tall.

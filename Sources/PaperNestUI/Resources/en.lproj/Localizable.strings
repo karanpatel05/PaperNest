@@ -1048,6 +1048,15 @@
 "export.watermark.text.placeholder" = "Your text";
 "export.watermark.text.missing" = "Enter the text to show on each page.";
 "export.watermark.text.undrawable" = "These characters can’t be drawn in a watermark. Use letters or numbers.";
+"export.watermark.placement.bottomLeft" = "Bottom left";
+"export.watermark.mark" = "%@ mark";
+"export.watermark.mark.free" = "Free exports carry a small %1$@ mark in the corner of each page. Remove it with %1$@ Pro.";
+"export.watermark.mark.pro" = "Adds a small %@ mark in the corner of each page.";
+"export.watermark.preview.markOnly" = "%@ mark in the corner";
+"export.watermark.preview.valueWithMark" = "%1$@, %2$@, opacity %3$@, and the %4$@ mark";
+"pro.feature.removeWatermark" = "Exports without the %@ mark";
+"export.watermark.freeRedrawNote" = "Free exports carry the %@ mark, so every PDF page is redrawn to hold it: links and fillable form fields aren’t kept, and a copy may not be smaller.";
+"export.watermark.compressNoGainMarked" = "This copy is no smaller: it carries the %@ mark, which redraws every page.";
 "export.watermark.placement" = "Placement";
 "export.watermark.placement.center" = "Center";
 "export.watermark.placement.topRight" = "Top right";

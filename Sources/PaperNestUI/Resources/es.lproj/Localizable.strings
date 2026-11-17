@@ -1048,6 +1048,15 @@
 "export.watermark.text.placeholder" = "Tu texto";
 "export.watermark.text.missing" = "Escribe el texto que se mostrará en cada página.";
 "export.watermark.text.undrawable" = "Estos caracteres no se pueden dibujar en una marca de agua. Usa letras o números.";
+"export.watermark.placement.bottomLeft" = "Abajo a la izquierda";
+"export.watermark.mark" = "Marca de %@";
+"export.watermark.mark.free" = "Las exportaciones gratuitas llevan una pequeña marca de %1$@ en la esquina de cada página. Quítala con %1$@ Pro.";
+"export.watermark.mark.pro" = "Añade una pequeña marca de %@ en la esquina de cada página.";
+"export.watermark.preview.markOnly" = "Marca de %@ en la esquina";
+"export.watermark.preview.valueWithMark" = "%1$@, %2$@, opacidad %3$@, y la marca de %4$@";
+"pro.feature.removeWatermark" = "Exportaciones sin la marca de %@";
+"export.watermark.freeRedrawNote" = "Las exportaciones gratuitas llevan la marca de %@, así que cada página PDF se vuelve a dibujar para incluirla: los enlaces y los campos de formulario no se conservan, y una copia puede no ser más pequeña.";
+"export.watermark.compressNoGainMarked" = "Esta copia no es más pequeña: lleva la marca de %@, que vuelve a dibujar cada página.";
 "export.watermark.placement" = "Posición";
 "export.watermark.placement.center" = "Centro";
 "export.watermark.placement.topRight" = "Arriba a la derecha";

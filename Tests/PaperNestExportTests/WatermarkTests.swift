@@ -7,6 +7,17 @@ import PaperNestCore
 
 private let letter = CGSize(width: 612, height: 792)
 
+/// A template logo as `BrandMark` stores one: a white disc whose alpha is the
+/// shape, on nothing.
+func syntheticLogo(side: Int = 64) -> WatermarkLogo {
+    let ctx = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+                        space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    ctx.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+    ctx.fillEllipse(in: CGRect(x: 0, y: 0, width: side, height: side))
+    return WatermarkLogo(name: "test-disc", template: ctx.makeImage()!)!
+}
+
 /// Draws `watermark` onto white paper of `pageSize` at one pixel per point,
 /// through the same page-space flip the exporter uses.
 private func paper(_ watermark: Watermark?, pageSize: CGSize = letter) -> WatermarkBitmap {
@@ -85,8 +96,40 @@ struct WatermarkBitmap: Equatable {
         let custom = Watermark(preset: .custom, text: "Acme Ltd")
         #expect(custom.placement == .center)
         #expect(custom.shape == .text)
-        // Four presets, four colours a reader can tell apart.
-        #expect(Set(WatermarkPreset.allCases.map(\.color)).count == 4)
+        // Five presets, five colours a reader can tell apart.
+        #expect(Set(WatermarkPreset.allCases.map(\.color)).count == 5)
+    }
+
+    /// The branded preset as the design gives it: centred, −32°, within
+    /// 10–16% opacity, in the deep accent, the logo beside the name.
+    @Test func thePaperNestPresetStartsFromTheDesign() {
+        let mark = Watermark(preset: .paperNest, text: "PaperNest", logo: syntheticLogo())
+        #expect(mark.placement == .center)
+        #expect(mark.rotation == -32)
+        #expect((0.10...0.16).contains(mark.opacity))
+        #expect(mark.shape == .brand)
+        #expect(mark.color == RGBAColor(red: 0.333, green: 0.129, blue: 0.796))
+        #expect(mark.logo == syntheticLogo())
+    }
+
+    /// The small mark free exports carry, defined once.
+    @Test func theFreeExportMarkIsSmallUprightAndBottomLeft() {
+        let mark = Watermark.attribution(name: "PaperNest", logo: syntheticLogo())
+        #expect(mark.preset == .paperNest)
+        #expect(mark.placement == .bottomLeft)
+        #expect(mark.rotation == 0)
+        #expect(mark.opacity == 0.55)
+        #expect(mark.text == "PaperNest")
+    }
+
+    /// A template becomes a mask of its shape: white where the disc is, black
+    /// where there was nothing.
+    @Test func aLogoIsKeptAsAMaskOfItsShape() {
+        let mask = WatermarkBitmap(syntheticLogo().mask)
+        #expect(mask.bytes[(32 * mask.width + 32) * 4] > 250, "the disc's middle is not white")
+        #expect(mask.bytes[(1 * mask.width + 1) * 4] < 5, "the empty corner is not black")
+        #expect(syntheticLogo() == syntheticLogo())
+        #expect(syntheticLogo(side: 32) != syntheticLogo())
     }
 
     @Test func valuesOutsideTheirRangeAreBroughtBackIntoIt() {
@@ -161,6 +204,26 @@ struct WatermarkBitmap: Equatable {
             pageSize: letter).first)
         #expect(abs(turned.boundingBox.maxX - (letter.width - margin)) < 0.5)
         #expect(abs(turned.boundingBox.minY - margin) < 0.5)
+    }
+
+    @Test func bottomLeftSitsInItsCorner() throws {
+        let margin = WatermarkDrawing.cornerMargin
+        let mark = try #require(WatermarkDrawing.marks(
+            for: Watermark.attribution(name: "PaperNest", logo: syntheticLogo()), pageSize: letter).first)
+        #expect(abs(mark.boundingBox.minX - margin) < 0.5)
+        #expect(abs(mark.boundingBox.maxY - (letter.height - margin)) < 0.5)
+        // Small: a line of type, not a banner.
+        #expect(mark.boundingBox.height < 20)
+        #expect(mark.boundingBox.width < 120)
+    }
+
+    /// The logo takes room beside the name; without one the name stands alone.
+    @Test func theLogoSitsBeforeTheName() throws {
+        let with = try #require(WatermarkDrawing.marks(
+            for: Watermark(preset: .paperNest, text: "PaperNest", rotation: 0, logo: syntheticLogo()), pageSize: letter).first)
+        let without = try #require(WatermarkDrawing.marks(
+            for: Watermark(preset: .paperNest, text: "PaperNest", rotation: 0), pageSize: letter).first)
+        #expect(with.size.width > without.size.width * 1.1)
     }
 
     @Test func rotationTurnsTheMark() throws {
@@ -257,6 +320,44 @@ struct WatermarkBitmap: Equatable {
                         CGRect(x: 0, y: 396, width: 306, height: 396), CGRect(x: 306, y: 396, width: 306, height: 396)] {
             #expect(page.marked(in: quarter).count > 300, "nothing drawn in \(quarter)")
         }
+    }
+
+    /// The brand mark draws its logo, in the brand's colour, to the left of
+    /// the name: purple where the disc is, at the start of the mark.
+    @Test func theBrandMarkPaintsItsLogoInTheBrandColour() throws {
+        let mark = Watermark(preset: .paperNest, text: "PaperNest", opacity: 1, rotation: 0, logo: syntheticLogo())
+        let laid = try #require(WatermarkDrawing.marks(for: mark, pageSize: letter).first)
+        let page = paper(mark)
+        let box = laid.boundingBox
+        // The logo is a square as tall as the mark, at its left end.
+        let logo = page.marked(in: CGRect(x: box.minX, y: box.minY, width: box.height, height: box.height))
+        #expect(logo.count > Int(box.height * box.height * 0.5), "the logo's disc is not drawn")
+        #expect(logo.blue > logo.green + 60 && logo.red > logo.green, "the logo is not in the brand's purple")
+        // The free-export mark draws only in its corner.
+        let free = paper(Watermark.attribution(name: "PaperNest", logo: syntheticLogo()))
+        #expect(free.marked(in: CGRect(x: 0, y: 740, width: 160, height: 52)).count > 100)
+        #expect(free.marked(in: CGRect(x: 0, y: 0, width: 612, height: 700)).count == 0)
+        #expect(free.marked(in: CGRect(x: 200, y: 700, width: 412, height: 92)).count == 0)
+    }
+
+    /// A lopsided logo — its top half filled — comes out the right way up,
+    /// so a flip missing or doubled in the logo's square cannot pass.
+    @Test func theLogoIsUpright() throws {
+        let side = 64
+        let ctx = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: side / 2, width: side, height: side / 2))   // y-up: the top half
+        let topHalf = try #require(WatermarkLogo(name: "top-half", template: ctx.makeImage()!))
+        let mark = Watermark(preset: .paperNest, text: "PaperNest", opacity: 1, rotation: 0, logo: topHalf)
+        let laid = try #require(WatermarkDrawing.marks(for: mark, pageSize: letter).first)
+        let square = CGRect(x: laid.boundingBox.minX, y: laid.boundingBox.minY,
+                            width: laid.boundingBox.height, height: laid.boundingBox.height)
+        let page = paper(mark)
+        let top = page.marked(in: CGRect(x: square.minX + 2, y: square.minY + 2, width: square.width - 4, height: square.height / 2 - 4))
+        let bottom = page.marked(in: CGRect(x: square.minX + 2, y: square.midY + 2, width: square.width - 4, height: square.height / 2 - 4))
+        #expect(top.count > bottom.count * 10, "the logo is upside down on a picture (top \(top.count), bottom \(bottom.count))")
     }
 
     @Test func higherOpacityShowsMoreStrongly() {

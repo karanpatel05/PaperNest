@@ -84,6 +84,9 @@ struct ExportSheet: View {
     /// handed to every export the sheet makes, so Save, Copy and Share
     /// draw the same one.
     @State private var watermarkDraft = WatermarkDraft()
+    /// Whether the small PaperNest mark goes on each page: on for a free
+    /// user, who meets the paywall on switching it off; off for Pro.
+    @State private var includesBrandMark = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum PageChoice: Hashable { case all, current, range }
@@ -119,6 +122,12 @@ struct ExportSheet: View {
         .toolPanelAppearance(isEmbedded: isEmbedded)
         .modifier(lifecycle)
         .proPaywall($proFeature)
+        // Entitlements load after launch, and Pro can be bought from this
+        // very sheet: the switch follows the answer rather than the one it
+        // opened with, so a paying user is never left marked.
+        .onChange(of: SubscriptionStore.shared.allows(.removeWatermark)) { _, allowed in
+            includesBrandMark = Self.defaultIncludesBrandMark(allowsRemoval: allowed)
+        }
     }
 
     private var standalone: some View {
@@ -182,6 +191,7 @@ struct ExportSheet: View {
         ExportLifecycle(onAppear: {
             rangeEnd = pages.count
             if !SubscriptionStore.shared.allows(.textExport) { options.includesRecognizedText = false }
+            includesBrandMark = Self.defaultIncludesBrandMark(allowsRemoval: SubscriptionStore.shared.allows(.removeWatermark))
         }, onDisappear: {
             exportTask?.cancel()
             if case .ready(let output) = phase { output.removeTemporaryFiles() }
@@ -243,7 +253,9 @@ struct ExportSheet: View {
             if options.canCarryWatermark {
                 ExportWatermarkSection(draft: $watermarkDraft, previewPage: selectedPages.first ?? pages.first,
                                        paper: options.format == .pdf ? options.paperSize : .original,
-                                       isPDF: options.format == .pdf)
+                                       isPDF: options.format == .pdf, includesBrandMark: $includesBrandMark,
+                                       canRemoveBrandMark: SubscriptionStore.shared.allows(.removeWatermark),
+                                       refuseRemoval: { proFeature = .removeWatermark })
             } else if watermarkDraft.preset != nil {
                 // Chosen, then a format with nowhere to draw it: said where
                 // the section was, rather than exporting without it in
@@ -470,10 +482,24 @@ struct ExportSheet: View {
     /// watermark being set up when the format can hold one. Save, Copy and
     /// Share all export through here, so all three draw the same mark.
     nonisolated static func optionsToExport(_ options: ExportOptions, watermark draft: WatermarkDraft,
-                                            on date: Date = Date()) -> ExportOptions {
+                                            includesBrandMark: Bool, on date: Date = Date()) -> ExportOptions {
         var configured = options
         configured.watermark = options.canCarryWatermark ? draft.watermark(on: date) : nil
+        configured.attribution = options.canCarryWatermark && includesBrandMark
+            ? Watermark.freeExportMark(allowsRemoval: false) : nil
         return configured
+    }
+
+    /// Where the PaperNest mark switch starts: on for someone who may not
+    /// remove it. A build with no products configured lets everyone remove
+    /// it, so nothing is marked until the Free/Pro boundary is real.
+    nonisolated static func defaultIncludesBrandMark(allowsRemoval: Bool) -> Bool { !allowsRemoval }
+
+    /// Whether this export carries the mark: the switch, checked again
+    /// against the entitlement as the export starts, so a subscription that
+    /// lapsed while the sheet was open does not export unmarked.
+    nonisolated static func brandMarkToExport(switchOn: Bool, allowsRemoval: Bool) -> Bool {
+        switchOn || !allowsRemoval
     }
 
     /// What each refusal means to someone reading it, rather than its name.
@@ -806,7 +832,8 @@ struct ExportSheet: View {
         if let needed, !SubscriptionStore.shared.allows(needed) { proFeature = needed; return }
         guard let exporter = session.environment?.exporter else { return }
         let selection = selectedPages
-        let options = Self.optionsToExport(options, watermark: watermarkDraft)
+        let options = Self.optionsToExport(options, watermark: watermarkDraft, includesBrandMark: Self.brandMarkToExport(
+            switchOn: includesBrandMark, allowsRemoval: SubscriptionStore.shared.allows(.removeWatermark)))
         let name = itemName
         let password = Self.passwordToUse(password)
         phase = .exporting(ExportProgress(completedPages: 0, totalPages: selection.count))
@@ -865,6 +892,9 @@ struct ChoiceTile: View {
     let title: String
     var subtitle: String?
     var systemImage: String?
+    /// A template image drawn in place of `systemImage`, such as the app's
+    /// own mark, which no SF Symbol stands in for.
+    var image: Image?
     var iconColor: Color = .secondary
     let isSelected: Bool
     var isEnabled = true
@@ -874,7 +904,15 @@ struct ChoiceTile: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                if let systemImage {
+                if let image {
+                    image
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 26)
+                        .foregroundStyle(iconColor)
+                        .accessibilityHidden(true)
+                } else if let systemImage {
                     Image(systemName: systemImage)
                         .font(.title2)
                         .foregroundStyle(iconColor)

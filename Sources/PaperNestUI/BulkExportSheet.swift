@@ -57,7 +57,16 @@ final class BulkExportModel {
                         entries.append(.document(LibraryExportItem(name: item.name, pages: try await env.store.pages(of: id))))
                     }
                 }
-                let output = try await env.exporter.exportArchive(entries, archiveName: archiveName) { progress in
+                // A free user's PDFs carry the PaperNest mark, as any export of
+                // theirs does. Decided once entitlements have loaded, so a
+                // paying user is not marked for opening this soon after launch.
+                if !SubscriptionStore.shared.hasLoaded { await SubscriptionStore.shared.refresh() }
+                // Cancelled while waiting: nothing is started, so nothing is left behind.
+                try Task.checkCancellation()
+                let pdfOptions = ExportOptions(format: .pdf, paperSize: .original, pdfImageQuality: .balanced,
+                                               attribution: Watermark.freeExportMark)
+                let output = try await env.exporter.exportArchive(entries, archiveName: archiveName,
+                                                                  pdfOptions: pdfOptions) { progress in
                     Task { @MainActor in
                         if case .exporting = self.phase { self.phase = .exporting(progress) }
                     }
@@ -123,6 +132,13 @@ struct BulkExportSheet: View {
                         .font(.footnote)
                         .foregroundStyle(EditorChrome.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
+                    if !SubscriptionStore.shared.allows(.removeWatermark) {
+                        Text(L10n.exportWatermarkFreeRedrawNote)
+                            .font(.footnote)
+                            .foregroundStyle(EditorChrome.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("export-zip-mark-note")
+                    }
                 }
                 .padding(20)
             }
