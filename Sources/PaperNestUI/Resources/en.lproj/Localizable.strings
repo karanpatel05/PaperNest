@@ -1025,3 +1025,11 @@
 "scanner.settings.defaultFilter" = "Default filter";
 "scanner.settings.autoOnEntry" = "Start with Auto capture";
 "scanner.settings.note" = "The default filter is used for Document and ID / Card captures. Pages already scanned keep their look.";
+
+/* Word page images */
+"export.docxLayout" = "Word Layout";
+"export.docxLayout.text" = "Editable Text";
+"export.docxLayout.text.detail" = "Words you can change";
+"export.docxLayout.images" = "Page Images";
+"export.docxLayout.images.detail" = "Looks like the page";
+"export.docxImagesNote" = "Each page goes into the Word file as one picture, so it keeps its look, ink and marks. Its words are part of the picture: they can’t be edited or searched in Word. Choose Editable Text for that.";

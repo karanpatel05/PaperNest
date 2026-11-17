@@ -1148,3 +1148,13 @@ extension L10n {
     static var scannerSettingsAutoOnEntry: String { tr("scanner.settings.autoOnEntry") }
     static var scannerSettingsNote: String { tr("scanner.settings.note") }
 }
+
+// Word page images: the second Word layout, each page as a picture.
+extension L10n {
+    static var exportDocxLayout: String { tr("export.docxLayout") }
+    static var exportDocxLayoutText: String { tr("export.docxLayout.text") }
+    static var exportDocxLayoutTextDetail: String { tr("export.docxLayout.text.detail") }
+    static var exportDocxLayoutImages: String { tr("export.docxLayout.images") }
+    static var exportDocxLayoutImagesDetail: String { tr("export.docxLayout.images.detail") }
+    static var exportDocxImagesNote: String { tr("export.docxImagesNote") }
+}

@@ -1025,3 +1025,11 @@
 "scanner.settings.defaultFilter" = "Filtro predeterminado";
 "scanner.settings.autoOnEntry" = "Empezar con captura automática";
 "scanner.settings.note" = "El filtro predeterminado se usa en las capturas de Documento e ID / Tarjeta. Las páginas ya escaneadas conservan su aspecto.";
+
+/* Word page images */
+"export.docxLayout" = "Diseño de Word";
+"export.docxLayout.text" = "Texto editable";
+"export.docxLayout.text.detail" = "Palabras que puedes cambiar";
+"export.docxLayout.images" = "Imágenes de página";
+"export.docxLayout.images.detail" = "Igual que la página";
+"export.docxImagesNote" = "Cada página entra en el archivo de Word como una imagen: conserva su aspecto, su tinta y sus marcas. Sus palabras forman parte de la imagen y no se pueden editar ni buscar en Word. Elige Texto editable para eso.";

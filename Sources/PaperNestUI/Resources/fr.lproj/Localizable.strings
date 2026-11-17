@@ -1025,3 +1025,11 @@
 "scanner.settings.defaultFilter" = "Filtre par défaut";
 "scanner.settings.autoOnEntry" = "Démarrer en capture automatique";
 "scanner.settings.note" = "Le filtre par défaut s’applique aux captures Document et ID / Carte. Les pages déjà numérisées gardent leur apparence.";
+
+/* Word page images */
+"export.docxLayout" = "Mise en page Word";
+"export.docxLayout.text" = "Texte modifiable";
+"export.docxLayout.text.detail" = "Des mots à modifier";
+"export.docxLayout.images" = "Images des pages";
+"export.docxLayout.images.detail" = "Identique à la page";
+"export.docxImagesNote" = "Chaque page devient une image dans le fichier Word : elle garde son apparence, son encre et ses annotations. Ses mots font partie de l’image et ne peuvent être ni modifiés ni recherchés dans Word. Choisissez Texte modifiable pour cela.";

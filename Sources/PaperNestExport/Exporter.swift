@@ -88,7 +88,14 @@ public struct Exporter: Sendable {
                                            password: password, protection: protection, progress: progress)]
             case .jpeg, .png, .heic: try await writeImages(pages, base: base, in: directory, options: options, progress: progress)
             case .txt: [try await writeText(pages, to: directory.appendingPathComponent("\(base).txt"), progress: progress)]
-            case .docx: [try await writeDocx(pages, to: directory.appendingPathComponent("\(base).docx"), progress: progress)]
+            case .docx:
+                switch options.docxLayout {
+                case .editableText:
+                    [try await writeDocx(pages, to: directory.appendingPathComponent("\(base).docx"), progress: progress)]
+                case .pageImages:
+                    [try await writeDocxPageImages(pages, to: directory.appendingPathComponent("\(base).docx"),
+                                                   options: options, progress: progress)]
+                }
             }
             // Checked, not trusted: three different writers can produce this
             // file, and one that dropped the author's limits must fail the
@@ -441,7 +448,7 @@ public struct Exporter: Sendable {
         }
         let ext = options.format.fileExtension
         let pixelsPerPoint = CGFloat(options.imageDPI) / 72
-        let zip: (writer: ZipWriter, url: URL)? = if pages.count > 1, options.packaging == .zip {
+        let zip: (writer: ZipWriter, url: URL)? = if options.writesArchive(pageCount: pages.count) {
             (try ZipWriter(url: directory.appendingPathComponent("\(base).zip")), directory.appendingPathComponent("\(base).zip"))
         } else {
             nil

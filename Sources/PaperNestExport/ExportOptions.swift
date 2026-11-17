@@ -15,19 +15,18 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     /// to send a file somewhere, and older systems, many Windows installs and
     /// plenty of web forms cannot open a HEIC. JPEG stays the safe default.
     case heic
-    /// A Word file holding the same text as `.txt`, one paragraph per line.
-    /// The words, not the layout: `ExportOptions`' paper, resolution and
-    /// quality do not apply to it either.
+    /// A Word file, in one of two layouts chosen by `ExportOptions.docxLayout`:
+    /// the same text as `.txt`, one paragraph per line, or each page as a
+    /// picture. The brief asks for both and for them to be named apart.
     case docx
 
-    /// Whether this format carries the words alone, with no picture of the
-    /// page.
+    /// Whether this format, **in its default layout**, carries the words
+    /// alone, with no picture of the page.
     ///
-    /// The sheet reads this to decide which options to show: resolution,
-    /// image quality and how to package several pages all mean nothing for a
-    /// text file, and a control that does nothing is worse than no control.
-    /// Kept on the format rather than in the screen so the two cannot
-    /// disagree about which is which.
+    /// A screen should ask `ExportOptions.keepsOnlyWords` instead: a Word
+    /// file of page images is a `.docx` that carries pictures and no words,
+    /// and only the options know which layout was chosen. This stays as the
+    /// property of the format alone, true for TXT and for Word's default.
     public var keepsOnlyWords: Bool {
         switch self {
         case .txt, .docx: true
@@ -97,6 +96,20 @@ extension PDFImageQuality {
     var rasterQuality: RasterQuality { RasterQuality(maxDPI: maxDPI, jpegQuality: jpegQuality) }
 }
 
+/// What a Word export holds. The product brief asks for both, "clearly
+/// named": a Word file of words to edit, and one that looks like the pages.
+/// They are different promises, so neither may be described as the other —
+/// above all, the picture layout is not an editable or OCR conversion.
+public enum DocxLayout: String, Codable, Sendable, CaseIterable {
+    /// One paragraph per line of text the pages really carry. Refused when
+    /// no page has any (`ExportError.noTextToExport`).
+    case editableText
+    /// Each page as one picture filling a Word page of the page's own size,
+    /// ink and marks included. No words, so it needs none: a blank or
+    /// handwritten notebook exports this way.
+    case pageImages
+}
+
 public enum ImagePackaging: String, Codable, Sendable, CaseIterable {
     /// One file per page.
     case separateFiles
@@ -106,12 +119,12 @@ public enum ImagePackaging: String, Codable, Sendable, CaseIterable {
 
 public struct ExportOptions: Hashable, Sendable {
     public var format: ExportFormat
-    /// PDF only. Content is fitted whole, never cropped.
+    /// PDF, and Word page images. Content is fitted whole, never cropped.
     public var paperSize: PaperSize
     public var pdfImageQuality: PDFImageQuality
-    /// JPEG/PNG only.
+    /// JPEG/PNG/HEIC, and the pictures in Word page images.
     public var imageDPI: Int
-    /// JPEG only, 0.1...1.
+    /// JPEG, and the pictures in Word page images (which are JPEG), 0.1...1.
     public var jpegQuality: Double
     /// JPEG/PNG with more than one page.
     public var packaging: ImagePackaging
@@ -119,6 +132,8 @@ public struct ExportOptions: Hashable, Sendable {
     /// a scan can be searched and selected outside PaperNest. Only text that
     /// is current for the page is written; nothing is invented.
     public var includesRecognizedText: Bool
+    /// Word only: words to edit, or pictures of the pages.
+    public var docxLayout: DocxLayout
 
     public init(
         format: ExportFormat = .pdf,
@@ -127,7 +142,8 @@ public struct ExportOptions: Hashable, Sendable {
         imageDPI: Int = 200,
         jpegQuality: Double = 0.85,
         packaging: ImagePackaging = .zip,
-        includesRecognizedText: Bool = true
+        includesRecognizedText: Bool = true,
+        docxLayout: DocxLayout = .editableText
     ) {
         self.format = format
         self.paperSize = paperSize
@@ -136,9 +152,41 @@ public struct ExportOptions: Hashable, Sendable {
         self.jpegQuality = min(max(jpegQuality, 0.1), 1)
         self.packaging = packaging
         self.includesRecognizedText = includesRecognizedText
+        self.docxLayout = docxLayout
     }
 
     public static let imageDPIChoices = [72, 150, 200, 300]
+
+    /// Whether the file these options produce carries the words alone, with
+    /// no picture of the page — which is what decides that resolution,
+    /// quality and paper mean nothing for it, and that the export is refused
+    /// when no page has any text.
+    ///
+    /// On the options rather than the format because Word is both: its
+    /// editable-text layout keeps only words, its page-image layout keeps
+    /// only pictures. A screen that asked the format would hide the
+    /// resolution of a Word file made of pictures, and tell its reader that
+    /// pictures are left out of it.
+    public var keepsOnlyWords: Bool {
+        format == .docx ? docxLayout == .editableText : format.keepsOnlyWords
+    }
+
+    /// Whether exporting `pageCount` pages with these options writes one ZIP
+    /// rather than the file itself.
+    ///
+    /// Only pictures are ever packed: several JPEG, PNG or HEIC pages, when
+    /// ZIP was chosen. A PDF, a text file and a Word file hold every page in
+    /// one file of their own, whatever `packaging` says — `packaging` is not
+    /// even shown for them, so a value left over from an earlier choice must
+    /// not decide it. The writer and the screen both read this, so the
+    /// clipboard is never refused a single `.docx` because of a ZIP that was
+    /// never going to be written.
+    public func writesArchive(pageCount: Int) -> Bool {
+        switch format {
+        case .jpeg, .png, .heic: pageCount > 1 && packaging == .zip
+        case .pdf, .txt, .docx: false
+        }
+    }
 }
 
 public struct ExportProgress: Sendable, Equatable {

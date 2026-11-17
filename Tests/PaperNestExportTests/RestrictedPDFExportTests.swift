@@ -72,6 +72,24 @@ import PaperNestTestSupport
         #expect(try FileManager.default.contentsOfDirectory(atPath: scratch.path).isEmpty)
     }
 
+    /// A Word file of page pictures is pictures of the pages, which is
+    /// exactly what copying is; the layout must not be a way round the rule.
+    @Test func itsPagesCannotLeaveAsPicturesInAWordFile() async throws {
+        let f = try ExportFixture()
+        let (_, item, pages) = try await imported(f)
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PaperNestRestricted-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let exporter = Exporter(renderer: f.exporter.renderer, temporaryRoot: scratch)
+
+        await #expect(throws: ExportError.copyingNotAllowed) {
+            try await exporter.export(itemName: item.name, pages: pages,
+                                      options: ExportOptions(format: .docx, docxLayout: .pageImages))
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: scratch.path).isEmpty)
+    }
+
     /// With something drawn on a page the PDF has to be rebuilt. The rebuilt
     /// file must be as closed as the original: this is the path that used to
     /// write the author's limits away.

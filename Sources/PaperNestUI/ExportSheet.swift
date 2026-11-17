@@ -223,12 +223,9 @@ struct ExportSheet: View {
                 // Section whose content is empty is dropped whole, footer
                 // and all, so a caveat with no controls beside it has to
                 // live on a section that has some.
-                if options.format.keepsOnlyWords {
-                    Text(L10n.exportWordsOnlyNote)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("export-words-only-note")
-                }
+                // Word says what each of its layouts keeps under its own
+                // tiles, below; TXT has only the one.
+                if options.keepsOnlyWords, options.format != .docx { wordsOnlyNote }
                 // Why five formats are missing, said where they would be.
                 if !permissions.allowsCopying {
                     Text(L10n.restrictedExportNote)
@@ -237,6 +234,7 @@ struct ExportSheet: View {
                         .accessibilityIdentifier("export-restricted-note")
                 }
             }
+            docxLayoutSection
             passwordSection
             Section(L10n.exportPages) {
                 tileRow {
@@ -373,6 +371,43 @@ struct ExportSheet: View {
         (.docx, "Word", "doc.text", .blue),
     ]
 
+    private var wordsOnlyNote: some View {
+        Text(L10n.exportWordsOnlyNote)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("export-words-only-note")
+    }
+
+    /// Word's two layouts, which the brief asks for "clearly named": words
+    /// to edit, or pictures of the pages. Each says under the tiles what it
+    /// keeps and what it gives up, so the picture layout is never taken for
+    /// an editable conversion.
+    @ViewBuilder private var docxLayoutSection: some View {
+        if options.format == .docx {
+            Section {
+                tileRow {
+                    ChoiceTile(title: L10n.exportDocxLayoutText, subtitle: L10n.exportDocxLayoutTextDetail,
+                               isSelected: options.docxLayout == .editableText,
+                               identifier: "export-docx-layout-editableText") { options.docxLayout = .editableText }
+                    ChoiceTile(title: L10n.exportDocxLayoutImages, subtitle: L10n.exportDocxLayoutImagesDetail,
+                               isSelected: options.docxLayout == .pageImages,
+                               identifier: "export-docx-layout-pageImages") { options.docxLayout = .pageImages }
+                }
+            } header: {
+                Text(L10n.exportDocxLayout)
+            } footer: {
+                if options.keepsOnlyWords {
+                    wordsOnlyNote
+                } else {
+                    Text(L10n.exportDocxImagesNote)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("export-docx-images-note")
+                }
+            }
+        }
+    }
+
     /// A password for the exported PDF, and what it cannot be.
     ///
     /// Offered only where it can be kept. The problem is shown as it is
@@ -428,16 +463,11 @@ struct ExportSheet: View {
         // Nothing at all for a format that holds only the words: no
         // resolution, no quality, no packaging, because none of them touch
         // it. What is lost is said under the format tiles instead.
-        if options.format.keepsOnlyWords {
+        if options.keepsOnlyWords {
             EmptyView()
         } else if options.format == .pdf {
             Section {
-                Picker(L10n.paperSize, selection: $options.paperSize) {
-                    Text(L10n.paperOriginal).tag(PaperSize.original)
-                    Text(L10n.paperLetter).tag(PaperSize.usLetter)
-                    Text(L10n.paperA4).tag(PaperSize.a4)
-                }
-                .choicePickerStyle()
+                paperSizePicker
                 Picker(L10n.imageQuality, selection: $options.pdfImageQuality) {
                     Text(L10n.qualityBest).tag(PDFImageQuality.best)
                     Text(L10n.qualityBalanced).tag(PDFImageQuality.balanced)
@@ -452,12 +482,25 @@ struct ExportSheet: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
+        } else if options.format == .docx {
+            // Word page images: each page is a JPEG on a Word page, so the
+            // controls are a picture's — and the paper, as for a PDF. No
+            // packaging: it is one Word file however many pages.
+            Section {
+                paperSizePicker
+                resolutionPicker
+                LabeledContent(L10n.jpegQuality) {
+                    Slider(value: $options.jpegQuality, in: 0.3...1)
+                        .frame(minWidth: 160)
+                }
+            } footer: {
+                if options.paperSize != .original {
+                    Text(L10n.paperNote).font(.caption).foregroundStyle(.secondary)
+                }
+            }
         } else {
             Section {
-                Picker(L10n.resolution, selection: $options.imageDPI) {
-                    ForEach(ExportOptions.imageDPIChoices, id: \.self) { Text(L10n.dpi($0)).tag($0) }
-                }
-                .choicePickerStyle()
+                resolutionPicker
                 if options.format == .jpeg {
                     LabeledContent(L10n.jpegQuality) {
                         Slider(value: $options.jpegQuality, in: 0.3...1)
@@ -473,6 +516,22 @@ struct ExportSheet: View {
                 }
             }
         }
+    }
+
+    private var paperSizePicker: some View {
+        Picker(L10n.paperSize, selection: $options.paperSize) {
+            Text(L10n.paperOriginal).tag(PaperSize.original)
+            Text(L10n.paperLetter).tag(PaperSize.usLetter)
+            Text(L10n.paperA4).tag(PaperSize.a4)
+        }
+        .choicePickerStyle()
+    }
+
+    private var resolutionPicker: some View {
+        Picker(L10n.resolution, selection: $options.imageDPI) {
+            ForEach(ExportOptions.imageDPIChoices, id: \.self) { Text(L10n.dpi($0)).tag($0) }
+        }
+        .choicePickerStyle()
     }
 
     /// What the sheet says, then the three ways out. Each action exports
@@ -524,6 +583,8 @@ struct ExportSheet: View {
         case .failed(let message):
             HStack {
                 Text(message).foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("export-failed")
                 Spacer()
                 Button(L10n.done) { close() }
             }
@@ -682,9 +743,11 @@ struct ExportSheet: View {
     }
 
     /// Several image pages packed as one ZIP, which the clipboard can't
-    /// usefully hold.
+    /// usefully hold. The engine's rule rather than a guess: this used to
+    /// treat any non-PDF of several pages as a ZIP, and so refused Copy for a
+    /// multi-page TXT or Word file, which is one file.
     private var producesArchive: Bool {
-        options.format != .pdf && selectedPages.count > 1 && options.packaging == .zip
+        options.writesArchive(pageCount: selectedPages.count)
     }
 
     /// Selected pages in document order.

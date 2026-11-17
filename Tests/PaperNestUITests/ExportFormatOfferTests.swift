@@ -37,14 +37,16 @@ import PaperNestExport
         #expect(ExportSheet.offeredFormats.first?.format == .pdf)
     }
 
-    /// The two formats that carry the words alone are the two that must not
-    /// show resolution, quality or packaging — controls that would do
-    /// nothing. Kept on the format itself so the sheet cannot disagree with
-    /// the engine about which is which.
+    /// The two formats that carry the words alone in their default layout.
+    /// The sheet asks `ExportOptions.keepsOnlyWords`, which also knows Word's
+    /// layout: Word as page images carries pictures and shows their
+    /// controls, and the engine and the sheet read the same property.
     @Test func onlyTextFormatsCarryWordsAlone() {
         let wordsOnly = ExportFormat.allCases.filter(\.keepsOnlyWords)
 
         #expect(Set(wordsOnly) == Set([.txt, .docx]))
+        #expect(ExportOptions(format: .docx).keepsOnlyWords, "Word opens on editable text, as Convert expects")
+        #expect(!ExportOptions(format: .docx, docxLayout: .pageImages).keepsOnlyWords)
     }
 
     @Test func everyFormatKnowsWhichItIs() {
