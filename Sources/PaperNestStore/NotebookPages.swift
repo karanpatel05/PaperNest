@@ -34,6 +34,30 @@ extension LibraryStore {
         }
     }
 
+    /// A new page made from a saved template, after `anchor`: its size,
+    /// content, crop and rotation, and copies of its marks under new
+    /// identities, in one transaction, so undo takes them away together. The
+    /// page is an ordinary page; the template is not linked to it.
+    public func addNotebookPage(fromTemplate templateID: SavedTemplateID, to itemID: ItemID,
+                                after anchor: PageID?) throws -> NotebookPageChange {
+        try db.transaction {
+            try requireActiveNotebook(itemID)
+            guard let template = try savedTemplate(templateID) else { throw StoreError.itemNotFound }
+            for asset in template.assetIDs where try assetRecord(asset) == nil { throw StoreError.assetMissing(asset.sha256) }
+            let inserted = try insertPages([
+                .init(sourceSize: template.sourceSize, content: template.content, transform: template.transform)
+            ], into: itemID, after: anchor, assets: [])
+            let page = inserted[0]
+            let timestamp = now()
+            for (payload, key) in zip(template.objects, SortKey.evenlySpaced(count: template.objects.count)) {
+                try upsertObjectRow(PageObject(pageID: page.id, zKey: key, payload: payload, modifiedAt: timestamp))
+            }
+            // Typed text from the template becomes findable on the page.
+            try reindexTypedText(on: page)
+            return try notebookPageChange(page, deleted: false)
+        }
+    }
+
     /// A new notebook and its first page of `template`, with that page's
     /// headings, in one transaction.
     public func createNotebook(named name: String, folderID: FolderID?, template: PageTemplate,

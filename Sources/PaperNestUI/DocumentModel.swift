@@ -23,6 +23,8 @@ final class DocumentModel {
     var presentedError: PresentedError?
     /// A Pro feature that was just refused. The document screen shows the paywall for it.
     var proPaywall: ProFeature?
+    /// Pages saved to start other pages from, by name, for the Insert tool.
+    private(set) var savedTemplates: [SavedPageTemplate] = []
     private(set) var isChangingNotebookPage = false
     private var historyTask: Task<Void, Never>?
     private var pendingHistory = 0
@@ -101,6 +103,8 @@ final class DocumentModel {
             if limits != permissions { permissions = limits }
             hasLoaded = true
             applyPageRequest()
+            // Saved on another document's screen, they are offered here too.
+            savedTemplates = (try? await store.savedTemplates()) ?? savedTemplates
         } catch {
             presentedError = .saveFailed()
         }
@@ -1081,6 +1085,45 @@ final class DocumentModel {
         await load()
         await loadSelectedPageObjects()
         session.didChange()
+    }
+
+    // MARK: - Saved templates
+
+    /// Saves `pageID`, with what is drawn and typed on it, as a template.
+    func saveTemplate(from pageID: PageID, named name: String) async throws {
+        await finishPendingHistory()
+        guard let store else { throw StoreError.pageNotFound }
+        _ = try await store.saveTemplate(from: pageID, named: name)
+        savedTemplates = try await store.savedTemplates()
+    }
+
+    /// A new page made from a saved template, after `anchor`; undone and
+    /// redone like any added page.
+    func addNotebookPage(fromTemplate templateID: SavedTemplateID, after anchor: PageID?,
+                         undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard !isChangingNotebookPage, let store else { throw StoreError.pageNotFound }
+        isChangingNotebookPage = true
+        defer { isChangingNotebookPage = pendingHistory > 0 }
+        let change = try await store.addNotebookPage(fromTemplate: templateID, to: itemID, after: anchor)
+        registerNotebookPageUndo(NotebookUndoStep(change), undoManager: undoManager)
+        selectedPageID = change.page.id
+        await load()
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    func renameSavedTemplate(_ id: SavedTemplateID, to name: String) async throws {
+        guard let store else { throw StoreError.itemNotFound }
+        try await store.renameSavedTemplate(id, to: name)
+        savedTemplates = try await store.savedTemplates()
+    }
+
+    /// Not undoable; the screen asks first. Pages made from it stay.
+    func deleteSavedTemplate(_ id: SavedTemplateID) async throws {
+        guard let store else { throw StoreError.itemNotFound }
+        try await store.deleteSavedTemplate(id)
+        savedTemplates = try await store.savedTemplates()
     }
 
     @MainActor private final class NotebookUndoStep {

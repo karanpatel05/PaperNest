@@ -1124,13 +1124,13 @@
 "redact.marks" = "Supprimer aussi les annotations sur ces zones (%lld)";
 "redact.marksStay" = "Les annotations conservées sont dessinées par-dessus le noir et apparaissent dans chaque exportation.";
 "redact.commentsKept" = "Les commentaires privés de cette page sont conservés ; ils ne sont jamais exportés.";
-"redact.shared" = "Une autre page de votre bibliothèque utilise le même original. Ce que vous caviardez y reste visible tant que cette page n’est pas caviardée ou supprimée elle aussi.";
+"redact.shared" = "Une autre page ou un modèle enregistré utilise le même original. Ce que vous caviardez reste dans votre bibliothèque tant que cette page n’est pas caviardée ou supprimée, ou que le modèle n’est pas supprimé.";
 "redact.sync" = "La synchronisation iCloud est activée : les copies de cette page déjà dans iCloud ou sur vos autres appareils ne sont pas supprimées.";
 "redact.restricted" = "L’auteur de ce PDF limite la copie ou l’impression ; ses pages ne peuvent pas être caviardées.";
 "redact.back" = "Modifier les zones";
 "redact.apply" = "Caviarder la page";
 "redact.applying" = "Caviardage…";
-"redact.doneShared" = "La page est caviardée ici, mais une autre page de votre bibliothèque utilise encore l’original. Caviardez ou supprimez aussi cette page.";
+"redact.doneShared" = "La page est caviardée ici, mais une autre page ou un modèle enregistré utilise encore l’original. Caviardez ou supprimez aussi cette page, ou supprimez le modèle.";
 "redact.failed" = "La page n’a pas pu être caviardée.";
 
 /* Pro tools */
@@ -1194,3 +1194,14 @@
 "template.notes" = "Notes";
 "template.actionItems" = "Actions à mener";
 "template.weekOf" = "Semaine du";
+
+/* Saved templates */
+"templates.mine" = "Mes modèles";
+"templates.saveAsTemplate" = "Enregistrer comme modèle";
+"templates.namePrompt" = "Enregistrer la page comme modèle";
+"templates.nameField" = "Nom du modèle";
+"templates.saveDetail" = "Cette page, avec ce qui y est dessiné et saisi, pourra ensuite être ajoutée à n’importe quel carnet depuis Insérer. Les commentaires privés ne sont pas inclus.";
+"templates.save" = "Enregistrer";
+"templates.renameTitle" = "Renommer le modèle";
+"templates.deleteTitle" = "Supprimer « %@ » ?";
+"templates.deleteDetail" = "Les pages déjà créées à partir de ce modèle sont conservées.";

@@ -62,7 +62,7 @@ Library/
 
 Tests cover each step: `DurabilityTests`, `LibraryStoreTests`, `DeletionTests`.
 
-### Schema (v7)
+### Schema (v12)
 
 `folders`, `items`, `tags`/`item_tags`, `assets` (keyed by SHA-256, with `availability` local or remoteOnly), `pages`, `page_transform_history`, `page_objects` (ink/text/image/comment JSON payloads), `page_recognition` (OCR, stale when `source_revision` is older than the page's revision), `file_items` (one row per general file: its bytes and what they are), and `search_index` (FTS5, `unicode61 remove_diacritics 2`, derived and rebuildable, holding `title`, `ocr`, `text` and `pdfText` rows).
 
@@ -70,7 +70,7 @@ Migrations, in order: **v2** adds `pages.deleted_at` (soft delete until next lau
 
 SQLite cannot alter a CHECK constraint, so v5, v6 and v7 rebuild their tables. Those migrations run with foreign keys disabled and are checked with `PRAGMA foreign_key_check` before they commit, which is SQLite's documented procedure: with foreign keys enforced, `DROP TABLE items` performs an implicit delete that **cascades into `pages`** and empties the library. Each migration runs in its own transaction with its `user_version` bump, so an interrupted one leaves the previous, consistent version in place.
 
-Sync took **v10**. **v11** adds `bookmarks`, the reader's own place-marks: one row per marked page (`page_id` is unique and `ON DELETE CASCADE`), a name and two dates. It adds a table and rebuilds none, so the sync triggers are left where they were; `BookmarkTests` checks that. The next migration is v12. Shape annotations and embedded PDF text needed none: shapes save as ordinary ink, and `search_index` is derived, rebuildable and has an unconstrained `field`. See `Sources/PaperNestStore/Schema.swift`.
+Sync took **v10**. **v11** adds `bookmarks`, the reader's own place-marks: one row per marked page (`page_id` is unique and `ON DELETE CASCADE`), a name and two dates. It adds a table and rebuilds none, so the sync triggers are left where they were; `BookmarkTests` checks that. **v12** adds `saved_templates`, pages saved to start other pages from (since 2026-11-17): a template's size, content (a built-in paper, or an image or PDF page through `asset_id REFERENCES assets(id)`), transform, and its ink, text boxes and placed pictures as `objects_json`; never comments or recognized text. Again a new table, nothing rebuilt, and not synced, like bookmarks: syncing templates needs a record type and their originals uploaded first. **A template keeps its originals alive**: its `asset_id` and the pictures in its `objects_json` count in `isAssetReferenced`, the launch sweep (`deleteUnreferencedAssetRows`, which would otherwise also trip the foreign key and fail partway — `SavedTemplatesTests` shows it does without the check), `isAssetUsedElsewhere` (Redact) and `syncEvictableAssets`. A page made from a template (`addNotebookPage(fromTemplate:to:after:)`, notebooks only) is an ordinary copy under new identities, its typed text indexed then and not before. The library backup is a ZIP of documents as PDFs, so templates, like saved signatures, are not in it. The next migration is v13. Shape annotations and embedded PDF text needed none: shapes save as ordinary ink, and `search_index` is derived, rebuildable and has an unconstrained `field`. See `Sources/PaperNestStore/Schema.swift`.
 
 ### Ordering
 

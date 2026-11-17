@@ -274,5 +274,27 @@ enum Schema {
             modified_at REAL NOT NULL
         );
         """),
+        // Pages someone saved to start other pages from (`SavedTemplates.swift`).
+        // A new table and nothing rebuilt, so v10's sync triggers stay where
+        // they were; like bookmarks, templates are not synced. A template
+        // keeps originals alive: its background through `asset_id`, and its
+        // placed pictures inside `objects_json`, which every check of whether
+        // an asset is still used reads too.
+        Migration(version: 12, sql: """
+        CREATE TABLE saved_templates (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            source_width REAL NOT NULL,
+            source_height REAL NOT NULL,
+            content_kind TEXT NOT NULL CHECK (content_kind IN ('image', 'pdfPage', 'template')),
+            asset_id TEXT REFERENCES assets(id),
+            pdf_page_index INTEGER,
+            template TEXT,
+            transform_json TEXT NOT NULL,
+            objects_json TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            modified_at REAL NOT NULL
+        );
+        """),
     ]
 }

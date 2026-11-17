@@ -1124,13 +1124,13 @@
 "redact.marks" = "Also remove the marks over these areas (%lld)";
 "redact.marksStay" = "Marks you keep are drawn over the black and show in every export.";
 "redact.commentsKept" = "Private comments on this page are kept; they are never exported.";
-"redact.shared" = "Another page in your library uses the same original. What you redact stays visible there until that page is redacted or deleted too.";
+"redact.shared" = "Another page or a saved template uses the same original. What you redact stays in your library there until that page is redacted or deleted, or the template is deleted.";
 "redact.sync" = "iCloud sync is on: copies of this page already in iCloud or on your other devices are not removed by this.";
 "redact.restricted" = "The author of this PDF limits copying or printing, so its pages can’t be redacted.";
 "redact.back" = "Edit Areas";
 "redact.apply" = "Redact Page";
 "redact.applying" = "Redacting…";
-"redact.doneShared" = "The page is redacted here, but another page in your library still uses the original. Redact or delete that page too.";
+"redact.doneShared" = "The page is redacted here, but another page or a saved template still uses the original. Redact or delete that page, or delete the template, too.";
 "redact.failed" = "The page couldn’t be redacted.";
 
 /* Pro tools */
@@ -1194,3 +1194,14 @@
 "template.notes" = "Notes";
 "template.actionItems" = "Action Items";
 "template.weekOf" = "Week of";
+
+/* Saved templates */
+"templates.mine" = "My Templates";
+"templates.saveAsTemplate" = "Save as Template";
+"templates.namePrompt" = "Save Page as Template";
+"templates.nameField" = "Template name";
+"templates.saveDetail" = "This page, with what is drawn and typed on it, can then be added to any notebook from Insert. Private comments are left out.";
+"templates.save" = "Save";
+"templates.renameTitle" = "Rename Template";
+"templates.deleteTitle" = "Delete “%@”?";
+"templates.deleteDetail" = "Pages already made from it are kept.";

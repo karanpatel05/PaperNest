@@ -246,8 +246,9 @@ import PaperNestCore
 
         let store = try LibraryStore(directory: dir.url)
 
-        #expect(try await store.schemaVersion() == 11)
-        #expect(Schema.latestVersion == 11)
+        // v11 brought bookmarks; later versions keep them.
+        #expect(try await store.schemaVersion() == Schema.latestVersion)
+        #expect(Schema.latestVersion >= 11)
         let item = try #require(try await store.item(ItemID(rawValue: "i1")))
         #expect(item.name == "Lease" && item.isFavorite && item.colorLabel == .blue)
         let pages = try await store.pages(of: item.id)

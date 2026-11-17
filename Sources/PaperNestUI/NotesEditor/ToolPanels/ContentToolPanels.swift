@@ -317,6 +317,12 @@ struct InsertToolActions {
     var divider: () -> Void
     var duplicatePage: () -> Void
     var organizePages: () -> Void
+    /// Pages saved to start other pages from, and what can be done with them.
+    var templates: [SavedPageTemplate] = []
+    var addPageFromTemplate: ((SavedPageTemplate) -> Void)? = nil
+    var saveTemplate: (() -> Void)? = nil
+    var renameTemplate: ((SavedPageTemplate) -> Void)? = nil
+    var deleteTemplate: ((SavedPageTemplate) -> Void)? = nil
 }
 
 /// A small sheet of paper showing a page template's ruling.
@@ -425,6 +431,33 @@ struct InsertSettingsPanel: View {
                     PanelNote(text: L10n.insertPageDetail)
                 }
             }
+            if let addFromTemplate = actions.addPageFromTemplate, !actions.templates.isEmpty {
+                PanelSection(title: L10n.templatesMine) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(actions.templates) { template in
+                                ToolPresetCard(title: template.name, selected: false, id: "insert-template") {
+                                    addFromTemplate(template)
+                                } preview: {
+                                    // A plain sign for now: a picture of the template needs a
+                                    // renderer that takes marks not stored on a page.
+                                    Image(systemName: "doc.text.image").font(.title3).foregroundStyle(EditorChrome.purple)
+                                }
+                                .frame(width: 96)
+                                .contextMenu {
+                                    if let rename = actions.renameTemplate {
+                                        Button { rename(template) } label: { Label(L10n.rename, systemImage: "pencil") }
+                                    }
+                                    if let delete = actions.deleteTemplate {
+                                        Button(role: .destructive) { delete(template) } label: { Label(L10n.delete, systemImage: "trash") }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("insert-templates")
+                }
+            }
             PanelSection(title: L10n.insertOnPage) {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
                     PanelTile(title: L10n.textBox, systemImage: "character.textbox", id: "insert-text-box",
@@ -444,6 +477,10 @@ struct InsertSettingsPanel: View {
                               id: "insert-duplicate-page", action: actions.duplicatePage)
                     PanelTile(title: L10n.insertOrganize, systemImage: "square.grid.2x2", id: "insert-organize-pages",
                               action: actions.organizePages)
+                    if let save = actions.saveTemplate {
+                        PanelTile(title: L10n.templatesSaveAsTemplate, systemImage: "square.and.arrow.down.on.square",
+                                  id: "insert-save-template", action: save)
+                    }
                 }
             }
         }

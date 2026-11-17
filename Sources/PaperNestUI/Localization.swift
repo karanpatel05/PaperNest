@@ -1337,4 +1337,16 @@ extension L10n {
     static var templateNotes: String { tr("template.notes") }
     static var templateActionItems: String { tr("template.actionItems") }
     static var templateWeekOf: String { tr("template.weekOf") }
+
+    // MARK: Saved templates
+
+    static var templatesMine: String { tr("templates.mine") }
+    static var templatesSaveAsTemplate: String { tr("templates.saveAsTemplate") }
+    static var templatesNamePrompt: String { tr("templates.namePrompt") }
+    static var templatesNameField: String { tr("templates.nameField") }
+    static var templatesSaveDetail: String { tr("templates.saveDetail") }
+    static var templatesSave: String { tr("templates.save") }
+    static var templatesRenameTitle: String { tr("templates.renameTitle") }
+    static func templatesDeleteTitle(_ value0: String) -> String { tr("templates.deleteTitle", value0) }
+    static var templatesDeleteDetail: String { tr("templates.deleteDetail") }
 }

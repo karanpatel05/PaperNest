@@ -74,6 +74,13 @@ struct DocumentView: View {
     @State private var isShowingRedact = false
     /// Comparing this document with another.
     @State private var isShowingCompare = false
+    /// Saving the page as a template: asking for its name.
+    @State private var isNamingTemplate = false
+    @State private var templateName = ""
+    @State private var renamingTemplate: SavedPageTemplate?
+    @State private var templateRename = ""
+    /// Deleting a template is not undoable, so it is asked first.
+    @State private var deletingTemplate: SavedPageTemplate?
     @State private var annotationPage: Page?
     /// Which mark the recognised-text sheet opens on.
     @State private var annotationStyle: TextMarkupStyle = .highlight
@@ -192,7 +199,7 @@ struct DocumentView: View {
     /// was put down.) Put a new modifier in the function it belongs with,
     /// and start another function rather than let one grow past a dozen.
     var body: some View {
-        readerServices(pageSources(toolSheets(exportAndPictures(lifecycle(toolsPanel(bars(pages)))))))
+        readerServices(pageSources(templateDialogs(toolSheets(exportAndPictures(lifecycle(toolsPanel(bars(pages))))))))
     }
 
     /// The pages themselves, or what stands in for them while there are none.
@@ -440,6 +447,48 @@ struct DocumentView: View {
                     model.presentedError = .saveFailed()
                 }
             }
+    }
+
+    /// Saving the page as a template, and renaming or deleting one. System
+    /// alerts and sheets: their fields and buttons do not carry SwiftUI
+    /// identifiers, so tests find them through `app.alerts` and `app.sheets`.
+    @inline(never)
+    private func templateDialogs<Content: View>(_ content: Content) -> some View {
+        content
+            .alert(L10n.templatesNamePrompt, isPresented: $isNamingTemplate) {
+                TextField(L10n.templatesNameField, text: $templateName)
+                Button(L10n.cancel, role: .cancel) {}
+                Button(L10n.templatesSave) {
+                    guard let page = model.selectedPageID else { return }
+                    let name = templateName
+                    Task {
+                        do { try await model.saveTemplate(from: page, named: name) } catch { model.presentedError = .saveFailed() }
+                    }
+                }
+            } message: { Text(L10n.templatesSaveDetail) }
+            .alert(L10n.templatesRenameTitle, isPresented: Binding(get: { renamingTemplate != nil },
+                                                                   set: { if !$0 { renamingTemplate = nil } })) {
+                TextField(L10n.templatesNameField, text: $templateRename)
+                Button(L10n.cancel, role: .cancel) {}
+                Button(L10n.rename) {
+                    guard let template = renamingTemplate else { return }
+                    let name = templateRename
+                    Task {
+                        do { try await model.renameSavedTemplate(template.id, to: name) } catch { model.presentedError = .saveFailed() }
+                    }
+                }
+            }
+            .confirmationDialog(L10n.templatesDeleteTitle(deletingTemplate?.name ?? ""),
+                                isPresented: Binding(get: { deletingTemplate != nil }, set: { if !$0 { deletingTemplate = nil } }),
+                                titleVisibility: .visible) {
+                Button(L10n.delete, role: .destructive) {
+                    guard let template = deletingTemplate else { return }
+                    Task {
+                        do { try await model.deleteSavedTemplate(template.id) } catch { model.presentedError = .saveFailed() }
+                    }
+                }
+                Button(L10n.cancel, role: .cancel) {}
+            } message: { Text(L10n.templatesDeleteDetail) }
     }
 
     /// The sheet each page tool opens where there is no tools panel to hold it.
@@ -855,7 +904,24 @@ struct DocumentView: View {
                     catch { model.presentedError = .saveFailed() }
                 }
             },
-            organizePages: { openInspectorTool(.pages) })
+            organizePages: { openInspectorTool(.pages) },
+            templates: model.savedTemplates,
+            addPageFromTemplate: isNotebook ? { template in
+                Task {
+                    do { try await model.addNotebookPage(fromTemplate: template.id, after: model.selectedPageID,
+                                                         undoManager: undoManager) }
+                    catch { model.presentedError = .saveFailed() }
+                }
+            } : nil,
+            saveTemplate: model.selectedPage == nil ? nil : {
+                templateName = model.item?.name ?? ""
+                isNamingTemplate = true
+            },
+            renameTemplate: { template in
+                templateRename = template.name
+                renamingTemplate = template
+            },
+            deleteTemplate: { template in deletingTemplate = template })
     }
 
     /// Places one of the app's own stickers on the selected page, as an image

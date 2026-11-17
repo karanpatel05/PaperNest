@@ -840,7 +840,8 @@ public actor LibraryStore {
     }
 
     /// Whether anything in the library still points at this asset: a page, a
-    /// page's undo history, a file item or an image placed on a page.
+    /// page's undo history, a file item, an image placed on a page, or a
+    /// saved template.
     ///
     /// Redaction reports this rather than assuming. Assets are content
     /// addressed, so two pages of identical paper share one; when another page
@@ -855,6 +856,7 @@ public actor LibraryStore {
                 OR EXISTS (SELECT 1 FROM file_items f WHERE f.asset_id = a.id))
             """, [.text(id.sha256)]) { $0.int(0) }
         if !direct.isEmpty { return true }
+        if try isAssetKeptBySavedTemplate(id) { return true }
         let placed = try db.query("SELECT payload_json FROM page_objects WHERE kind = 'image'") {
             try decoder.decode(PageObject.Payload.self, from: Data($0.text(0).utf8))
         }.contains { payload in
@@ -1077,6 +1079,7 @@ public actor LibraryStore {
     }
 
     func deleteUnreferencedAssetRows() throws -> [(AssetID, AssetKind)] {
+        let keptByTemplates = try assetsKeptBySavedTemplates()
         // Placed images inside page objects also reference assets.
         let placed = Set(try db.query("SELECT payload_json FROM page_objects WHERE kind = 'image'") {
             try decoder.decode(PageObject.Payload.self, from: Data($0.text(0).utf8))
@@ -1091,6 +1094,9 @@ public actor LibraryStore {
               AND NOT EXISTS (SELECT 1 FROM file_items f WHERE f.asset_id = a.id)
             """) { (AssetID(sha256: $0.text(0)), AssetKind(rawValue: $0.text(1)) ?? .pdf) }
             .filter { !placed.contains($0.0) }
+            // A saved template keeps its originals; deleting one would also
+            // trip `saved_templates.asset_id`'s foreign key.
+            .filter { !keptByTemplates.contains($0.0) }
         for (id, _) in unreferenced {
             try db.run("DELETE FROM assets WHERE id = ?", [.text(id.sha256)])
         }

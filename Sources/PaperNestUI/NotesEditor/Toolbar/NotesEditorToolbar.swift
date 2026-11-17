@@ -270,7 +270,14 @@ struct NotesEditorToolbar<Leading: View, Trailing: View>: View {
                 importPages: presenting(actions.importPages), textBox: closing(actions.textBox),
                 image: presenting(actions.image), dateAndTime: closing(actions.dateAndTime),
                 divider: closing(actions.divider), duplicatePage: closing(actions.duplicatePage),
-                organizePages: presenting(actions.organizePages)), close: close)
+                organizePages: presenting(actions.organizePages),
+                // Each new action threaded through, or the panel never sees it.
+                templates: actions.templates,
+                addPageFromTemplate: actions.addPageFromTemplate.map { add in { template in close(); add(template) } },
+                saveTemplate: actions.saveTemplate.map(presenting),
+                renameTemplate: actions.renameTemplate.map { rename in { template in presenting { rename(template) }() } },
+                deleteTemplate: actions.deleteTemplate.map { delete in { template in presenting { delete(template) }() } }),
+                close: close)
         }
     }
 }

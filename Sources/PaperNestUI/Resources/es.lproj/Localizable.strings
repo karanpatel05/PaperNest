@@ -1124,13 +1124,13 @@
 "redact.marks" = "Eliminar también las marcas sobre estas zonas (%lld)";
 "redact.marksStay" = "Las marcas que conserves se dibujan sobre el negro y aparecen en cada exportación.";
 "redact.commentsKept" = "Los comentarios privados de esta página se conservan; nunca se exportan.";
-"redact.shared" = "Otra página de tu biblioteca usa el mismo original. Lo que censures seguirá visible allí hasta que esa página también se censure o se elimine.";
+"redact.shared" = "Otra página o una plantilla guardada usa el mismo original. Lo que censures seguirá en tu biblioteca hasta que esa página se censure o se elimine, o se elimine la plantilla.";
 "redact.sync" = "La sincronización con iCloud está activada: las copias de esta página que ya estén en iCloud o en tus otros dispositivos no se eliminan.";
 "redact.restricted" = "El autor de este PDF limita la copia o la impresión, así que sus páginas no se pueden censurar.";
 "redact.back" = "Editar zonas";
 "redact.apply" = "Censurar página";
 "redact.applying" = "Censurando…";
-"redact.doneShared" = "La página está censurada aquí, pero otra página de tu biblioteca aún usa el original. Censura o elimina también esa página.";
+"redact.doneShared" = "La página está censurada aquí, pero otra página o una plantilla guardada aún usa el original. Censura o elimina también esa página, o elimina la plantilla.";
 "redact.failed" = "No se pudo censurar la página.";
 
 /* Pro tools */
@@ -1194,3 +1194,14 @@
 "template.notes" = "Notas";
 "template.actionItems" = "Tareas pendientes";
 "template.weekOf" = "Semana del";
+
+/* Saved templates */
+"templates.mine" = "Mis plantillas";
+"templates.saveAsTemplate" = "Guardar como plantilla";
+"templates.namePrompt" = "Guardar la página como plantilla";
+"templates.nameField" = "Nombre de la plantilla";
+"templates.saveDetail" = "Esta página, con lo que tiene dibujado y escrito, podrá añadirse a cualquier cuaderno desde Insertar. Los comentarios privados no se incluyen.";
+"templates.save" = "Guardar";
+"templates.renameTitle" = "Cambiar el nombre de la plantilla";
+"templates.deleteTitle" = "¿Eliminar «%@»?";
+"templates.deleteDetail" = "Las páginas ya creadas a partir de ella se conservan.";
