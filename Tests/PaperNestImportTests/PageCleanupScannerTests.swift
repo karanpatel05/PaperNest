@@ -30,6 +30,20 @@ import PaperNestTestSupport
         return data as Data
     }
 
+    /// What a scanner app saves: a PDF page holding only a picture — here a
+    /// white one, so a page with no text and no ink.
+    private func pictureOnlyPDF() -> Data {
+        let picture = PixelProbe.decode(scan())!
+        let data = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let context = CGContext(consumer: CGDataConsumer(data: data as CFMutableData)!, mediaBox: &box, nil)!
+        context.beginPDFPage(nil)
+        context.draw(picture, in: box)
+        context.endPDFPage()
+        context.closePDF()
+        return data as Data
+    }
+
     private func document(_ lib: TestLibrary, _ pages: [(Data, AssetKind)]) async throws -> ItemID {
         var staged: [AssetFileStore.StagedAsset] = []
         var newPages: [LibraryStore.NewPage] = []
@@ -88,6 +102,39 @@ import PaperNestTestSupport
         _ = try await lib.store.addBookmark(on: pages[1].id, name: "Keep")
         let bookmarked = try await scanner(lib).suggestions(for: item)
         #expect(bookmarked == [CleanupSuggestion(page: 0, reason: .duplicate(of: 1), isPreselected: true, attachments: [])])
+    }
+
+    /// A PDF page without text is a picture nobody has read: only offered,
+    /// until a recognition reads it and finds nothing.
+    @Test func aPictureOnlyPDFPageIsUnreadUntilRecognized() async throws {
+        let lib = try TestLibrary()
+        let item = try await document(lib, [(pictureOnlyPDF(), .pdf)])
+
+        let unread = try await scanner(lib).suggestions(for: item)
+        #expect(unread.map(\.reason) == [.looksBlank])
+        #expect(unread.allSatisfy { !$0.isPreselected })
+
+        let page = try #require(try await lib.store.pages(of: item).first)
+        try await lib.store.saveRecognition(PageRecognition(pageID: page.id, sourceRevision: page.revision, engineVersion: "test",
+                                                            status: .completed, languages: ["en-US"], lines: []))
+        let read = try await scanner(lib).suggestions(for: item)
+        #expect(read == [CleanupSuggestion(page: 0, reason: .blank, isPreselected: true, attachments: [])])
+    }
+
+    /// Text someone corrected by hand is kept with its page: that copy stays,
+    /// and the losses name it when it is the one offered.
+    @Test func theCopyWithCorrectedTextIsKept() async throws {
+        let lib = try TestLibrary()
+        let statement = SyntheticDocuments.textPDF(pages: ["Account statement for November with three payments listed"])
+        let item = try await document(lib, [(statement, .pdf), (statement, .pdf)])
+        let pages = try await lib.store.pages(of: item)
+        try await lib.store.saveRecognition(PageRecognition(pageID: pages[1].id, sourceRevision: pages[1].revision,
+                                                            engineVersion: "test", status: .completed, languages: ["en-US"],
+                                                            lines: [], correctedAt: Date()))
+
+        let suggestions = try await scanner(lib).suggestions(for: item)
+
+        #expect(suggestions == [CleanupSuggestion(page: 0, reason: .duplicate(of: 1), isPreselected: true, attachments: [])])
     }
 
     /// Two separate files saying the same thing: similar, to look at, never chosen.

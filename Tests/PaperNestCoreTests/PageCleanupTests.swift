@@ -109,6 +109,42 @@ import Testing
         #expect(pairs == [PageCleanup.SimilarPair(page: 1, of: 0, needsPictureCheck: true)])
     }
 
+    /// A signed copy is not "similar" to the unsigned one, by words or by look.
+    @Test func theSameWordsOrLookWithDifferentMarksAreNotSimilar() {
+        let byWords = PageCleanup.similarCandidates([page(0, words: wordsA, ink: 0.1),
+                                                     page(1, other, words: wordsA, ink: 0.1, marks: [note])], excluding: [])
+        let byLook = PageCleanup.similarCandidates([page(0, words: nil, ink: 0.1),
+                                                    page(1, other, words: nil, ink: 0.1, marks: [note])], excluding: [])
+        #expect(byWords.isEmpty)
+        #expect(byLook.isEmpty)
+    }
+
+    /// One page's "é" typed as one character, another's as e and an accent: the same word.
+    @Test func wordsCompareInOneNormalForm() {
+        let composed = ["Caf\u{E9}", "menu", "for", "the", "week", "ahead"]
+        let decomposed = ["Cafe\u{301}", "menu", "for", "the", "week", "ahead"]
+        let pairs = PageCleanup.similarCandidates([page(0, words: composed, ink: 0.1), page(1, other, words: decomposed, ink: 0.1)],
+                                                  excluding: [])
+        #expect(pairs == [PageCleanup.SimilarPair(page: 1, of: 0, needsPictureCheck: false)])
+    }
+
+    /// Three pages with the same words: both later ones are similar to the first.
+    @Test func severalPagesWithTheSameWordsPointAtTheFirst() {
+        let pages = [page(0, words: wordsA, ink: 0.1), page(1, words: wordsB, ink: 0.1),
+                     page(2, other, words: wordsA, ink: 0.1),
+                     page(3, .image(AssetID(sha256: String(repeating: "c", count: 64))), words: wordsA, ink: 0.1)]
+        #expect(PageCleanup.similarCandidates(pages, excluding: []).map { [$0.page, $0.of] } == [[2, 0], [3, 0]])
+    }
+
+    /// Hand-corrected recognized text goes with its page: that copy is kept.
+    @Test func theCopyWithCorrectedTextIsKept() {
+        let pages = [page(0, ink: 0.1), page(1, ink: 0.1, attachments: [.correctedText])]
+        #expect(PageCleanup.exactDuplicates(pages) == [
+            CleanupSuggestion(page: 0, reason: .duplicate(of: 1), isPreselected: true, attachments: [])])
+        let blank = PageCleanup.blankSuggestions([page(0, attachments: [.correctedText])], detailInk: [0: 0])
+        #expect(blank.map(\.isPreselected) == [false], "a blank page with corrected text is offered, not chosen")
+    }
+
     @Test func onePageGetsOneSuggestion() {
         let all = PageCleanup.suggestions(
             blank: [CleanupSuggestion(page: 2, reason: .blank, isPreselected: true, attachments: [])],

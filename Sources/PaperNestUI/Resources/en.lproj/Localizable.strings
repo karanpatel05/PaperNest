@@ -1269,3 +1269,5 @@
 "cleanup.moveCopyTitle" = "Move “%@” to Recently Deleted?";
 "cleanup.onDevice" = "Looked for on this device. Nothing is deleted until you confirm. Scans whose text has not been recognized are compared only by how they look.";
 "cleanup.failed" = "The pages couldn’t be looked through.";
+"cleanup.with.correctedText" = "Its corrected text goes with it.";
+"cleanup.lookedAgain" = "The document changed after it was looked through, so nothing was deleted and it was looked through again.";

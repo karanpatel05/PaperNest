@@ -3,6 +3,8 @@ import Foundation
 /// What a page carries that deleting it would lose beyond the page itself.
 public enum CleanupAttachment: String, Hashable, Sendable, CaseIterable {
     case comment, bookmark, keptDetails
+    /// Recognized text someone corrected by hand.
+    case correctedText
 }
 
 /// One page, as the cleanup sees it.
@@ -136,26 +138,43 @@ public enum PageCleanup {
         public var needsPictureCheck: Bool
     }
 
-    /// Pairs worth calling similar. With words on both, near-identical words
-    /// (a layout shared by every page of a document is no evidence); without,
-    /// a near-identical small picture, which the pictures must then confirm.
+    /// Pairs worth calling similar, always with the same marks (a signed
+    /// copy is not "similar" to the unsigned one). With words on both, the
+    /// same words — grouped by them, so a long document is not compared page
+    /// against page (a layout shared by every page is no evidence anyway);
+    /// without, a near-identical small picture, which the pictures must then
+    /// confirm.
     public static func similarCandidates(_ pages: [CleanupPage], excluding: Set<Int>) -> [SimilarPair] {
         var pairs: [SimilarPair] = []
         var claimed = excluding
-        for (i, a) in pages.enumerated() where !claimed.contains(a.index) && !(a.isNotebookPaper && a.marks.isEmpty) {
-            for b in pages[(i + 1)...] where !claimed.contains(b.index) && !(b.isNotebookPaper && b.marks.isEmpty) {
-                guard a.content != b.content || a.transform != b.transform || a.marks != b.marks else { continue }
-                if let wa = a.words, let wb = b.words, wa.count >= minimumWords, wb.count >= minimumWords {
-                    if WordDiff.changes(wa, wb).isEmpty {
-                        pairs.append(SimilarPair(page: b.index, of: a.index, needsPictureCheck: false))
-                        claimed.insert(b.index)
-                    }
-                } else if a.marks == b.marks, GrayPicture.similarity(a.fingerprint, b.fingerprint) >= 0.985 {
-                    pairs.append(SimilarPair(page: b.index, of: a.index, needsPictureCheck: true))
-                }
+        let considered = pages.filter { !($0.isNotebookPaper && $0.marks.isEmpty) }
+        // By words: the same words, normalized, in the same order.
+        var byWords: [String: [CleanupPage]] = [:]
+        for page in considered where !claimed.contains(page.index) {
+            guard let words = page.words, words.count >= minimumWords else { continue }
+            let key = words.map(\.precomposedStringWithCanonicalMapping).joined(separator: "\u{1F}")
+            if let earlier = byWords[key]?.first(where: { $0.marks == page.marks && !isSamePage($0, page) }) {
+                pairs.append(SimilarPair(page: page.index, of: earlier.index, needsPictureCheck: false))
+                claimed.insert(page.index)
+            } else {
+                byWords[key, default: []].append(page)
             }
         }
-        return pairs
+        // By look, for pages without words to go on.
+        for (i, a) in considered.enumerated() where !claimed.contains(a.index) && !hasWords(a) {
+            for b in considered[(i + 1)...] where !claimed.contains(b.index) && !hasWords(b) {
+                guard a.marks == b.marks, !isSamePage(a, b),
+                      GrayPicture.similarity(a.fingerprint, b.fingerprint) >= 0.985 else { continue }
+                pairs.append(SimilarPair(page: b.index, of: a.index, needsPictureCheck: true))
+            }
+        }
+        return pairs.sorted { $0.page < $1.page }
+    }
+
+    private static func hasWords(_ page: CleanupPage) -> Bool { (page.words?.count ?? 0) >= minimumWords }
+
+    private static func isSamePage(_ a: CleanupPage, _ b: CleanupPage) -> Bool {
+        a.content == b.content && a.transform == b.transform && a.marks == b.marks
     }
 
     /// Everything to offer, one suggestion per page, in page order: blank

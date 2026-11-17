@@ -16,9 +16,21 @@ public struct PageCleanupScanner: Sendable {
         self.store = store
     }
 
-    /// `progress` is told the share done, from 0 to 1, after each page read.
+    /// What was found, and which pages it was found on: suggestions name
+    /// pages by position, and a deletion must check that position still holds
+    /// the same page, at the same revision, before anything goes.
+    public struct Scan: Sendable {
+        public var suggestions: [CleanupSuggestion]
+        public var pages: [(id: PageID, revision: Int)]
+    }
+
     public func suggestions(for itemID: ItemID,
                             progress: @Sendable (Double) async -> Void = { _ in }) async throws -> [CleanupSuggestion] {
+        try await scan(itemID, progress: progress).suggestions
+    }
+
+    /// `progress` is told the share done, from 0 to 1, after each page read.
+    public func scan(_ itemID: ItemID, progress: @Sendable (Double) async -> Void = { _ in }) async throws -> Scan {
         let pages = try await store.pages(of: itemID)
         let bookmarked = Set(try await store.bookmarks(of: itemID).map(\.pageID))
         let detailsPage = try await store.documentDetails(of: itemID)?.pageID
@@ -30,6 +42,10 @@ public struct PageCleanupScanner: Sendable {
             if objects.contains(where: { if case .comment = $0.payload { true } else { false } }) { attachments.insert(.comment) }
             if bookmarked.contains(page.id) { attachments.insert(.bookmark) }
             if detailsPage == page.id { attachments.insert(.keptDetails) }
+            if let recognition = try await store.recognition(for: page.id), recognition.correctedAt != nil,
+               recognition.sourceRevision == page.revision {
+                attachments.insert(.correctedText)
+            }
             let marks = objects.compactMap { object -> PageObject.Payload? in
                 if case .comment = object.payload { return nil }
                 return object.payload
@@ -61,17 +77,19 @@ public struct PageCleanupScanner: Sendable {
             similar.append(CleanupSuggestion(page: pair.page, reason: .similar(to: pair.of), isPreselected: false,
                                              attachments: cleanupPages[pair.page].attachments))
         }
-        return PageCleanup.suggestions(blank: blank, duplicates: duplicates, similar: similar)
+        return Scan(suggestions: PageCleanup.suggestions(blank: blank, duplicates: duplicates, similar: similar),
+                    pages: pages.map { ($0.id, $0.revision) })
     }
 
     /// The page's words when it has been read: its PDF text, or its current
     /// recognition (a completed recognition with no lines is "read, none").
-    /// Notebook paper has none to read. Nil when nobody has read it.
+    /// Notebook paper has none to read. Nil when nobody has read it — and a
+    /// PDF page without text is no different from a scan: scanner apps save
+    /// pictures as PDFs, and an unread one says nothing by being wordless.
     private func words(of page: Page) async throws -> [String]? {
         if case .template = page.content { return [] }
         let words = try await renderer.textLayout(for: page).comparisonText.words.map(\.text)
         if !words.isEmpty { return words }
-        if case .pdfPage = page.content { return [] }
         guard let recognition = try await store.recognition(for: page.id), recognition.status == .completed,
               recognition.sourceRevision == page.revision else { return nil }
         return recognition.lines.flatMap { $0.text.split(whereSeparator: \.isWhitespace).map(String.init) }

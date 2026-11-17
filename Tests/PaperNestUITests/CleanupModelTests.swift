@@ -96,6 +96,59 @@ import PaperNestTestSupport
         #expect(try await store.pages(of: itemID).count == 3)
     }
 
+    /// A chosen page changed after the look (turned, elsewhere): nothing is
+    /// deleted, the document is looked through again, and what is offered
+    /// then is what the pages are now.
+    @Test func aPageChangedAfterTheLookStopsTheDeletionAndIsLookedAtAgain() async throws {
+        let (root, session, store, itemID) = try await bundle()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let document = DocumentModel(itemID: itemID, session: session)
+        await document.load()
+        let model = CleanupModel(document: document)
+        model.look()
+        try await ready(model)
+        #expect(model.selected == [1, 2])
+
+        let blank = try await store.pages(of: itemID)[2]
+        try await store.updateTransform(blank.id, to: PageTransform(rotation: .clockwise90))
+
+        #expect(await !model.deleteSelected(undoManager: nil))
+        #expect(model.lookedAgain)
+        #expect(model.phase != .ready, "Review is off until the new look is done")
+        #expect(try await store.pages(of: itemID).count == 3, "nothing deleted")
+
+        try await ready(model)
+        // Its reading was of the page before it turned: unread now, so only offered.
+        #expect(model.suggestions.map(\.reason) == [.duplicate(of: 0), .looksBlank])
+        #expect(model.selected == [1])
+        #expect(await model.deleteSelected(undoManager: nil))
+        #expect(try await store.pages(of: itemID).map(\.id).contains(blank.id), "the page that changed stays")
+        #expect(try await store.pages(of: itemID).count == 2)
+    }
+
+    /// The page a duplicate was offered against is removed elsewhere after
+    /// the look: deleting the duplicate now would lose that content entirely,
+    /// so nothing goes and the document is looked through again.
+    @Test func theCopyIsNotDeletedWhenTheOriginalWentElsewhere() async throws {
+        let (root, session, store, itemID) = try await bundle()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let document = DocumentModel(itemID: itemID, session: session)
+        await document.load()
+        let model = CleanupModel(document: document)
+        model.look()
+        try await ready(model)
+        let pages = try await store.pages(of: itemID)
+        model.selected = [1]
+
+        _ = try await store.deletePages([pages[0].id])
+
+        #expect(await !model.deleteSelected(undoManager: nil))
+        #expect(model.lookedAgain)
+        #expect(try await store.pages(of: itemID).map(\.id) == [pages[1].id, pages[2].id], "the last copy stays")
+        try await ready(model)
+        #expect(!model.suggestions.contains { $0.page == 0 }, "no longer a duplicate of anything")
+    }
+
     @Test func anIdenticalDocumentIsOfferedAndMovedToRecentlyDeleted() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("PaperNestCleanup-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

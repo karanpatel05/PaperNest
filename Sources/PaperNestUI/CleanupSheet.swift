@@ -15,6 +15,10 @@ final class CleanupModel {
     private(set) var suggestions: [CleanupSuggestion] = []
     var selected: Set<Int> = []
     private(set) var copies: [PaperNestCore.LibraryItem] = []
+    /// The page each suggestion was found on, and its revision then.
+    private var foundOn: [(id: PageID, revision: Int)] = []
+    /// The document changed after it was looked through, so it was looked through again.
+    private(set) var lookedAgain = false
     @ObservationIgnored private var task: Task<Void, Never>?
 
     init(document: DocumentModel) {
@@ -25,14 +29,18 @@ final class CleanupModel {
 
     func look() {
         task?.cancel()
+        // Not ready again until this look is done: Review stays off meanwhile.
+        phase = .looking(0)
         guard let store = session.environment?.store, let renderer = session.environment?.renderer else { phase = .failed; return }
         let itemID = document.itemID
         let progress: @Sendable (Double) async -> Void = { [weak self] share in await self?.report(share) }
         task = Task { [weak self] in
             do {
-                let found = try await PageCleanupScanner(renderer: renderer, store: store).suggestions(for: itemID, progress: progress)
+                let scan = try await PageCleanupScanner(renderer: renderer, store: store).scan(itemID, progress: progress)
+                let found = scan.suggestions
                 let copies = try await store.identicalDocuments(to: itemID)
                 guard let self, !Task.isCancelled else { return }
+                self.foundOn = scan.pages
                 self.suggestions = found
                 self.selected = Set(found.filter(\.isPreselected).map(\.page))
                 self.copies = copies
@@ -58,11 +66,24 @@ final class CleanupModel {
     /// A document keeps a page: choosing every one is not allowed.
     var choosesEveryPage: Bool { !selected.isEmpty && selected.count >= document.pages.count }
 
-    /// Deletes the chosen pages as one undoable step.
+    /// Deletes the chosen pages as one undoable step — only if each is still
+    /// the page it was found on, at the revision it was found at, and the
+    /// document keeps a page. Otherwise nothing goes, and the document is
+    /// looked through again.
     func deleteSelected(undoManager: UndoManager?) async -> Bool {
-        let ids = selected.sorted().compactMap { document.pages.indices.contains($0) ? document.pages[$0].id : nil }
-        guard !choosesEveryPage, !ids.isEmpty else { return false }
-        return await document.deletePages(ids, undoManager: undoManager)
+        guard let store = session.environment?.store, !choosesEveryPage else { return false }
+        let chosen = selected.sorted().compactMap { foundOn.indices.contains($0) ? foundOn[$0] : nil }
+        guard !chosen.isEmpty, chosen.count == selected.count,
+              let current = try? await store.pages(of: document.itemID) else { return false }
+        let now = Dictionary(uniqueKeysWithValues: current.map { ($0.id, $0.revision) })
+        let unchanged = current.count == foundOn.count && chosen.allSatisfy { now[$0.id] == $0.revision }
+        guard unchanged, current.count > chosen.count else {
+            lookedAgain = true
+            look()
+            return false
+        }
+        await document.load()
+        return await document.deletePages(chosen.map(\.id), undoManager: undoManager)
     }
 
     /// Moves an identical document to Recently Deleted, where it stays for 30 days.
@@ -94,6 +115,7 @@ final class CleanupModel {
             case .comment: L10n.cleanupWithComment
             case .bookmark: L10n.cleanupWithBookmark
             case .keptDetails: L10n.cleanupWithKeptDetails
+            case .correctedText: L10n.cleanupWithCorrectedText
             }
         }
     }
@@ -204,6 +226,9 @@ struct CleanupSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 if !model.suggestions.isEmpty {
                     Text(L10n.cleanupSelected(model.selected.count)).accessibilityIdentifier("cleanup-selected")
+                }
+                if model.lookedAgain {
+                    Text(L10n.cleanupLookedAgain).foregroundStyle(.orange).accessibilityIdentifier("cleanup-looked-again")
                 }
                 if model.choosesEveryPage {
                     Text(L10n.cleanupAllPages).foregroundStyle(.orange).accessibilityIdentifier("cleanup-all-pages")

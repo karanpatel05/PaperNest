@@ -1415,4 +1415,6 @@ extension L10n {
     static func cleanupMoveCopyTitle(_ value0: String) -> String { tr("cleanup.moveCopyTitle", value0) }
     static var cleanupOnDevice: String { tr("cleanup.onDevice") }
     static var cleanupFailed: String { tr("cleanup.failed") }
+    static var cleanupWithCorrectedText: String { tr("cleanup.with.correctedText") }
+    static var cleanupLookedAgain: String { tr("cleanup.lookedAgain") }
 }

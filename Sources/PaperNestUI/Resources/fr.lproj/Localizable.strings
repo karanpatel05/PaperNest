@@ -1269,3 +1269,5 @@
 "cleanup.moveCopyTitle" = "Placer « %@ » dans Supprimés récemment ?";
 "cleanup.onDevice" = "Recherche faite sur cet appareil. Rien n’est supprimé sans votre confirmation. Les scans dont le texte n’a pas été reconnu ne sont comparés que par leur apparence.";
 "cleanup.failed" = "Impossible d’examiner les pages.";
+"cleanup.with.correctedText" = "Son texte corrigé disparaît avec elle.";
+"cleanup.lookedAgain" = "Le document a changé après l’examen : rien n’a été supprimé et il a été examiné de nouveau.";

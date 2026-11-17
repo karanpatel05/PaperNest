@@ -1269,3 +1269,5 @@
 "cleanup.moveCopyTitle" = "¿Mover «%@» a Eliminados recientemente?";
 "cleanup.onDevice" = "Búsqueda hecha en este dispositivo. No se elimina nada sin tu confirmación. Los escaneos cuyo texto no se ha reconocido solo se comparan por su aspecto.";
 "cleanup.failed" = "No se pudieron revisar las páginas.";
+"cleanup.with.correctedText" = "Su texto corregido se elimina con ella.";
+"cleanup.lookedAgain" = "El documento cambió después de revisarlo, así que no se eliminó nada y se ha vuelto a revisar.";
