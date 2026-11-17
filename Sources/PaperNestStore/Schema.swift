@@ -296,5 +296,20 @@ enum Schema {
             modified_at REAL NOT NULL
         );
         """),
+        // Details someone reviewed and kept, read off one page of a document
+        // (`DocumentDetails.swift`): a receipt's, a card's or an invoice's.
+        // One per document, gone with it or with the page they were read
+        // from. A new table, nothing rebuilt, not synced. Not indexed: the
+        // page's own text already makes them findable.
+        Migration(version: 13, sql: """
+        CREATE TABLE document_details (
+            item_id TEXT PRIMARY KEY NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            page_id TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+            page_revision INTEGER NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('receipt', 'businessCard', 'invoice')),
+            details_json TEXT NOT NULL,
+            modified_at REAL NOT NULL
+        );
+        """),
     ]
 }

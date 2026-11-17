@@ -132,7 +132,7 @@ extension PageTextLayout {
 extension NormalizedRect {
     /// The smallest box holding both, kept exact: these are text boxes, far
     /// thinner than the smallest crop, and must not be inflated to one.
-    func union(_ other: NormalizedRect) -> NormalizedRect {
+    public func union(_ other: NormalizedRect) -> NormalizedRect {
         let minX = Swift.min(x, other.x), minY = Swift.min(y, other.y)
         let maxX = Swift.max(x + width, other.x + other.width)
         let maxY = Swift.max(y + height, other.y + other.height)

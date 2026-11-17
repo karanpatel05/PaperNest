@@ -202,7 +202,8 @@ import PaperNestCore
 
         let store = try LibraryStore(directory: dir.url)
 
-        #expect(try await store.schemaVersion() == 12)
+        // v12 brought templates; later versions keep them.
+        #expect(try await store.schemaVersion() == Schema.latestVersion)
         let page = try #require(try await store.pages(of: ItemID(rawValue: "n1")).first)
         #expect(page.content == .template(.lined))
         #expect(try await store.bookmarks(of: ItemID(rawValue: "n1")).map(\.name) == ["Start"])

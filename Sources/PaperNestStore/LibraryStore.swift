@@ -1124,6 +1124,10 @@ public actor LibraryStore {
         // `persistCommentChange` deliberately does not bump, so a private
         // comment never reaches the index.
         try reindexTypedText(on: page)
+        // Nor do kept details: read from the paper, they stay current through
+        // an ink stroke, and only if they were current before it.
+        try db.run("UPDATE document_details SET page_revision = page_revision + 1 WHERE page_id = ? AND page_revision = ?",
+                   [.text(page.id.rawValue), .int(Int64(page.revision))])
         // Object edits don't change the underlying paper. Preserve only a
         // current completed result; never make already-stale OCR current.
         if var recognition = try recognition(for: page.id), recognition.status == .completed,

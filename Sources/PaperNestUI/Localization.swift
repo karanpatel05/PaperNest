@@ -1349,4 +1349,42 @@ extension L10n {
     static var templatesRenameTitle: String { tr("templates.renameTitle") }
     static func templatesDeleteTitle(_ value0: String) -> String { tr("templates.deleteTitle", value0) }
     static var templatesDeleteDetail: String { tr("templates.deleteDetail") }
+
+    // MARK: Structured capture
+
+    static var detailsExtract: String { tr("details.extract") }
+    static var detailsTitle: String { tr("details.title") }
+    static var detailsKind: String { tr("details.kind") }
+    static var detailsKindReceipt: String { tr("details.kind.receipt") }
+    static var detailsKindBusinessCard: String { tr("details.kind.businessCard") }
+    static var detailsKindInvoice: String { tr("details.kind.invoice") }
+    static var detailsFields: String { tr("details.fields") }
+    static var detailsFieldMerchant: String { tr("details.field.merchant") }
+    static var detailsFieldDate: String { tr("details.field.date") }
+    static var detailsFieldTotal: String { tr("details.field.total") }
+    static var detailsFieldTax: String { tr("details.field.tax") }
+    static var detailsFieldCurrency: String { tr("details.field.currency") }
+    static var detailsFieldName: String { tr("details.field.name") }
+    static var detailsFieldCompany: String { tr("details.field.company") }
+    static var detailsFieldPhone: String { tr("details.field.phone") }
+    static var detailsFieldEmail: String { tr("details.field.email") }
+    static var detailsFieldAddress: String { tr("details.field.address") }
+    static var detailsFieldWebsite: String { tr("details.field.website") }
+    static var detailsFieldSupplier: String { tr("details.field.supplier") }
+    static var detailsFieldInvoiceNumber: String { tr("details.field.invoiceNumber") }
+    static var detailsFieldDueDate: String { tr("details.field.dueDate") }
+    static var detailsCheck: String { tr("details.check") }
+    static var detailsLineItems: String { tr("details.lineItems") }
+    static var detailsLineItemsNote: String { tr("details.lineItemsNote") }
+    static var detailsAddRow: String { tr("details.addRow") }
+    static var detailsDescription: String { tr("details.description") }
+    static var detailsAmount: String { tr("details.amount") }
+    static var detailsOnDevice: String { tr("details.onDevice") }
+    static var detailsStale: String { tr("details.stale") }
+    static var detailsNoText: String { tr("details.noText") }
+    static var detailsReadAgain: String { tr("details.readAgain") }
+    static var detailsSave: String { tr("details.save") }
+    static var detailsShareCard: String { tr("details.shareCard") }
+    static var detailsShareCSV: String { tr("details.shareCSV") }
+    static var detailsFailed: String { tr("details.failed") }
 }

@@ -74,6 +74,8 @@ struct DocumentView: View {
     @State private var isShowingRedact = false
     /// Comparing this document with another.
     @State private var isShowingCompare = false
+    /// Reading a receipt's, card's or invoice's details off the page.
+    @State private var isShowingDetails = false
     /// Saving the page as a template: asking for its name.
     @State private var isNamingTemplate = false
     @State private var templateName = ""
@@ -455,6 +457,11 @@ struct DocumentView: View {
     @inline(never)
     private func templateDialogs<Content: View>(_ content: Content) -> some View {
         content
+            .sheet(isPresented: $isShowingDetails) {
+                if let page = model.selectedPage {
+                    DetailsSheet(itemID: model.itemID, pageID: page.id, session: model.session)
+                }
+            }
             .alert(L10n.templatesNamePrompt, isPresented: $isNamingTemplate) {
                 TextField(L10n.templatesNameField, text: $templateName)
                 Button(L10n.cancel, role: .cancel) {}
@@ -992,7 +999,7 @@ struct DocumentView: View {
             || managedMarkupPage != nil || signaturePage != nil || notebookPageRequest != nil
             || isShowingCrop || isShowingFilePicker || isShowingPDFForm || isShowingPageOrganizer
             || isShowingExport || isShowingAdjustments || isShowingOutline || isShowingImagePicker
-            || isShowingPhotoPicker || isShowingCompress || isShowingOCR || isShowingRedact || isShowingCompare
+            || isShowingPhotoPicker || isShowingCompress || isShowingOCR || isShowingRedact || isShowingCompare || isShowingDetails
         #if os(iOS)
         presenting = presenting || cameraPurpose != nil || photoCameraPage != nil
         #endif
@@ -1109,6 +1116,11 @@ struct DocumentView: View {
             }
             .disabled(model.pages.isEmpty)
             .accessibilityIdentifier("utilities-compare")
+            Button { finishThen { isShowingDetails = true } } label: {
+                Label(L10n.detailsExtract, systemImage: "doc.text.magnifyingglass")
+            }
+            .disabled(model.selectedPage == nil)
+            .accessibilityIdentifier("utilities-extract-details")
             Button { finishThen { openProTool(.redact) { isShowingRedact = true } } } label: {
                 Label(L10n.redactTitle, systemImage: "eye.slash")
             }

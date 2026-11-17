@@ -83,6 +83,8 @@ public struct PageRedactor: Sendable {
         // the recognition row still physically holds them, and the undo
         // history still references the paper they were read from.
         try await store.deleteRecognition(for: page.id)
+        // Details someone kept from this page are its words too.
+        try await store.deleteDocumentDetails(readFrom: page.id)
         try await store.forgetReplacedContent(for: page.id)
 
         var stillThere = false
