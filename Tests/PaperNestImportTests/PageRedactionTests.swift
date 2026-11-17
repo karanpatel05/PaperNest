@@ -118,6 +118,34 @@ import PaperNestTestSupport
         #expect(!FileManager.default.fileExists(atPath: originalFile.path), "the original is still on disk")
     }
 
+    /// After a redaction the page is a picture nobody has read, and automatic
+    /// recognition reads it again, as it would any scan. What is left showing
+    /// becomes searchable again; what is under the black never can, because
+    /// it is not in the picture. The review says exactly this.
+    @Test func readingTheRedactedPageAgainFindsOnlyWhatIsLeftShowing() async throws {
+        let lib = try TestLibrary()
+        let item = try await lib.importer.importItem(.data(
+            SyntheticDocuments.textImage(lines: ["ACCOUNT 55512345", " ", " ", "Filed in March"]), name: "Scan"))
+        #expect(try await AutomaticTextRecognizer(store: lib.store, renderer: lib.renderer).recognizeMissing() == 1)
+        #expect(try await lib.store.search("55512345") == [item.id], "precondition: the scan was read")
+        let page = try await lib.store.pages(of: item.id)[0]
+        // The area a person would drag over the account line: its recognized
+        // box, with a margin.
+        let line = try #require(try await lib.store.recognition(for: page.id)?.lines.first { $0.text.contains("55512345") })
+        let area = NormalizedRect.exact(x: max(0, line.box.x - 0.02), y: max(0, line.box.y - 0.01),
+                                        width: min(1, line.box.width + 0.04), height: line.box.height + 0.02)
+
+        _ = try await PageRedactor(store: lib.store, renderer: lib.renderer).redact(page, rectangles: [area])
+        #expect(try await lib.store.search("march").isEmpty, "the page's recognized words go with the redaction")
+
+        let read = try await AutomaticTextRecognizer(store: lib.store, renderer: lib.renderer).recognizeMissing()
+
+        #expect(read == 1, "the redacted page is a new picture, read like any scan")
+        #expect(try await lib.store.search("march") == [item.id], "the words left showing are found again")
+        #expect(try await lib.store.search("55512345").isEmpty, "a word under the black came back")
+        #expect(try await lib.store.search("account").isEmpty, "a word under the black came back")
+    }
+
     /// Content addressing means identical paper is stored once. Redacting one
     /// page cannot delete it, and the words stay reachable through the other —
     /// so the outcome has to say so rather than report a removal.

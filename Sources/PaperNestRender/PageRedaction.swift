@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import PDFKit
 import UniformTypeIdentifiers
 import PaperNestCore
 
@@ -80,5 +81,21 @@ public enum PageRedaction {
         CGImageDestinationAddImage(destination, painted, nil)
         guard CGImageDestinationFinalize(destination) else { throw RedactionError.encodingFailed }
         return data as Data
+    }
+}
+
+extension PageRenderer {
+    /// Whether the page's paper carries words a reader can select or search:
+    /// a digital PDF page's own text, or text recognized for the page as it
+    /// is now. Redaction flattens the whole sheet, so all of them go — the
+    /// review says so whenever this is true.
+    ///
+    /// Read from the page itself rather than from the search index, which a
+    /// background pass fills some time after an import.
+    public func paperHasWords(_ page: Page) async throws -> Bool {
+        if !(try await recognizedLines(for: page)).isEmpty { return true }
+        guard case .pdfPage(_, let index) = page.content, let data = try await sourcePDFData(for: page),
+              let pdfPage = PDFDocument(data: data)?.page(at: index) else { return false }
+        return !(pdfPage.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

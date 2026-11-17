@@ -166,7 +166,9 @@ hard part, and they are not negotiable.
 - Placed strokes are ordinary ink: editable, erasable and undoable like anything else drawn, which also means
   anyone can remove one.
 
-### Redaction, when a screen for it arrives (engine done 2026-10-27)
+### Redaction (engine done 2026-10-27; the screen, `RedactEditor`, since 2026-11-17)
+
+The screen below says all of this already; keep every line of it on screen before Redact Page if you restyle it.
 
 Redaction is the one place in this app where a convincing lie is worse than no feature. A black rectangle drawn
 over a word, in a PDF, leaves the word underneath — selectable, searchable, recoverable. `PageRedaction` does not
@@ -182,8 +184,10 @@ What a screen has to say, before the user commits:
 - **A shared original may survive.** Two pages of identical paper share one stored file. If another page still
   shows it, the content stays reachable through that page. `isAssetReferenced` answers this *before* you promise
   anything — ask it, and if it says the original is shared, say the content is still in the library and where.
-- **Ink, comments and stamps under the rectangle are not touched.** They are separate records. If a note contains
-  the thing being redacted, redaction will not remove it.
+- **Marks over the areas go with it; comments stay.** Ink, text boxes and placed pictures are separate records drawn
+  over the page; since 2026-11-17 `PageRedactor.redact(_:rectangles:removingMarks:)` removes the ones it is given
+  (`PageRedactionReview.marksOverlapping` finds them) in the same operation, and the screen lets the person keep
+  them. Private comments are never drawn and are not touched: if one contains the thing being redacted, it stays.
 - **Deleting a file does not scrub the disk.** Never say "securely erased", "wiped" or "unrecoverable". The honest
   claim is that the content is no longer in the document, in the library's text, or in search.
 

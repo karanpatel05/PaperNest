@@ -1099,3 +1099,27 @@
 "scanner.feedback.moveCloser" = "Acércate";
 "scanner.feedback.holdSteady" = "No te muevas";
 "scanner.feedback.ready" = "Listo";
+
+/* Redact screen */
+"redact.title" = "Censurar";
+"redact.pageLabel" = "Página que censurar";
+"redact.hint" = "Arrastra sobre lo que quieras eliminar. Cada arrastre marca una zona.";
+"redact.count" = "Zonas: %lld";
+"redact.removeLast" = "Quitar la última zona";
+"redact.review" = "Revisar";
+"redact.preparing" = "Preparando la página censurada…";
+"redact.previewLabel" = "La página tal como quedará tras censurarla";
+"redact.warning.flatten" = "La página se convierte en una imagen de sí misma con estas zonas pintadas de negro. Lo que hay debajo desaparece de la página, de su texto y del archivo.";
+"redact.warning.wholePage" = "Las palabras de esta página ya no se pueden seleccionar, copiar ni buscar, en toda la página y no solo bajo las zonas negras, hasta que el reconocimiento de texto vuelva a leer la página; entonces solo encuentra las palabras que siguen visibles.";
+"redact.warning.undo" = "Esta acción no se puede deshacer.";
+"redact.marks" = "Eliminar también las marcas sobre estas zonas (%lld)";
+"redact.marksStay" = "Las marcas que conserves se dibujan sobre el negro y aparecen en cada exportación.";
+"redact.commentsKept" = "Los comentarios privados de esta página se conservan; nunca se exportan.";
+"redact.shared" = "Otra página de tu biblioteca usa el mismo original. Lo que censures seguirá visible allí hasta que esa página también se censure o se elimine.";
+"redact.sync" = "La sincronización con iCloud está activada: las copias de esta página que ya estén en iCloud o en tus otros dispositivos no se eliminan.";
+"redact.restricted" = "El autor de este PDF limita la copia o la impresión, así que sus páginas no se pueden censurar.";
+"redact.back" = "Editar zonas";
+"redact.apply" = "Censurar página";
+"redact.applying" = "Censurando…";
+"redact.doneShared" = "La página está censurada aquí, pero otra página de tu biblioteca aún usa el original. Censura o elimina también esa página.";
+"redact.failed" = "No se pudo censurar la página.";

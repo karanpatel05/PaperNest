@@ -70,6 +70,8 @@ struct DocumentView: View {
     @State private var photoTargetPage: Page?
     @State private var isLoadingPhoto = false
     @State private var isShowingCrop = false
+    /// The Redact screen, for the page on screen.
+    @State private var isShowingRedact = false
     @State private var annotationPage: Page?
     /// Which mark the recognised-text sheet opens on.
     @State private var annotationStyle: TextMarkupStyle = .highlight
@@ -376,6 +378,7 @@ struct DocumentView: View {
             .task {
                 isShowingExport = UserDefaults.standard.bool(forKey: "PaperNestDebugShowExport")
                 isShowingCrop = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCrop")
+                isShowingRedact = UserDefaults.standard.bool(forKey: "PaperNestDebugShowRedact")
                 isShowingCompress = UserDefaults.standard.bool(forKey: "PaperNestDebugShowCompress")
                 if UserDefaults.standard.bool(forKey: "PaperNestDebugShowMarkup") { isMarkingUp = true }
                 isShowingOutline = UserDefaults.standard.bool(forKey: "PaperNestDebugShowOutline")
@@ -450,6 +453,11 @@ struct DocumentView: View {
                     CropEditor(page: page) { crop in
                         Task { await model.setCrop(crop, undoManager: undoManager) }
                     }
+                }
+            }
+            .sheet(isPresented: $isShowingRedact) {
+                if let page = model.selectedPage {
+                    RedactEditor(model: model, page: page, undoManager: undoManager)
                 }
             }
             .sheet(item: $notebookPageRequest) { request in
@@ -905,7 +913,7 @@ struct DocumentView: View {
             || managedMarkupPage != nil || signaturePage != nil || notebookPageRequest != nil
             || isShowingCrop || isShowingFilePicker || isShowingPDFForm || isShowingPageOrganizer
             || isShowingExport || isShowingAdjustments || isShowingOutline || isShowingImagePicker
-            || isShowingPhotoPicker || isShowingCompress || isShowingOCR
+            || isShowingPhotoPicker || isShowingCompress || isShowingOCR || isShowingRedact
         #if os(iOS)
         presenting = presenting || cameraPurpose != nil || photoCameraPage != nil
         #endif
@@ -1017,6 +1025,11 @@ struct DocumentView: View {
             }
             .disabled(model.pages.isEmpty)
             .accessibilityIdentifier("utilities-convert")
+            Button { finishThen { isShowingRedact = true } } label: {
+                Label(L10n.redactTitle, systemImage: "eye.slash")
+            }
+            .disabled(model.selectedPage == nil || model.isChangingNotebookPage)
+            .accessibilityIdentifier("utilities-redact")
         }
     }
 

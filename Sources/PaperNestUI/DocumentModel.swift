@@ -1280,6 +1280,62 @@ final class DocumentModel {
         historyDidChange()
     }
 
+    // MARK: - Redaction
+
+    /// What applying a redaction would do, worked out before anything is
+    /// written, for the review.
+    struct RedactionReview {
+        /// The redacted page exactly as it would be written: the engine's own
+        /// drawing, not a preview of it.
+        let picture: Data
+        /// Marks drawn over the areas, which would show over the black.
+        let marks: [PageObject]
+        /// Private comments on the page, which stay.
+        let comments: Int
+        /// Another page still uses this page's original: the redacted content
+        /// stays reachable there.
+        let originalUsedElsewhere: Bool
+        /// iCloud copies already synced are not removed by redacting.
+        let syncIsOn: Bool
+        /// The page carries words a reader can select: all of them go, not
+        /// only those under the areas.
+        let hasSelectableText: Bool
+    }
+
+    func redactionReview(of page: Page, areas: [NormalizedRect]) async throws -> RedactionReview {
+        guard let store, let renderer = session.environment?.renderer else { throw StoreError.pageNotFound }
+        let picture = try await PageRedaction.redactedPNG(for: page, rectangles: areas, renderer: renderer)
+        let objects = try await store.objects(on: page.id)
+        let marks = PageRedactionReview.marksOverlapping(areas, in: objects, sourceSize: page.sourceSize)
+        let comments = PageRedactionReview.comments(in: objects).count
+        var shared = false
+        if let asset = page.content.assetID { shared = try await store.isAssetUsedElsewhere(asset, besides: page.id) }
+        return RedactionReview(picture: picture, marks: marks, comments: comments, originalUsedElsewhere: shared,
+                               syncIsOn: (try? await store.syncIsEnabled()) ?? false,
+                               hasSelectableText: try await renderer.paperHasWords(page))
+    }
+
+    /// Redacts a page: its paper flattened with the areas painted black, the
+    /// marks given removed, its recognized words and undo history deleted.
+    ///
+    /// **The document's whole undo history is cleared afterwards**, every
+    /// target's: it holds snapshots of ink and text boxes, words included,
+    /// and an Undo after a redaction must not bring back a mark it removed.
+    func redact(_ page: Page, areas: [NormalizedRect], removingMarks marks: [PageObject],
+                undoManager: UndoManager?) async throws -> RedactionOutcome {
+        await finishPendingHistory()
+        guard let store, let renderer = session.environment?.renderer,
+              let current = try await store.page(page.id), current.itemID == itemID else { throw StoreError.pageNotFound }
+        let outcome = try await PageRedactor(store: store, renderer: renderer)
+            .redact(current, rectangles: areas, removingMarks: marks)
+        undoManager?.removeAllActions()
+        historyDidChange()
+        await load()
+        await loadSelectedPageObjects()
+        session.didChange()
+        return outcome
+    }
+
     private func replace(_ page: Page) {
         if let index = pages.firstIndex(where: { $0.id == page.id }) {
             pages[index] = page

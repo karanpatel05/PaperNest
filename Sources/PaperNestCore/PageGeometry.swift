@@ -53,6 +53,19 @@ public struct PageGeometry: Hashable, Sendable {
         r.denormalized(in: sourceSize).applying(sourceToPage)
     }
 
+    /// The other way: a rectangle drawn on the page as it is seen (crop and
+    /// rotation applied, points, y-down) as a box normalized to the upright,
+    /// uncropped source — where ink, text and redactions are stored.
+    ///
+    /// Through `NormalizedRect`'s own initializer, which keeps the box on the
+    /// sheet and never smaller than its minimum side: a tiny box grows, it
+    /// never shrinks, so a box drawn to redact covers at least what was drawn.
+    public func normalizedSourceRect(forPageRect rect: CGRect) -> NormalizedRect {
+        let source = rect.standardized.applying(pageToSource)
+        return NormalizedRect(x: source.minX / sourceSize.width, y: source.minY / sourceSize.height,
+                              width: source.width / sourceSize.width, height: source.height / sourceSize.height)
+    }
+
     // MARK: - Crop editing
 
     /// The same page with no crop: what a crop editor shows, rotated as the

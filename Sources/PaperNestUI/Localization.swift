@@ -1236,3 +1236,29 @@ extension L10n {
     static var scannerFeedbackHoldSteady: String { tr("scanner.feedback.holdSteady") }
     static var scannerFeedbackReady: String { tr("scanner.feedback.ready") }
 }
+
+// Redact screen: marking areas, the review before applying, and what it cannot do.
+extension L10n {
+    static var redactTitle: String { tr("redact.title") }
+    static var redactPageLabel: String { tr("redact.pageLabel") }
+    static var redactHint: String { tr("redact.hint") }
+    static func redactAreaCount(_ count: Int) -> String { tr("redact.count", count) }
+    static var redactRemoveLast: String { tr("redact.removeLast") }
+    static var redactReview: String { tr("redact.review") }
+    static var redactPreparing: String { tr("redact.preparing") }
+    static var redactPreviewLabel: String { tr("redact.previewLabel") }
+    static var redactWarningFlatten: String { tr("redact.warning.flatten") }
+    static var redactWarningWholePage: String { tr("redact.warning.wholePage") }
+    static var redactWarningUndo: String { tr("redact.warning.undo") }
+    static func redactRemoveMarks(_ count: Int) -> String { tr("redact.marks", count) }
+    static var redactMarksStay: String { tr("redact.marksStay") }
+    static var redactCommentsKept: String { tr("redact.commentsKept") }
+    static var redactShared: String { tr("redact.shared") }
+    static var redactSync: String { tr("redact.sync") }
+    static var redactRestricted: String { tr("redact.restricted") }
+    static var redactBack: String { tr("redact.back") }
+    static var redactApply: String { tr("redact.apply") }
+    static var redactApplying: String { tr("redact.applying") }
+    static var redactDoneShared: String { tr("redact.doneShared") }
+    static var redactFailed: String { tr("redact.failed") }
+}

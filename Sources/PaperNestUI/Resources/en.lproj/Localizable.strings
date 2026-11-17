@@ -1099,3 +1099,27 @@
 "scanner.feedback.moveCloser" = "Move closer";
 "scanner.feedback.holdSteady" = "Hold steady";
 "scanner.feedback.ready" = "Ready";
+
+/* Redact screen */
+"redact.title" = "Redact";
+"redact.pageLabel" = "Page to redact";
+"redact.hint" = "Drag across anything you want removed. Each drag marks one area.";
+"redact.count" = "Areas: %lld";
+"redact.removeLast" = "Remove Last Area";
+"redact.review" = "Review";
+"redact.preparing" = "Preparing the redacted page…";
+"redact.previewLabel" = "The page as it will be after redaction";
+"redact.warning.flatten" = "The page becomes a picture of itself with these areas painted black. What is under them is gone from the page, its text and the file.";
+"redact.warning.wholePage" = "This page’s words can no longer be selected, copied or searched — on the whole page, not only under the black areas — until text recognition reads the page again, and then it finds only the words still showing.";
+"redact.warning.undo" = "This can’t be undone.";
+"redact.marks" = "Also remove the marks over these areas (%lld)";
+"redact.marksStay" = "Marks you keep are drawn over the black and show in every export.";
+"redact.commentsKept" = "Private comments on this page are kept; they are never exported.";
+"redact.shared" = "Another page in your library uses the same original. What you redact stays visible there until that page is redacted or deleted too.";
+"redact.sync" = "iCloud sync is on: copies of this page already in iCloud or on your other devices are not removed by this.";
+"redact.restricted" = "The author of this PDF limits copying or printing, so its pages can’t be redacted.";
+"redact.back" = "Edit Areas";
+"redact.apply" = "Redact Page";
+"redact.applying" = "Redacting…";
+"redact.doneShared" = "The page is redacted here, but another page in your library still uses the original. Redact or delete that page too.";
+"redact.failed" = "The page couldn’t be redacted.";

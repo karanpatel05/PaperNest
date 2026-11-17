@@ -298,6 +298,28 @@ public struct RecognizedLine: Hashable, Codable, Sendable {
 }
 
 extension PageObject {
+    /// Where the mark is drawn on the page, in source points, ink's width
+    /// included. Nil for a private comment, which is never drawn.
+    public var drawnSourceBounds: CGRect? {
+        switch payload {
+        case .ink(let stroke):
+            guard let first = stroke.points.first else { return nil }
+            var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
+            var widest = stroke.width(at: first)
+            for point in stroke.points {
+                minX = min(minX, point.x); maxX = max(maxX, point.x)
+                minY = min(minY, point.y); maxY = max(maxY, point.y)
+                widest = max(widest, stroke.width(at: point))
+            }
+            guard [minX, maxX, minY, maxY, widest].allSatisfy(\.isFinite) else { return nil }
+            return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+                .insetBy(dx: -widest / 2, dy: -widest / 2)
+        case .text(let box): return box.frame
+        case .image(let image): return image.frame
+        case .comment: return nil
+        }
+    }
+
     public var commentText: String? {
         if case .comment(let text) = payload { return text }
         return nil
