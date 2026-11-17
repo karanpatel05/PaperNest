@@ -235,6 +235,68 @@ import PaperNestTestSupport
 
     /// Print must never run into the Pro gate or a password: it is the plain
     /// document, at the size of its own pages.
+    /// Coloured pixels in the page's bottom-left corner, where the PaperNest
+    /// mark sits. The test document has nothing of its own there.
+    private static func cornerInk(_ image: CGImage) -> Int {
+        let width = image.width, height = image.height
+        var buffer = [UInt8](repeating: 0, count: width * height * 4)
+        let ctx = CGContext(data: &buffer, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var count = 0
+        for y in Int(Double(height) * 0.93)..<height {
+            for x in 0..<Int(Double(width) * 0.26) {
+                let i = (y * width + x) * 4
+                if buffer[i] < 250 || buffer[i + 1] < 250 || buffer[i + 2] < 250 { count += 1 }
+            }
+        }
+        return count
+    }
+
+    /// A free user's printout carries the PaperNest mark in every page's
+    /// corner, as their exports do: printing to a PDF is not a way round it.
+    @Test func aFreeUsersPrintCarriesThePaperNestMark() async throws {
+        let (url, environment) = try environment()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let (item, _) = try await report(["", ""], in: environment)
+        let panel = Panel()
+        let printer = DocumentPrinter(panel: panel.show, freeMark: { Watermark.freeExportMark(allowsRemoval: false) })
+
+        await printer.print(item.id, in: environment)?.value
+
+        let data = try #require(panel.data.first)
+        for index in 0..<2 {
+            let image = try #require(PixelProbe.renderPDFPage(data, index: index, scale: 1))
+            #expect(Self.cornerInk(image) > 100, "page \(index + 1) was printed without the mark")
+        }
+        // Drawn as outlines, like every watermark: never in the page's text.
+        #expect(panel.texts.first?.contains("PaperNest") != true)
+        #expect(!printer.isShowingFailure)
+    }
+
+    @Test func aProUsersPrintIsUnmarked() async throws {
+        let (url, environment) = try environment()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let (item, _) = try await report([""], in: environment)
+        let panel = Panel()
+
+        await DocumentPrinter(panel: panel.show, freeMark: { nil }).print(item.id, in: environment)?.value
+
+        let data = try #require(panel.data.first)
+        let image = try #require(PixelProbe.renderPDFPage(data, index: 0, scale: 1))
+        #expect(Self.cornerInk(image) == 0, "a Pro user's print was marked")
+    }
+
+    /// The print's options are the plain document's, with the mark added.
+    @Test func printingAddsTheMarkToThePlainDocument() {
+        let mark = Watermark.freeExportMark(allowsRemoval: false)
+        let options = DocumentPrinter.options(attribution: mark)
+        #expect(options.attribution == mark)
+        #expect(options.format == .pdf && options.paperSize == .original && !options.includesRecognizedText)
+        #expect(DocumentPrinter.options(attribution: nil).attribution == nil)
+    }
+
     @Test func printingAsksForThePlainDocumentAtItsOwnPageSizes() {
         #expect(DocumentPrinter.options.format == .pdf)
         #expect(DocumentPrinter.options.paperSize == .original)

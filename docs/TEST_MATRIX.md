@@ -1,3 +1,34 @@
+## 2026-11-17 — Free users' printouts carry the PaperNest mark too (Claude, owner in session)
+
+Owner asked for a recommendation on the two routes `0f1848a` left unmarked; the recommendation was to mark printing
+(its panel can "Save as PDF" on the Mac, and share a PDF from the iPhone and iPad print options, which made it a
+two-tap way round the mark) and keep the library backup unmarked (the user's safety net and a faithful copy of
+their own documents; an awkward way to share one file). Owner: "Yes go ahead".
+
+**What changed.** `DocumentPrinter` (`Reader/DocumentPrint.swift`) asks an injectable `freeMark` step before making
+the PDF; the default, `entitlementFreeMark`, waits for entitlements to load and asks `Watermark.freeExportMark`, and a
+print cancelled during that wait makes nothing. The mark rides on `DocumentPrinter.options(attribution:)`, the plain
+print options plus `attribution`. Nothing is marked while no App Store products are configured. The backup and the
+form workspace's saved copy stay unmarked.
+
+**Verification**, in a clean detached worktree outside iCloud: `0f1848a` plus exactly the committed files.
+- New `DocumentPrintTests` (3): a free user's printout carries the mark in every page's corner and never in its
+  text; a Pro user's is unmarked; the print options are the plain document's plus the mark. **Shown to fail first:**
+  against the old printer they do not compile (no `freeMark`, no `options(attribution:)`).
+- `./scripts/test.sh`: **1,318 passed, 0 failed, 0 warnings** (1,315 plus the 3). No export folder left in the temp folder.
+- `./scripts/build-mac-app.sh`: **passed, 0 warnings.**
+- `xcodebuild build-for-testing -scheme PaperNest-iOS`: **TEST BUILD SUCCEEDED**, no warnings from the changed files.
+- `DocumentPrintUITests` (2, run by a subagent): **iPhone 17 Pro 2/2, iPad Pro 13-inch (M5) 2/2** (iOS 26.5). The
+  print panel appeared 2.8–4.7 s after the tap against the test's 20 s. One iPad launch in French took 195 s at a
+  load above 100 (spindump: the app rendering pages, nothing from printing or StoreKit; that test never prints).
+- **What the UI runs do not cover:** the scheme has no App Store products, so the entitlement wait returned at once
+  and the printouts were unmarked; the wait against real StoreKit, and a marked printout through the real panel,
+  were not exercised. The store sets `hasLoaded` after its first refresh whether it succeeded or not, so a print
+  waits for StoreKit at most once per launch.
+
+**Not done.** No physical printer and no device; the print panel itself is the system's and was not driven to a
+printout or a saved PDF. A printout says nothing about the mark (the panel is the system's, with no room for a note).
+
 ## 2026-11-17 — Redact and Compress are Pro (Claude)
 
 Owner in session ("Yes go ahead"), carrying out the Free/Pro list approved on 2026-11-13, which says "Compress and Redact once their screens exist". `ProFeature` gains `compress` and `redact`, with names in the paywall's list ("Compress documents", "Redact pages"; French and Spanish too). For a free user, once products are configured, the **Compress** and **Redact** buttons in Document Tools open the paywall naming the tool instead of its screen, and `DocumentModel.redact` refuses as well (`SubscriptionStore.require(.redact)`), so no other way in can write a redaction. **Nothing changes today:** with no App Store products in `Subscriptions.plist`, every check allows everything.

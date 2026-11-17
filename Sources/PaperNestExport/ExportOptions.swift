@@ -141,9 +141,9 @@ public struct ExportOptions: Hashable, Sendable {
     /// draw one. It lives only here: the library stores nothing about it.
     public var watermark: Watermark?
     /// The small PaperNest mark a free export carries (`Watermark.attribution`),
-    /// drawn after `watermark`. Set by the export sheet, bulk export and
-    /// Compress for someone without Pro; nil everywhere else, the backup and
-    /// printing included.
+    /// drawn after `watermark`. Set by the export sheet, bulk export,
+    /// Compress and printing for someone without Pro; nil everywhere else,
+    /// the backup and the form workspace included.
     public var attribution: Watermark?
 
     public init(

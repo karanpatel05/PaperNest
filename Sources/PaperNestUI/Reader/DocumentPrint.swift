@@ -42,6 +42,18 @@ final class DocumentPrinter {
     /// by printing or by cancelling. Throws when no panel could be shown.
     typealias Panel = @MainActor (PrintJob) async throws -> Void
 
+    /// The PaperNest mark this print carries, or nil. A free user's printout
+    /// carries it like their exports do — the print panel can save a PDF, so
+    /// an unmarked print would be an export without it.
+    typealias FreeMark = @MainActor () async -> Watermark?
+
+    /// The store's answer, once entitlements have loaded, so a paying user
+    /// who prints soon after launch is not marked.
+    static let entitlementFreeMark: FreeMark = {
+        if !SubscriptionStore.shared.hasLoaded { await SubscriptionStore.shared.refresh() }
+        return Watermark.freeExportMark
+    }
+
     private(set) var phase: Phase = .idle
     /// Set when the document could not be made ready or the panel refused it.
     var isShowingFailure = false
@@ -49,17 +61,27 @@ final class DocumentPrinter {
     private(set) var failureMessage = L10n.printFailed
 
     private let panel: Panel
+    private let freeMark: FreeMark
     private let temporaryRoot: URL?
     private var task: Task<Void, Never>?
 
     /// The plain document at the size of its own pages; the print panel fits
     /// it to the paper. No invisible text layer — paper cannot be searched —
     /// which also keeps Print clear of everything Export keeps for Pro.
-    static let options = ExportOptions(format: .pdf, paperSize: .original, pdfImageQuality: .balanced,
-                                       includesRecognizedText: false)
+    nonisolated static let options = ExportOptions(format: .pdf, paperSize: .original, pdfImageQuality: .balanced,
+                                                   includesRecognizedText: false)
 
-    init(panel: @escaping Panel = DocumentPrinter.systemPanel, temporaryRoot: URL? = nil) {
+    /// The same, with the PaperNest mark a free user's print carries.
+    nonisolated static func options(attribution: Watermark?) -> ExportOptions {
+        var configured = options
+        configured.attribution = attribution
+        return configured
+    }
+
+    init(panel: @escaping Panel = DocumentPrinter.systemPanel, temporaryRoot: URL? = nil,
+         freeMark: @escaping FreeMark = DocumentPrinter.entitlementFreeMark) {
         self.panel = panel
+        self.freeMark = freeMark
         self.temporaryRoot = temporaryRoot
     }
 
@@ -72,13 +94,18 @@ final class DocumentPrinter {
         let exporter = temporaryRoot.map { Exporter(renderer: environment.renderer, temporaryRoot: $0) }
             ?? environment.exporter
         let panel = panel
+        let freeMark = freeMark
         let task = Task {
             defer {
                 phase = .idle
                 self.task = nil
             }
             do {
-                guard let job = try await Self.prepare(itemID, store: environment.store, exporter: exporter)
+                let mark = await freeMark()
+                // Cancelled while entitlements loaded: nothing is made.
+                try Task.checkCancellation()
+                guard let job = try await Self.prepare(itemID, store: environment.store, exporter: exporter,
+                                                       attribution: mark)
                 else { return }
                 defer { job.output.removeTemporaryFiles() }
                 try Task.checkCancellation()
@@ -108,11 +135,13 @@ final class DocumentPrinter {
 
     /// Reads the document as it is saved now and writes the PDF to print.
     /// Nil when it has no pages: there is nothing to print and nothing wrong.
-    nonisolated static func prepare(_ itemID: ItemID, store: LibraryStore, exporter: Exporter) async throws -> PrintJob? {
+    nonisolated static func prepare(_ itemID: ItemID, store: LibraryStore, exporter: Exporter,
+                                    attribution: Watermark? = nil) async throws -> PrintJob? {
         guard let item = try await store.item(itemID) else { throw ExportError.noPages }
         let pages = try await store.pages(of: itemID)
         guard !pages.isEmpty else { return nil }
-        let output = try await exporter.export(itemName: item.name, pages: pages, options: options, purpose: .printing)
+        let output = try await exporter.export(itemName: item.name, pages: pages,
+                                               options: options(attribution: attribution), purpose: .printing)
         guard let file = output.files.first else {
             output.removeTemporaryFiles()
             throw ExportError.writeFailed
