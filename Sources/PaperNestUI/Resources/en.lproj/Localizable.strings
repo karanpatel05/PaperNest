@@ -1132,3 +1132,7 @@
 "redact.applying" = "Redacting…";
 "redact.doneShared" = "The page is redacted here, but another page in your library still uses the original. Redact or delete that page too.";
 "redact.failed" = "The page couldn’t be redacted.";
+
+/* Pro tools */
+"pro.feature.compress" = "Compress documents";
+"pro.feature.redact" = "Redact pages";

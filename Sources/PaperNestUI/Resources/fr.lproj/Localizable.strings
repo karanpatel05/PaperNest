@@ -1132,3 +1132,7 @@
 "redact.applying" = "Caviardage…";
 "redact.doneShared" = "La page est caviardée ici, mais une autre page de votre bibliothèque utilise encore l’original. Caviardez ou supprimez aussi cette page.";
 "redact.failed" = "La page n’a pas pu être caviardée.";
+
+/* Pro tools */
+"pro.feature.compress" = "Compresser des documents";
+"pro.feature.redact" = "Caviarder des pages";

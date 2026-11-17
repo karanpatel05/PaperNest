@@ -1323,6 +1323,8 @@ final class DocumentModel {
     /// and an Undo after a redaction must not bring back a mark it removed.
     func redact(_ page: Page, areas: [NormalizedRect], removingMarks marks: [PageObject],
                 undoManager: UndoManager?) async throws -> RedactionOutcome {
+        // The screen is opened only for Pro; this keeps any other way in honest.
+        try SubscriptionStore.shared.require(.redact)
         await finishPendingHistory()
         guard let store, let renderer = session.environment?.renderer,
               let current = try await store.page(page.id), current.itemID == itemID else { throw StoreError.pageNotFound }

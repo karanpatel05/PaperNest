@@ -1,3 +1,19 @@
+## 2026-11-17 — Redact and Compress are Pro (Claude)
+
+Owner in session ("Yes go ahead"), carrying out the Free/Pro list approved on 2026-11-13, which says "Compress and Redact once their screens exist". `ProFeature` gains `compress` and `redact`, with names in the paywall's list ("Compress documents", "Redact pages"; French and Spanish too). For a free user, once products are configured, the **Compress** and **Redact** buttons in Document Tools open the paywall naming the tool instead of its screen, and `DocumentModel.redact` refuses as well (`SubscriptionStore.require(.redact)`), so no other way in can write a redaction. **Nothing changes today:** with no App Store products in `Subscriptions.plist`, every check allows everything.
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh`, clean worktree (`0f1848a` + this change) | **1,315 tests, 0 failures, 0 warnings** (376 + 49 + 226 + 223 + 246 + 195). `SubscriptionStateTests` loops over every `ProFeature`: the two new ones are allowed before products are configured, refused by name for a free user after, and each has its own translated name and a symbol. `LocalizationTests` pass with the new keys. |
+| `xcodebuild build-for-testing`, `PaperNest-iOS`, iOS Simulator (project regenerated with XcodeGen for the new test file) | Succeeded, no compiler warnings. |
+| `./scripts/build-mac-app.sh` | Succeeded, 0 warnings. |
+| New `ProToolGateUITests` (2 tests), iPhone 17 / iOS 26.5, launched with `-PaperNestDebugProProducts` and nothing bought | **2/2 pass.** Redact in Document Tools opens the paywall with `pro-locked-feature` = `redact` and no Redact screen behind it or after closing it; Compress the same with `compress` and no Compress screen. Screenshot looked at: "Included in PaperNest Pro: Redact pages" above the list. |
+| `ProToolGateUITests`, iPad Air 13-inch (M4) / iOS 26.5 (Compress opens in the side panel there, not a sheet) | **2/2 pass**, the paywall naming each tool, from the side panel as well. |
+| `RedactUITests` (3 tests), iPhone 17, without products: the control | **3/3 pass**: with the boundary off, Redact opens and redacts as before. |
+| `SubscriptionUITests` (3 tests), iPhone 17 | Profile paywall in en/fr/es (the list is now eleven rows; Spanish at XXXL still reaches Continue with Free) and the welcome test **pass**. `testAFreeUserGetsThePaywallNamingTheRefusedFeature` **failed** on the first run, "export sheet did not open": it opens "Crop target" from `/tmp/papernest-uitest-library`, which only `scripts/ui-test-ios.sh` seeds, and this run used `xcodebuild` directly. With a private library seeded the way the script does (`PAPERNEST_UITEST_LIBRARY`), it **passed** (39.8 s). |
+
+**Not done:** the Compress screen itself does not check again (its only way in is the gated button and a DEBUG launch argument), unlike Redact's model; the Mac's Document Tools were built, not opened; nothing was bought in a StoreKit test store to see the tools open for a subscriber (the paywall's own tests cover access).
+
 ## 2026-11-16 — The PaperNest watermark: a branded preset, and a small mark on free exports that Pro removes (Claude, owner in session)
 
 Owner: "Yes, build it" (the PaperNest branded watermark), then, asked whether free exports should carry it

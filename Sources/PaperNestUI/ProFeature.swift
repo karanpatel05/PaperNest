@@ -19,6 +19,10 @@ enum ProFeature: String, CaseIterable, Identifiable, Sendable {
     case signature
     /// Saving a filled PDF form.
     case forms
+    /// Making a smaller copy of a document (Document Tools → Compress).
+    case compress
+    /// Redacting a page (Document Tools → Redact).
+    case redact
     /// Exporting without the small PaperNest mark free exports carry.
     case removeWatermark
 
@@ -36,6 +40,8 @@ enum ProFeature: String, CaseIterable, Identifiable, Sendable {
         case .markup: L10n.proFeatureMarkup
         case .signature: L10n.proFeatureSignature
         case .forms: L10n.proFeatureForms
+        case .compress: L10n.proFeatureCompress
+        case .redact: L10n.proFeatureRedact
         case .removeWatermark: L10n.proFeatureRemoveWatermark
         }
     }
@@ -50,6 +56,8 @@ enum ProFeature: String, CaseIterable, Identifiable, Sendable {
         case .markup: "highlighter"
         case .signature: "signature"
         case .forms: "list.bullet.rectangle"
+        case .compress: "arrow.down.right.and.arrow.up.left"
+        case .redact: "xmark.rectangle"
         case .removeWatermark: "eye.slash"
         }
     }

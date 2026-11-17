@@ -1132,3 +1132,7 @@
 "redact.applying" = "Censurando…";
 "redact.doneShared" = "La página está censurada aquí, pero otra página de tu biblioteca aún usa el original. Censura o elimina también esa página.";
 "redact.failed" = "No se pudo censurar la página.";
+
+/* Pro tools */
+"pro.feature.compress" = "Comprimir documentos";
+"pro.feature.redact" = "Censurar páginas";

@@ -641,6 +641,13 @@ struct DocumentView: View {
         Task { if await finishForAction() { action() } }
     }
 
+    /// Opens a Pro tool's screen, or, for a free user once products are
+    /// configured, the paywall naming it.
+    private func openProTool(_ feature: ProFeature, _ open: () -> Void) {
+        guard SubscriptionStore.shared.allows(feature) else { model.proPaywall = feature; return }
+        open()
+    }
+
     private func makeCommandContext() -> DocumentCommandContext {
         DocumentCommandContext(model: model, undoManager: undoManager,
             showExport: { finishThen { isShowingExport = true } },
@@ -1015,7 +1022,7 @@ struct DocumentView: View {
                     Label(L10n.toolsFillForm, systemImage: "list.bullet.rectangle")
                 }.accessibilityIdentifier("editor-fill-form")
             }
-            Button { finishThen { isShowingCompress = true } } label: {
+            Button { finishThen { openProTool(.compress) { isShowingCompress = true } } } label: {
                 Label(L10n.toolsCompress, systemImage: "arrow.down.right.and.arrow.up.left")
             }
             .disabled(model.pages.isEmpty)
@@ -1025,7 +1032,7 @@ struct DocumentView: View {
             }
             .disabled(model.pages.isEmpty)
             .accessibilityIdentifier("utilities-convert")
-            Button { finishThen { isShowingRedact = true } } label: {
+            Button { finishThen { openProTool(.redact) { isShowingRedact = true } } } label: {
                 Label(L10n.redactTitle, systemImage: "eye.slash")
             }
             .disabled(model.selectedPage == nil || model.isChangingNotebookPage)

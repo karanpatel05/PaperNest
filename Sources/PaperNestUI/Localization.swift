@@ -1272,4 +1272,9 @@ extension L10n {
     static var redactApplying: String { tr("redact.applying") }
     static var redactDoneShared: String { tr("redact.doneShared") }
     static var redactFailed: String { tr("redact.failed") }
+
+    // MARK: Pro tools
+
+    static var proFeatureCompress: String { tr("pro.feature.compress") }
+    static var proFeatureRedact: String { tr("pro.feature.redact") }
 }
