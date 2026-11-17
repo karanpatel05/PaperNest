@@ -1083,3 +1083,12 @@
 "ocr.status.recognized" = "La página %lld tiene texto reconocido.";
 "ocr.status.corrected" = "La página %lld tiene texto que corregiste.";
 "ocr.replacesCorrections" = "Algunas de estas páginas tienen texto que corregiste. Volver a reconocerlas lo reemplaza.";
+
+/* Search snippets */
+"search.inPages" = "En las páginas";
+"search.hitPlace" = "%1$@ · Página %2$lld";
+"search.hitHint" = "Abre el documento en esta página.";
+"search.source.recognized" = "Texto reconocido";
+"search.source.pageText" = "Texto del PDF";
+"search.source.typed" = "Texto escrito";
+"search.source.title" = "Nombre del documento";

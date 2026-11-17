@@ -1083,3 +1083,12 @@
 "ocr.status.recognized" = "La page %lld contient du texte reconnu.";
 "ocr.status.corrected" = "La page %lld contient du texte que vous avez corrigé.";
 "ocr.replacesCorrections" = "Certaines de ces pages contiennent du texte que vous avez corrigé. Les reconnaître de nouveau le remplace.";
+
+/* Search snippets */
+"search.inPages" = "Dans les pages";
+"search.hitPlace" = "%1$@ · Page %2$lld";
+"search.hitHint" = "Ouvre le document à cette page.";
+"search.source.recognized" = "Texte reconnu";
+"search.source.pageText" = "Texte du PDF";
+"search.source.typed" = "Texte saisi";
+"search.source.title" = "Nom du document";

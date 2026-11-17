@@ -1216,3 +1216,14 @@ extension L10n {
     static func ocrStatusCorrected(_ page: Int) -> String { tr("ocr.status.corrected", page) }
     static var ocrReplacesCorrections: String { tr("ocr.replacesCorrections") }
 }
+
+// Search snippets: which page a search matched, and the words around it.
+extension L10n {
+    static var searchInPages: String { tr("search.inPages") }
+    static func searchHitPlace(_ document: String, _ page: Int) -> String { tr("search.hitPlace", document, page) }
+    static var searchHitHint: String { tr("search.hitHint") }
+    static var searchSourceRecognized: String { tr("search.source.recognized") }
+    static var searchSourcePageText: String { tr("search.source.pageText") }
+    static var searchSourceTyped: String { tr("search.source.typed") }
+    static var searchSourceTitle: String { tr("search.source.title") }
+}

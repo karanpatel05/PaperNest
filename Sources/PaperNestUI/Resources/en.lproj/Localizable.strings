@@ -1083,3 +1083,12 @@
 "ocr.status.recognized" = "Page %lld has recognized text.";
 "ocr.status.corrected" = "Page %lld has text you corrected.";
 "ocr.replacesCorrections" = "Some of these pages have text you corrected. Recognizing them again replaces it.";
+
+/* Search snippets */
+"search.inPages" = "In Pages";
+"search.hitPlace" = "%1$@ · Page %2$lld";
+"search.hitHint" = "Opens the document at this page.";
+"search.source.recognized" = "Recognized text";
+"search.source.pageText" = "Text in the PDF";
+"search.source.typed" = "Typed text";
+"search.source.title" = "Document name";

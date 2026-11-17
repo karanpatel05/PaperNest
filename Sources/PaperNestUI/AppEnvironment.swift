@@ -129,6 +129,34 @@ public final class LibrarySession {
         sync?.localDidChange()
     }
 
+    // MARK: - Opening a document at a page
+
+    /// A page someone asked to see, from a search hit, until the document's
+    /// window shows it.
+    ///
+    /// Navigation, not an edit: it does not go through `didChange()`, which
+    /// would start the background text pass and tell sync there is something
+    /// to send. A document not yet open takes it when it first loads; one
+    /// already open in a tab sees it change and goes to the page.
+    struct PageRequest: Equatable, Sendable {
+        let id = UUID()
+        let itemID: ItemID
+        let pageID: PageID
+    }
+
+    private(set) var pageRequest: PageRequest?
+
+    func requestPage(_ pageID: PageID, in itemID: ItemID) {
+        pageRequest = PageRequest(itemID: itemID, pageID: pageID)
+    }
+
+    /// The page asked for in this document, once: whoever takes it shows it.
+    func takePageRequest(for itemID: ItemID) -> PageID? {
+        guard let request = pageRequest, request.itemID == itemID else { return nil }
+        pageRequest = nil
+        return request.pageID
+    }
+
     /// The app came to the front: see who is signed in to iCloud and fetch
     /// what other devices did meanwhile.
     public func appBecameActive() async {

@@ -24,6 +24,21 @@ public final class LibraryModel {
     }
     var path: [ItemID] = []
     private(set) var items: [LibraryStore.ItemSummary] = []
+    /// While searching: the pages that match, with the words around each
+    /// match, for the documents in `items` and in their order. Empty when
+    /// not searching.
+    private(set) var pageHits: [PageHit] = []
+
+    /// One page a search matched, as the results list shows it.
+    struct PageHit: Identifiable, Hashable {
+        let itemID: ItemID
+        let itemName: String
+        let pageID: PageID
+        let pageNumber: Int
+        let source: SearchHit.Source
+        let snippet: SearchSnippet
+        var id: PageID { pageID }
+    }
     /// Folders for the sidebar, by name.
     private(set) var folders: [Folder] = []
     /// Item counts shown next to each sidebar entry.
@@ -90,6 +105,12 @@ public final class LibraryModel {
 
     /// Opens a document from anywhere: over the iPhone home when that is
     /// showing (no selection), otherwise over All Documents.
+    /// Opens a document at one of its pages: a search hit's.
+    func open(_ id: ItemID, at pageID: PageID) {
+        session.requestPage(pageID, in: id)
+        open(id)
+    }
+
     func open(_ id: ItemID) {
         if sidebarSelection == nil {
             if usesCompactNavigation { homeDocument = id }
@@ -125,9 +146,11 @@ public final class LibraryModel {
         do {
             let query = requestedSearch.trimmingCharacters(in: .whitespacesAndNewlines)
             var summaries = try await env.store.items(in: requestedScope)
+            var hits: [SearchHit] = []
             if !query.isEmpty, requestedScope != .recentlyDeleted {
                 let matches = Set(try await env.store.search(query))
                 summaries = summaries.filter { matches.contains($0.id) }
+                hits = try await env.store.searchHits(query)
             }
             summaries = summaries.filter { requestedKind.includes($0.item.kind) }
             let loadedFolders = try await env.store.folders()
@@ -137,6 +160,7 @@ public final class LibraryModel {
             guard !Task.isCancelled, generation == reloadGeneration,
                   requestedScope == scope, requestedSearch == searchText, requestedKind == contentKind else { return }
             items = sorted(summaries)
+            pageHits = Self.pageHits(hits, shownIn: items)
             folders = loadedFolders
             counts = loadedCounts
             if case .folder(let id?) = scope, !folders.contains(where: { $0.id == id }) {
@@ -148,6 +172,20 @@ public final class LibraryModel {
                   requestedScope == scope, requestedSearch == searchText, requestedKind == contentKind else { return }
             presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.libraryOpenFailed)
         }
+    }
+
+    /// The page hits for the documents on screen, in the order they are
+    /// listed: a hit for a document the scope, folder or kind leaves out is
+    /// not shown, and a title match has no page and is not a page hit.
+    static func pageHits(_ hits: [SearchHit], shownIn items: [LibraryStore.ItemSummary]) -> [PageHit] {
+        let position = Dictionary(items.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let names = Dictionary(items.map { ($0.id, $0.item.name) }, uniquingKeysWith: { first, _ in first })
+        return hits.compactMap { hit -> PageHit? in
+            guard let pageID = hit.pageID, let number = hit.pageNumber, let name = names[hit.itemID] else { return nil }
+            return PageHit(itemID: hit.itemID, itemName: name, pageID: pageID, pageNumber: number,
+                           source: hit.source, snippet: hit.snippet)
+        }
+        .sorted { (position[$0.itemID] ?? 0, $0.pageNumber) < (position[$1.itemID] ?? 0, $1.pageNumber) }
     }
 
     struct ImportLocationRequest: Identifiable { let id = UUID() }

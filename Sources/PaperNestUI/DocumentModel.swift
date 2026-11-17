@@ -100,9 +100,19 @@ final class DocumentModel {
             let limits = (try? await session.environment?.renderer.permissions(for: pages)) ?? .unknown
             if limits != permissions { permissions = limits }
             hasLoaded = true
+            applyPageRequest()
         } catch {
             presentedError = .saveFailed()
         }
+    }
+
+    /// Shows the page a search hit asked for, if it is in this document.
+    /// Waits for the first load, so a request made while the document opens
+    /// is not taken before there are pages to show it on.
+    func applyPageRequest() {
+        guard hasLoaded, let id = session.takePageRequest(for: itemID),
+              pages.contains(where: { $0.id == id }) else { return }
+        selectedPageID = id
     }
 
     // MARK: - The document itself (title menu)

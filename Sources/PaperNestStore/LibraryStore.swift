@@ -309,10 +309,21 @@ public actor LibraryStore {
         return try db.query("""
             SELECT DISTINCT s.item_id FROM search_index s
             JOIN items i ON i.id = s.item_id
-            WHERE search_index MATCH ? AND i.deleted_at IS NULL
+            WHERE search_index MATCH ? AND i.deleted_at IS NULL AND \(Self.livePageRow)
             ORDER BY i.modified_at DESC
             """, [.text(match)]) { ItemID(rawValue: $0.text(0)) }
     }
+
+    /// A page's words answer a search only while the page is live.
+    ///
+    /// Deleting a page keeps its row, and its index rows, until the next
+    /// launch's purge — thirty days while sync is on — so that undo can bring
+    /// it back exactly. Until then a document matched words that were only on
+    /// a page in the trash, and nothing on screen said why it was there.
+    /// Rows with no page (a title) are not affected. `s` is `search_index`.
+    static let livePageRow = """
+        (s.page_id IS NULL OR EXISTS (SELECT 1 FROM pages p WHERE p.id = s.page_id AND p.deleted_at IS NULL))
+        """
 
     /// Turns user input into a safe FTS5 query. Input is split the way the
     /// `unicode61` tokenizer splits text (anything but letters and digits

@@ -159,6 +159,13 @@ struct LibraryView: View {
                             }
                         }
                     }
+                    // While searching: where in those documents it matched.
+                    if !model.pageHits.isEmpty {
+                        SearchPageHitsList(hits: model.pageHits) { hit in
+                            endSelection()
+                            model.open(hit.itemID, at: hit.pageID)
+                        }
+                    }
                 }
                 .padding(20)
                 .frame(maxWidth: 1200)

@@ -365,6 +365,8 @@ struct DocumentView: View {
                 if isNotebook { inkTool = .lasso; isMarkingUp = true }
             }
             .task(id: model.session.changeToken) { await model.load() }
+            // A search hit asking for a page of this document while it is open.
+            .task(id: model.session.pageRequest) { model.applyPageRequest() }
             // Opening a document that is only in iCloud fetches it.
             .task(id: model.itemID) { await model.session.sync?.downloadIfNeeded(model.itemID) }
             .task(id: model.selectedPageID) { await model.loadSelectedPageObjects() }
