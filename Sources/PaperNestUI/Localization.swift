@@ -1428,6 +1428,7 @@ extension L10n {
     static var textStampWordRejected: String { tr("stamp.text.word.rejected") }
     static var textStampSaved: String { tr("stamp.text.saved") }
     static var textStampCustom: String { tr("stamp.text.custom") }
+    static var textStampCustomRow: String { tr("stamp.text.customRow") }
     static var textStampCustomPlaceholder: String { tr("stamp.text.custom.placeholder") }
     static var textStampStyle: String { tr("stamp.text.style") }
     static var textStampOutlined: String { tr("stamp.text.outlined") }

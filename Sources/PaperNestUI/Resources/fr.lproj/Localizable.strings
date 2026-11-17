@@ -1281,6 +1281,7 @@
 "stamp.text.word.rejected" = "REFUSÉ";
 "stamp.text.saved" = "Vos tampons";
 "stamp.text.custom" = "Vos propres mots";
+"stamp.text.customRow" = "Saisir vos mots";
 "stamp.text.custom.placeholder" = "Texte du tampon";
 "stamp.text.style" = "Style";
 "stamp.text.outlined" = "Contour";

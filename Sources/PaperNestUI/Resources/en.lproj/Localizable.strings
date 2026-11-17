@@ -1281,6 +1281,7 @@
 "stamp.text.word.rejected" = "REJECTED";
 "stamp.text.saved" = "Your Stamps";
 "stamp.text.custom" = "Your Own Words";
+"stamp.text.customRow" = "Type Your Own";
 "stamp.text.custom.placeholder" = "Words on the stamp";
 "stamp.text.style" = "Style";
 "stamp.text.outlined" = "Outlined";

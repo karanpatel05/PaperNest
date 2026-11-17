@@ -1281,6 +1281,7 @@
 "stamp.text.word.rejected" = "RECHAZADO";
 "stamp.text.saved" = "Tus sellos";
 "stamp.text.custom" = "Tus propias palabras";
+"stamp.text.customRow" = "Escribir tus palabras";
 "stamp.text.custom.placeholder" = "Texto del sello";
 "stamp.text.style" = "Estilo";
 "stamp.text.outlined" = "Contorno";

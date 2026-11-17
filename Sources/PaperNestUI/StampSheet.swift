@@ -292,7 +292,7 @@ struct StampSheet: View {
     @ViewBuilder
     private var custom: some View {
         Section(L10n.textStampCustom) {
-            optionRow(L10n.textStampCustom, selected: model.choice == .custom, id: "text-stamp-custom", swatch: nil) {
+            optionRow(L10n.textStampCustomRow, selected: model.choice == .custom, id: "text-stamp-custom", swatch: nil) {
                 model.choose(.custom)
             }
             if model.choice == .custom {
