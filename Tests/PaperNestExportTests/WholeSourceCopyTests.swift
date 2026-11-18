@@ -33,22 +33,14 @@ import PaperNestTestSupport
 
     @Test func oneUntouchedPageOfOneFileIsThatFile() {
         #expect(Exporter.wholeSourceAsset(of: [page(0)], options: pdf,
-                                          rasterQuality: nil, password: nil) == asset)
+                                          rasterQuality: nil) == asset)
     }
 
     @Test func soAreAllOfItsPagesInOrder() {
         let pages = (0..<3).map { page($0) }
 
         #expect(Exporter.wholeSourceAsset(of: pages, options: pdf,
-                                          rasterQuality: nil, password: nil) == asset)
-    }
-
-    /// A password has to be written, and a copy of an unprotected file would
-    /// be unprotected — the silent false promise the engine refuses
-    /// everywhere else.
-    @Test func aPasswordRulesOutACopy() {
-        #expect(Exporter.wholeSourceAsset(of: [page(0)], options: pdf,
-                                          rasterQuality: nil, password: "secret") == nil)
+                                          rasterQuality: nil) == asset)
     }
 
     /// A compression preset does **not** rule out a copy, and this is the
@@ -60,22 +52,21 @@ import PaperNestTestSupport
     /// moment untouched exports started handing the source back.
     @Test func aCompressionPresetStillAllowsACopyWhenNothingCouldBeShrunk() {
         #expect(Exporter.wholeSourceAsset(of: [page(0)], options: pdf,
-                                          rasterQuality: .init(maxDPI: 150, jpegQuality: 0.5),
-                                          password: nil) == asset)
+                                          rasterQuality: .init(maxDPI: 150, jpegQuality: 0.5)) == asset)
     }
 
     @Test func anotherFormatIsNotACopyOfAPDF() {
         for format in ExportFormat.allCases where format != .pdf {
             #expect(Exporter.wholeSourceAsset(of: [page(0)],
                                               options: ExportOptions(format: format, paperSize: .original),
-                                              rasterQuality: nil, password: nil) == nil, "\(format)")
+                                              rasterQuality: nil) == nil, "\(format)")
         }
     }
 
     @Test func askingForDifferentPaperIsAskingForADifferentFile() {
         #expect(Exporter.wholeSourceAsset(of: [page(0)],
                                           options: ExportOptions(format: .pdf, paperSize: .a4),
-                                          rasterQuality: nil, password: nil) == nil)
+                                          rasterQuality: nil) == nil)
     }
 
     /// Reordered, and so no longer the file that was imported.
@@ -83,7 +74,7 @@ import PaperNestTestSupport
         let reordered = [page(1), page(0)]
 
         #expect(Exporter.wholeSourceAsset(of: reordered, options: pdf,
-                                          rasterQuality: nil, password: nil) == nil)
+                                          rasterQuality: nil) == nil)
     }
 
     /// The case the per-page index check exists for, and the only one it
@@ -96,7 +87,7 @@ import PaperNestTestSupport
         let shuffled = [page(0), page(2), page(1)]
 
         #expect(Exporter.wholeSourceAsset(of: shuffled, options: pdf,
-                                          rasterQuality: nil, password: nil) == nil)
+                                          rasterQuality: nil) == nil)
     }
 
     /// The first page was deleted, so page 0 of the export is page 1 of the
@@ -106,14 +97,14 @@ import PaperNestTestSupport
         let withoutTheFirst = [page(1), page(2)]
 
         #expect(Exporter.wholeSourceAsset(of: withoutTheFirst, options: pdf,
-                                          rasterQuality: nil, password: nil) == nil)
+                                          rasterQuality: nil) == nil)
     }
 
     @Test func pagesFromTwoFilesAreNeitherFile() {
         let merged = [page(0), page(1, of: other)]
 
         #expect(Exporter.wholeSourceAsset(of: merged, options: pdf,
-                                          rasterQuality: nil, password: nil) == nil)
+                                          rasterQuality: nil) == nil)
     }
 
     /// Cropped, rotated or filtered is an edit, whatever the rest says.
@@ -121,7 +112,7 @@ import PaperNestTestSupport
         let rotated = page(0, transform: PageTransform(rotation: .clockwise90))
 
         #expect(Exporter.wholeSourceAsset(of: [rotated], options: pdf,
-                                          rasterQuality: nil, password: nil) == nil)
+                                          rasterQuality: nil) == nil)
     }
 
     /// A notebook page has no source file to hand back.
@@ -133,11 +124,11 @@ import PaperNestTestSupport
                          modifiedAt: Date(timeIntervalSince1970: 0))
 
         #expect(Exporter.wholeSourceAsset(of: [drawn], options: pdf,
-                                          rasterQuality: nil, password: nil) == nil)
+                                          rasterQuality: nil) == nil)
     }
 
     @Test func nothingIsNotACopyOfAnything() {
         #expect(Exporter.wholeSourceAsset(of: [], options: pdf,
-                                          rasterQuality: nil, password: nil) == nil)
+                                          rasterQuality: nil) == nil)
     }
 }

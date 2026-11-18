@@ -1465,4 +1465,9 @@ extension L10n {
     static var stampPictureFromFiles: String { tr("stamp.picture.fromFiles") }
     static var stampPictureNotImage: String { tr("stamp.picture.notImage") }
     static var stampPictureFailed: String { tr("stamp.picture.failed") }
+
+    // MARK: Form fields on export
+
+    static var exportFormFieldsKept: String { tr("export.formFields.kept") }
+    static var exportFormFieldsLost: String { tr("export.formFields.lost") }
 }

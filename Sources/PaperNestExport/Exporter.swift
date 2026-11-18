@@ -309,11 +309,20 @@ public struct Exporter: Sendable {
         // was imported. Hand that back rather than the rebuild, which would
         // keep the widget boxes and lose the form they belong to.
         if untouched.count == pages.count,
-           let asset = Self.wholeSourceAsset(of: pages, options: options,
-                                             rasterQuality: rasterQuality, password: password),
+           let asset = Self.wholeSourceAsset(of: pages, options: options, rasterQuality: rasterQuality),
            let document = sourceDocuments[asset], document.pageCount == pages.count,
-           let data = sourceData[asset] {
+           let data = sourceData[asset], password == nil {
             try data.write(to: url, options: .atomic)
+        } else if untouched.count == pages.count, let password, protection == nil,
+                  let asset = Self.wholeSourceAsset(of: pages, options: options, rasterQuality: rasterQuality),
+                  let document = sourceDocuments[asset], document.pageCount == pages.count,
+                  !document.isEncrypted, let data = sourceData[asset] {
+            // The same file under the password: the original written again,
+            // not rebuilt from its pages, so its form keeps its fields and its
+            // links stay links. Only from a source that is not encrypted
+            // already — what PDFKit writes from one is not relied on — and
+            // only without an author's limits, which the rebuild keeps.
+            try Self.writeProtectedCopy(of: data, to: url, password: password)
         } else if !untouched.isEmpty {
             try Self.replaceWithSourcePages(untouched, in: url, password: password, protection: protection)
         }
@@ -339,8 +348,9 @@ public struct Exporter: Sendable {
     ///
     /// - **Another format**, or **different paper** — a copy is the original's
     ///   format and the original's paper.
-    /// - **A password** — the file on disk is unprotected, and returning it
-    ///   would be the silent false promise refused everywhere else here.
+    /// - **A password** is not checked here: the file on disk is unprotected,
+    ///   so the caller never hands it back as it is. It writes the same file
+    ///   again under the password instead (`writeProtectedCopy`).
     /// - **Pages from more than one file**, or **out of the source's order**,
     ///   or **a subset**: handing back the whole file would restore pages
     ///   somebody deleted, which is the worst thing this could do. The caller
@@ -352,9 +362,8 @@ public struct Exporter: Sendable {
     /// caller already knows, because it is exactly the pages it copied
     /// untouched.
     static func wholeSourceAsset(of pages: [Page], options: ExportOptions,
-                                 rasterQuality: RasterQuality?, password: String?) -> AssetID? {
+                                 rasterQuality: RasterQuality?) -> AssetID? {
         guard options.format == .pdf, options.paperSize == .original else { return nil }
-        guard password == nil else { return nil }
         // A compression preset is **not** a reason to rebuild. The caller
         // only reaches here when no page was re-encoded, which under a preset
         // means nothing could be made smaller — and the rebuild was measured
@@ -370,6 +379,30 @@ public struct Exporter: Sendable {
                   case .pdfPage(asset, index: offset) = page.content else { return nil }
         }
         return asset
+    }
+
+    /// The source PDF written again under `password` — every page, its form
+    /// and its links as they are, because the document itself is written
+    /// rather than its pages copied into a new one (which keeps the widget
+    /// boxes and loses the form). PDFKit encrypts it with AES, as it does the
+    /// rebuild. Both passwords are the one asked for, as elsewhere here: a
+    /// document opens with either, so an empty owner password would open it.
+    static func writeProtectedCopy(of data: Data, to url: URL, password: String) throws {
+        guard let document = PDFDocument(data: data), !document.isLocked, !document.isEncrypted else {
+            throw ExportError.writeFailed
+        }
+        // Beside the file the context wrote, then over it, as the pass-through does.
+        let staged = url.deletingLastPathComponent().appendingPathComponent("protected-\(UUID().uuidString).pdf")
+        guard document.write(to: staged, withOptions: [.userPasswordOption: password, .ownerPasswordOption: password]) else {
+            try? FileManager.default.removeItem(at: staged)
+            throw ExportError.writeFailed
+        }
+        do {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: staged)
+        } catch {
+            try? FileManager.default.removeItem(at: staged)
+            throw ExportError.writeFailed
+        }
     }
 
     /// Vector PDF pages pass through untouched; raster content is limited to

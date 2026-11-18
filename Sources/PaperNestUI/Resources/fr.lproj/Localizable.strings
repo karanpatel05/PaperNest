@@ -1316,3 +1316,7 @@
 "stamp.picture.fromFiles" = "Ajouter depuis Fichiers";
 "stamp.picture.notImage" = "Ce fichier n’est pas une image qui peut être placée.";
 "stamp.picture.failed" = "Impossible de garder l’image.";
+
+/* Form fields on export */
+"export.formFields.kept" = "Les champs à remplir de ce formulaire sont conservés : il pourra encore être rempli après l’export.";
+"export.formFields.lost" = "Les champs à remplir de ce formulaire ne seront pas conservés : ses pages sont redessinées, les réponses restent visibles mais ne peuvent plus être modifiées. Ils ne sont conservés que si chaque page est exportée telle quelle, à sa taille d’origine, sans filigrane ni marque.";

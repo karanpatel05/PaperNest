@@ -91,6 +91,17 @@ struct ExportSheet: View {
     @State private var sizeEstimate: SizeEstimate = .none
     /// The first chosen page read back from its own export with these options.
     @State private var preview: ExportPreview?
+    /// Whether a form's fillable fields survive this export, as the writer decides it.
+    @State private var formFate: FormFieldFate = .notApplicable
+
+    /// What the fate of a form's fields depends on: the options the export
+    /// would use (its marks included), the pages, and whether there is a password.
+    struct FormFateRequest: Hashable {
+        var options: ExportOptions
+        var pages: [PageID]
+        var revisions: [Int]
+        var password: String?
+    }
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum SizeEstimate: Equatable { case none, working, ready(ExportSizeEstimate) }
@@ -311,6 +322,44 @@ struct ExportSheet: View {
         .background(EditorChrome.secondaryBackground)
         .tint(Theme.accent)
         .disabled(isBusyOrDone)
+        .task(id: formFateRequest) { await decideFormFate(formFateRequest) }
+    }
+
+    private var formFateRequest: FormFateRequest? {
+        let chosen = selectedPages
+        guard rangeIsValid, !chosen.isEmpty else { return nil }
+        let options = Self.optionsToExport(options, watermark: watermarkDraft, includesBrandMark: Self.brandMarkToExport(
+            switchOn: includesBrandMark, allowsRemoval: SubscriptionStore.shared.allows(.removeWatermark)))
+        return FormFateRequest(options: options, pages: chosen.map(\.id), revisions: chosen.map(\.revision),
+                               password: Self.passwordToUse(password))
+    }
+
+    /// Asks the exporter, by the rules it writes with, whether a form's
+    /// fields will still be fillable. Nothing is written.
+    private func decideFormFate(_ request: FormFateRequest?) async {
+        guard let request, let exporter = session.environment?.exporter else { formFate = .notApplicable; return }
+        let chosen = selectedPages
+        guard chosen.map(\.id) == request.pages else { return }
+        let fate = (try? await exporter.formFieldFate(of: chosen, options: request.options, password: request.password))
+            ?? .notApplicable
+        if !Task.isCancelled { formFate = fate }
+    }
+
+    @ViewBuilder
+    private var formFateNote: some View {
+        switch formFate {
+        case .notApplicable:
+            EmptyView()
+        case .kept:
+            Text(L10n.exportFormFieldsKept)
+                .accessibilityIdentifier("export-form-fields")
+                .accessibilityValue(Text(verbatim: "kept"))
+        case .lost:
+            Text(L10n.exportFormFieldsLost)
+                .foregroundStyle(.orange)
+                .accessibilityIdentifier("export-form-fields")
+                .accessibilityValue(Text(verbatim: "lost"))
+        }
     }
 
     private var documentRow: some View {
@@ -549,6 +598,7 @@ struct ExportSheet: View {
                 .choicePickerStyle()
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
+                    formFateNote
                     if options.paperSize != .original { Text(L10n.paperNote) }
                     Text(L10n.exportVectorNote)
                 }

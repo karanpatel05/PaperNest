@@ -356,23 +356,8 @@ import PaperNestTestSupport
         #expect(try Data(contentsOf: output.files[0]) != source)
     }
 
-    /// A password still costs the form, because a protected file has to be
-    /// written and writing it is the rebuild. Pinned so the cost is known
-    /// rather than discovered: **you cannot have both today.**
-    @Test func askingForAPasswordStillCostsTheForm() async throws {
-        let fixture = try ExportFixture()
-        let source = SyntheticDocuments.acroFormPDF(fields: [.init(name: "customer")])
-        let item = try await fixture.importer.importItem(.data(source, name: "Agreement"))
-        let pages = try await fixture.store.pages(of: item.id)
-
-        let output = try await fixture.exporter.export(
-            itemName: item.name, pages: pages,
-            options: ExportOptions(format: .pdf, paperSize: .original), password: "correct-horse")
-        defer { output.removeTemporaryFiles() }
-
-        #expect(try Data(contentsOf: output.files[0]) != source, "the password was not applied")
-        #expect(Self.acroFormFieldNames(in: output.files[0]).isEmpty)
-    }
+    // A password no longer costs the form: the unchanged original is written
+    // again under it (`ProtectedFormExportTests`).
 
     /// **The worst thing a whole-file copy could do**: hand back a file that
     /// still contains a page somebody deleted. Driven as a real export

@@ -1316,3 +1316,7 @@
 "stamp.picture.fromFiles" = "Añadir desde Archivos";
 "stamp.picture.notImage" = "Ese archivo no es una imagen que se pueda colocar.";
 "stamp.picture.failed" = "No se pudo guardar la imagen.";
+
+/* Form fields on export */
+"export.formFields.kept" = "Los campos rellenables de este formulario se conservan: se podrá seguir rellenando después de exportarlo.";
+"export.formFields.lost" = "Los campos rellenables de este formulario no se conservarán: sus páginas se vuelven a dibujar, así que las respuestas siguen visibles pero no se pueden cambiar. Solo se conservan si todas las páginas se exportan sin cambios, a su tamaño original y sin marca de agua ni marca.";

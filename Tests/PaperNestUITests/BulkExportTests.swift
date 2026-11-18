@@ -193,6 +193,11 @@ import PaperNestTestSupport
         let id = try #require(library.items.first?.id)
         let env = try #require(session.environment)
 
+        // Other tests export into the same temporary folder at the same time,
+        // so only this export's leftovers count: folders that appear while it
+        // runs and hold its archive.
+        let temporary = env.exporter.temporaryRoot
+        let before = Set(try FileManager.default.contentsOfDirectory(atPath: temporary.path))
         let model = BulkExportModel(session: session)
         model.start([id], archiveName: "Cancelled")
         model.cancel()
@@ -201,8 +206,13 @@ import PaperNestTestSupport
         // A 12-page export takes well under this, so the wait is generous.
         try await settle(upTo: 40) { false }
         if case .ready = model.phase { Issue.record("a cancelled export must not become ready") }
-        let temporaries = try FileManager.default.contentsOfDirectory(atPath: env.exporter.temporaryRoot.path)
-        #expect(temporaries.allSatisfy { !$0.hasPrefix("PaperNestExport-") }, "left behind: \(temporaries)")
+        let appeared = try FileManager.default.contentsOfDirectory(atPath: temporary.path)
+            .filter { $0.hasPrefix("PaperNestExport-") && !before.contains($0) }
+        let leftovers = appeared.filter { folder in
+            let files = (try? FileManager.default.contentsOfDirectory(atPath: temporary.appendingPathComponent(folder).path)) ?? []
+            return files.contains { $0.hasPrefix("Cancelled") }
+        }
+        #expect(leftovers.isEmpty, "the cancelled export left its archive behind in \(leftovers)")
     }
 
     @Test func anEmptySelectionAndEmptyDocumentsNeverProduceAnArchive() async throws {

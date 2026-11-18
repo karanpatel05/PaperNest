@@ -1316,3 +1316,7 @@
 "stamp.picture.fromFiles" = "Add from Files";
 "stamp.picture.notImage" = "That file isn’t an image that can be placed.";
 "stamp.picture.failed" = "The image couldn’t be kept.";
+
+/* Form fields on export */
+"export.formFields.kept" = "This form’s fillable fields are kept: it can still be filled in after exporting.";
+"export.formFields.lost" = "This form’s fillable fields won’t be kept: its pages are redrawn, so the answers stay visible but can’t be changed. They’re kept only when every page goes out unchanged, at its original size, without a watermark or mark.";
