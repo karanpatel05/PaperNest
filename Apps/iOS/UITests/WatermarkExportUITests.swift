@@ -241,6 +241,27 @@ import PaperNestStore
         XCTAssertTrue(center.isSelected, "the branded preset starts in the middle")
     }
 
+    /// The branded preset in French and Spanish: the brand's name is the same
+    /// in every language and cannot be retyped, and the controls fit. Named
+    /// by the Simulator's appearance, so one run covers light and another
+    /// (after `simctl ui … appearance dark`) dark.
+    func testThePaperNestPresetInFrenchAndSpanish() async throws {
+        let appearance = UIScreen.main.traitCollection.userInterfaceStyle == .dark ? "dark" : "light"
+        for language in ["fr", "es"] {
+            let app = try await openExport(language: language)
+            defer { app.terminate() }
+            let tile = choose("paperNest", in: app)
+            XCTAssertTrue(tile.isSelected, "\(language): the PaperNest tile is not chosen")
+            XCTAssertTrue(previewValue(app).contains("PaperNest"), "\(language): the preview does not say PaperNest")
+            XCTAssertFalse(app.textFields["export-watermark-text"].exists, "\(language): the brand's name can be retyped")
+            snap(app, "paperNest-\(language)-\(appearance)")
+            let center = app.buttons["export-watermark-placement-center"]
+            reveal(center, in: app)
+            XCTAssertTrue(center.isSelected && center.isHittable, "\(language): placement out of reach")
+            app.terminate()
+        }
+    }
+
     /// With no App Store products configured nobody is held to Free, so the
     /// PaperNest mark starts off and switches on and off freely.
     func testWithoutProductsTheMarkStartsOff() async throws {

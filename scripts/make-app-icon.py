@@ -57,6 +57,12 @@ BRAND_MARK_SET = BRAND_CATALOGUE / "BrandMark.imageset"
 # Points at 1x. The lockup draws it near text size; this is generous enough
 # to stay crisp if a later design uses it larger.
 BRAND_MARK_POINTS = 48
+# The mark again at its own size in the brand art, never scaled up, for the
+# PaperNest watermark: the large branded preset draws it about 85 points
+# across, which on a page printed at 300 dpi takes about 354 pixels, and the
+# 144-pixel @3x rendition above printed soft. One universal image, so no
+# device thins it away.
+BRAND_MARK_LARGE_SET = BRAND_CATALOGUE / "BrandMarkLarge.imageset"
 
 # Sampled from the brand mark rather than chosen: 107,115 of its pixels are
 # exactly this purple.
@@ -253,6 +259,20 @@ def write_brand_mark(mark: Image.Image) -> None:
         json.dumps({"info": {"author": "xcode", "version": 1}}, indent=2) + "\n")
 
 
+def write_large_brand_mark(mark: Image.Image) -> None:
+    """Emit the mark at its native size in the art, as a template image."""
+    BRAND_MARK_LARGE_SET.mkdir(parents=True, exist_ok=True)
+    tile = Image.new("RGBA", mark.size, (255, 255, 255, 255))
+    tile.putalpha(mark)
+    tile.save(BRAND_MARK_LARGE_SET / "brand-mark-large.png")
+    (BRAND_MARK_LARGE_SET / "Contents.json").write_text(
+        json.dumps({
+            "images": [{"filename": "brand-mark-large.png", "idiom": "universal"}],
+            "info": {"author": "xcode", "version": 1},
+            "properties": {"template-rendering-intent": "template"},
+        }, indent=2) + "\n")
+
+
 def main() -> int:
     if not SOURCE.exists():
         print(f"brand mark missing: {SOURCE}", file=sys.stderr)
@@ -298,9 +318,11 @@ def main() -> int:
         json.dumps({"info": {"author": "xcode", "version": 1}}, indent=2) + "\n")
     write_icns(tiles)
     write_brand_mark(mark)
+    write_large_brand_mark(mark)
     print(f"wrote {len(images)} images to {ICON_SET.relative_to(ROOT)}")
     print(f"wrote {ICNS.relative_to(ROOT)}")
     print(f"wrote {BRAND_MARK_SET.relative_to(ROOT)}")
+    print(f"wrote {BRAND_MARK_LARGE_SET.relative_to(ROOT)}")
     return 0
 
 
