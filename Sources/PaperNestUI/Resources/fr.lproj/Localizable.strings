@@ -1299,7 +1299,11 @@
 "stamp.text.failed" = "Impossible de placer le tampon.";
 "stamp.text.keepFailed" = "Le tampon n’a pas pu être gardé dans vos tampons, il n’a donc pas été placé.";
 
-/* Export size estimate */
+/* Export size estimate and preview */
 "export.size.working" = "Calcul de la taille…";
 "export.size.exact" = "Taille : %@";
 "export.size.about" = "Taille : environ %@, d’après quelques pages";
+"export.preview.title" = "Aperçu";
+"export.preview.caption" = "La page %d telle qu’elle sera exportée.";
+"export.preview.working" = "Préparation de l’aperçu…";
+"export.preview.noWords" = "Cette page n’a aucun texte à exporter.";

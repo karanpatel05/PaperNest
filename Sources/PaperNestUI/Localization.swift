@@ -1446,9 +1446,13 @@ extension L10n {
     static var textStampFailed: String { tr("stamp.text.failed") }
     static var textStampKeepFailed: String { tr("stamp.text.keepFailed") }
 
-    // MARK: Export size estimate
+    // MARK: Export size estimate and preview
 
     static var exportSizeWorking: String { tr("export.size.working") }
     static func exportSizeExact(_ value0: String) -> String { tr("export.size.exact", value0) }
     static func exportSizeAbout(_ value0: String) -> String { tr("export.size.about", value0) }
+    static var exportPreviewTitle: String { tr("export.preview.title") }
+    static func exportPreviewCaption(_ value0: Int) -> String { tr("export.preview.caption", value0) }
+    static var exportPreviewWorking: String { tr("export.preview.working") }
+    static var exportPreviewNoWords: String { tr("export.preview.noWords") }
 }

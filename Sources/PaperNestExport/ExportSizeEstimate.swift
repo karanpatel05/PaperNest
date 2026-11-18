@@ -49,6 +49,15 @@ public enum ExportSizeModel {
     }
 }
 
+/// A size estimate, and the first chosen page exported on its own: the
+/// file the export sheet's preview is read from, written by the same writer
+/// with the same options as the export. **The caller removes `firstPage`**
+/// once it has read it.
+public struct ExportSample: Sendable {
+    public var size: ExportSizeEstimate
+    public var firstPage: ExportOutput
+}
+
 extension Exporter {
     /// How large exporting `pages` with `options` will be, found by really
     /// exporting some of them — the same writer, the same marks, the same
@@ -64,16 +73,40 @@ extension Exporter {
     /// calling task stops it and removes what it wrote.
     public func estimateSize(itemName: String, pages: [Page], options: ExportOptions,
                              samplePages: Int = 4) async throws -> ExportSizeEstimate {
+        let sample = try await sample(itemName: itemName, pages: pages, options: options, samplePages: samplePages)
+        sample.firstPage.removeTemporaryFiles()
+        return sample.size
+    }
+
+    /// The size estimate, keeping the first chosen page's own export for a
+    /// preview. That one-page export is also the estimate's first sample, so
+    /// a preview costs nothing more except when two to four pages are chosen
+    /// (then all of them are exported for the exact size, and the first again
+    /// on its own). On any error, cancelling included, nothing is kept.
+    public func sample(itemName: String, pages: [Page], options: ExportOptions,
+                       samplePages: Int = 4) async throws -> ExportSample {
         guard !pages.isEmpty else { throw ExportError.noPages }
-        let sample = ExportSizeModel.sampleIndices(count: pages.count, limit: max(2, samplePages))
-        if sample.count == pages.count {
-            return ExportSizeEstimate(byteCount: try await measure(itemName, pages, options), isExact: true)
+        let indices = ExportSizeModel.sampleIndices(count: pages.count, limit: max(2, samplePages))
+        let first = try await export(itemName: itemName, pages: [pages[indices[0]]], options: options)
+        do {
+            try Task.checkCancellation()
+            let one = first.totalByteCount
+            let size: ExportSizeEstimate
+            if pages.count == 1 {
+                size = ExportSizeEstimate(byteCount: one, isExact: true)
+            } else if indices.count == pages.count {
+                size = ExportSizeEstimate(byteCount: try await measure(itemName, pages, options), isExact: true)
+            } else {
+                let all = try await measure(itemName, indices.map { pages[$0] }, options)
+                size = ExportSizeEstimate(byteCount: ExportSizeModel.estimate(one: one, sample: all, sampleCount: indices.count,
+                                                                              total: pages.count),
+                                          isExact: false)
+            }
+            return ExportSample(size: size, firstPage: first)
+        } catch {
+            first.removeTemporaryFiles()
+            throw error
         }
-        let one = try await measure(itemName, [pages[sample[0]]], options)
-        let all = try await measure(itemName, sample.map { pages[$0] }, options)
-        return ExportSizeEstimate(byteCount: ExportSizeModel.estimate(one: one, sample: all, sampleCount: sample.count,
-                                                                      total: pages.count),
-                                  isExact: false)
     }
 
     private func measure(_ itemName: String, _ pages: [Page], _ options: ExportOptions) async throws -> Int64 {

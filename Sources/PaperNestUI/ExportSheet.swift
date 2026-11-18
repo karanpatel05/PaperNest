@@ -89,6 +89,8 @@ struct ExportSheet: View {
     @State private var includesBrandMark = false
     /// How large the export will be, worked out from the options as they are.
     @State private var sizeEstimate: SizeEstimate = .none
+    /// The first chosen page read back from its own export with these options.
+    @State private var preview: ExportPreview?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum SizeEstimate: Equatable { case none, working, ready(ExportSizeEstimate) }
@@ -302,6 +304,7 @@ struct ExportSheet: View {
                 }
             }
             formatOptions
+            previewSection
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
@@ -629,20 +632,69 @@ struct ExportSheet: View {
     }
 
     /// Exports a few of the chosen pages, after a pause so a slider being
-    /// dragged does not start one per step, and says how large the whole
-    /// will be. A refusal shows nothing: the export itself explains it.
+    /// dragged does not start one per step: says how large the whole will be,
+    /// and shows the first chosen page read back from its own export. A
+    /// refusal shows neither: the export itself explains it.
     private func estimateSize(_ request: EstimateRequest?) async {
         sizeEstimate = .none
+        preview = nil
         guard let request, let exporter = session.environment?.exporter else { return }
         do { try await Task.sleep(for: .milliseconds(400)) } catch { return }
         let chosen = selectedPages
         guard chosen.map(\.id) == request.pages else { return }
         sizeEstimate = .working
         do {
-            let estimate = try await exporter.estimateSize(itemName: itemName, pages: chosen, options: request.options)
-            if !Task.isCancelled { sizeEstimate = .ready(estimate) }
+            let sample = try await exporter.sample(itemName: itemName, pages: chosen, options: request.options)
+            defer { sample.firstPage.removeTemporaryFiles() }
+            guard !Task.isCancelled else { return }
+            preview = ExportPreview.read(sample.firstPage)
+            sizeEstimate = .ready(sample.size)
         } catch {
             if !Task.isCancelled { sizeEstimate = .none }
+        }
+    }
+
+    /// The first chosen page as it will be exported, under the options.
+    @ViewBuilder
+    private var previewSection: some View {
+        if case .configuring = phase, sizeEstimate != .none, let first = selectedPages.first,
+           let number = pages.firstIndex(where: { $0.id == first.id }).map({ $0 + 1 }) {
+            Section {
+                previewContent
+            } header: {
+                Text(L10n.exportPreviewTitle)
+            } footer: {
+                Text(L10n.exportPreviewCaption(number)).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var previewContent: some View {
+        switch preview {
+        case .picture(let image):
+            Image(decorative: image, scale: 1)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: 260)
+                .shadow(color: Theme.paperShadow, radius: 4, y: 2)
+                .padding(.vertical, 6)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(L10n.exportPreviewTitle)
+                // The picture's own shape, so a test can see the paper size.
+                .accessibilityValue(Text(verbatim: "\(image.width)×\(image.height)"))
+                .accessibilityIdentifier("export-preview")
+        case .words(let words):
+            Text(verbatim: words.isEmpty ? L10n.exportPreviewNoWords : words)
+                .font(.caption.monospaced())
+                .foregroundStyle(words.isEmpty ? .secondary : .primary)
+                .lineLimit(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("export-preview")
+        case nil:
+            Text(L10n.exportPreviewWorking)
+                .font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("export-preview-working")
         }
     }
 

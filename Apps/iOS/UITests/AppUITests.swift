@@ -324,14 +324,18 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(jpeg.isSelected)
         XCTAssertFalse(pdf.isSelected)
         let all = app.buttons["export-pages-all"], range = app.buttons["export-pages-range"]
-        // The ways out sit in a bar along the bottom; on an iPad sheet the
-        // Pages row starts under it until the options are scrolled.
+        // The ways out, and the size line above them, sit in a bar along the
+        // bottom; the Pages row can start under it, or below the fold on a
+        // phone, until the options are scrolled.
         let bar = app.buttons["export-destination-save"]
-        if bar.exists, range.frame.maxY > bar.frame.minY { app.swipeUp() }
+        for _ in 0..<4 where !range.exists || (bar.exists && range.frame.maxY > bar.frame.minY) { app.swipeUp() }
         range.tap()
         XCTAssertTrue(range.isSelected)
         XCTAssertFalse(all.isSelected)
+        // On a phone the format tiles may have scrolled out of sight.
+        for _ in 0..<4 where !jpeg.exists { app.swipeDown() }
         XCTAssertTrue(jpeg.isSelected, "a pages tap changed the format")
+        for _ in 0..<4 where !all.exists || (bar.exists && all.frame.maxY > bar.frame.minY) { app.swipeUp() }
         all.tap()
 
         let copy = app.buttons["export-destination-copy"]

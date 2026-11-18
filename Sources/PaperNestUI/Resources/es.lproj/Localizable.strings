@@ -1299,7 +1299,11 @@
 "stamp.text.failed" = "No se pudo colocar el sello.";
 "stamp.text.keepFailed" = "El sello no se pudo guardar en tus sellos, así que no se colocó.";
 
-/* Export size estimate */
+/* Export size estimate and preview */
 "export.size.working" = "Calculando el tamaño…";
 "export.size.exact" = "Tamaño: %@";
 "export.size.about" = "Tamaño: unos %@, según algunas páginas";
+"export.preview.title" = "Vista previa";
+"export.preview.caption" = "La página %d tal como se exportará.";
+"export.preview.working" = "Preparando la vista previa…";
+"export.preview.noWords" = "Esta página no tiene texto que exportar.";
