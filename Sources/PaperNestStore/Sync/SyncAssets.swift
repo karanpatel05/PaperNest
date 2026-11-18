@@ -147,9 +147,10 @@ extension LibraryStore {
             let uploaded = try !db.query("SELECT 1 FROM sync_assets WHERE asset_id = ? AND state = 'uploaded'",
                                          [.text(id.sha256)]) { $0.int(0) }.isEmpty
             guard uploaded else { return nil }
-            // Templates are not synced, so nothing in iCloud speaks for the
-            // ones here: an original a template keeps stays on this device.
-            guard try !isAssetKeptBySavedTemplate(id) else { return nil }
+            // Templates and picture stamps are not synced, so nothing in
+            // iCloud speaks for the ones here: an original either keeps stays
+            // on this device.
+            guard try !isAssetKeptAside(id) else { return nil }
             let users = try db.query("""
                 SELECT item_id FROM pages WHERE asset_id = ?1
                 UNION SELECT item_id FROM file_items WHERE asset_id = ?1

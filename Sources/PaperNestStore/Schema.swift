@@ -321,5 +321,20 @@ enum Schema {
             created_at REAL NOT NULL
         );
         """),
+        // Images someone kept to place again as stamps (`SavedStamps.swift`).
+        // **A picture stamp keeps its original alive**, as a template does:
+        // `asset_id` counts in every check of whether an asset is still used
+        // (`isAssetKeptAside`), or the launch sweep would delete the row's
+        // asset — and trip this foreign key partway. One per image. A new
+        // table, nothing rebuilt, not synced.
+        Migration(version: 15, sql: """
+        CREATE TABLE saved_picture_stamps (
+            id TEXT PRIMARY KEY NOT NULL,
+            asset_id TEXT NOT NULL UNIQUE REFERENCES assets(id),
+            pixel_width REAL NOT NULL,
+            pixel_height REAL NOT NULL,
+            created_at REAL NOT NULL
+        );
+        """),
     ]
 }

@@ -388,6 +388,28 @@ final class DocumentModel {
         session.didChange()
     }
 
+    /// A saved picture stamp on `page` as it is shown, in `placement`'s
+    /// corner, its own proportions kept: an ordinary placed image, moved,
+    /// resized, undone and exported like one. Stamps are markup, so Pro.
+    func placePictureStamp(_ stamp: SavedPictureStamp, size: StampSize, placement: StampPlacement, on page: Page,
+                           undoManager: UndoManager?) async throws {
+        try SubscriptionStore.shared.require(.markup)
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        let frame = Self.pictureStampFrame(stamp, size: size, placement: placement, on: page)
+        let result = try await store.placePictureStamp(stamp.id, on: page.id, frame: frame)
+        replace(result.page)
+        let change = InkChange(pageID: page.id, saved: [result.object], replaced: [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.textStampTitle)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    nonisolated static func pictureStampFrame(_ stamp: SavedPictureStamp, size: StampSize, placement: StampPlacement,
+                                              on page: Page) -> CGRect {
+        placement.frame(size: stamp.frameSize(size, onPageOfSize: page.geometry.pageSize), on: page.geometry)
+    }
+
     /// The text box a stamp is on `page`: its words and date line, its type
     /// size for the page, measured, and placed. The stamp sheet previews
     /// exactly this. A stamp wider than the page as shown (less its margins)

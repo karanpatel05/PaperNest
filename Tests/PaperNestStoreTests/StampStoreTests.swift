@@ -162,7 +162,7 @@ import PaperNestCore
 
         let store = try LibraryStore(directory: dir.url)
 
-        #expect(try await store.schemaVersion() == 14)
+        #expect(try await store.schemaVersion() >= 14, "moved on past thirteen")
         #expect(try await store.pages(of: ItemID(rawValue: "d1")).map(\.id) == [PageID(rawValue: "p1")])
         try await store.saveStamp(StampDesign(text: "Paid", style: .outlined, color: green))
         #expect(try await store.savedStamps().count == 1)
@@ -171,10 +171,12 @@ import PaperNestCore
     /// A library a newer build has moved on is refused, as an older build refuses this v14 one.
     @Test func aLibraryANewerBuildMovedOnIsRefused() async throws {
         let dir = TempDirectory()
-        #expect(try await LibraryStore(directory: dir.url).schemaVersion() == 14)
+        #expect(try await LibraryStore(directory: dir.url).schemaVersion() == Schema.latestVersion)
         let raw = try SQLiteDatabase(path: dir.url.appendingPathComponent(LibraryStore.databaseFilename).path)
-        try raw.setUserVersion(15)
+        try raw.setUserVersion(Schema.latestVersion + 1)
         raw.close()
-        #expect(throws: StoreError.newerSchema(found: 15, supported: 14)) { try LibraryStore(directory: dir.url) }
+        #expect(throws: StoreError.newerSchema(found: Schema.latestVersion + 1, supported: Schema.latestVersion)) {
+            try LibraryStore(directory: dir.url)
+        }
     }
 }

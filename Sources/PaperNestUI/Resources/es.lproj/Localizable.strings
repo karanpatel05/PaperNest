@@ -1273,7 +1273,7 @@
 "cleanup.lookedAgain" = "El documento cambió después de revisarlo, así que no se eliminó nada y se ha vuelto a revisar.";
 
 /* Text stamps */
-"stamp.text.title" = "Sello de texto";
+"stamp.text.title" = "Sello o imagen";
 "stamp.text.presets" = "Sellos";
 "stamp.text.word.paid" = "PAGADO";
 "stamp.text.word.received" = "RECIBIDO";
@@ -1307,3 +1307,12 @@
 "export.preview.caption" = "La página %d tal como se exportará.";
 "export.preview.working" = "Preparando la vista previa…";
 "export.preview.noWords" = "Esta página no tiene texto que exportar.";
+
+/* Picture stamps */
+"stamp.picture.section" = "Tus imágenes";
+"stamp.picture.row" = "Imagen %d";
+"stamp.picture.note" = "Se guardan en este dispositivo para volver a colocarlas. Una imagen conserva su propio fondo.";
+"stamp.picture.fromPhotos" = "Añadir desde Fotos";
+"stamp.picture.fromFiles" = "Añadir desde Archivos";
+"stamp.picture.notImage" = "Ese archivo no es una imagen que se pueda colocar.";
+"stamp.picture.failed" = "No se pudo guardar la imagen.";

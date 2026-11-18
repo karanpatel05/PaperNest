@@ -1,5 +1,9 @@
+import ImageIO
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 import PaperNestCore
+import PaperNestImport
 import PaperNestRender
 import PaperNestStore
 
@@ -31,15 +35,16 @@ enum StampColor: String, CaseIterable, Identifiable {
     }
 }
 
-/// The stamp being set up in the Text Stamp sheet: a preset, a saved stamp
-/// or the person's own words, with a date or not, a size and a corner.
-/// Nothing is written until Place.
+/// The stamp being set up in the stamp sheet: a preset, a saved stamp, the
+/// person's own words or a saved image, with a date or not, a size and a
+/// corner. Nothing is placed until Place; an image is kept when it is added.
 @MainActor @Observable
 final class StampModel {
     enum Choice: Hashable {
         case preset(StampPreset)
         case saved(SavedStampID)
         case custom
+        case picture(SavedPictureStampID)
     }
 
     let document: DocumentModel
@@ -54,6 +59,8 @@ final class StampModel {
     var size: StampSize = .medium
     var placement: StampPlacement = .topRight
     private(set) var saved: [SavedStamp] = []
+    private(set) var pictures: [SavedPictureStamp] = []
+    private(set) var thumbnails: [SavedPictureStampID: CGImage] = [:]
     private(set) var isPlacing = false
 
     init(document: DocumentModel, page: Page) {
@@ -65,6 +72,61 @@ final class StampModel {
 
     func loadSaved() async {
         saved = (try? await store?.savedStamps()) ?? saved
+        pictures = (try? await store?.savedPictureStamps()) ?? pictures
+        guard let store else { return }
+        for picture in pictures where thumbnails[picture.id] == nil {
+            let url = store.assets.url(for: picture.assetID, kind: picture.kind)
+            thumbnails[picture.id] = await Task.detached(priority: .userInitiated) { Self.thumbnail(of: url) }.value
+        }
+    }
+
+    /// A small upright picture of a saved image, read from its file.
+    nonisolated static func thumbnail(of url: URL, maxPixelSize: Int = 240) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+        ] as CFDictionary)
+    }
+
+    var chosenPicture: SavedPictureStamp? {
+        if case .picture(let id) = choice { return pictures.first { $0.id == id } }
+        return nil
+    }
+
+    /// Whether Place has something to place.
+    var canPlace: Bool { design != nil || chosenPicture != nil }
+
+    /// Keeps an image as a picture stamp and chooses it. Refused unless the
+    /// bytes are an image that can be placed. Stamps are markup, so Pro.
+    func addPicture(_ data: Data) async throws {
+        try SubscriptionStore.shared.require(.markup)
+        guard let store else { throw StampSheetError.notKept }
+        guard let kind = FileTypeSniffer.kind(of: data), kind.isDrawableImage,
+              let size = DocumentModel.pixelSize(of: data), size.width > 0, size.height > 0 else {
+            throw StampSheetError.notAnImage
+        }
+        do {
+            let staged = try store.assets.store(data, kind: kind, originalFilename: nil)
+            let stamp = try await store.savePictureStamp(staged, pixelSize: size)
+            await loadSaved()
+            choice = .picture(stamp.id)
+        } catch {
+            throw StampSheetError.notKept
+        }
+    }
+
+    /// Deletes a saved image. Copies placed on pages stay.
+    func deletePicture(_ stamp: SavedPictureStamp) async {
+        do {
+            try await store?.deleteSavedPictureStamp(stamp.id)
+            if choice == .picture(stamp.id) { choice = .preset(.approved) }
+            thumbnails[stamp.id] = nil
+            await loadSaved()
+        } catch {
+            document.presentedError = .saveFailed()
+        }
     }
 
     func choose(_ choice: Choice) {
@@ -87,6 +149,8 @@ final class StampModel {
             }
         case .custom:
             StampDesign(text: customText, style: customStyle, color: customColor.rgba, includesDate: includesDate)
+        case .picture:
+            nil
         }
         return design?.isEmpty == false ? design : nil
     }
@@ -100,10 +164,15 @@ final class StampModel {
     /// it is on the page. Stamps are markup: a free user is asked to upgrade
     /// before anything is kept or placed.
     func place(undoManager: UndoManager?) async throws -> Bool {
-        guard let design, !isPlacing else { return false }
+        guard canPlace, !isPlacing else { return false }
         try SubscriptionStore.shared.require(.markup)
         isPlacing = true
         defer { isPlacing = false }
+        if let picture = chosenPicture {
+            try await document.placePictureStamp(picture, size: size, placement: placement, on: page, undoManager: undoManager)
+            return true
+        }
+        guard let design else { return false }
         if choice == .custom, keepsCustom {
             do { _ = try await store?.saveStamp(design) } catch { throw StampSheetError.notKept }
         }
@@ -159,7 +228,7 @@ final class StampModel {
     }
 }
 
-enum StampSheetError: Error { case notKept }
+enum StampSheetError: Error { case notKept, notAnImage }
 
 /// Places a text stamp — Approved, Paid, a saved one or one's own words —
 /// on the page as an editable text box. Inline option rows throughout, so
@@ -168,6 +237,8 @@ struct StampSheet: View {
     @State private var model: StampModel
     @State private var proFeature: ProFeature?
     @State private var failure: String?
+    @State private var photo: PhotosPickerItem?
+    @State private var isPickingFile = false
     let undoManager: UndoManager?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.displayScale) private var displayScale
@@ -184,6 +255,7 @@ struct StampSheet: View {
                 presets
                 if !model.saved.isEmpty { savedStamps }
                 custom
+                pictures
                 options
             }
             .navigationTitle(L10n.textStampTitle)
@@ -196,6 +268,8 @@ struct StampSheet: View {
             .alert(failure ?? "", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
                 Button(L10n.ok, role: .cancel) {}
             }
+            .task(id: photo) { await addPhoto() }
+            .fileImporter(isPresented: $isPickingFile, allowedContentTypes: [.image]) { addFile($0) }
         }
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 600)
@@ -209,7 +283,7 @@ struct StampSheet: View {
         }
         ToolbarItem(placement: .confirmationAction) {
             Button(L10n.textStampPlace) { place() }
-                .disabled(model.design == nil || model.isPlacing)
+                .disabled(!model.canPlace || model.isPlacing)
                 .accessibilityIdentifier("text-stamp-place")
         }
     }
@@ -228,6 +302,36 @@ struct StampSheet: View {
         }
     }
 
+    private func addPhoto() async {
+        guard let photo else { return }
+        defer { self.photo = nil }
+        do {
+            guard let data = try await photo.loadTransferable(type: Data.self) else { failure = L10n.stampPictureFailed; return }
+            try await model.addPicture(data)
+        } catch is CancellationError {
+        } catch {
+            report(error)
+        }
+    }
+
+    private func addFile(_ result: Result<URL, any Error>) {
+        guard case .success(let url) = result else { return }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else { failure = L10n.stampPictureFailed; return }
+        Task {
+            do { try await model.addPicture(data) } catch { report(error) }
+        }
+    }
+
+    private func report(_ error: any Error) {
+        switch error {
+        case let error as ProAccessError: proFeature = error.feature
+        case StampSheetError.notAnImage: failure = L10n.stampPictureNotImage
+        default: failure = L10n.stampPictureFailed
+        }
+    }
+
     // MARK: - Sections
 
     /// The stamp as it will be drawn, by the renderer that draws it on the page.
@@ -235,7 +339,11 @@ struct StampSheet: View {
         Section {
             HStack {
                 Spacer(minLength: 0)
-                if let box = model.previewBox, let picture = picture(of: box) {
+                if let chosen = model.chosenPicture {
+                    if let thumbnail = model.thumbnails[chosen.id] {
+                        Image(decorative: thumbnail, scale: 1).resizable().scaledToFit().frame(maxWidth: 280, maxHeight: 96)
+                    }
+                } else if let box = model.previewBox, let picture = picture(of: box) {
                     Image(decorative: picture, scale: displayScale)
                         .resizable()
                         .scaledToFit()
@@ -250,9 +358,16 @@ struct StampSheet: View {
             .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(L10n.stampPreview)
-            .accessibilityValue(model.previewBox?.text.replacingOccurrences(of: "\n", with: ", ") ?? L10n.textStampMissing)
+            .accessibilityValue(previewValue)
             .accessibilityIdentifier("text-stamp-preview")
         }
+    }
+
+    private var previewValue: String {
+        if let chosen = model.chosenPicture, let index = model.pictures.firstIndex(of: chosen) {
+            return L10n.stampPictureRow(index + 1)
+        }
+        return model.previewBox?.text.replacingOccurrences(of: "\n", with: ", ") ?? L10n.textStampMissing
     }
 
     private func picture(of box: TextBox) -> CGImage? {
@@ -312,10 +427,59 @@ struct StampSheet: View {
         }
     }
 
+    /// Images kept to place again, and adding one from Photos or Files.
+    private var pictures: some View {
+        Section {
+            ForEach(Array(model.pictures.enumerated()), id: \.element.id) { index, picture in
+                Button { model.choose(.picture(picture.id)) } label: {
+                    HStack(spacing: 12) {
+                        Group {
+                            if let thumbnail = model.thumbnails[picture.id] {
+                                Image(decorative: thumbnail, scale: 1).resizable().scaledToFit()
+                            } else {
+                                Color.secondary.opacity(0.15)
+                            }
+                        }
+                        .frame(width: 56, height: 40)
+                        Text(verbatim: L10n.stampPictureRow(index + 1)).foregroundStyle(.primary)
+                        Spacer(minLength: 8)
+                        if model.choice == .picture(picture.id) {
+                            Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("text-stamp-picture-\(index + 1)")
+                .accessibilityValue(model.choice == .picture(picture.id) ? L10n.selectionOn : L10n.selectionOff)
+                .swipeActions {
+                    Button(L10n.delete, role: .destructive) { Task { await model.deletePicture(picture) } }
+                }
+                .contextMenu {
+                    Button(L10n.delete, role: .destructive) { Task { await model.deletePicture(picture) } }
+                }
+            }
+            PhotosPicker(selection: $photo, matching: .images, preferredItemEncoding: .compatible) {
+                Label(L10n.stampPictureFromPhotos, systemImage: "photo.on.rectangle")
+            }
+            .accessibilityIdentifier("text-stamp-add-photo")
+            Button { isPickingFile = true } label: {
+                Label(L10n.stampPictureFromFiles, systemImage: "folder")
+            }
+            .accessibilityIdentifier("text-stamp-add-file")
+        } header: {
+            Text(L10n.stampPictureSection)
+        } footer: {
+            Text(L10n.stampPictureNote).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var options: some View {
         Section {
-            Toggle(L10n.textStampDate, isOn: $model.includesDate)
-                .accessibilityIdentifier("text-stamp-date")
+            if model.chosenPicture == nil {
+                Toggle(L10n.textStampDate, isOn: $model.includesDate)
+                    .accessibilityIdentifier("text-stamp-date")
+            }
             Text(L10n.textStampSize).font(.headline).accessibilityAddTraits(.isHeader)
             ForEach(StampSize.allCases, id: \.self) { size in
                 optionRow(StampModel.name(of: size), selected: model.size == size,

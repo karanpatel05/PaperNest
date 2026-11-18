@@ -170,3 +170,49 @@ public struct SavedStamp: Hashable, Sendable, Identifiable {
         self.createdAt = createdAt
     }
 }
+
+public typealias SavedPictureStampID = Identifier<SavedPictureStamp>
+
+/// An image someone kept to place again as a stamp — a logo, a seal, a
+/// scanned rubber stamp (schema v15, `saved_picture_stamps`). Placed, it is
+/// an ordinary placed image on its page; the saved one keeps its original.
+public struct SavedPictureStamp: Hashable, Sendable, Identifiable {
+    public var id: SavedPictureStampID
+    public var assetID: AssetID
+    public var kind: AssetKind
+    /// The image as it is shown (its orientation applied), in pixels: only
+    /// its proportions matter, since a placed image is stretched to its frame.
+    public var pixelSize: CGSize
+    public var createdAt: Date
+
+    public init(id: SavedPictureStampID = .make(), assetID: AssetID, kind: AssetKind, pixelSize: CGSize, createdAt: Date) {
+        self.id = id
+        self.assetID = assetID
+        self.kind = kind
+        self.pixelSize = pixelSize
+        self.createdAt = createdAt
+    }
+
+    /// Its frame's size placed at `size` on a page `pageSize` as shown: its
+    /// longer side a share of the page's shorter side, its own proportions.
+    public func frameSize(_ size: StampSize, onPageOfSize pageSize: CGSize) -> CGSize {
+        let long = size.pictureSide(on: pageSize)
+        guard pixelSize.width > 0, pixelSize.height > 0 else { return CGSize(width: long, height: long) }
+        return pixelSize.width >= pixelSize.height
+            ? CGSize(width: long, height: long * pixelSize.height / pixelSize.width)
+            : CGSize(width: long * pixelSize.width / pixelSize.height, height: long)
+    }
+}
+
+extension StampSize {
+    /// A picture stamp's longer side, as a share of the page's shorter side:
+    /// about 86, 122 and 171 points on a US Letter page.
+    public func pictureSide(on pageSize: CGSize) -> Double {
+        let side = Double(min(pageSize.width, pageSize.height))
+        return switch self {
+        case .small: side * 0.14
+        case .medium: side * 0.2
+        case .large: side * 0.28
+        }
+    }
+}

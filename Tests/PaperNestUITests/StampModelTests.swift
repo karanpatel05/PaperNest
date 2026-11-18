@@ -1,6 +1,8 @@
 import CoreGraphics
 import Foundation
+import ImageIO
 import Testing
+import UniformTypeIdentifiers
 import PaperNestCore
 import PaperNestRender
 import PaperNestStore
@@ -168,5 +170,84 @@ import PaperNestTestSupport
         #expect(after.frame.origin == before.frame.origin)
         #expect(after.frame.width > before.frame.width + 50)
         #expect(after.frame.size == PageRenderer.stampSize(for: after))
+    }
+
+    // MARK: - Pictures
+
+    /// A 400 × 200 PNG: a logo twice as wide as it is tall.
+    private func logo() -> Data {
+        let context = CGContext(data: nil, width: 400, height: 200, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(red: 0.1, green: 0.3, blue: 0.8, alpha: 1))
+        context.fillEllipse(in: CGRect(x: 20, y: 20, width: 360, height: 160))
+        let data = NSMutableData()
+        let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, context.makeImage()!, nil)
+        CGImageDestinationFinalize(destination)
+        return data as Data
+    }
+
+    private func images(_ store: LibraryStore, _ page: Page) async throws -> [PlacedImage] {
+        try await store.objects(on: page.id).compactMap { if case .image(let image) = $0.payload { image } else { nil } }
+    }
+
+    @Test func anImageAddedIsKeptChosenAndPlacedInItsOwnProportions() async throws {
+        let (root, store, document) = try await document()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let page = try #require(document.selectedPage)
+        let model = StampModel(document: document, page: page)
+
+        try await model.addPicture(logo())
+
+        let kept = try await store.savedPictureStamps()
+        #expect(kept.count == 1 && kept.first?.pixelSize == CGSize(width: 400, height: 200))
+        #expect(model.chosenPicture?.id == kept.first?.id, "the image added is the one chosen")
+        #expect(model.thumbnails[try #require(kept.first).id] != nil)
+        #expect(model.canPlace && model.design == nil)
+
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
+        #expect(try await model.place(undoManager: undo))
+        undo.endUndoGrouping()
+
+        let placed = try #require(try await images(store, page).first)
+        #expect(placed.assetID == kept.first?.assetID)
+        #expect(abs(placed.frame.width / placed.frame.height - 2) < 0.001, "its own proportions")
+        #expect(abs(placed.frame.width - 612 * 0.2) < 0.01, "medium: a fifth of the page's shorter side")
+        #expect(abs(placed.frame.maxX - (612 - 30.6)) < 0.01 && abs(placed.frame.minY - 30.6) < 0.01, "top right")
+
+        undo.undo()
+        for _ in 0..<100 where try await !images(store, page).isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(try await images(store, page).isEmpty)
+        undo.redo()
+        for _ in 0..<100 where try await images(store, page).isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(try await images(store, page).first?.assetID == kept.first?.assetID)
+    }
+
+    @Test func somethingThatIsNotAnImageIsRefused() async throws {
+        let (root, store, document) = try await document()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = StampModel(document: document, page: try #require(document.selectedPage))
+        await #expect(throws: StampSheetError.self) { try await model.addPicture(Data("not an image".utf8)) }
+        await #expect(throws: StampSheetError.self) {
+            try await model.addPicture(SyntheticDocuments.textPDF(pages: ["A PDF is not a stamp picture"]))
+        }
+        #expect(try await store.savedPictureStamps().isEmpty)
+    }
+
+    @Test func deletingAnImageLeavesItsPlacedCopy() async throws {
+        let (root, store, document) = try await document()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let page = try #require(document.selectedPage)
+        let model = StampModel(document: document, page: page)
+        try await model.addPicture(logo())
+        #expect(try await model.place(undoManager: nil))
+
+        await model.deletePicture(try #require(model.pictures.first))
+
+        #expect(model.pictures.isEmpty && model.choice == .preset(.approved))
+        #expect(try await store.savedPictureStamps().isEmpty)
+        #expect(try await images(store, page).count == 1, "the placed copy stays")
     }
 }

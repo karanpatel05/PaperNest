@@ -19,8 +19,9 @@ extension LibraryStore {
             LIMIT 1
             """, [.text(asset.sha256), .text(pageID.rawValue)]) { $0.int(0) }
         if !direct.isEmpty { return true }
-        // A template saved from a page keeps its own copy of what it showed.
-        if try isAssetKeptBySavedTemplate(asset) { return true }
+        // A template saved from a page keeps its own copy of what it showed,
+        // and a picture stamp keeps the image it was kept from.
+        if try isAssetKeptAside(asset) { return true }
         return try db.query("SELECT payload_json FROM page_objects WHERE kind = 'image'") {
             try decoder.decode(PageObject.Payload.self, from: Data($0.text(0).utf8))
         }.contains { payload in

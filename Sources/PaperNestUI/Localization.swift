@@ -1455,4 +1455,14 @@ extension L10n {
     static func exportPreviewCaption(_ value0: Int) -> String { tr("export.preview.caption", value0) }
     static var exportPreviewWorking: String { tr("export.preview.working") }
     static var exportPreviewNoWords: String { tr("export.preview.noWords") }
+
+    // MARK: Picture stamps
+
+    static var stampPictureSection: String { tr("stamp.picture.section") }
+    static func stampPictureRow(_ value0: Int) -> String { tr("stamp.picture.row", value0) }
+    static var stampPictureNote: String { tr("stamp.picture.note") }
+    static var stampPictureFromPhotos: String { tr("stamp.picture.fromPhotos") }
+    static var stampPictureFromFiles: String { tr("stamp.picture.fromFiles") }
+    static var stampPictureNotImage: String { tr("stamp.picture.notImage") }
+    static var stampPictureFailed: String { tr("stamp.picture.failed") }
 }

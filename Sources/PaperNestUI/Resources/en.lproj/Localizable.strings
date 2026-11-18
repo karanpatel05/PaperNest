@@ -1273,7 +1273,7 @@
 "cleanup.lookedAgain" = "The document changed after it was looked through, so nothing was deleted and it was looked through again.";
 
 /* Text stamps */
-"stamp.text.title" = "Text Stamp";
+"stamp.text.title" = "Text or Image Stamp";
 "stamp.text.presets" = "Stamps";
 "stamp.text.word.paid" = "PAID";
 "stamp.text.word.received" = "RECEIVED";
@@ -1307,3 +1307,12 @@
 "export.preview.caption" = "Page %d as it will be exported.";
 "export.preview.working" = "Making the preview…";
 "export.preview.noWords" = "This page has no words to export.";
+
+/* Picture stamps */
+"stamp.picture.section" = "Your Images";
+"stamp.picture.row" = "Image %d";
+"stamp.picture.note" = "Kept on this device to place again. An image keeps its own background.";
+"stamp.picture.fromPhotos" = "Add from Photos";
+"stamp.picture.fromFiles" = "Add from Files";
+"stamp.picture.notImage" = "That file isn’t an image that can be placed.";
+"stamp.picture.failed" = "The image couldn’t be kept.";

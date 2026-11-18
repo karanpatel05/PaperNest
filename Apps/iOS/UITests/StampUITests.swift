@@ -1,11 +1,13 @@
 import XCTest
+import ImageIO
+import UniformTypeIdentifiers
 import PaperNestCore
 import PaperNestStore
 
-/// Text stamps from Document Tools: Approved placed in a corner, undone,
-/// redone and read back from disk after a relaunch; one's own words kept
-/// and offered again; French and Spanish; and a free user asked to upgrade
-/// with nothing placed.
+/// Text and image stamps from Document Tools: Approved placed in a corner,
+/// undone, redone and read back from disk after a relaunch; one's own words
+/// kept and offered again; a saved image placed the same way; French and
+/// Spanish; and a free user asked to upgrade with nothing placed.
 ///
 /// No `continueAfterFailure = false` and no `async` `tearDown`: after a
 /// failure either left the runner idle in tear-down.
@@ -203,5 +205,115 @@ import PaperNestStore
         try await Task.sleep(for: .seconds(1))
         let placed = try await stamps(store, item)
         XCTAssertTrue(placed.isEmpty, "a stamp was placed for a free user")
+    }
+
+    // MARK: - Images
+
+    /// A saved picture stamp, put in the library before launch: the system
+    /// Photos and Files pickers are not driven here.
+    private func seedPicture(_ store: LibraryStore) async throws -> SavedPictureStamp {
+        let context = CGContext(data: nil, width: 400, height: 200, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(red: 0.1, green: 0.3, blue: 0.8, alpha: 1))
+        context.fillEllipse(in: CGRect(x: 20, y: 20, width: 360, height: 160))
+        let data = NSMutableData()
+        let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, context.makeImage()!, nil)
+        CGImageDestinationFinalize(destination)
+        let staged = try store.assets.store(data as Data, kind: .png, originalFilename: "logo.png")
+        return try await store.savePictureStamp(staged, pixelSize: CGSize(width: 400, height: 200))
+    }
+
+    private func placedImages(_ store: LibraryStore, _ item: ItemID) async throws -> [PlacedImage] {
+        guard let page = try await store.pages(of: item).first else { return [] }
+        return try await store.objects(on: page.id).compactMap { if case .image(let image) = $0.payload { image } else { nil } }
+    }
+
+    private func waitForImages(_ store: LibraryStore, _ item: ItemID, count: Int) async throws -> [PlacedImage] {
+        var found: [PlacedImage] = []
+        for _ in 0..<60 {
+            found = try await placedImages(store, item)
+            if found.count == count { break }
+            try await Task.sleep(for: .milliseconds(250))
+        }
+        return found
+    }
+
+    func testASavedImageIsPlacedUndoneRedoneAndKept() async throws {
+        let (directory, store, item) = try await seed()
+        let picture = try await seedPicture(store)
+        var app = launch(directory)
+        defer { app.terminate() }
+        guard openStamps(app) else { return }
+
+        let row = app.buttons["text-stamp-picture-1"]
+        reveal(row, in: app)
+        XCTAssertTrue(row.exists, "the saved image is not offered")
+        row.tap()
+        XCTAssertEqual(row.value as? String, "Selected")
+        XCTAssertFalse(app.switches["text-stamp-date"].exists, "an image has no date")
+        snap(app, "image-chosen-en")
+        app.buttons["text-stamp-place"].tap()
+        XCTAssertTrue(app.buttons["text-stamp-place"].waitForNonExistence(timeout: 10), "the sheet stayed open")
+
+        let placed = try await waitForImages(store, item, count: 1)
+        XCTAssertEqual(placed.first?.assetID, picture.assetID)
+        if let frame = placed.first?.frame {
+            XCTAssertEqual(frame.width / frame.height, 2, accuracy: 0.01, "not in the image's own proportions")
+            XCTAssertGreaterThan(frame.midX, 306, "not on the right")
+        }
+        snap(app, "image-placed-en")
+
+        tapHistory(app, "notebook-undo")
+        let undone = try await waitForImages(store, item, count: 0)
+        XCTAssertTrue(undone.isEmpty, "Undo left the image")
+        tapHistory(app, "notebook-redo")
+        let redone = try await waitForImages(store, item, count: 1)
+        XCTAssertEqual(redone.first?.assetID, picture.assetID, "Redo did not bring it back")
+
+        app.terminate()
+        app = launch(directory)
+        XCTAssertTrue(app.descendants(matching: .any)["document-page-image"].firstMatch.waitForExistence(timeout: 30))
+        let reopened = try await placedImages(store, item)
+        XCTAssertEqual(reopened.map(\.assetID), [picture.assetID], "not there after reopening")
+        let kept = try await store.savedPictureStamps()
+        XCTAssertEqual(kept.map(\.id), [picture.id], "the saved image went")
+    }
+
+    func testImagesInFrenchAndSpanish() async throws {
+        for (language, label) in [("fr", "Image 1"), ("es", "Imagen 1")] {
+            let (directory, store, _) = try await seed()
+            _ = try await seedPicture(store)
+            let app = launch(directory, language: language)
+            defer { app.terminate() }
+            guard openStamps(app) else { return }
+            let row = app.buttons["text-stamp-picture-1"]
+            reveal(row, in: app)
+            XCTAssertTrue(row.isHittable, "\(language): the image row is out of reach")
+            XCTAssertTrue(row.label.contains(label), "\(language): row reads \(row.label)")
+            XCTAssertTrue(app.buttons["text-stamp-add-file"].exists, "\(language): no way to add an image")
+            snap(app, "images-\(language)")
+            app.terminate()
+        }
+    }
+
+    func testAFreeUserPlacingAnImageIsAskedToUpgrade() async throws {
+        let (directory, store, item) = try await seed()
+        _ = try await seedPicture(store)
+        let app = launch(directory, free: true)
+        defer { app.terminate() }
+        guard openStamps(app) else { return }
+        let row = app.buttons["text-stamp-picture-1"]
+        reveal(row, in: app)
+        row.tap()
+        app.buttons["text-stamp-place"].tap()
+        let locked = app.descendants(matching: .any)["pro-locked-feature"]
+        XCTAssertTrue(locked.waitForExistence(timeout: 15), "placed without a subscription")
+        XCTAssertEqual(locked.value as? String, "markup")
+        app.buttons["pro-close"].tap()
+        XCTAssertTrue(locked.waitForNonExistence(timeout: 10))
+        try await Task.sleep(for: .seconds(1))
+        let placed = try await placedImages(store, item)
+        XCTAssertTrue(placed.isEmpty, "an image was placed for a free user")
     }
 }
