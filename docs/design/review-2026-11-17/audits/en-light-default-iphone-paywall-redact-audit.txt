@@ -1,0 +1,3 @@
+iphone en-light-default paywall-redact: 2 issue(s)
+[1] Contrast nearly passed — id= label=A little more power for your everyday paperwork.
+[1] Contrast failed — no element

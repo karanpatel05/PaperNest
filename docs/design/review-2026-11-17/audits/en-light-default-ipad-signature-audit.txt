@@ -1,0 +1,10 @@
+ipad en-light-default signature: 9 issue(s)
+[1] Contrast nearly passed — id= label=Not set up in this build
+[1] Contrast nearly passed — no element
+[1] Contrast failed — no element
+[1] Contrast nearly passed — id= label=Name
+[1] Contrast nearly passed — id=signature-name-required label=Enter a name to save your signature.
+[1] Contrast failed — id=signature-clear label=Clear Drawing
+[1] Contrast failed — id=signature-save label=Save Signature
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Not set up in this build
+[131072] Text clipped — id= label=Draw your signature in this area.

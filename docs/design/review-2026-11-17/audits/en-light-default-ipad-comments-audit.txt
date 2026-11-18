@@ -1,0 +1,16 @@
+ipad en-light-default comments: 15 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=comments-done label=Done
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element

@@ -1,0 +1,14 @@
+ipad en-light-default notebook-create: 13 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=notebook-create label=Create
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Cancel
+[1] Contrast failed — id=notebook-create label=Create
+[1] Contrast nearly passed — id= label=Creates one A4 page. Write or draw using the document’s mark
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element

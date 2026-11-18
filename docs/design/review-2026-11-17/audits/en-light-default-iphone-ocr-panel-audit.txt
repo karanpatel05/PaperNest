@@ -1,0 +1,2 @@
+iphone en-light-default ocr-panel: 1 issue(s)
+[1] Contrast nearly passed — id= label=1 page

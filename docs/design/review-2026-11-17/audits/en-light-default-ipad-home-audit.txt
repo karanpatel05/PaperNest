@@ -1,0 +1,13 @@
+ipad en-light-default home: 12 issue(s)
+[4] Hit area is too small — id=home-see-all label=See All, Recent Documents
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Not set up in this build
+[1] Contrast nearly passed — no element
+[1] Contrast nearly passed — id= label=Not set up in this build
+[1] Contrast failed — no element
+[1] Contrast nearly passed — no element
+[1] Contrast nearly passed — no element
+[1] Contrast nearly passed — no element
+[1] Contrast failed — no element
+[1] Contrast failed — no element
+[1] Contrast failed — no element
+[1] Contrast nearly passed — no element

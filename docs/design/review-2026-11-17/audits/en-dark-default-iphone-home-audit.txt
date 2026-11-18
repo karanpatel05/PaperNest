@@ -1,0 +1,4 @@
+iphone en-dark-default home: 3 issue(s)
+[4] Hit area is too small — id=home-see-all label=See All, Recent Documents
+[1] Contrast failed — no element
+[131072] Text clipped — id=home-search label=

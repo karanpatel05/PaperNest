@@ -1,0 +1,2 @@
+iphone fr-xxxl-light scanner-capture: 1 issue(s)
+[131072] Text clipped — id= label=Appareil photo indisponible. Autorisez son accès dans Réglag

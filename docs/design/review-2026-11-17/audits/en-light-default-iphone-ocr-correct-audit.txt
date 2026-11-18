@@ -1,0 +1,8 @@
+iphone en-light-default ocr-correct: 7 issue(s)
+[1] Contrast nearly passed — id=ocr-correct-count label=Lines changed: 0
+[1] Contrast failed — id=ocr-correct-save label=Save
+[1] Contrast nearly passed — id= label=Page 1 of 1
+[1] Contrast nearly passed — id= label=1
+[1] Contrast nearly passed — id= label=2
+[1] Contrast nearly passed — id= label=Each field is one line as it was read. Correct it against th
+[65536] Dynamic Type font sizes are partially unsupported — id=ocr-correct-cancel label=Cancel

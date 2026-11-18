@@ -1,0 +1,7 @@
+iphone en-light-default notebook-create: 6 issue(s)
+[1] Contrast failed — id=notebook-create label=Create
+[1] Contrast nearly passed — id= label=Paper
+[1] Contrast nearly passed — id= label=Creates one A4 page. Write or draw using the document’s mark
+[65536] Dynamic Type font sizes are partially unsupported — id=notebook-create label=Create
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Cancel
+[131072] Text clipped — id=notebook-name label=

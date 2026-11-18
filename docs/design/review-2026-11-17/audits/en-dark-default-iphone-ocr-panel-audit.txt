@@ -1,0 +1,2 @@
+iphone en-dark-default ocr-panel: 1 issue(s)
+[1] Contrast failed — id=ocr-start label=Recognize 1 page

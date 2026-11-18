@@ -1,0 +1,10 @@
+iphone en-light-default home: 9 issue(s)
+[4] Hit area is too small — id=home-see-all label=See All, Recent Documents
+[131072] Text clipped — id=home-search label=
+[1] Contrast nearly passed — no element
+[1] Contrast failed — no element
+[1] Contrast nearly passed — no element
+[1] Contrast nearly passed — id= label=A little space for what matters.
+[1] Contrast nearly passed — id= label=Today at 9:06 AM
+[1] Contrast nearly passed — id= label=Today at 9:06 AM
+[1] Contrast nearly passed — id= label=Today at 9:06 AM

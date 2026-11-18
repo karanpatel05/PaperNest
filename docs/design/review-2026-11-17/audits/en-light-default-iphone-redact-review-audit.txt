@@ -1,0 +1,3 @@
+iphone en-light-default redact-review: 2 issue(s)
+[1] Contrast nearly passed — id=redact-apply label=Redact Page
+[65536] Dynamic Type font sizes are partially unsupported — id=redact-cancel label=Cancel

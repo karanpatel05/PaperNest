@@ -1,0 +1,8 @@
+iphone en-light-default scanner-capture: 7 issue(s)
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[65536] Dynamic Type font sizes are partially unsupported — no element
+[65536] Dynamic Type font sizes are partially unsupported — no element
+[65536] Dynamic Type font sizes are partially unsupported — no element
+[65536] Dynamic Type font sizes are partially unsupported — no element

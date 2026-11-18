@@ -1,0 +1,10 @@
+iphone es-xxxl-light export-papernest: 9 issue(s)
+[65536] Dynamic Type font sizes are unsupported — no element
+[65536] Dynamic Type font sizes are unsupported — no element
+[131072] Text clipped — id= label=Guardar en Archivos
+[131072] Text clipped — no element
+[131072] Text clipped — no element
+[131072] Text clipped — no element
+[131072] Text clipped — no element
+[131072] Text clipped — id= label=Compartir
+[131072] Text clipped — no element

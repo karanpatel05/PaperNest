@@ -1,0 +1,23 @@
+ipad en-light-default export: 22 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=export-watermark-brand-mark-note label=Adds a small PaperNest mark in the corner of each page.
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Not set up in this build
+[65536] Dynamic Type font sizes are partially unsupported — id= label=PaperNest mark
+[65536] Dynamic Type font sizes are partially unsupported — id= label=A PDF with a password cannot be opened without it. Leave thi
+[131072] Text clipped — id=export-password label=
+[131072] Text clipped — id= label=Save to Files
+[1] Contrast nearly passed — id= label=Not set up in this build
+[1] Contrast nearly passed — no element
+[1] Contrast failed — no element
+[1] Contrast nearly passed — id= label=Save to Files
+[1] Contrast nearly passed — id= label=Copy
+[1] Contrast nearly passed — id= label=Share
+[1] Contrast nearly passed — no element
+[1] Contrast nearly passed — no element
+[1] Contrast failed — id= label=A PDF with a password cannot be opened without it. Leave thi
+[1] Contrast nearly passed — no element
+[1] Contrast nearly passed — id=export-watermark-brand-mark-note label=Adds a small PaperNest mark in the corner of each page.
+[1] Contrast nearly passed — no element
+[1] Contrast nearly passed — id= label=2 pages
+[1] Contrast failed — no element
+[1] Contrast nearly passed — no element
+[1] Contrast failed — no element

@@ -1,0 +1,9 @@
+iphone en-dark-default form: 8 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=form-unsupported-reference label=Read-only or unsupported field. Its current value is preserv
+[65536] Dynamic Type font sizes are partially unsupported — id=form-close label=Cancel
+[65536] Dynamic Type font sizes are partially unsupported — id= label=approved
+[65536] Dynamic Type font sizes are partially unsupported — id=form-save-copy label=Save Filled Copy
+[65536] Dynamic Type font sizes are partially unsupported — id=form-unsupported-reference label=PN-TEST
+[65536] Dynamic Type font sizes are partially unsupported — id=form-unsupported-reference label=reference
+[131072] Text clipped — id=form-copy-name label=
+[131072] Text clipped — id= label=Fill PDF Form

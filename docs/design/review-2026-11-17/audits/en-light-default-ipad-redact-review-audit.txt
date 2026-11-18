@@ -1,0 +1,21 @@
+ipad en-light-default redact-review: 20 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=redact-cancel label=Cancel
+[1] Contrast failed — id=redact-cancel label=Cancel
+[1] Contrast nearly passed — id=redact-apply label=Redact Page
+[1] Contrast nearly passed — id= label=Another page in your library uses the same original. What yo
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible element — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element

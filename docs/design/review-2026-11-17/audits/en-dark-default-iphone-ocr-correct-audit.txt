@@ -1,0 +1,3 @@
+iphone en-dark-default ocr-correct: 2 issue(s)
+[1] Contrast failed — id=ocr-correct-save label=Save
+[65536] Dynamic Type font sizes are partially unsupported — id=ocr-correct-cancel label=Cancel

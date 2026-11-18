@@ -1,0 +1,6 @@
+ipad en-light-default ocr-panel: 5 issue(s)
+[1] Contrast nearly passed — id= label=Not set up in this build
+[1] Contrast nearly passed — no element
+[1] Contrast failed — no element
+[1] Contrast nearly passed — id= label=1 page
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Not set up in this build

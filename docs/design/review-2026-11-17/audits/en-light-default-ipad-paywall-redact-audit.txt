@@ -1,0 +1,23 @@
+ipad en-light-default paywall-redact: 22 issue(s)
+[1] Contrast nearly passed — id= label=A little more power for your everyday paperwork.
+[1] Contrast failed — no element
+[1] Contrast failed — no element
+[1] Contrast failed — no element
+[1] Contrast failed — no element
+[1] Contrast failed — id= label=Subscriptions are unavailable right now. You can continue wi
+[1] Contrast failed — id= label=Try Again
+[1] Contrast failed — id=pro-continue-free label=Continue with Free
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible element — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element

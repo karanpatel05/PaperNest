@@ -1,0 +1,5 @@
+iphone en-light-default compress: 4 issue(s)
+[1] Contrast failed — id= label=Compress
+[65536] Dynamic Type font sizes are partially unsupported — id=compress-strong label=Strong
+[65536] Dynamic Type font sizes are partially unsupported — id=compress-smallest label=Smallest
+[65536] Dynamic Type font sizes are partially unsupported — id=compress-light label=Light

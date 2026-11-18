@@ -1,0 +1,5 @@
+iphone fr-xxxl-light notebook-create: 4 issue(s)
+[1] Contrast failed — id=notebook-create label=Créer
+[65536] Dynamic Type font sizes are partially unsupported — id=notebook-create label=Créer
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Annuler
+[131072] Text clipped — id=notebook-name label=

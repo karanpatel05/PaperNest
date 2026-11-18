@@ -1,0 +1,5 @@
+iphone fr-xxxl-light export: 4 issue(s)
+[131072] Text clipped — no element
+[131072] Text clipped — id= label=Enregistrer dans Fichiers
+[131072] Text clipped — no element
+[131072] Text clipped — no element

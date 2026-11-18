@@ -1,0 +1,6 @@
+ipad en-light-default scanner-review: 5 issue(s)
+[131072] Text clipped — no element
+[131072] Text clipped — no element
+[131072] Text clipped — no element
+[131072] Text clipped — no element
+[1] Contrast failed — no element

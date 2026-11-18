@@ -1,0 +1,9 @@
+iphone en-dark-default export: 8 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id= label=A PDF with a password cannot be opened without it. Leave thi
+[131072] Text clipped — id= label=Save to Files
+[1] Contrast nearly passed — id= label=Save to Files
+[1] Contrast nearly passed — id= label=Copy
+[1] Contrast nearly passed — id= label=Share
+[1] Contrast failed — id= label=A PDF with a password cannot be opened without it. Leave thi
+[1] Contrast failed — no element
+[1] Contrast failed — no element

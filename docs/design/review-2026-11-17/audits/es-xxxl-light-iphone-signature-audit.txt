@@ -1,0 +1,2 @@
+iphone es-xxxl-light signature: 1 issue(s)
+[1] Contrast failed — id=signature-place label=Colocar firma

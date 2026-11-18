@@ -1,0 +1,13 @@
+iphone fr-xxxl-light scanner-review: 12 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Niveaux de gris
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Auto
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Amélioré
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Original
+[131072] Text clipped — id= label=Modifier le scan
+[131072] Text clipped — id=scanner.finish label=Enregistrer…
+[131072] Text clipped — id= label=Préréglages de page
+[131072] Text clipped — id= label=Niveaux de gris
+[131072] Text clipped — id= label=Amélioré
+[131072] Text clipped — id= label=Auto
+[131072] Text clipped — id=scanner.name label=
+[131072] Text clipped — id= label=Original

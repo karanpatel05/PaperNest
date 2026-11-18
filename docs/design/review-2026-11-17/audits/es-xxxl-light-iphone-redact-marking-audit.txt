@@ -1,0 +1,4 @@
+iphone es-xxxl-light redact-marking: 3 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=redact-cancel label=Cancelar
+[131072] Text clipped — id=redact-count label=Zonas: 1
+[131072] Text clipped — id=redact-review label=Revisar

@@ -1,0 +1,3 @@
+iphone fr-xxxl-light signature: 2 issue(s)
+[1] Contrast failed — id=signature-place label=Placer la signature
+[1] Contrast failed — id= label=Placez votre écriture sous forme de traits modifiables. Les 

@@ -1,0 +1,2 @@
+iphone fr-xxxl-light comments: 1 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=comments-done label=Terminé

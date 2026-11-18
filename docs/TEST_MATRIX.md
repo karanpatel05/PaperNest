@@ -143,6 +143,82 @@ Owner in session ("Go ahead"). From the Insert tool, **Save as Template** keeps 
 
 **Also changed:** Redact's two shared-original messages now name a saved template alongside another page, in en, fr and es, since a template can hold the original a redaction cannot remove. **Not done / limits:** templates are not synced and not in the backup; a template's card shows a generic sign, not a picture of it (that needs a renderer that takes marks not stored on a page); templates can be made into notebook pages only, not inserted into documents, and New Note does not offer them; deleting a template cannot be undone (it asks first). Templates are not on the owner's Free/Pro list, so they are free. **Not verified:** the Mac, dark mode, large text, VoiceOver, sync.
 
+## 2026-11-17 — UI design-implementation review (Claude, owner's review prompt; review only, no product edits)
+
+The owner pasted `docs/UI_DESIGN_REVIEW_PROMPT.md`. Compared the running app against `docs/CLEAN_NATIVE_DESIGN.md` (dated owner approvals win), `docs/WATERMARK_DESIGN_CLAUDE.md`, `docs/FEATURE_UI_SAMPLES.md`, and then the feature atlas. The atlas is concept art: its logo, sample names, "Accept All" and Tables/Images tabs are not a spec. **Tree tested:** a detached worktree at `a69cc18` (`~/Library/Caches/PaperNest/claude-ui-review`). It does **not** contain Codex's uncommitted `RedactEditor.swift` / `ScannerWorkspaceView.swift` fixes, so findings those fixes address are marked "known". **Simulators:** iPhone 17 Pro `63992C10` and iPad Air 13-inch (M4) `62328381`, iOS 26.5. Private seeded libraries were used; `scripts/ui-test-ios.sh` was not run. A temporary worktree-only XCUITest (`ZReviewScreensUITests`, never in the shared tree, never committed) opened each screen from its real entry point. It wrote screenshots and `performAccessibilityAudit` reports to `/tmp/claude-ui-review-shots/<config>/`. **The evidence kept in the repo is `docs/design/review-2026-11-17/`** (uncommitted): 35 screenshots (numbered 01–37; 30 and 31 are the two original-fingerprint files) and every audit report. Logs and `.xcresult` bundles are in `~/Library/Caches/PaperNest/claude-ui-review-results/`.
+
+**Host conditions, which affect every timing below.** Five simulators were booted at the peak (three belonged to other sessions), swap reached 36.7 of 37.9 GB, and the load average reached about 670. UI tests ran 5–30× slower and failed on infrastructure: "Timed out while fetching snapshot from testmanagerd", `kAXErrorServerNotFound`/`IPCTimeout`, and one runner crash "signal abrt while preparing to run tests". No failure was judged until it was rerun alone at normal load.
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh` (worktree) | **1,318 passed, 0 failed, 0 warnings** (379+49+226+223+246+195), 1 min 54 s |
+| `./scripts/build-mac-app.sh` | **passed, 0 warnings** |
+| `xcodebuild build-for-testing -scheme PaperNest-iOS` (iOS Simulator) | **TEST BUILD SUCCEEDED**, no compiler warnings (built three times as the review test changed) |
+| Mac interaction | **Not run.** computer-use `request_access` for the dev app (`com.example.papernest.dev`) → `user_denied`. The Mac app was launched with a throwaway library and quit without being seen. |
+| Screen pass, iPad, en, light, default size (13 screens) | 12/13 on the first run. The Export failure was the review test's own scroll helper. The rerun with fixed IDs **passed**, including the PaperNest preset. |
+| Screen pass, iPhone, en, light, default | 11/13. Export failed on the test's wrong preset ID. Compress hit a 20 s open timeout at load ~300, but the screen opened and returned its result (screenshot). |
+| Screen pass, iPhone, fr, light, **XXXL** | 10/13. Export: same test-ID bug. OCR panel: "Correct Text" not reached in 8 swipes. Paywall: the helper could not open Document Tools at XXXL; not judged. |
+| Original unchanged (`test13`, iPad and iPhone) | **Passed.** A watermarked Copy (Confidential) followed by Redact mark → Cancel left the page rows and every asset's SHA-256 identical (`*-original-fingerprint.txt`). |
+| Existing suites, iPad, en (36 tests, 96 min under load) | 22 passed, 11 failed, 3 with no verdict (`RedactUITests.testTheScreenInFrenchAndSpanish`, `ScannerFeedbackUITests.testTheAdviceFollowsWhatTheCameraSees`, `.testNothingFoundSaysNothing`: started, then "Restarting after unexpected exit, crash, or test timeout"). **Solo reruns at normal load: 9 of the 11 now pass**: Export Save dialog, notebook create/relaunch, OCR panel en/fr/es, comments en/fr/es, Redact apply, scan→export→Home, and three watermark tests. **Still failing:** `OCRCorrectionUITests.testACorrectedWordIsSavedAndFindAnswersIt` twice ("the OCR panel did not open"; Document Tools still showing, though the same entry opened in 4 other iPad runs, so inconclusive), and `WatermarkExportUITests.testWithoutProductsTheMarkStartsOff` twice. The latter is a **test defect on iPad**: it centre-taps the Toggle row, which `PanelControls.flipSwitch` documents does nothing on iPad. |
+| Screen pass, iPhone, es, light, **XXXL** (6 screens) | **6/6 passed** (Home, Export incl. PaperNest preset, Redact, Signature, Form, paywall). |
+| Existing suites, iPhone, en (subset, warm simulator, normal load) | **5/5 passed**: form filled copy reopens, saved signature places/undo/reopens, Redact Cancel writes nothing, watermark Copy, closing Export forgets the watermark. (The first full iPhone run crashed in runner setup, "signal abrt while preparing to run tests", with no verdict.) |
+| Screen pass, iPhone, en, **dark**, default (7 screens, 14:10 CST, load ~4, after other work paused) | **7/7 passed** (Home, Export incl. PaperNest preset, Redact, OCR panel + correction, Signature, Form, scanner review). The first two dark attempts failed in runner setup on a freshly booted simulator ("Timed out waiting for AX loaded notification"); the third ran after a 60 s warm-up. Paper stays white; surfaces follow the dark palette. |
+
+**Verified interactions (iPad unless marked; iPhone repeats noted):**
+- Export with watermark:
+  - Preset selection, placement, opacity and rotation change the preview.
+  - Custom requires text; a text format says it can't carry a watermark.
+  - Copy, Share and Save each export with the watermark; closing the sheet forgets it (Copy and closing also on iPhone).
+  - French at XXXL keeps controls reachable.
+  - Free-user mark until Pro, and Pro gates for Redact/Compress (paywall names the feature).
+  - The unavailable state "Subscriptions are unavailable right now" + Try Again / Continue with Free was shown (iPad).
+- Redact: mark → review → apply removes the line from page and library; Cancel writes nothing (iPad and iPhone).
+- OCR: panel language/range validation and recognition in en/fr/es; correction Cancel asks and saves nothing; editor in fr/es.
+- Forms: filled copy reopens with fields (iPad and iPhone).
+- Signature: saved signature places, undo/redo, survives reopen (iPad and iPhone); French XXXL reachable (iPad).
+- Process tools do real work; scanner review edits save and reopen; scan → export → Home.
+- Scanner advice in fr/es.
+- Approved Home with recents/folders; notebook creation survives relaunch; comments edit/cancel/delete/undo in all three languages.
+
+**Mismatches found (evidence file numbers refer to `docs/design/review-2026-11-17/`).** HEAD moved during the review (to `613e3a1` at commit time). Of the reviewed screens, only two changed after `a69cc18`. **Export** (`62deaeb`, `613e3a1`) gained a size line in the footer and a preview at the end of the sheet. **Notebook creation** (`ae9d080`, `ebe49fe`) gained more papers and saved templates. So the Export and template findings need a recheck at HEAD. `RedactEditor`, `SignatureSheet`, `PDFFormSheet`, `OCRPanel`, `RecognizedTextEditor`, `ScannerWorkspaceView`, `Theme`, `LibraryHome` and `SubscriptionViews` are **unchanged at HEAD**, so those findings stand.
+- **Major:**
+  1. Redact review offers the irreversible Redact Page while warnings sit below the visible area. iPad Air 13" at default size: the second warning is cut mid-line and the third is hidden (01). iPhone fr XXXL: no warning is visible at all (04). iPhone default size: the hidden one was the conditional "another page uses the same original" warning (02), which appeared only because the seed gave both pages one asset; on an ordinary document both warnings probably fit. **Expected:** the prompt's "no inaccessible off-screen content" and Claude's R7 note ("keep every warning the review shows on screen before Redact Page"). Codex's 08:24 entry read below-viewport warnings as "not a new truncation finding", so this is the owner's call.
+  2. Export action bar at XXXL (iPhone) truncates: fr "En-re…", "Co-pier", "Par-ta…"; es "Gua rd…", "Co-piar", "Co m…".
+  3. The Signature panel's pinned footer and header leave about a quarter of the screen for content at fr XXXL (iPhone).
+  4. The Form sheet at fr and es XXXL moves Save Filled Copy into a "…" overflow and drops its title; in English at default size the title already truncates to "Fill PDF Fo…".
+  5. Scanner review at fr XXXL: Save "Enr…", presets cut to one or two letters, zoom pill over the page, tool row clipped.
+  6. Dark mode: filled primary actions draw white text on the pale dark accent (#C5AEFF, 1.93:1 by Codex's 10:23 calculation). Seen on OCR "Recognize 1 page" and Redact "Review"; the audit flags both. Codex's uncommitted fix changes only Redact's Review tint, but the problem is the shared filled-action colour.
+  7. Known, fix uncommitted (Codex): Redact action labels truncate at fr XXXL ("Cav…"). Codex's 13:30 entry reports its uncommitted fix showing full labels on the phone.
+- **Minor:**
+  - OCR panel chrome at XXXL.
+  - Form panel chrome differs from the approved compact header + pinned footer; raw PDF field names used as labels.
+  - Watermark preview sits below the presets (not in view on iPhone after choosing one).
+  - Single password field with no Confirm, and its warning text fails the contrast audit in light and dark.
+  - Home See All hit area too small.
+  - Template rows have no paper preview. **Possibly superseded:** `ae9d080` added six papers to the same sheet; not re-checked.
+  - Scanner advice sits under the top bar (already noted by Claude, 2026-11-16).
+- **Polish:**
+  - Save to Files wraps alone on iPad.
+  - Compress "Save…/Share…" vs Export's direct buttons.
+  - Paywall reuses the Redact glyph for the mark row.
+  - Dark stage in the light Redact sheet.
+  - Scrolled Redact title goes white over the blurred preview.
+  - "Nouveau ca…" large title at XXXL.
+  - Signature's Name field is pure black inside the dark purple card.
+
+**Not a mismatch:** the free-export PaperNest mark contradicts the watermark doc's "never forced" line, but the owner changed that policy on 2026-11-13 (`docs/PRO_SUBSCRIPTIONS.md`). **Landed after the tested commit, not reviewed:** Compare (`5e73951`, `7c5ad32`); stationery papers (`ae9d080`, `bfa7dca`); saved templates (`ebe49fe`); receipt, business-card and invoice details (`7338677`, `d9dc1cd`); clean-up suggestions (`2510776`, `04b6ebe`); text stamps (`2e6aa94`); export size estimate and preview (`62deaeb`, `613e3a1`). **Correctly absent at `a69cc18`** (the samples say not to expose them yet): review links, structured capture and clean-up assistant (both landed later), handwriting-to-text, presentation, audio notes, assistant, Book scan mode, extra templates, PDF restrictions.
+
+**Not covered:**
+- Mac (access denied).
+- Physical devices, a real camera, real StoreKit purchase, iCloud.
+- VoiceOver navigation; the audit is not VoiceOver verification.
+- iPad dark (dropped for time; Codex checked iPad dark Redact today).
+- iPad and phone dark for Compress, Comments, paywall, notebook creation and scanner capture.
+- iPad XXXL screenshots. Reachability tests did pass on iPad for French XXXL watermark controls and French XXXL signature.
+- iPad Spanish screenshots. Interaction tests covered the OCR panel, comments, OCR correction and scanner advice in Spanish on iPad.
+- Spanish at default size on iPhone.
+- Exported files opened in an external reader.
+
 ## 2026-11-17 — Stationery: a planner's days in the headings' language, with the reader's week (Claude, follow-up to the entry below)
 
 Found in review after the stationery commit: the planner's day names came from the calendar's locale while every other heading comes from `L10n`, which resolves through the app's own localizations. The usual way someone sets a language is to change it and keep their region, so the two can disagree: French with a US region, or a German phone whose headings fall back to English while the days would have been German. Now the day names are in the language the headings resolved to, and the week starts on the reader's region's first day (`TemplateHeadings.readersWeek`).

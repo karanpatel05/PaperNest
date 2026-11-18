@@ -1,0 +1,13 @@
+iphone en-light-default form: 12 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=form-unsupported-reference label=Read-only or unsupported field. Its current value is preserv
+[65536] Dynamic Type font sizes are partially unsupported — id=form-unsupported-reference label=reference
+[65536] Dynamic Type font sizes are partially unsupported — id= label=approved
+[65536] Dynamic Type font sizes are partially unsupported — id=form-save-copy label=Save Filled Copy
+[65536] Dynamic Type font sizes are partially unsupported — id=form-unsupported-reference label=PN-TEST
+[65536] Dynamic Type font sizes are partially unsupported — id=form-close label=Cancel
+[131072] Text clipped — id= label=Fill PDF Form
+[131072] Text clipped — id=form-copy-name label=
+[1] Contrast nearly passed — id= label=Save a filled copy in Documents. Your original stays unchang
+[1] Contrast nearly passed — id= label=Page 1 of 1
+[1] Contrast nearly passed — id=form-unsupported-reference label=Read-only or unsupported field. Its current value is preserv
+[1] Contrast nearly passed — no element

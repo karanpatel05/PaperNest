@@ -1,0 +1,5 @@
+iphone en-dark-default signature: 4 issue(s)
+[1] Contrast nearly passed — id=signature-clear label=Clear Drawing
+[1] Contrast failed — id=signature-save label=Save Signature
+[1] Contrast nearly passed — id= label=Draw your signature in this area.
+[131072] Text clipped — id= label=Draw your signature in this area.

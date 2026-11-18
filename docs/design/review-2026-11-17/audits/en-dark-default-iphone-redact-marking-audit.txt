@@ -1,0 +1,4 @@
+iphone en-dark-default redact-marking: 3 issue(s)
+[1] Contrast failed — id=redact-review label=Review
+[65536] Dynamic Type font sizes are partially unsupported — id=redact-cancel label=Cancel
+[131072] Text clipped — id=redact-review label=Review

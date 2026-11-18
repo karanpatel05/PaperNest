@@ -1,0 +1,18 @@
+ipad en-light-default redact-marking: 17 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=redact-cancel label=Cancel
+[1] Contrast failed — id=redact-cancel label=Cancel
+[1] Contrast nearly passed — id= label=Drag across anything you want removed. Each drag marks one a
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible element — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element
+[2] Potentially inaccessible text — no element

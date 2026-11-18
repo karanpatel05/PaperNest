@@ -1,0 +1,14 @@
+ipad en-light-default form: 13 issue(s)
+[65536] Dynamic Type font sizes are partially unsupported — id=form-unsupported-reference label=Read-only or unsupported field. Its current value is preserv
+[65536] Dynamic Type font sizes are partially unsupported — id=form-unsupported-reference label=reference
+[65536] Dynamic Type font sizes are partially unsupported — id=form-unsupported-reference label=PN-TEST
+[65536] Dynamic Type font sizes are partially unsupported — id= label=Not set up in this build
+[131072] Text clipped — id=form-copy-name label=
+[1] Contrast nearly passed — id= label=Not set up in this build
+[1] Contrast failed — id=form-close label=Cancel
+[1] Contrast nearly passed — no element
+[1] Contrast failed — no element
+[1] Contrast nearly passed — id= label=Save a filled copy in Documents. Your original stays unchang
+[1] Contrast nearly passed — id= label=Page 1 of 1
+[1] Contrast nearly passed — id=form-unsupported-reference label=Read-only or unsupported field. Its current value is preserv
+[1] Contrast nearly passed — no element

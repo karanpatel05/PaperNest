@@ -1,0 +1,4 @@
+iphone en-light-default redact-marking: 3 issue(s)
+[1] Contrast nearly passed — id= label=Drag across anything you want removed. Each drag marks one a
+[65536] Dynamic Type font sizes are partially unsupported — id=redact-cancel label=Cancel
+[131072] Text clipped — id=redact-review label=Review
