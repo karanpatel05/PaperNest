@@ -1336,3 +1336,6 @@
 "presentation.start" = "Présenter";
 "presentation.exit" = "Quitter";
 "presentation.laser" = "Pointeur laser";
+"presentation.pen" = "Stylo";
+"presentation.noPointer" = "Aucun pointeur";
+"presentation.pointer" = "Pointeur";

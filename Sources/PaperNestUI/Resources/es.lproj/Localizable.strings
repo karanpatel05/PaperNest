@@ -1336,3 +1336,6 @@
 "presentation.start" = "Presentar";
 "presentation.exit" = "Salir";
 "presentation.laser" = "Puntero láser";
+"presentation.pen" = "Lápiz";
+"presentation.noPointer" = "Sin puntero";
+"presentation.pointer" = "Puntero";

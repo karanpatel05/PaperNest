@@ -80,3 +80,45 @@ public struct LaserTrail: Equatable, Sendable {
 
     public mutating func clear() { points.removeAll() }
 }
+
+/// What a finger does on a presented page: nothing but tap and swipe, point
+/// with the laser, or draw with the pen. One at a time.
+public enum PresentationPointer: String, CaseIterable, Sendable {
+    case none
+    case laser
+    case pen
+}
+
+/// What the presenter draws with the pen pointer on the page shown: strokes
+/// as shares of the page (top-left origin). Never ink and never saved —
+/// cleared when the page changes or on request.
+public struct PenSketch: Equatable, Sendable {
+    /// The strokes finished, oldest first.
+    public private(set) var strokes: [[CGPoint]] = []
+    /// The stroke being drawn, if any.
+    public private(set) var current: [CGPoint]?
+
+    public init() {}
+
+    /// Continues the stroke being drawn to `point`, starting one if none is.
+    /// Points are held to the page.
+    public mutating func extend(to point: CGPoint) {
+        let held = CGPoint(x: min(max(point.x, 0), 1), y: min(max(point.y, 0), 1))
+        if current == nil { current = [] }
+        if current?.last != held { current?.append(held) }
+    }
+
+    /// Finishes the stroke being drawn. A touch that never moved is a tap,
+    /// not a stroke, and leaves nothing.
+    public mutating func end() {
+        if let current, current.count > 1 { strokes.append(current) }
+        current = nil
+    }
+
+    public mutating func clear() {
+        strokes.removeAll()
+        current = nil
+    }
+
+    public var isEmpty: Bool { strokes.isEmpty && current == nil }
+}

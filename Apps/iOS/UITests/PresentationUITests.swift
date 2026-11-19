@@ -4,8 +4,9 @@ import PaperNestStore
 
 /// Presenting a document in the running app: Present from the title menu
 /// opens the page being read full screen; ‹ ›, swipes and keys turn pages;
-/// with the laser pointer on, a swipe points instead of turning; Exit
-/// closes it on the page last shown. What a presentation is lives in
+/// with the laser pointer a swipe points, and with the pen it draws, instead
+/// of turning, and nothing drawn is saved; Exit closes it on the page last
+/// shown. What a presentation is lives in
 /// `PresentationTests`.
 ///
 /// No `continueAfterFailure = false` and no `async` `tearDown`: after a
@@ -68,14 +69,26 @@ import PaperNestStore
         XCTAssertTrue(app.buttons["presentation.exit"].waitForExistence(timeout: 5), "a tap did not show the controls")
     }
 
-    private func setLaser(_ app: XCUIApplication, page: XCUIElement) {
+    /// Chooses the pointer in the ⋯ menu by its name: "No Pointer",
+    /// "Laser Pointer" or "Pen". Its options show as menu items, whatever type
+    /// XCUITest gives them.
+    private func choosePointer(_ name: String, _ app: XCUIApplication, page: XCUIElement,
+                               file: StaticString = #filePath, line: UInt = #line) {
         showControls(app, page: page)
         app.buttons["presentation.more"].tap()
-        // A toggle in a menu shows as a menu item, whatever type XCUITest gives it.
-        let laser = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == %@ OR label == %@", "presentation.laser", "Laser Pointer")).firstMatch
-        XCTAssertTrue(laser.waitForExistence(timeout: 5), "no Laser Pointer in the menu")
-        laser.tap()
+        let option = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", name)).firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 5), "no \(name) in the menu", file: file, line: line)
+        option.tap()
+    }
+
+    /// The pen strokes on the page shown.
+    private func strokesShown(_ app: XCUIApplication) -> String {
+        app.descendants(matching: .any)["presentation.sketch"].firstMatch.value as? String ?? ""
+    }
+
+    private func drawAcross(_ page: XCUIElement, at height: CGFloat) {
+        page.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: height))
+            .press(forDuration: 0.05, thenDragTo: page.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: height + 0.02)))
     }
 
     func testPresentingTurnsPagesPointsAndEndsWhereItStopped() async throws {
@@ -100,11 +113,11 @@ import PaperNestStore
         expectPage(page, 3, "the last page stays")
 
         // The laser pointer: a swipe points, and the page stays.
-        setLaser(app, page: page)
+        choosePointer("Laser Pointer", app, page: page)
         page.swipeRight()
         expectPage(page, 3, "with the laser on, a swipe points instead of turning")
         snap(app, "laser-en")
-        setLaser(app, page: page)
+        choosePointer("No Pointer", app, page: page)
         page.swipeRight()
         expectPage(page, 2, "with the laser off again, a swipe turns the page")
 
@@ -147,6 +160,45 @@ import PaperNestStore
         XCTAssertEqual(strokes, 1, "after presenting, a stroke on the page was not saved")
     }
 
+    /// The pen: a drag draws on the page and turns nothing; Clear Drawing
+    /// and turning the page clear it; nothing drawn is saved.
+    func testThePenDrawsOnThePageAndNothingIsSaved() async throws {
+        let app = try await open()
+        defer { app.terminate() }
+        let page = present(app, item: "Present")
+        expectPage(page, 1, "starts on page 1")
+        choosePointer("Pen", app, page: page)
+        drawAcross(page, at: 0.4)
+        drawAcross(page, at: 0.55)
+        XCTAssertEqual(strokesShown(app), "2", "two drags should be two strokes")
+        expectPage(page, 1, "with the pen, a drag draws instead of turning")
+        snap(app, "pen-en")
+
+        let clear = app.buttons["presentation.clear"]
+        showControls(app, page: page)
+        XCTAssertTrue(clear.waitForExistence(timeout: 5), "no Clear Drawing while there is a drawing")
+        clear.tap()
+        XCTAssertEqual(strokesShown(app), "0", "Clear Drawing left strokes")
+        XCTAssertFalse(clear.exists, "Clear Drawing with nothing to clear")
+
+        drawAcross(page, at: 0.5)
+        XCTAssertEqual(strokesShown(app), "1")
+        showControls(app, page: page)
+        app.buttons["presentation.next"].tap()
+        expectPage(page, 2, "› still turns the page with the pen")
+        XCTAssertEqual(strokesShown(app), "0", "the drawing belongs to the page it was drawn on")
+
+        showControls(app, page: page)
+        app.buttons["presentation.exit"].tap()
+        XCTAssertTrue(page.waitForNonExistence(timeout: 10))
+        // Nothing the pen drew reached the document.
+        let store = try XCTUnwrap(store), item = try XCTUnwrap(item)
+        for each in try await store.pages(of: item) {
+            let ink = try await store.objects(on: each.id).filter { if case .ink = $0.payload { true } else { false } }
+            XCTAssertTrue(ink.isEmpty, "the pen's drawing was saved as ink on page \(each.id)")
+        }
+    }
+
     /// The keyboard: the arrows and space turn pages. (Escape is handled too,
     /// but sent this way it never reached the app; not claimed.)
     func testAKeyboardTurnsPages() async throws {
@@ -165,8 +217,10 @@ import PaperNestStore
     /// French and Spanish, and Spanish at the largest text size: the menu
     /// item and the controls in the language, the controls on screen.
     func testPresentingInFrenchAndSpanish() async throws {
-        for (language, item, exit, largest) in [("fr", "Présenter", "Quitter", false), ("es", "Presentar", "Salir", false),
-                                                ("es", "Presentar", "Salir", true)] {
+        for (language, item, exit, pen, largest) in [("fr", "Présenter", "Quitter", "Stylo", false),
+                                                     ("es", "Presentar", "Salir", "Lápiz", false),
+                                                     ("es", "Presentar", "Salir", "Lápiz", true),
+                                                     ("fr", "Présenter", "Quitter", "Stylo", true)] {
             let app = try await open(language: language, largestText: largest)
             let page = present(app, item: item)
             showControls(app, page: page)
@@ -176,6 +230,18 @@ import PaperNestStore
             XCTAssertTrue(app.buttons["presentation.next"].isHittable, "\(language): › is not reachable")
             XCTAssertLessThanOrEqual(exitButton.frame.maxX, app.frame.maxX, "\(language): Exit runs off the screen")
             snap(app, "controls-\(language)\(largest ? "-xxxl" : "")")
+            // With a pen drawing, Clear Drawing joins Exit and ⋯ along the top: all on screen.
+            choosePointer(pen, app, page: page)
+            drawAcross(page, at: 0.45)
+            showControls(app, page: page)
+            let clear = app.buttons["presentation.clear"], more = app.buttons["presentation.more"]
+            XCTAssertTrue(clear.waitForExistence(timeout: 5), "\(language): no Clear Drawing")
+            for control in [exitButton, clear, more] {
+                XCTAssertTrue(control.isHittable, "\(language): \(control.label) is not reachable")
+                XCTAssertGreaterThanOrEqual(control.frame.minX, app.frame.minX, "\(language): \(control.label) runs off the left")
+                XCTAssertLessThanOrEqual(control.frame.maxX, app.frame.maxX, "\(language): \(control.label) runs off the right")
+            }
+            snap(app, "pen-\(language)\(largest ? "-xxxl" : "")")
             exitButton.tap()
             XCTAssertTrue(page.waitForNonExistence(timeout: 10))
             app.terminate()

@@ -1336,3 +1336,6 @@
 "presentation.start" = "Present";
 "presentation.exit" = "Exit";
 "presentation.laser" = "Laser Pointer";
+"presentation.pen" = "Pen";
+"presentation.noPointer" = "No Pointer";
+"presentation.pointer" = "Pointer";

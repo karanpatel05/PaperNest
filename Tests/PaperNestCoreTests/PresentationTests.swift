@@ -58,3 +58,35 @@ import Testing
         #expect(trail.points.isEmpty)
     }
 }
+
+/// The pen pointer's drawing: strokes kept while the page is shown, a tap
+/// leaves nothing, and clearing empties it.
+@Suite struct PenSketchTests {
+    @Test func aDragIsAStrokeAndATapIsNothing() {
+        var sketch = PenSketch()
+        #expect(sketch.isEmpty)
+        sketch.extend(to: CGPoint(x: 0.2, y: 0.2))
+        sketch.extend(to: CGPoint(x: 0.4, y: 0.25))
+        #expect(sketch.current?.count == 2 && sketch.strokes.isEmpty, "the stroke is still being drawn")
+        sketch.end()
+        #expect(sketch.strokes.count == 1 && sketch.current == nil)
+        sketch.extend(to: CGPoint(x: 0.5, y: 0.5))
+        sketch.extend(to: CGPoint(x: 0.5, y: 0.5))
+        sketch.end()
+        #expect(sketch.strokes.count == 1, "a touch that never moved is not a stroke")
+    }
+
+    @Test func pointsAreHeldToThePageAndClearingEmpties() {
+        var sketch = PenSketch()
+        sketch.extend(to: CGPoint(x: -0.2, y: 0.5))
+        sketch.extend(to: CGPoint(x: 1.4, y: 1.2))
+        sketch.end()
+        #expect(sketch.strokes[0] == [CGPoint(x: 0, y: 0.5), CGPoint(x: 1, y: 1)])
+        sketch.clear()
+        #expect(sketch.isEmpty)
+    }
+
+    @Test func thePointersAreThree() {
+        #expect(PresentationPointer.allCases == [.none, .laser, .pen])
+    }
+}

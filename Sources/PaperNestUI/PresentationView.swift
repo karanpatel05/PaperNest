@@ -16,9 +16,11 @@ struct PresentationRequest: Identifiable {
 /// Exit and VoiceOver's escape end it. The screen does not sleep while it
 /// runs.
 ///
-/// The laser pointer, from the ⋯ menu, draws a red dot with a fading tail
-/// where the finger goes; while it is on, swipes point instead of turning
-/// pages. It marks nothing: it is never ink and never saved. Each page is
+/// The ⋯ menu chooses the pointer: none, the laser (a red dot with a
+/// fading tail where the finger goes) or the pen (red strokes that stay
+/// until the page turns or Clear Drawing). With either, swipes point or draw
+/// instead of turning pages. Neither marks the document: never ink, never
+/// saved. Each page is
 /// drawn as Print draws it (`PageImageView`: ink, typed text and pictures;
 /// private comments never). Only the page shown is drawn, with the next one
 /// prepared, so a long PDF does not draw every page.
@@ -29,8 +31,9 @@ struct PresentationView: View {
 
     @State private var deck: PresentationDeck
     @State private var showsControls = false
-    @State private var laserOn = false
+    @State private var pointerKind = PresentationPointer.none
     @State private var trail = LaserTrail()
+    @State private var sketch = PenSketch()
     @State private var fade: Task<Void, Never>?
     @State private var idleTimerWasDisabled = false
     @Environment(\.dismiss) private var dismiss
@@ -86,7 +89,8 @@ struct PresentationView: View {
             PageImageView(page: page, pixelSize: max(fitted.width, fitted.height) * displayScale)
                 .frame(width: fitted.width, height: fitted.height)
                 .id(page.id)
-            if laserOn { LaserTrailView(trail: trail).frame(width: fitted.width, height: fitted.height) }
+            if pointerKind == .laser { LaserTrailView(trail: trail).frame(width: fitted.width, height: fitted.height) }
+            if !sketch.isEmpty { SketchView(sketch: sketch).frame(width: fitted.width, height: fitted.height) }
             if deck.canGoForward {
                 // The next page drawn ahead, at the size it will be shown, so turning to it is immediate.
                 let next = pages[deck.index + 1]
@@ -99,6 +103,13 @@ struct PresentationView: View {
         .accessibilityLabel(L10n.pageLabel(deck.index + 1, of: pages.count))
         .accessibilityValue(String(deck.index + 1))
         .accessibilityIdentifier("presentation.page")
+        .overlay(alignment: .topLeading) {
+            // How many pen strokes are on the page, for tests: the drawing itself is a picture.
+            Color.clear.frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier("presentation.sketch")
+                .accessibilityValue(String(sketch.strokes.count))
+        }
         .accessibilityAdjustableAction { direction in
             if direction == .increment { forward() } else if direction == .decrement { back() }
         }
@@ -113,31 +124,42 @@ struct PresentationView: View {
 
     // MARK: Turning pages and pointing
 
+    /// Turning the page clears what the pointer left on it: the pen's
+    /// drawing belongs to the page it was drawn on.
     private func forward() {
-        if deck.forward() { trail.clear() }
+        if deck.forward() { trail.clear(); sketch.clear() }
     }
 
     private func back() {
-        if deck.back() { trail.clear() }
+        if deck.back() { trail.clear(); sketch.clear() }
     }
 
-    /// With the laser off, a swipe turns the page; with it on, the finger
-    /// points, in shares of the page shown.
+    /// With no pointer, a swipe turns the page; with the laser the finger
+    /// points, and with the pen it draws, in shares of the page shown.
     private func pointer(in size: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: laserOn ? 0 : 24)
+        DragGesture(minimumDistance: pointerKind == .none ? 24 : 0)
             .onChanged { value in
-                guard laserOn, pages.indices.contains(deck.index) else { return }
+                guard pointerKind != .none, pages.indices.contains(deck.index) else { return }
                 let fitted = Self.fitted(pages[deck.index].geometry.pageSize, in: size)
                 guard fitted.width > 0, fitted.height > 0 else { return }
                 let origin = CGPoint(x: (size.width - fitted.width) / 2, y: (size.height - fitted.height) / 2)
                 let share = CGPoint(x: (value.location.x - origin.x) / fitted.width,
                                     y: (value.location.y - origin.y) / fitted.height)
+                if pointerKind == .pen {
+                    // A stroke may run off the page; it is held to its edge.
+                    sketch.extend(to: share)
+                    return
+                }
                 guard (0...1).contains(share.x), (0...1).contains(share.y) else { return }
                 fade?.cancel()
                 trail.add(share, at: Date().timeIntervalSinceReferenceDate)
             }
             .onEnded { value in
-                if laserOn {
+                if pointerKind == .pen {
+                    sketch.end()
+                    return
+                }
+                if pointerKind == .laser {
                     // Once the tail has faded, clear it, so its redrawing stops.
                     fade?.cancel()
                     fade = Task {
@@ -158,12 +180,28 @@ struct PresentationView: View {
         VStack {
             HStack(spacing: 12) {
                 Spacer()
+                if pointerKind == .pen && !sketch.isEmpty {
+                    // An icon, as ⋯ is: in words, at the largest text sizes in
+                    // French it broke a few letters a line and pushed Exit away.
+                    Button { sketch.clear() } label: {
+                        Image(systemName: "eraser").font(.title2).frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel(L10n.signatureClear)
+                    .accessibilityIdentifier("presentation.clear")
+                }
                 Button(L10n.presentationExit) { dismiss() }
+                    .lineLimit(1).fixedSize()
                     .buttonStyle(.borderedProminent).tint(Color.white.opacity(0.25))
                     .accessibilityIdentifier("presentation.exit")
                 Menu {
-                    Toggle(isOn: $laserOn) { Label(L10n.presentationLaser, systemImage: "light.max") }
-                        .accessibilityIdentifier("presentation.laser")
+                    Picker(selection: $pointerKind) {
+                        Label(L10n.presentationNoPointer, systemImage: "hand.tap").tag(PresentationPointer.none)
+                        Label(L10n.presentationLaser, systemImage: "light.max").tag(PresentationPointer.laser)
+                        Label(L10n.presentationPen, systemImage: "pencil.tip").tag(PresentationPointer.pen)
+                    } label: {
+                        Text(L10n.presentationPointer)
+                    }
+                    .pickerStyle(.inline)
                 } label: {
                     Image(systemName: "ellipsis.circle").font(.title2).frame(width: 44, height: 44)
                 }
@@ -273,6 +311,25 @@ final class KeyCatcherView: UIView {
             }
         }
         if !handled { super.pressesBegan(presses, with: event) }
+    }
+}
+
+/// The pen pointer's strokes over the page. A picture on screen only.
+private struct SketchView: View {
+    let sketch: PenSketch
+
+    var body: some View {
+        Canvas { canvas, size in
+            let width = max(3, min(size.width, size.height) / 160)
+            for stroke in sketch.strokes + (sketch.current.map { [$0] } ?? []) where !stroke.isEmpty {
+                var path = Path()
+                path.move(to: CGPoint(x: stroke[0].x * size.width, y: stroke[0].y * size.height))
+                for point in stroke.dropFirst() { path.addLine(to: CGPoint(x: point.x * size.width, y: point.y * size.height)) }
+                canvas.stroke(path, with: .color(.red), style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
