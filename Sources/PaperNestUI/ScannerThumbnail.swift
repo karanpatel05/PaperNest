@@ -9,6 +9,7 @@ struct ScannerThumbnail: View {
             if let image { Image(uiImage: image).resizable().scaledToFit() }
             else { ProgressView() }
         }
+        .overlay(alignment: .topLeading) { ScanQualityBadge(page: page) }
         .task(id: page.drawKey) {
             let draft = page
             let data = await Task.detached(priority: .utility) {

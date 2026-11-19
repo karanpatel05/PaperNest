@@ -1470,4 +1470,10 @@ extension L10n {
 
     static var exportFormFieldsKept: String { tr("export.formFields.kept") }
     static var exportFormFieldsLost: String { tr("export.formFields.lost") }
+
+    // MARK: Scan quality after capture
+
+    static var scannerQualityBlurry: String { tr("scanner.quality.blurry") }
+    static var scannerQualitySteepAngle: String { tr("scanner.quality.steepAngle") }
+    static var scannerQualityTooDark: String { tr("scanner.quality.tooDark") }
 }

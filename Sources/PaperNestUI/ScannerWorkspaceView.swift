@@ -663,11 +663,12 @@ struct ScannerWorkspaceView: View {
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(outline, lineWidth: marked ? 2 : 1))
     }
 
-    /// What a page in the filmstrip is called: its number, and its side when it is a card's.
+    /// What a page in the filmstrip is called: its number, its side when it
+    /// is a card's, and anything its quality check found (the thumbnail's mark).
     private func pageLabel(_ page: ScannerPage, number: Int) -> String {
         let name: String = L10n.scannerReview + " " + String(number)
-        guard let side = sideName(of: page) else { return name }
-        return name + ", " + side
+        let issues = ScanQualityMemo.shared.issues(for: page).map(\.title)
+        return ([name] + [sideName(of: page)].compactMap { $0 } + issues).joined(separator: ", ")
     }
 
     /// "Front" or "Back" for a page scanned as a card's side.
@@ -711,6 +712,7 @@ struct ScannerWorkspaceView: View {
                     .id(pages[selected].id)
             } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
         }
+        .overlay(alignment: .bottom) { if !cropping, let page = selectedPage { ScanQualityNote(page: page).padding(8) } }
         .task(id: previewKey) {
             guard pages.indices.contains(selected), !cropping else { return }
             let page = pages[selected]

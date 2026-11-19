@@ -1320,3 +1320,8 @@
 /* Form fields on export */
 "export.formFields.kept" = "Los campos rellenables de este formulario se conservan: se podrá seguir rellenando después de exportarlo.";
 "export.formFields.lost" = "Los campos rellenables de este formulario no se conservarán: sus páginas se vuelven a dibujar, así que las respuestas siguen visibles pero no se pueden cambiar. Solo se conservan si todas las páginas se exportan sin cambios, a su tamaño original y sin marca de agua ni marca.";
+
+/* Scan quality after capture */
+"scanner.quality.blurry" = "Parece borroso";
+"scanner.quality.steepAngle" = "Tomado muy en ángulo";
+"scanner.quality.tooDark" = "Demasiado oscuro";
