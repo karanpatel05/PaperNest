@@ -1325,3 +1325,4 @@
 "scanner.quality.blurry" = "Looks blurry";
 "scanner.quality.steepAngle" = "Taken at a steep angle";
 "scanner.quality.tooDark" = "Too dark";
+"scanner.quality.sameAs" = "Same as page %d";

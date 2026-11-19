@@ -1476,4 +1476,5 @@ extension L10n {
     static var scannerQualityBlurry: String { tr("scanner.quality.blurry") }
     static var scannerQualitySteepAngle: String { tr("scanner.quality.steepAngle") }
     static var scannerQualityTooDark: String { tr("scanner.quality.tooDark") }
+    static func scannerQualitySameAs(_ value0: Int) -> String { tr("scanner.quality.sameAs", value0) }
 }

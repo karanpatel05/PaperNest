@@ -56,7 +56,16 @@ public enum ScanQualityAnalyzer {
     /// that photo's size as shown (`photoSize(of:)`); without it, the angle
     /// is not judged.
     public static func report(page: CGImage, corners: [CGPoint], photoSize: CGSize?) -> ScanQualityReport? {
+        examine(page: page, corners: corners, photoSize: photoSize)?.report
+    }
+
+    /// The report, and the page's `ScanFingerprint` for telling whether it
+    /// repeats another, both from one grey picture of it.
+    public static func examine(page: CGImage, corners: [CGPoint], photoSize: CGSize?)
+        -> (report: ScanQualityReport, fingerprint: ScanFingerprint)? {
         guard let picture = grey(page) else { return nil }
+        let fingerprint = ScanFingerprint(picture.resized(width: ScanFingerprint.width, height: ScanFingerprint.height),
+                                          aspect: Double(page.width) / Double(max(1, page.height)))
         var histogram = [Int](repeating: 0, count: 256)
         for value in picture.pixels { histogram[Int(value)] += 1 }
         let paper = level(histogram, total: picture.pixels.count, share: 0.9)
@@ -64,7 +73,7 @@ public enum ScanQualityAnalyzer {
         let sharpness = markDepth(plane, width: picture.width, height: picture.height) < leastMarkDepth
             ? nil : self.sharpness(of: plane, width: picture.width, height: picture.height)
         let stretch = photoSize.flatMap { ScanQualityReport.stretch(of: corners, photoSize: $0) }
-        return ScanQualityReport(sharpness: sharpness, paperBrightness: paper, stretch: stretch)
+        return (ScanQualityReport(sharpness: sharpness, paperBrightness: paper, stretch: stretch), fingerprint)
     }
 
     /// The size of the photo in `data` as it is shown, its orientation

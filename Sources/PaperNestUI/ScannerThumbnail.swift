@@ -3,13 +3,16 @@ import SwiftUI
 
 struct ScannerThumbnail: View {
     let page: ScannerPage
+    /// The scan's pages, in order, so the corner mark can say this one
+    /// repeats an earlier one.
+    var pages: [ScannerPage] = []
     @State private var image: UIImage?
     var body: some View {
         Group {
             if let image { Image(uiImage: image).resizable().scaledToFit() }
             else { ProgressView() }
         }
-        .overlay(alignment: .topLeading) { ScanQualityBadge(page: page) }
+        .overlay(alignment: .topLeading) { ScanQualityBadge(page: page, pages: pages) }
         .task(id: page.drawKey) {
             let draft = page
             let data = await Task.detached(priority: .utility) {

@@ -431,7 +431,7 @@ struct ScannerWorkspaceView: View {
             ZStack(alignment: .topTrailing) {
                 Group {
                     if let last = pages.last {
-                        ScannerThumbnail(page: last)
+                        ScannerThumbnail(page: last, pages: pages)
                     } else {
                         Image(systemName: "square.stack").font(.title3)
                     }
@@ -652,7 +652,7 @@ struct ScannerWorkspaceView: View {
         let outline: Color = marked ? Theme.accent : ScannerChrome.stroke
         let fill: Color = marked ? ScannerChrome.purple.opacity(0.28) : Color.clear
         return VStack(spacing: 4) {
-            ScannerThumbnail(page: page).frame(width: 56, height: 70)
+            ScannerThumbnail(page: page, pages: pages).frame(width: 56, height: 70)
                 .overlay(alignment: .topTrailing) { if selecting { pickMark(marked) } }
             Text(verbatim: String(number)).font(.caption.monospacedDigit())
             // A card's two sides are two pages; this is what says they belong together.
@@ -664,11 +664,12 @@ struct ScannerWorkspaceView: View {
     }
 
     /// What a page in the filmstrip is called: its number, its side when it
-    /// is a card's, and anything its quality check found (the thumbnail's mark).
+    /// is a card's, and anything its quality check found (the thumbnail's
+    /// mark), the page it repeats included.
     private func pageLabel(_ page: ScannerPage, number: Int) -> String {
         let name: String = L10n.scannerReview + " " + String(number)
-        let issues = ScanQualityMemo.shared.issues(for: page).map(\.title)
-        return ([name] + [sideName(of: page)].compactMap { $0 } + issues).joined(separator: ", ")
+        let notes = ScanQualityMemo.shared.notes(for: page, among: pages)
+        return ([name] + [sideName(of: page)].compactMap { $0 } + notes).joined(separator: ", ")
     }
 
     /// "Front" or "Back" for a page scanned as a card's side.
@@ -712,7 +713,7 @@ struct ScannerWorkspaceView: View {
                     .id(pages[selected].id)
             } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
         }
-        .overlay(alignment: .bottom) { if !cropping, let page = selectedPage { ScanQualityNote(page: page).padding(8) } }
+        .overlay(alignment: .bottom) { if !cropping, let page = selectedPage { ScanQualityNote(page: page, pages: pages).padding(8) } }
         .task(id: previewKey) {
             guard pages.indices.contains(selected), !cropping else { return }
             let page = pages[selected]

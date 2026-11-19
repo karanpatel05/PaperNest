@@ -1325,3 +1325,4 @@
 "scanner.quality.blurry" = "Parece borroso";
 "scanner.quality.steepAngle" = "Tomado muy en ángulo";
 "scanner.quality.tooDark" = "Demasiado oscuro";
+"scanner.quality.sameAs" = "Igual que la página %d";

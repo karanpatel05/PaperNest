@@ -15,8 +15,9 @@ import CoreImage
 @MainActor final class ScanQualityUITests: XCTestCase {
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
-    /// A page of print, 1200 × 1560 pixels, on paper of `paper` white.
-    private func page(paper: CGFloat, ink: CGFloat, blur: Double = 0) throws -> Data {
+    /// A page of `words`, 1200 × 1560 pixels, on paper of `paper` white.
+    private func page(paper: CGFloat, ink: CGFloat, blur: Double = 0,
+                      words: String = "The quarterly report shows steady growth in every region we serve.") throws -> Data {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let size = CGSize(width: 1200, height: 1560)
@@ -27,8 +28,7 @@ import CoreImage
                                                              .foregroundColor: UIColor(white: ink, alpha: 1)]
             var y: CGFloat = 80
             while y < size.height - 80 {
-                ("The quarterly report shows steady growth in every region we serve." as NSString)
-                    .draw(at: CGPoint(x: 72, y: y), withAttributes: attributes)
+                (words as NSString).draw(at: CGPoint(x: 72, y: y), withAttributes: attributes)
                 y += 42
             }
         }
@@ -62,7 +62,10 @@ import CoreImage
         let dark = folder.appendingPathComponent("dark.png")
         try page(paper: 0.96, ink: 0.1).write(to: sharp)
         // About 5 pixels at the size pages are measured at: well past reading.
-        try page(paper: 0.96, ink: 0.1, blur: 8).write(to: blurred)
+        // Its own words: the sharp page blurred would be that page again
+        // (`ScanRepeatUITests`).
+        try page(paper: 0.96, ink: 0.1, blur: 8, words: "Orders rose by a third over spring and summer, costs held flat.")
+            .write(to: blurred)
         try page(paper: 0.12, ink: 0.02).write(to: dark)
 
         let words = ["en": ("Looks blurry", "Too dark"), "fr": ("Semble flou", "Trop sombre"),
