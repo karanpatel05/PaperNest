@@ -59,8 +59,12 @@ import PaperNestCore
         return image
     }
 
+    /// The page's fingerprint, made as `ScanQualityAnalyzer.examine` makes
+    /// it, without the quality measures these tests do not need.
     static func print(_ image: CGImage) throws -> ScanFingerprint {
-        try #require(ScanQualityAnalyzer.examine(page: image, corners: ScannerCorners.whole, photoSize: nil)).fingerprint
+        let picture = try #require(ScanQualityAnalyzer.grey(image))
+        return ScanFingerprint(picture.resized(width: ScanFingerprint.width, height: ScanFingerprint.height),
+                               aspect: Double(image.width) / Double(image.height))
     }
 
     /// A second photograph: 1% across, 0.8% down, 1% larger, 0.4° turned,

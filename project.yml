@@ -100,6 +100,7 @@ targets:
     sources:
       - path: Tests/PaperNestUITests/InkCanvasCoordinatorTests.swift
       - path: Tests/PaperNestUITests/ScannerPageTests.swift
+      - path: Tests/PaperNestUITests/ScanQualityMemoTests.swift
       - path: Tests/PaperNestUITests/WatermarkLogoTests.swift
     dependencies:
       - target: PaperNest-iOS

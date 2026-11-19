@@ -57,9 +57,17 @@ import PaperNestRender
         return notes
     }
 
+    /// How many pages are measured and how many pairs compared: for tests.
+    var measuredCount: Int { prints.count }
+    var comparedCount: Int { alike.count }
+
     /// Measures `page` off the main thread, unless its crop already was,
-    /// then compares it with every other page measured so far.
-    func measure(_ page: ScannerPage) async {
+    /// then compares it with the other pages of the scan, `pages`. The memo
+    /// lives as long as the app, so it then forgets every page not in
+    /// `pages` — an earlier scan's, a deleted one — and every pair with
+    /// one: otherwise each capture would be compared with everything scanned
+    /// since launch.
+    func measure(_ page: ScannerPage, among pages: [ScannerPage]) async {
         let key = Self.key(of: page)
         guard reports[page.id]?.key != key, !measuring.contains(key) else { return }
         measuring.insert(key)
@@ -75,6 +83,7 @@ import PaperNestRender
         guard let (report, print, digest) = measured else { return }
         reports[page.id] = (key, report)
         prints[page.id] = (key, print, digest)
+        forget(allBut: Set(pages.map(\.id)).union([page.id]))
         let others = prints.filter { $0.key != page.id }.map(\.value)
         guard !others.isEmpty else { return }
         let results = await Task.detached(priority: .utility) { () -> [(String, Bool)] in
@@ -82,7 +91,21 @@ import PaperNestRender
                 (Self.pair(key, other.key), other.digest != digest && ScanLikeness.isSamePage(print, other.print))
             }
         }.value
-        for (pair, same) in results { alike[pair] = same }
+        // Only pairs whose pages are still measured as they are now.
+        let current = Set(prints.values.map(\.key))
+        for (pair, same) in results where pair.split(separator: "|").allSatisfy({ current.contains(String($0)) }) {
+            alike[pair] = same
+        }
+    }
+
+    /// Drops what is known about pages other than `kept`, and pairs with a
+    /// page no longer measured as it is now (deleted, or cropped again).
+    private func forget(allBut kept: Set<UUID>) {
+        if reports.keys.contains(where: { !kept.contains($0) }) { reports = reports.filter { kept.contains($0.key) } }
+        if prints.keys.contains(where: { !kept.contains($0) }) { prints = prints.filter { kept.contains($0.key) } }
+        let current = Set(prints.values.map(\.key))
+        let stale = alike.keys.filter { !$0.split(separator: "|").allSatisfy { current.contains(String($0)) } }
+        for pair in stale { alike[pair] = nil }
     }
 }
 
@@ -115,7 +138,7 @@ struct ScanQualityBadge: View {
                     .accessibilityHidden(true)
             }
         }
-        .task(id: ScanQualityMemo.key(of: page)) { await ScanQualityMemo.shared.measure(page) }
+        .task(id: ScanQualityMemo.key(of: page)) { await ScanQualityMemo.shared.measure(page, among: pages) }
     }
 }
 
@@ -141,7 +164,7 @@ struct ScanQualityNote: View {
                 .accessibilityIdentifier("scanner.quality")
             }
         }
-        .task(id: ScanQualityMemo.key(of: page)) { await ScanQualityMemo.shared.measure(page) }
+        .task(id: ScanQualityMemo.key(of: page)) { await ScanQualityMemo.shared.measure(page, among: pages) }
     }
 }
 #endif
