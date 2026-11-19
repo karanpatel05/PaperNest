@@ -78,6 +78,8 @@ struct DocumentView: View {
     #if os(iOS)
     /// The presentation running, full screen, if any.
     @State private var presentation: PresentationRequest?
+    /// The speaker note being written, if any.
+    @State private var speakerNoteDraft: SpeakerNoteRequest?
     #endif
     /// Reading a receipt's, card's or invoice's details off the page.
     @State private var isShowingDetails = false
@@ -669,10 +671,15 @@ struct DocumentView: View {
         #if os(iOS)
             // Presenting: the document full screen; closing it leaves the reader on the page last shown.
             .fullScreenCover(item: $presentation) { request in
-                PresentationView(pages: model.pages, start: request.start) { last in
+                PresentationView(pages: model.pages, start: request.start, notes: request.notes) { last in
                     if model.pages.indices.contains(last) { model.selectedPageID = model.pages[last].id }
                 }
                 .environment(model.session)
+            }
+            .sheet(item: $speakerNoteDraft) { request in
+                SpeakerNotesSheet(request: request) { text in
+                    Task { await model.setSpeakerNote(text, on: request.pageID, undoManager: undoManager) }
+                }
             }
         #endif
     }
@@ -826,12 +833,32 @@ struct DocumentView: View {
         .disabled(model.pages.isEmpty)
         #if os(iOS)
         Button {
-            finishThen { presentation = PresentationRequest(start: model.pages.firstIndex { $0.id == model.selectedPageID } ?? 0) }
+            finishThen {
+                Task {
+                    let notes = await model.speakerNotes()
+                    presentation = PresentationRequest(start: model.pages.firstIndex { $0.id == model.selectedPageID } ?? 0,
+                                                       notes: notes)
+                }
+            }
         } label: {
             Label(L10n.presentationStart, systemImage: "play.rectangle")
         }
         .disabled(model.pages.isEmpty)
         .accessibilityIdentifier("document-present")
+        Button {
+            guard let page = model.selectedPage, let index = model.pages.firstIndex(where: { $0.id == page.id }) else { return }
+            finishThen {
+                Task {
+                    let text = await model.speakerNote(on: page.id)
+                    speakerNoteDraft = SpeakerNoteRequest(pageID: page.id, pageNumber: index + 1,
+                                                          pageCount: model.pages.count, text: text)
+                }
+            }
+        } label: {
+            Label(L10n.speakerNotes, systemImage: "note.text")
+        }
+        .disabled(model.selectedPage == nil)
+        .accessibilityIdentifier("document-speaker-notes")
         #endif
         Button { finishThen { readAloud.toggle(reading: model) } } label: {
             if readAloud.isActive {

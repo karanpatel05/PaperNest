@@ -1339,3 +1339,8 @@
 "presentation.pen" = "Stylo";
 "presentation.noPointer" = "Aucun pointeur";
 "presentation.pointer" = "Pointeur";
+
+/* Speaker notes */
+"speakerNotes.title" = "Notes de l’orateur";
+"speakerNotes.none" = "Aucune note pour cette page.";
+"speakerNotes.placeholder" = "Notes que vous seul voyez pendant la présentation";

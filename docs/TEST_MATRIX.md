@@ -1,3 +1,19 @@
+## 2026-11-19 — Speaker notes: a presenter's private note per page, shown while presenting on iPad (Claude, schema v16)
+
+Owner: "Speaker notes". **Speaker Notes**, in the document's title menu (iPhone and iPad), writes the note for the page being read in a sheet (Cancel / Done; one undo step). While presenting on an iPad, ⋯ → Speaker Notes shows the page's note under the page, "No notes for this page." otherwise; an iPhone presents without them (the sample keeps it a viewer). Notes are private like page comments: **never rendered, exported, searched or synced**; writing one is not editing the page (no revision or date moves). **Schema v16:** `speaker_notes`, one row per page, `ON DELETE CASCADE`, a new table with nothing rebuilt.
+
+| Check | Result |
+|---|---|
+| New `SpeakerNoteTests` (10, Store) | **Pass.** Kept per page and replaced when written again; on disk when the call returns (read by a second store); blank or white-space text removes it; not an edit (page and document unchanged); no note for a deleted or unknown page (`pageNotFound`); hidden while its page is deleted, back on undo, gone when purged (integrity check clean); a document deleted for good takes its notes, **a copy starts without them**; its words answer no search; **with sync on, nothing is queued**; a v15 library opens at v16 with every sync trigger in place and takes notes. |
+| Mutations (each restored) | No `ON DELETE CASCADE` → the purge and permanent-delete tests fail. Blank text kept → the blank test fails. Deleted pages' notes listed → the page-deletion test fails. |
+| New `SpeakerNoteModelTests` (2, `DocumentModel`) | **Pass.** Saved and listed; undo walks back note by note to none, redo forward; blank text on a page with no note, or the same text again, registers nothing. |
+| `PictureStampStoreTests` | Its v14→v15 migration test asserted the version as a literal 15; now `Schema.latestVersion`. |
+| New `PresentationUITests.testSpeakerNotesAreWrittenAndShownWhilePresenting` | **iPhone 17 pass (45.8 s), iPad Air 13 pass (42.6 s)**: Speaker Notes from the title menu, typed, Done, **read back from the library**; presenting — **iPad:** ⋯ → Speaker Notes shows page 1's note, › and page 2 shows "No notes for this page."; **iPhone:** no Speaker Notes in the menu, no panel. Screenshot looked at (iPad): the note under the page. The first build failed on the test's own name clash. |
+| Other presentation tests | **iPad: all pass** (keyboard, fr/es, main, pen); iPhone: all pass in the run before this test was added. |
+| `./scripts/test.sh`, git-free copy | **1,608 tests, 0 failures, 0 warnings.** `build-mac-app.sh`: built, no warnings. `LocalizationTests`: pass. |
+
+**Not verified:** VoiceOver itself; a real device. **Not started:** notes on Mac; presenter controls on an external display — without them, notes on an iPad's own screen are seen by an audience if that screen is mirrored. Notes are not copied with a document and not in the library backup.
+
 ## 2026-11-19 — Presentation mode's pen pointer: draw on the page shown, never saved (Claude)
 
 Owner: "Extend presentation". Of the extensions — Mac, presenter controls on an external display, the sample's pen pointer — the pen is the one that can be verified here (Mac interaction is blocked; the Simulator's external displays cannot be driven from the tests). The ⋯ menu now chooses the pointer: **No Pointer, Laser Pointer or Pen**. With the pen, a drag draws red strokes on the page shown (`PenSketch`, shares of the page; a tap that never moved leaves nothing); they stay until the page turns or **Clear Drawing**; swipes draw instead of turning pages, and ‹ › and the keys still turn them. Nothing drawn reaches the document.

@@ -1339,3 +1339,8 @@
 "presentation.pen" = "Lápiz";
 "presentation.noPointer" = "Sin puntero";
 "presentation.pointer" = "Puntero";
+
+/* Speaker notes */
+"speakerNotes.title" = "Notas del orador";
+"speakerNotes.none" = "No hay notas para esta página.";
+"speakerNotes.placeholder" = "Notas que solo ves tú al presentar";

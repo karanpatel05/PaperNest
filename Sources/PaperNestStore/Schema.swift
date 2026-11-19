@@ -336,5 +336,16 @@ enum Schema {
             created_at REAL NOT NULL
         );
         """),
+        // A presenter's private note on a page (`SpeakerNotes.swift`): one
+        // per page, gone with the page. Written by the person, not read off
+        // the page, so it is never exported, indexed or rendered. A new
+        // table, nothing rebuilt, not synced.
+        Migration(version: 16, sql: """
+        CREATE TABLE speaker_notes (
+            page_id TEXT PRIMARY KEY NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+            text TEXT NOT NULL,
+            modified_at REAL NOT NULL
+        );
+        """),
     ]
 }

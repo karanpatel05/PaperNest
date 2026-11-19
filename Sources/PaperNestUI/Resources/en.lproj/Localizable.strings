@@ -1339,3 +1339,8 @@
 "presentation.pen" = "Pen";
 "presentation.noPointer" = "No Pointer";
 "presentation.pointer" = "Pointer";
+
+/* Speaker notes */
+"speakerNotes.title" = "Speaker Notes";
+"speakerNotes.none" = "No notes for this page.";
+"speakerNotes.placeholder" = "Notes only you see while presenting";

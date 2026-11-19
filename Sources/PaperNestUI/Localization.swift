@@ -1492,4 +1492,10 @@ extension L10n {
     static var presentationPen: String { tr("presentation.pen") }
     static var presentationNoPointer: String { tr("presentation.noPointer") }
     static var presentationPointer: String { tr("presentation.pointer") }
+
+    // MARK: Speaker notes
+
+    static var speakerNotes: String { tr("speakerNotes.title") }
+    static var speakerNotesNone: String { tr("speakerNotes.none") }
+    static var speakerNotesPlaceholder: String { tr("speakerNotes.placeholder") }
 }

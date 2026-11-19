@@ -168,7 +168,7 @@ import PaperNestCore
 
         let store = try LibraryStore(directory: dir.url)
 
-        #expect(try await store.schemaVersion() == 15)
+        #expect(try await store.schemaVersion() == Schema.latestVersion)
         #expect(try await store.savedStamps().map(\.design.text) == ["Paid"])
         _ = try await store.savePictureStamp(try logo(store), pixelSize: logoSize)
         #expect(try await store.savedPictureStamps().count == 1)

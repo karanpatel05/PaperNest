@@ -6,6 +6,8 @@ import PaperNestCore
 struct PresentationRequest: Identifiable {
     let id = UUID()
     let start: Int
+    /// The document's speaker notes, by page.
+    var notes: [PageID: String] = [:]
 }
 
 /// A document full screen, one page at a time, on black (roadmap:
@@ -26,6 +28,8 @@ struct PresentationRequest: Identifiable {
 /// prepared, so a long PDF does not draw every page.
 struct PresentationView: View {
     let pages: [Page]
+    /// The speaker notes, by page: shown under the page on an iPad when asked for.
+    let notes: [PageID: String]
     /// Called with the last page shown, as the presentation closes.
     let finished: (Int) -> Void
 
@@ -36,16 +40,42 @@ struct PresentationView: View {
     @State private var sketch = PenSketch()
     @State private var fade: Task<Void, Never>?
     @State private var idleTimerWasDisabled = false
+    @State private var showsNotes = false
+    @Environment(\.horizontalSizeClass) private var widthClass
     @Environment(\.dismiss) private var dismiss
     @Environment(\.displayScale) private var displayScale
 
-    init(pages: [Page], start: Int, finished: @escaping (Int) -> Void) {
+    init(pages: [Page], start: Int, notes: [PageID: String] = [:], finished: @escaping (Int) -> Void) {
         self.pages = pages
+        self.notes = notes
         self.finished = finished
         _deck = State(initialValue: PresentationDeck(pageCount: pages.count, startingAt: start))
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            presentationStage
+            // Speaker notes under the page, on an iPad, when asked for: the
+            // sample keeps the iPhone a viewer.
+            if showsNotes && widthClass == .regular && pages.indices.contains(deck.index) { notesPanel }
+        }
+        .background(Color.black.ignoresSafeArea())
+        .statusBarHidden(true)
+        .persistentSystemOverlays(.hidden)
+        .accessibilityAction(.escape) { dismiss() }
+        .onAppear {
+            // A presentation must not let the screen sleep.
+            idleTimerWasDisabled = UIApplication.shared.isIdleTimerDisabled
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = idleTimerWasDisabled
+            fade?.cancel()
+            finished(deck.index)
+        }
+    }
+
+    private var presentationStage: some View {
         GeometryReader { proxy in
             ZStack {
                 // Taps and swipes belong to the backdrop and the page only: over
@@ -65,19 +95,22 @@ struct PresentationView: View {
                 if showsControls { controls }
             }
         }
-        .statusBarHidden(true)
-        .persistentSystemOverlays(.hidden)
-        .accessibilityAction(.escape) { dismiss() }
-        .onAppear {
-            // A presentation must not let the screen sleep.
-            idleTimerWasDisabled = UIApplication.shared.isIdleTimerDisabled
-            UIApplication.shared.isIdleTimerDisabled = true
+    }
+
+    /// The page's speaker note, or that it has none.
+    private var notesPanel: some View {
+        let note = notes[pages[deck.index].id]
+        return ScrollView {
+            Text(note ?? L10n.speakerNotesNone)
+                .font(.title3)
+                .foregroundStyle(note == nil ? Color.white.opacity(0.6) : Color.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
         }
-        .onDisappear {
-            UIApplication.shared.isIdleTimerDisabled = idleTimerWasDisabled
-            fade?.cancel()
-            finished(deck.index)
-        }
+        .frame(maxHeight: 220)
+        .background(Color(white: 0.12))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("presentation.notes")
     }
 
     // MARK: The page
@@ -202,6 +235,9 @@ struct PresentationView: View {
                         Text(L10n.presentationPointer)
                     }
                     .pickerStyle(.inline)
+                    if widthClass == .regular {
+                        Toggle(isOn: $showsNotes) { Label(L10n.speakerNotes, systemImage: "note.text") }
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle").font(.title2).frame(width: 44, height: 44)
                 }

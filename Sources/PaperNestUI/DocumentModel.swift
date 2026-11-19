@@ -152,6 +152,53 @@ final class DocumentModel {
         await apply(t, to: page.id, actionName: L10n.undoRotate, undoManager: undoManager)
     }
 
+    // MARK: Speaker notes
+
+    /// The document's speaker notes, by page, for a presentation.
+    func speakerNotes() async -> [PageID: String] {
+        guard let store else { return [:] }
+        return (try? await store.speakerNotes(of: itemID)) ?? [:]
+    }
+
+    /// A page's speaker note; empty when it has none.
+    func speakerNote(on pageID: PageID) async -> String {
+        guard let store else { return "" }
+        return (try? await store.speakerNote(on: pageID)) ?? ""
+    }
+
+    /// Sets a page's speaker note, committed before it returns; one undo
+    /// step puts the old note back. Blank text removes the note.
+    func setSpeakerNote(_ text: String, on pageID: PageID, undoManager: UndoManager?) async {
+        await finishPendingHistory()
+        let old = await speakerNote(on: pageID)
+        let blank = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard old != text, !(blank && old.isEmpty), await commitSpeakerNote(text, on: pageID) else { return }
+        registerSpeakerNoteUndo(restoring: old, redoing: text, pageID: pageID, undoManager: undoManager)
+    }
+
+    private func registerSpeakerNoteUndo(restoring old: String, redoing new: String, pageID: PageID, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                model.registerSpeakerNoteUndo(restoring: new, redoing: old, pageID: pageID, undoManager: undoManager)
+                model.enqueueHistory(undoManager: undoManager) { await model.commitSpeakerNote(old, on: pageID) }
+            }
+        }
+        undoManager?.setActionName(L10n.speakerNotes)
+        historyDidChange()
+    }
+
+    @discardableResult
+    private func commitSpeakerNote(_ text: String, on pageID: PageID) async -> Bool {
+        guard let store else { return false }
+        do {
+            try await store.setSpeakerNote(text, on: pageID)
+            return true
+        } catch {
+            presentedError = .saveFailed()
+            return false
+        }
+    }
+
     func setFilter(_ filter: PageFilter, undoManager: UndoManager?) async {
         await finishPendingHistory()
         guard let page = selectedPage, page.transform.filter != filter else { return }

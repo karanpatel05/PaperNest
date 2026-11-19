@@ -199,6 +199,62 @@ import PaperNestStore
         }
     }
 
+    /// Speaker notes: written from the title menu and saved; shown under the
+    /// page while presenting on an iPad, page by page; an iPhone presents
+    /// without them, as the sample keeps it a viewer.
+    func testSpeakerNotesAreWrittenAndShownWhilePresenting() async throws {
+        let app = try await open()
+        defer { app.terminate() }
+        let note = "Open with the revenue chart"
+        let title = app.navigationBars.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Review")).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap()
+        let notesItem = app.buttons["Speaker Notes"]
+        XCTAssertTrue(notesItem.waitForExistence(timeout: 5), "no Speaker Notes in the title menu")
+        notesItem.tap()
+        let editor = app.textViews["speaker-notes-editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "the notes sheet did not open")
+        editor.tap()
+        editor.typeText(note)
+        snap(app, "notes-sheet-en")
+        app.buttons["speaker-notes-done"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 10), "Done did not close the sheet")
+        let store = try XCTUnwrap(store), document = try XCTUnwrap(item)
+        let firstPage = try await store.pages(of: document)[0].id
+        var saved: String?
+        for _ in 0..<40 where saved == nil {
+            try await Task.sleep(for: .milliseconds(250))
+            saved = try await store.speakerNote(on: firstPage)
+        }
+        XCTAssertEqual(saved, note, "the note was not saved")
+
+        let page = present(app, item: "Present")
+        showControls(app, page: page)
+        app.buttons["presentation.more"].tap()
+        let toggle = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Speaker Notes")).firstMatch
+        let panel = app.descendants(matching: .any)["presentation.notes"].firstMatch
+        if isPad {
+            XCTAssertTrue(toggle.waitForExistence(timeout: 5), "no Speaker Notes in the presentation's menu")
+            toggle.tap()
+            XCTAssertTrue(panel.waitForExistence(timeout: 5), "the notes did not show")
+            XCTAssertTrue(panel.label.contains(note), "page 1's note is not shown: \(panel.label)")
+            snap(app, "notes-shown-en")
+            showControls(app, page: page)
+            app.buttons["presentation.next"].tap()
+            expectPage(page, 2, "› turns to page 2")
+            let none = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "No notes for this page."),
+                                                 object: panel)
+            XCTAssertEqual(XCTWaiter.wait(for: [none], timeout: 5), .completed, "page 2 shows: \(panel.label)")
+        } else {
+            XCTAssertFalse(toggle.waitForExistence(timeout: 2), "an iPhone presents without speaker notes")
+            XCTAssertFalse(panel.exists)
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        showControls(app, page: page)
+        app.buttons["presentation.exit"].tap()
+        XCTAssertTrue(page.waitForNonExistence(timeout: 10))
+    }
+
     /// The keyboard: the arrows and space turn pages. (Escape is handled too,
     /// but sent this way it never reached the app; not claimed.)
     func testAKeyboardTurnsPages() async throws {
