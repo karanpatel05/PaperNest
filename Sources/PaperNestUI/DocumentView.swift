@@ -75,6 +75,10 @@ struct DocumentView: View {
     @State private var isShowingRedact = false
     /// Comparing this document with another.
     @State private var isShowingCompare = false
+    #if os(iOS)
+    /// The presentation running, full screen, if any.
+    @State private var presentation: PresentationRequest?
+    #endif
     /// Reading a receipt's, card's or invoice's details off the page.
     @State private var isShowingDetails = false
     /// Blank and repeated pages, offered for removal.
@@ -662,6 +666,15 @@ struct DocumentView: View {
             .focusedSceneValue(\.documentPrinter, printer)
             .focusedSceneValue(\.readerBookmarks, bookmarks)
             .focusedSceneValue(\.readAloud, readAloud)
+        #if os(iOS)
+            // Presenting: the document full screen; closing it leaves the reader on the page last shown.
+            .fullScreenCover(item: $presentation) { request in
+                PresentationView(pages: model.pages, start: request.start) { last in
+                    if model.pages.indices.contains(last) { model.selectedPageID = model.pages[last].id }
+                }
+                .environment(model.session)
+            }
+        #endif
     }
 
     private var isToolBusy: Bool {
@@ -811,6 +824,15 @@ struct DocumentView: View {
             Label(L10n.printMenu, systemImage: "printer")
         }
         .disabled(model.pages.isEmpty)
+        #if os(iOS)
+        Button {
+            finishThen { presentation = PresentationRequest(start: model.pages.firstIndex { $0.id == model.selectedPageID } ?? 0) }
+        } label: {
+            Label(L10n.presentationStart, systemImage: "play.rectangle")
+        }
+        .disabled(model.pages.isEmpty)
+        .accessibilityIdentifier("document-present")
+        #endif
         Button { finishThen { readAloud.toggle(reading: model) } } label: {
             if readAloud.isActive {
                 Label(L10n.readAloudStop, systemImage: "stop.circle")

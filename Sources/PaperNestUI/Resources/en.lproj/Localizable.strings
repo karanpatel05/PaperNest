@@ -1331,3 +1331,8 @@
 /* Book mode */
 "scanner.mode.book" = "Book";
 "scanner.book.twoPages" = "Two pages";
+
+/* Presentation */
+"presentation.start" = "Present";
+"presentation.exit" = "Exit";
+"presentation.laser" = "Laser Pointer";

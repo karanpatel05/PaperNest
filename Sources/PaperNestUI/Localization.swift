@@ -1483,4 +1483,10 @@ extension L10n {
 
     static var scannerBook: String { tr("scanner.mode.book") }
     static var scannerBookTwoPages: String { tr("scanner.book.twoPages") }
+
+    // MARK: Presentation
+
+    static var presentationStart: String { tr("presentation.start") }
+    static var presentationExit: String { tr("presentation.exit") }
+    static var presentationLaser: String { tr("presentation.laser") }
 }
