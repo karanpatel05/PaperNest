@@ -1,3 +1,15 @@
+## 2026-11-19 — The after-capture note no longer covers the page at the largest text sizes on a phone (Claude)
+
+Owner: "Yes, fix it". The gap found in the entry below: on iPhone at AX XXXL the note covered nearly all of the ~120 pt page preview. Now, at the accessibility text sizes in compact width, `ScanQualityNote` is a mark of a fixed size (44 pt) under the page that opens the note in a dark sheet (each issue on its own line, Done); VoiceOver reads the whole note from the mark's label. The ordinary sizes and iPad keep the note under the page. `ScannerWorkspaceView.swift` untouched.
+
+| Check | Result |
+|---|---|
+| `ScannerLargeTextUITests` (now: on a phone the mark is at most 60 × 60 pt, says the whole note, opens it in full, and closes) | **iPhone 17 pass (83.0 s), iPad Air 13 pass (54.1 s)**, en/fr/es. **A popover was tried first: the test passed but the screenshot showed the note clipped top and bottom and drawn light on light** — replaced by the sheet. Screenshots looked at (iPhone es and fr): the page visible with the mark on it; the sheet dark, "Demasiado oscuro" / "Reflejo en la página" and "Identique à la page 1" whole, "Listo" / "Terminé". |
+| `ScanQualityUITests`, `ScanRepeatUITests` (ordinary size), iPhone 17 | **Pass** (69.6 s, 49.6 s, 16.8 s). |
+| `./scripts/test.sh`, git-free copy | **1,588 tests, 0 failures, 0 warnings.** `build-for-testing` (iOS): no warnings. |
+
+**Not verified:** VoiceOver itself (the mark's label is asserted by XCUITest only).
+
 ## 2026-11-19 — UI verification: this session's scanner surfaces at the largest text size, and Book's one-page fallbacks (Claude, owner's queue item 4)
 
 Owner: "Move on" (to the remaining UI verification). Scoped to what no one else is checking — the after-capture notes, the repeat note and Book mode, added this session — at Accessibility XXXL in en/fr/es, and Book's failure states. Codex's active claim (the export sheet) left alone. Mac interaction stays blocked (screen access declined); VoiceOver is not claimed (labels are asserted by XCUITest only); dark mode does not apply (the scanner's chrome is fixed dark).

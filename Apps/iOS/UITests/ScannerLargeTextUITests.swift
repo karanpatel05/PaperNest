@@ -5,7 +5,9 @@ import UIKit
 /// (Accessibility XXXL), in English, French and Spanish: the notes and the
 /// filmstrip labels still say everything, and the screenshots are kept for
 /// a look (`/tmp/pn-scanner-xxxl-shots`). A dark page with a reflection
-/// carries the longest note, two issues joined.
+/// carries the longest note, two issues joined. On a phone the note in
+/// full covered the small page preview (2026-11-19), so there it is a mark
+/// that opens it.
 ///
 /// No `continueAfterFailure = false` and no `async` `tearDown`: after a
 /// failure either left the runner idle in tear-down.
@@ -82,14 +84,29 @@ import UIKit
         }
     }
 
-    /// The note sits on screen, side to side, and says all of `text`.
-    private func expectNote(_ app: XCUIApplication, _ text: String, _ message: String,
+    /// The note sits on screen, side to side, and says all of `text`. On a
+    /// phone at this size it is a mark that keeps clear of the page and opens
+    /// the note in full; on an iPad there is room for the note itself.
+    private func expectNote(_ app: XCUIApplication, _ text: String, _ message: String, shot: String,
                             file: StaticString = #filePath, line: UInt = #line) {
         let note = app.descendants(matching: .any)["scanner.quality"]
         XCTAssertTrue(note.waitForExistence(timeout: 15), "\(message): no note", file: file, line: line)
         XCTAssertEqual(note.label, text, message, file: file, line: line)
         XCTAssertGreaterThanOrEqual(note.frame.minX, app.frame.minX, "\(message): the note runs off the left", file: file, line: line)
         XCTAssertLessThanOrEqual(note.frame.maxX, app.frame.maxX, "\(message): the note runs off the right", file: file, line: line)
+        snap(app, shot)
+        guard !isPad else { return }
+        XCTAssertLessThanOrEqual(note.frame.height, 60, "\(message): the mark covers the page: \(note.frame)", file: file, line: line)
+        XCTAssertLessThanOrEqual(note.frame.width, 60, "\(message): the mark covers the page: \(note.frame)", file: file, line: line)
+        note.tap()
+        let full = app.descendants(matching: .any)["scanner.quality.full"]
+        XCTAssertTrue(full.waitForExistence(timeout: 10), "\(message): the mark does not open the note", file: file, line: line)
+        for part in text.components(separatedBy: " · ") {
+            XCTAssertTrue(full.label.contains(part), "\(message): the full note lacks “\(part)”: \(full.label)", file: file, line: line)
+        }
+        snap(app, shot + "-open")
+        app.buttons["scanner.quality.done"].tap()
+        XCTAssertTrue(full.waitForNonExistence(timeout: 10), "\(message): the note did not close", file: file, line: line)
     }
 
     /// Taps a filmstrip page, which at this size may need the strip moved.
@@ -123,11 +140,9 @@ import UIKit
             XCTAssertTrue(third.label.contains(words.both.components(separatedBy: " · ")[0]), "\(language): \(third.label)")
 
             open(second, in: app)
-            expectNote(app, words.repeat, "\(language) repeat")
-            snap(app, "repeat-\(language)")
+            expectNote(app, words.repeat, "\(language) repeat", shot: "repeat-\(language)")
             open(third, in: app)
-            expectNote(app, words.both, "\(language) dark and glare")
-            snap(app, "dark-glare-\(language)")
+            expectNote(app, words.both, "\(language) dark and glare", shot: "dark-glare-\(language)")
             app.terminate()
         }
     }

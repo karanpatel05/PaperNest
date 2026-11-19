@@ -158,24 +158,79 @@ struct ScanQualityBadge: View {
 struct ScanQualityNote: View {
     let page: ScannerPage
     let pages: [ScannerPage]
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var widthClass
+    @State private var expanded = false
 
     var body: some View {
         let notes = ScanQualityMemo.shared.notes(for: page, among: pages)
         Group {
             if !notes.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow).accessibilityHidden(true)
-                    Text(notes.joined(separator: " · "))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.footnote.weight(.semibold)).foregroundStyle(.white)
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(Color.black.opacity(0.75), in: Capsule())
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("scanner.quality")
+                if typeSize.isAccessibilitySize && widthClass == .compact { mark(notes) } else { inline(notes) }
             }
         }
         .task(id: ScanQualityMemo.key(of: page)) { await ScanQualityMemo.shared.measure(page, among: pages) }
+    }
+
+    private func inline(_ notes: [String]) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow).accessibilityHidden(true)
+            Text(notes.joined(separator: " · "))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.footnote.weight(.semibold)).foregroundStyle(.white)
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(Color.black.opacity(0.75), in: Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("scanner.quality")
+    }
+
+    /// At the accessibility text sizes on a phone the page preview is small
+    /// (about 120 points on an iPhone 17), and the note in full covered it,
+    /// zoom controls and all. So there the note is a mark of a fixed size
+    /// that opens it in a sheet; VoiceOver reads the whole note from the
+    /// mark. (A popover was tried first: at these sizes it clipped the note
+    /// top and bottom, and drew it light on light.)
+    private func mark(_ notes: [String]) -> some View {
+        Button { expanded = true } label: {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .symbolRenderingMode(.palette).foregroundStyle(.black, .yellow)
+                .frame(width: 44, height: 44)
+                .background(Color.black.opacity(0.75), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(notes.joined(separator: " · "))
+        .accessibilityIdentifier("scanner.quality")
+        .sheet(isPresented: $expanded) {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(notes, id: \.self) { note in
+                            Label {
+                                Text(note).fixedSize(horizontal: false, vertical: true)
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+                            }
+                        }
+                    }
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("scanner.quality.full")
+                }
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(L10n.done) { expanded = false }.accessibilityIdentifier("scanner.quality.done")
+                    }
+                }
+            }
+            .foregroundStyle(.white)
+            .environment(\.colorScheme, .dark)
+            .presentationBackground(ScannerChrome.panel)
+            .presentationDetents([.medium, .large])
+        }
     }
 }
 #endif
