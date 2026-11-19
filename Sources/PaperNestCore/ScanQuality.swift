@@ -68,6 +68,18 @@ public struct ScanQualityReport: Equatable, Sendable {
         return found
     }
 
+    /// The issues worth raising for a page captured in `mode`. A photo is
+    /// kept as it was taken: it may be dark or soft on purpose, and it has no
+    /// outline. A card may be dark itself: a black card is not a dark capture.
+    /// Paper and boards are expected to be light.
+    public func issues(in mode: ScanCaptureMode) -> [ScanQualityIssue] {
+        switch mode {
+        case .photo: []
+        case .card: issues.filter { $0 != .tooDark }
+        case .document, .whiteboard: issues
+        }
+    }
+
     /// How stretched a page's outline is in the photo: the larger of the two
     /// ratios between opposite sides. `corners` are shares of the photo from
     /// its top-left, in order around the page; `photoSize` turns them into

@@ -908,7 +908,7 @@ struct ScannerWorkspaceView: View {
         }
         // On iPhone as on iPad, a capture is not kept until the person says
         // so: it is staged, shown, and joins the queue only on Keep.
-        _ = captureReview.stage(ScannerPage(original: data, appearance: look, corners: corners))
+        _ = captureReview.stage(ScannerPage(original: data, appearance: look, corners: corners, mode: kind))
         busy = false
     }
 

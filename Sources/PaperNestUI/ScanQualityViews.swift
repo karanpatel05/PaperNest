@@ -17,10 +17,11 @@ import PaperNestRender
     /// measured and the angle. A turn or a look does not.
     nonisolated static func key(of page: ScannerPage) -> String { "\(page.id)-\(page.corners)" }
 
-    /// The issues found on `page` as it is cropped now; none until measured.
+    /// The issues found on `page` as it is cropped now, as far as its
+    /// capture mode lets them be said; none until measured.
     func issues(for page: ScannerPage) -> [ScanQualityIssue] {
         guard let stored = reports[page.id], stored.key == Self.key(of: page) else { return [] }
-        return stored.report.issues
+        return stored.report.issues(in: page.mode)
     }
 
     /// Measures `page` off the main thread, unless its crop already was.

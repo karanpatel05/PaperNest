@@ -95,6 +95,15 @@ import CoreImage
             snap(app, "blurred-\(language)")
             first.tap()
             XCTAssertTrue(note.waitForNonExistence(timeout: 10), "\(language): the sharp page has a note")
+            if language == "en" {
+                // The capture screen's stack shows the latest page, the dark
+                // one, with its mark: looked at in the screenshot. Its button
+                // says "Review scan" and the count, not the issue.
+                app.buttons["Scan Pages"].firstMatch.tap()
+                XCTAssertTrue(app.buttons["scanner.review"].waitForExistence(timeout: 15), "no capture screen")
+                sleep(2)
+                snap(app, "capture-stack-en")
+            }
             app.terminate()
         }
     }

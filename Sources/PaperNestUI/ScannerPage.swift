@@ -15,6 +15,10 @@ struct ScannerPage: Identifiable, Sendable {
     /// each time it is rendered and never into `original`.
     var appearance = ScanAppearance.original
     var corners = ScannerPage.wholeFrame
+    /// What the camera was pointed at, which decides what its quality check
+    /// may say (`ScanQualityReport.issues(in:)`). A page brought in from
+    /// Photos or Files is taken for a document, as the scanner's pages are.
+    var mode = ScanCaptureMode.document
 
     static let wholeFrame = [CGPoint(x: 0, y: 0), CGPoint(x: 1, y: 0), CGPoint(x: 1, y: 1), CGPoint(x: 0, y: 1)]
 
@@ -23,7 +27,7 @@ struct ScannerPage: Identifiable, Sendable {
 
     /// A second page of the same capture with the same edits.
     func copy() -> ScannerPage {
-        ScannerPage(original: original, quarterTurns: quarterTurns, appearance: appearance, corners: corners)
+        ScannerPage(original: original, quarterTurns: quarterTurns, appearance: appearance, corners: corners, mode: mode)
     }
 
     /// Back to the capture as it was taken: no turn, no look, the whole frame.

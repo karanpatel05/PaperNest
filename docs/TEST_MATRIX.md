@@ -1,3 +1,16 @@
+## 2026-11-18 — Scan quality follow-up: what is said depends on the capture mode; the capture screen's mark looked at (Claude)
+
+A review of `e9cf4ce` found that the checks were tuned on paper but ran in every capture mode. A drawn black card with one line of white print, cropped to the card, measures **too dark**: its own colour, not the light. Now `ScanQualityReport.issues(in:)` decides what may be said for the page's `ScannerPage.mode` (set from the mode at the shutter in `appendCapture`): **Photo says nothing** (kept as taken, perhaps dark or soft on purpose), **Card never says too dark**, Document and Whiteboard say everything; pages from Photos or Files count as documents.
+
+| Check | Result |
+|---|---|
+| New `ScanQualityReportTests.whatIsSaidDependsOnWhatWasPhotographed`, `ScanQualityAnalyzerTests.aBlackCardIsNotCalledTooDarkAsACard` | **Pass.** The first card drawn, dense with white print, was not "too dark" at all (the paper level fell on the print); redrawn as a card is, one line of print on black: too dark by the measure, nothing said as a card or a photo. |
+| `./scripts/test.sh`, git-free copy | **1,554 tests, 0 failures, 0 warnings** (422 + 49 + 263 + 259 + 269 + 292). |
+| `xcodebuild build-for-testing` (iOS), git-free copy | **Succeeded, no compiler warnings.** |
+| `ScanQualityUITests` on iPhone 17 | **Pass (51.3 s)**, en/fr/es as before, and now (en) back to the capture screen with a screenshot of the review stack, looked at: the mark at the top-left of the latest (dark) page, the count at its top-right, neither covering the other. That button's VoiceOver label stays "Review scan" and the count — the issue is not spoken there; the filmstrip page's label carries it. Not rerun on iPad after this change. |
+
+**Not verified:** the mode reaching a page through a real camera capture (`appendCapture` passes it; compiled, not exercised — the Simulator has no camera, and seeded pages are documents).
+
 ## 2026-11-18 — Scan quality after capture: blurry, steep angle, too dark (Claude, roadmap order item 2)
 
 Owner: "Go ahead with the next feature". Item 2 is scanner feedback and book mode; the live labels (Move closer, Hold steady, Improve lighting, Ready, Move back) already existed (2026-11-16). This slice adds what can be measured honestly **after** a capture. Advice only: a page is never refused or held back. **Thresholds come from drawn pages, not a camera.**

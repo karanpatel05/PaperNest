@@ -31,6 +31,19 @@ import Testing
         #expect(ScanQualityReport(sharpness: nil, paperBrightness: 0.9, stretch: nil).issues.isEmpty)
     }
 
+    /// A photo is kept as taken, so nothing is said about it; a card may be
+    /// dark itself, so only its darkness goes unsaid.
+    @Test func whatIsSaidDependsOnWhatWasPhotographed() {
+        let everything = ScanQualityReport(sharpness: 0.05, paperBrightness: 0.1, stretch: 1.8)
+        #expect(everything.issues(in: .document) == [.tooDark, .steepAngle])
+        #expect(everything.issues(in: .whiteboard) == [.tooDark, .steepAngle])
+        #expect(everything.issues(in: .card) == [.steepAngle])
+        #expect(everything.issues(in: .photo).isEmpty)
+        let blurred = ScanQualityReport(sharpness: 0.05, paperBrightness: 0.9, stretch: 1)
+        #expect(blurred.issues(in: .card) == [.blurry])
+        #expect(blurred.issues(in: .photo).isEmpty)
+    }
+
     @Test func aPageSquareOnIsNotStretched() throws {
         let stretch = try #require(ScanQualityReport.stretch(of: whole, photoSize: CGSize(width: 3000, height: 4000)))
         #expect(abs(stretch - 1) < 1e-9)

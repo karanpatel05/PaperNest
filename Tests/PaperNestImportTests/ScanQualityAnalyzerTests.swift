@@ -166,6 +166,24 @@ import PaperNestCore
         #expect(dense.issues.isEmpty, "\(dense)")
     }
 
+    /// A black card with one line of white print, cropped to the card, is
+    /// "too dark" by a page's measure: its own colour, not the light. So in
+    /// Card mode its darkness is not said, and in Photo mode nothing is.
+    @Test func aBlackCardIsNotCalledTooDarkAsACard() throws {
+        let context = try #require(CGContext(data: nil, width: 856, height: 540, bitsPerComponent: 8, bytesPerRow: 856,
+                                             space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue))
+        context.setFillColor(gray: 0.08, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: 856, height: 540))
+        let font = CTFontCreateWithName("Helvetica" as CFString, 44, nil)
+        let attributes = [kCTFontAttributeName: font, kCTForegroundColorAttributeName: CGColor(gray: 0.95, alpha: 1)] as CFDictionary
+        context.textPosition = CGPoint(x: 60, y: 180)
+        CTLineDraw(CTLineCreateWithAttributedString(CFAttributedStringCreate(nil, "4000 1234 5678 9010" as CFString, attributes)), context)
+        let card = try report(try #require(context.makeImage()))
+        #expect(card.issues.contains(.tooDark), "the measure itself: a black card's paper is dark")
+        #expect(card.issues(in: .card).isEmpty, "\(card)")
+        #expect(card.issues(in: .photo).isEmpty)
+    }
+
     /// The far side three fifths of the near one in a 3000 × 4000 photo is
     /// steep; the whole frame is not; without the photo's size, no verdict.
     @Test func aPageFromASteepAngleSaysSo() throws {
