@@ -1,29 +1,70 @@
 #if os(iOS)
+import CoreImage
 import Testing
 import UIKit
 import PaperNestCore
 @testable import PaperNestUI
 
-/// The scanner's memo of measurements lives as long as the app, so it must
-/// keep only the scan in progress: otherwise every capture is compared with
-/// every page scanned since launch, and memory grows with each one.
+/// The scanner's memo of measurements: it keeps only the scan in progress
+/// (it lives as long as the app, and otherwise every capture would be
+/// compared with every page scanned since launch), and of two photographs of
+/// one page it marks the one worth deleting.
 @MainActor
 struct ScanQualityMemoTests {
-    /// A page of print, different for each `seed`.
-    private func page(seed: Int) -> ScannerPage {
+    /// A page of print, different for each `seed`; `shift` moves the print
+    /// a few points, as a second photograph would sit, and `blur` softens it.
+    private func page(seed: Int, shift: CGFloat = 0, blur: Double = 0) -> ScannerPage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let words = ["report", "growth", "region", "costs", "orders", "spring", "summer", "teams", "stores", "north"]
-        let data = UIGraphicsImageRenderer(size: CGSize(width: 600, height: 780), format: format).image { context in
-            UIColor.white.setFill()
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 600, height: 780), format: format).image { context in
+            UIColor(white: shift > 0 ? 0.95 : 1, alpha: 1).setFill()
             context.fill(CGRect(x: 0, y: 0, width: 600, height: 780))
             let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.black]
             for line in 0..<40 {
                 let text = (0..<9).map { words[(seed * 7 + line * 3 + $0 * ($0 + seed)) % words.count] }.joined(separator: " ")
-                (text as NSString).draw(at: CGPoint(x: 40, y: 30 + CGFloat(line) * 18), withAttributes: attributes)
+                (text as NSString).draw(at: CGPoint(x: 40 + shift, y: 30 + shift + CGFloat(line) * 18), withAttributes: attributes)
             }
-        }.pngData()!
-        return ScannerPage(original: data)
+        }
+        guard blur > 0, let source = CIImage(image: image) else { return ScannerPage(original: image.pngData()!) }
+        let soft = source.clampedToExtent().applyingGaussianBlur(sigma: blur).cropped(to: source.extent)
+        let drawn = CIContext().createCGImage(soft, from: source.extent)!
+        return ScannerPage(original: UIImage(cgImage: drawn).pngData()!)
+    }
+
+    private func measured(_ pages: [ScannerPage]) async -> ScanQualityMemo {
+        let memo = ScanQualityMemo()
+        for each in pages { await memo.measure(each, among: pages) }
+        return memo
+    }
+
+    /// The natural way to fix a blurred capture is to take it again; the
+    /// mark then belongs on the blurred one, naming the good retake — not on
+    /// the retake, which would invite deleting the good page.
+    @Test func theBlurredPageOfARepeatIsMarkedNotItsSharpRetake() async {
+        let pages = [page(seed: 1, blur: 4), page(seed: 1, shift: 6)]
+        let memo = await measured(pages)
+        #expect(memo.issues(for: pages[0]) == [.blurry])
+        #expect(memo.issues(for: pages[1]).isEmpty)
+        #expect(memo.repeated(pages[0], among: pages) == 1, "the blurred first page should name its sharp retake")
+        #expect(memo.repeated(pages[1], among: pages) == nil, "the good retake should be left alone")
+    }
+
+    /// The other way round, the blurred page is still the one marked.
+    @Test func aBlurredRetakeOfAGoodPageIsMarked() async {
+        let pages = [page(seed: 1), page(seed: 1, shift: 6, blur: 4)]
+        let memo = await measured(pages)
+        #expect(memo.repeated(pages[1], among: pages) == 0)
+        #expect(memo.repeated(pages[0], among: pages) == nil)
+    }
+
+    /// Two good photographs of one page: the later is the extra copy.
+    @Test func ofTwoGoodPhotographsTheLaterIsMarked() async {
+        let pages = [page(seed: 1), page(seed: 1, shift: 6), page(seed: 2)]
+        let memo = await measured(pages)
+        #expect(memo.repeated(pages[1], among: pages) == 0)
+        #expect(memo.repeated(pages[0], among: pages) == nil)
+        #expect(memo.repeated(pages[2], among: pages) == nil, "another page is no one's repeat")
     }
 
     @Test func measuringAPageForgetsPagesNoLongerInTheScan() async {

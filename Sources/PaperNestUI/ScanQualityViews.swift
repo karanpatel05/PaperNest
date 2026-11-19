@@ -32,20 +32,28 @@ import PaperNestRender
         return stored.report.issues(in: page.mode)
     }
 
-    /// Where in `pages` the first earlier page is that `page` repeats: the
-    /// same paper photographed again. A page with the very same bytes as an
-    /// earlier one is a copy made on purpose (Duplicate, or one file brought
-    /// in twice), never a second photograph, so it says nothing.
+    /// Where in `pages` the page is that `page` repeats — the same paper
+    /// photographed again — when `page` is the one of the two worth deleting:
+    /// the one with something wrong with it, when only one has; otherwise the
+    /// later, the extra copy. So a blurred page retaken is marked, naming its
+    /// good retake, and the retake is left alone: marking the retake, as the
+    /// first version did, invited deleting the good page.
+    ///
+    /// A page with the very same bytes as an earlier one is a copy made on
+    /// purpose (Duplicate, or one file brought in twice), never a second
+    /// photograph, so it says nothing.
     func repeated(_ page: ScannerPage, among pages: [ScannerPage]) -> Int? {
-        guard let index = pages.firstIndex(where: { $0.id == page.id }),
-              let mine = prints[page.id], mine.key == Self.key(of: page) else { return nil }
-        let earlier = pages[..<index].compactMap { other in
-            prints[other.id].flatMap { $0.key == Self.key(of: other) ? $0 : nil }
+        func current(_ page: ScannerPage) -> (key: String, print: ScanFingerprint, digest: Data)? {
+            prints[page.id].flatMap { $0.key == Self.key(of: page) ? $0 : nil }
         }
-        guard !earlier.contains(where: { $0.digest == mine.digest }) else { return nil }
-        return pages[..<index].firstIndex { other in
-            guard let theirs = prints[other.id], theirs.key == Self.key(of: other) else { return false }
-            return alike[Self.pair(mine.key, theirs.key)] == true
+        guard let index = pages.firstIndex(where: { $0.id == page.id }), let mine = current(page) else { return nil }
+        guard !pages[..<index].contains(where: { current($0)?.digest == mine.digest }) else { return nil }
+        let flawed = !issues(for: page).isEmpty
+        return pages.indices.first { other in
+            guard other != index, let theirs = current(pages[other]), alike[Self.pair(mine.key, theirs.key)] == true
+            else { return false }
+            let theyAreFlawed = !issues(for: pages[other]).isEmpty
+            return flawed != theyAreFlawed ? flawed : other < index
         }
     }
 

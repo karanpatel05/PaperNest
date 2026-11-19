@@ -1,3 +1,17 @@
+## 2026-11-18 — Of two photographs of one page, the one worth deleting is marked (Claude)
+
+Owner: "Yes, fix the mark". The first version always marked the **later** page "Same as page N" — so after the natural fix for a blurred capture, taking it again, the good retake carried the mark, inviting its deletion. Now `ScanQualityMemo.repeated` marks the page worth deleting: the one with something wrong with it (any issue its mode lets be said) when only one of the two has; otherwise the later, the extra copy. A byte-for-byte copy still says nothing.
+
+| Check | Result |
+|---|---|
+| New `ScanQualityMemoTests` cases (3, iOS, `PaperNest-Canvas`) — **written first** | `theBlurredPageOfARepeatIsMarkedNotItsSharpRetake` **failed before the fix** (the blur was found and the pages matched, but the mark was on the retake) and **passes after**; `aBlurredRetakeOfAGoodPageIsMarked` and `ofTwoGoodPhotographsTheLaterIsMarked` (with a third, different page named by no one) pass before and after. All 27 canvas tests pass. |
+| New `ScanRepeatUITests.testTheBlurredPageIsMarkedNotItsSharpRetake` (en) | **iPhone 17 pass (28.4 s), iPad Air 13 pass (17.3 s)**: a blurred page and its sharp retake; page 1 reads "Looks blurry · Same as page 2" in its label and note, page 2 has nothing. |
+| `ScanRepeatUITests.testASecondPhotographOfAPageIsNamedAsItsRepeat`, `ScanQualityUITests` (unchanged) | **iPad Air 13:** repeat test **pass (60.0 s)**. **iPhone 17:** the first run never started (the test runner failed to launch: Mach error -308, "server died", right after the previous session was cut off mid-run); after rebooting the simulator, `ScanQualityUITests` **passed (47.4 s)**, and the repeat test passed its English checks, then the runner exited unexpectedly while tapping page 4 and was restarted, counted as a failure (cause not established); **rerun alone, it passed (66.4 s)**, at a machine load of about 90. |
+| `xcodebuild build-for-testing` (iOS), git-free copy | **Succeeded, no compiler warnings.** |
+| `./scripts/test.sh`, git-free copy | **1,573 tests, 0 failures, 0 warnings** (422 + 49 + 263 + 273 + 269 + 297). |
+
+**Not verified:** a real camera; VoiceOver itself. **Known limit:** when both photographs have something wrong (or neither), the later is marked whichever is worse.
+
 ## 2026-11-18 — Glare follow-up: white printed on tinted paper is not glare (Claude)
 
 A review of `d7da368` asked what tells a reflection from white print. Probed: a pure-white box printed on 0.85 paper (0.8–3.8% of the page, sharp or softened by 2 px) **was called glare** — so would a form's white box on tinted stock or a white panel on a card. Now a blown-out patch must also have a **halo**: a tenth or more of the pixels within two cells of it lie between the paper and white. A reflection is light added and falls off gradually; white print has a sharp edge.

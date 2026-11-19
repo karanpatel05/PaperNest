@@ -1,5 +1,6 @@
 import XCTest
 import UIKit
+import CoreImage
 
 /// A page photographed twice, in the running scanner: of four pages — a
 /// page, a second photograph of it (shifted, scaled, turned a little, lit
@@ -53,6 +54,14 @@ import UIKit
         return try XCTUnwrap(image.pngData())
     }
 
+    /// `data`'s picture blurred by a Gaussian of `sigma` pixels.
+    private func blurred(_ data: Data, sigma: Double) throws -> Data {
+        let source = try XCTUnwrap(CIImage(data: data))
+        let soft = source.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: source.extent)
+        let drawn = try XCTUnwrap(CIContext().createCGImage(soft, from: source.extent))
+        return try XCTUnwrap(UIImage(cgImage: drawn).pngData())
+    }
+
     private func snap(_ app: XCUIApplication, _ name: String) {
         let folder = URL(fileURLWithPath: "/tmp/pn-scan-repeat-shots")
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -103,5 +112,43 @@ import UIKit
             XCTAssertTrue(note.waitForNonExistence(timeout: 10), "\(language): the copy made on purpose has a note")
             app.terminate()
         }
+    }
+
+    /// A blurred capture taken again: the blurred page is the one marked,
+    /// naming its sharp retake, and the retake says nothing — marking the
+    /// retake would invite deleting the good page.
+    func testTheBlurredPageIsMarkedNotItsSharpRetake() throws {
+        let folder = URL(fileURLWithPath: "/tmp/papernest-scan-retake-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        let soft = folder.appendingPathComponent("soft.png"), sharp = folder.appendingPathComponent("sharp.png")
+        try blurred(page(seed: 1), sigma: 6).write(to: soft)
+        try page(seed: 1, shift: CGPoint(x: 12, y: 9), scale: 1.01, degrees: 0.4, paper: 0.9).write(to: sharp)
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-scan-retake-library-\(UUID().uuidString)",
+                               "-PaperNestDebugSkipWelcome", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-PaperNestDebugScannerImages", [soft, sharp].map(\.path).joined(separator: ";"),
+                               "-scanner.defaultMode", "document", "-scanner.defaultPreset", "original",
+                               "-scanner.autoOnEntry", "NO"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["scanner.finish"].waitForExistence(timeout: 30), "review did not open")
+        let first = app.buttons["scanner.page.0"], second = app.buttons["scanner.page.1"]
+        let named = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "Same as page 2"), object: first)
+        if XCTWaiter().wait(for: [named], timeout: 40) != .completed {
+            XCTFail("the blurred page does not name its retake: “\(first.label)”")
+        }
+        XCTAssertTrue(first.label.contains("Looks blurry"), first.label)
+        sleep(2)
+        XCTAssertFalse(second.label.contains("Same as page"), "the good retake is marked: \(second.label)")
+        XCTAssertFalse(second.label.contains("Looks blurry"), second.label)
+        first.tap()
+        let note = app.descendants(matching: .any)["scanner.quality"]
+        XCTAssertTrue(note.waitForExistence(timeout: 10), "no note over the blurred page")
+        XCTAssertEqual(note.label, "Looks blurry · Same as page 2")
+        snap(app, "blurred-retaken-en")
+        second.tap()
+        XCTAssertTrue(note.waitForNonExistence(timeout: 10), "the good retake has a note")
     }
 }
