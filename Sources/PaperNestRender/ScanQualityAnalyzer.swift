@@ -62,6 +62,13 @@ public enum ScanQualityAnalyzer {
     /// (the median of its cells' paper levels) is at most this. A page whose
     /// paper is nearly white all over is exposed brightly, not reflecting.
     static let glarePaperAtMost = 0.9
+    /// How many cells around a blown-out patch its halo is looked for in…
+    static let haloReach = 2
+    /// …and the share of those pixels that must lie between the paper and
+    /// white. A reflection is light added, so it falls off gradually around
+    /// its white core (measured 0.19 to 0.94); white printed on tinted paper
+    /// — a form's box, a panel on a card — has a sharp edge (0.01 to 0.02).
+    static let haloAtLeast = 0.1
 
     /// The report for `page`, the captured page cropped to its corners.
     /// `corners` are shares of the photo it was cropped from, `photoSize`
@@ -91,7 +98,8 @@ public enum ScanQualityAnalyzer {
 
     /// The share of the page in its largest patch of blown-out cells
     /// (touching side by side), or 0 when the page's paper is itself nearly
-    /// white, so nothing stands out. One patch and not all of them: scattered
+    /// white, so nothing stands out, or when the patch has no halo, so it is
+    /// white print and not light. One patch and not all of them: scattered
     /// white specks are not a reflection.
     static func glare(of picture: GrayPicture) -> Double {
         let cell = max(4, glareCell * max(picture.width, picture.height) / longSide)
@@ -122,12 +130,12 @@ public enum ScanQualityAnalyzer {
         let typicalPaper = Double(paperLevels.sorted()[paperLevels.count / 2]) / 255
         guard typicalPaper <= glarePaperAtMost else { return 0 }
         var seen = [Bool](repeating: false, count: blown.count)
-        var largest = 0
+        var largest: [Int] = []
         for start in blown.indices where blown[start] && !seen[start] {
-            var stack = [start], size = 0
+            var stack = [start], patch: [Int] = []
             seen[start] = true
             while let index = stack.popLast() {
-                size += 1
+                patch.append(index)
                 let row = index / columns, column = index % columns
                 for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
                     let r = row + dr, c = column + dc
@@ -136,9 +144,43 @@ public enum ScanQualityAnalyzer {
                     if blown[neighbour] && !seen[neighbour] { seen[neighbour] = true; stack.append(neighbour) }
                 }
             }
-            largest = max(largest, size)
+            if patch.count > largest.count { largest = patch }
         }
-        return Double(largest) / Double(blown.count)
+        guard !largest.isEmpty,
+              halo(around: largest, blown: blown, columns: columns, rows: rows, cell: cell, picture: picture,
+                   typicalPaper: typicalPaper) >= haloAtLeast else { return 0 }
+        return Double(largest.count) / Double(blown.count)
+    }
+
+    /// The share of the pixels within `haloReach` cells of `patch` (not in
+    /// any blown-out cell) whose shade lies between the paper and white:
+    /// the light falling off around a reflection.
+    static func halo(around patch: [Int], blown: [Bool], columns: Int, rows: Int, cell: Int, picture: GrayPicture,
+                     typicalPaper: Double) -> Double {
+        var ring = Set<Int>()
+        for index in patch {
+            let row = index / columns, column = index % columns
+            for r in max(0, row - haloReach)...min(rows - 1, row + haloReach) {
+                for c in max(0, column - haloReach)...min(columns - 1, column + haloReach) where !blown[r * columns + c] {
+                    ring.insert(r * columns + c)
+                }
+            }
+        }
+        guard !ring.isEmpty else { return 0 }
+        let low = UInt8(min(255, (typicalPaper + 0.05) * 255)), high = blownOut
+        var between = 0, total = 0
+        for index in ring {
+            let row = index / columns, column = index % columns
+            for y in (row * cell)..<((row + 1) * cell) {
+                let start = y * picture.width
+                for x in (column * cell)..<((column + 1) * cell) {
+                    let value = picture.pixels[start + x]
+                    total += 1
+                    if value >= low && value < high { between += 1 }
+                }
+            }
+        }
+        return Double(between) / Double(total)
     }
 
     /// The size of the photo in `data` as it is shown, its orientation

@@ -1,3 +1,18 @@
+## 2026-11-18 — Glare follow-up: white printed on tinted paper is not glare (Claude)
+
+A review of `d7da368` asked what tells a reflection from white print. Probed: a pure-white box printed on 0.85 paper (0.8–3.8% of the page, sharp or softened by 2 px) **was called glare** — so would a form's white box on tinted stock or a white panel on a card. Now a blown-out patch must also have a **halo**: a tenth or more of the pixels within two cells of it lie between the paper and white. A reflection is light added and falls off gradually; white print has a sharp edge.
+
+| Check | Result |
+|---|---|
+| Probe (Render, drawn) | Halo of reflections 0.19 (the UI test's straight-line fall-off) to 0.94 (a flash on dark paper); of white boxes 0.008–0.021, sharp or softened. Line at 0.1. |
+| New `ScanQualityAnalyzerTests.whitePrintedOnTintedPaperIsNotGlare` (2 cases, sharp and softened) | **Pass**; the reflection, glint, specks, bright-page, resolution and dark-flash tests still pass (17 in the suite). **Mutation:** without the halo rule, both box cases fail. |
+| `./scripts/test.sh`, git-free copy | **1,573 tests, 0 failures, 0 warnings** (422 + 49 + 263 + 273 + 269 + 297). |
+| `xcodebuild build-for-testing` (iOS) | **Succeeded, no compiler warnings.** |
+| `ScanQualityUITests` (now also shows the glare note and screenshots it) | **iPhone 17 pass (59.3 s)**; **iPad Air 13 failed once** — after tapping the blurred page, its note did not appear within 10 s, though its label already named the blur (cause not established; the 1-minute load had been 64 shortly before) — **and passed on rerun (70.5 s)**. Screenshot looked at (iPhone, es): "Reflejo en la página" whole under the page, the reflection visible. |
+| `ScanRepeatUITests`, `ScannerWorkspaceUITests.testCardModeAsksForTheBackAndNamesBothSides` on iPhone 17 | **Pass** (48.8 s, 43.5 s). The card test's fixture is a 0.9 grey card on 0.25: nothing blows out. |
+
+**Not looked at:** the combined note ("Too dark · Glare on the page") at iPhone width in French and Spanish — no UI test draws a dark page with a reflection. **Known limit (unchanged):** glare is said only when the page's typical paper is at most 0.9, so on white paper a phone exposes brightly, glare may go unsaid.
+
 ## 2026-11-18 — Glare on a captured page is named in the scanner (Claude, roadmap order item 2)
 
 Owner: "Yes, glare next". A page with a reflection on it gets the corner mark, "Glare on the page" / "Reflet sur la page" / "Reflejo en la página" in its filmstrip label (for VoiceOver) and in the note under it. Advice only. Said for documents, boards and cards (a laminated card is where glare is likeliest), not for photos. **Measured on drawn reflections, not a camera.**

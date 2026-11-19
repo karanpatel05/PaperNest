@@ -224,6 +224,26 @@ import PaperNestCore
         #expect(!measured.issues.contains(.glare))
     }
 
+    /// White printed on tinted paper — a form's box, a panel on a card —
+    /// blows out as much of the page as a reflection, but has no halo of
+    /// light around it: a sharp edge, softened or not. Before the halo rule
+    /// it was called glare. Measured halo: 0.01 to 0.02 (reflections 0.19
+    /// and up).
+    @Test(arguments: [140, 300])
+    func whitePrintedOnTintedPaperIsNotGlare(size: Int) throws {
+        let context = try #require(CGContext(data: nil, width: 2000, height: 2600, bitsPerComponent: 8, bytesPerRow: 2000,
+                                             space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue))
+        context.draw(Self.page(width: 2000, height: 2600, paper: 0.85), in: CGRect(x: 0, y: 0, width: 2000, height: 2600))
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(CGRect(x: 900, y: 1200, width: size * 2, height: size))
+        let sharp = try #require(context.makeImage())
+        for image in [sharp, Self.blurred(sharp, sigma: 2)] {
+            let measured = try report(image)
+            #expect(measured.glare == 0, "box \(size): \(measured)")
+            #expect(!measured.issues.contains(.glare))
+        }
+    }
+
     /// The same reflection on the same page at half or twice the pixels
     /// covers the same share of it (measured: 1.58% both).
     @Test func glareReadsTheSameAtAnyResolution() throws {

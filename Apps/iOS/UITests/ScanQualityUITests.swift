@@ -113,6 +113,9 @@ import CoreImage
             XCTAssertTrue(note.waitForExistence(timeout: 10), "\(language): no note over the blurred page")
             XCTAssertEqual(note.label, blurry, "\(language)")
             snap(app, "blurred-\(language)")
+            fourth.tap()
+            expectLabel(note, contains: glare, "\(language): no glare note over the reflected page")
+            snap(app, "glare-\(language)")
             first.tap()
             XCTAssertTrue(note.waitForNonExistence(timeout: 10), "\(language): the sharp page has a note")
             if language == "en" {
