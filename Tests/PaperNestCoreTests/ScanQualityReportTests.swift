@@ -16,6 +16,15 @@ import Testing
         #expect(ScanQualityReport(sharpness: 0.05, paperBrightness: 0.9, stretch: 1).issues == [.blurry])
         #expect(ScanQualityReport(sharpness: 0.5, paperBrightness: 0.1, stretch: 1).issues == [.tooDark])
         #expect(ScanQualityReport(sharpness: 0.5, paperBrightness: 0.9, stretch: 1.8).issues == [.steepAngle])
+        #expect(ScanQualityReport(sharpness: 0.5, paperBrightness: 0.9, stretch: 1, glare: 0.02).issues == [.glare])
+        #expect(ScanQualityReport(sharpness: 0.5, paperBrightness: 0.9, stretch: 1, glare: 0.004).issues.isEmpty)
+    }
+
+    /// The light first, then the focus, then the angle.
+    @Test func glareComesBeforeFocusAndAngle() {
+        #expect(ScanQualityReport(sharpness: 0.05, paperBrightness: 0.9, stretch: 1.8, glare: 0.02).issues
+                == [.glare, .blurry, .steepAngle])
+        #expect(ScanQualityReport(sharpness: 0.5, paperBrightness: 0.1, stretch: 1, glare: 0.02).issues == [.tooDark, .glare])
     }
 
     /// A dark capture is grainy and grain reads as detail, so its focus is
@@ -42,6 +51,10 @@ import Testing
         let blurred = ScanQualityReport(sharpness: 0.05, paperBrightness: 0.9, stretch: 1)
         #expect(blurred.issues(in: .card) == [.blurry])
         #expect(blurred.issues(in: .photo).isEmpty)
+        // A laminated card is where glare is likeliest: said for a card, not for a photo.
+        let glared = ScanQualityReport(sharpness: 0.5, paperBrightness: 0.1, stretch: 1, glare: 0.02)
+        #expect(glared.issues(in: .card) == [.glare])
+        #expect(glared.issues(in: .photo).isEmpty)
     }
 
     @Test func aPageSquareOnIsNotStretched() throws {

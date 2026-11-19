@@ -11,6 +11,9 @@ public enum ScanQualityIssue: String, CaseIterable, Sendable {
     case steepAngle
     /// The page itself is dark, not just its surroundings.
     case tooDark
+    /// A patch of the page is blown out to white, brighter than the paper
+    /// around it: a reflection, whose print is lost under it.
+    case glare
 }
 
 /// What was measured on a captured page (`ScanQualityAnalyzer`), and the
@@ -33,6 +36,9 @@ public struct ScanQualityReport: Equatable, Sendable {
     /// The longer of each pair of opposite sides over the shorter, the worse
     /// pair (1 for a page photographed square on). Nil without corners.
     public var stretch: Double?
+    /// The share of the page in its largest blown-out patch that stands out
+    /// from the paper around it, 0 when there is none.
+    public var glare: Double
 
     /// Below this, a page with enough on it is blurry. Set from drawn print
     /// measured at `ScanQualityAnalyzer.longSide`: sharp pages read 0.38
@@ -52,16 +58,23 @@ public struct ScanQualityReport: Equatable, Sendable {
     /// or fewer. The angle that takes depends on how close the camera is.
     public static let steepAbove = 1.5
 
-    public init(sharpness: Double?, paperBrightness: Double, stretch: Double?) {
+    /// At or above this share of the page, glare is said: about 2 cm across
+    /// on a sheet of A4, enough to wash out several words.
+    public static let glareAtLeast = 0.005
+
+    public init(sharpness: Double?, paperBrightness: Double, stretch: Double?, glare: Double = 0) {
         self.sharpness = sharpness
         self.paperBrightness = paperBrightness
         self.stretch = stretch
+        self.glare = glare
     }
 
-    /// The issues found, most worth fixing first: no use refocusing in the dark.
+    /// The issues found, most worth fixing first: the light, then the focus,
+    /// then the angle. No use refocusing in the dark.
     public var issues: [ScanQualityIssue] {
         var found: [ScanQualityIssue] = []
         if paperBrightness < Self.darkBelow { found.append(.tooDark) }
+        if glare >= Self.glareAtLeast { found.append(.glare) }
         // A dark capture is grainy, and grain reads as detail: no verdict on focus.
         if let sharpness, sharpness < Self.blurryBelow, paperBrightness >= Self.darkBelow { found.append(.blurry) }
         if let stretch, stretch > Self.steepAbove { found.append(.steepAngle) }
@@ -70,7 +83,8 @@ public struct ScanQualityReport: Equatable, Sendable {
 
     /// The issues worth raising for a page captured in `mode`. A photo is
     /// kept as it was taken: it may be dark or soft on purpose, and it has no
-    /// outline. A card may be dark itself: a black card is not a dark capture.
+    /// outline. A card may be dark itself: a black card is not a dark capture
+    /// — but a laminated card is where glare is most likely, so it is said.
     /// Paper and boards are expected to be light.
     public func issues(in mode: ScanCaptureMode) -> [ScanQualityIssue] {
         switch mode {

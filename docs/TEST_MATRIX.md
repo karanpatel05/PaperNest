@@ -1,3 +1,21 @@
+## 2026-11-18 — Glare on a captured page is named in the scanner (Claude, roadmap order item 2)
+
+Owner: "Yes, glare next". A page with a reflection on it gets the corner mark, "Glare on the page" / "Reflet sur la page" / "Reflejo en la página" in its filmstrip label (for VoiceOver) and in the note under it. Advice only. Said for documents, boards and cards (a laminated card is where glare is likeliest), not for photos. **Measured on drawn reflections, not a camera.**
+
+How (`ScanQualityAnalyzer.glare`): cells of 16 pixels at the measuring size (about 5 mm on A4); a cell is blown out when half its pixels are at 250 of 255 or more; glare is the share of the page in the **largest** patch of blown-out cells, counted only when the page's typical paper is at most 0.9 (so it stands out). 0.5% of the page or more is said, after darkness and before focus.
+
+| Check | Result |
+|---|---|
+| `ScanQualityReportTests` (+1 test, +4 checks, Core) | **Pass.** Glare at 2% is said and at 0.4% is not; it comes after darkness and before focus and angle; a card keeps it, a photo does not. |
+| `ScanQualityAnalyzerTests` (+6, Render, drawn reflections: light added as a Gaussian, washing paper and ink alike) | **Pass.** A reflection: 1.6% of the page, glare and nothing else. A glint: 0.1%, nothing. Paper exposed to white all over: 0, with or without a reflection on it. Hundreds of white specks: largest patch 0.03%, no glare. 1,500 vs 3,000 pixels: 1.58% both. A flash on dark paper: too dark and glare (1.2%) — a weaker reflection first drawn blew out only 0.13% of dark paper, which has further to go to white; the test now draws a flash-like one. |
+| Mutations (each restored) | Without the stand-out rule → the page exposed to white all over is called glare. All blown-out cells instead of the largest patch → the specks are called glare. |
+| `./scripts/test.sh`, git-free copy | **1,572 tests, 0 failures, 0 warnings** (422 + 49 + 263 + 272 + 269 + 297). `./scripts/build-mac-app.sh`: built, no warnings. |
+| `xcodebuild build-for-testing` (iOS), git-free copy | **Succeeded, no compiler warnings.** |
+| `ScanQualityUITests.testBlurredDarkAndReflectedPagesAreNamedForWhatIsWrong` (renamed; a fourth page with a reflection added in UIKit with `plusLighter`) | **iPhone 17 pass (53.2 s), iPad Air 13 pass (74.5 s)**, en/fr/es: the reflected page's label names glare and not blur; the sharp page names nothing. Capture-screen screenshot looked at: the reflected page, latest, shows its white patch with the mark at the top-left and the count at the top-right. |
+| `ScanRepeatUITests` (unchanged) | **iPhone 17 pass (48.4 s), iPad Air 13 pass (75.5 s).** |
+
+**Not verified:** a real camera, real glossy paper or laminate; VoiceOver itself; Mac (the scanner is iOS-only). **Known limits:** a reflection on paper already nearly white all over (typical paper above 0.9) is not found; by the same rule, a page lit so unevenly that one side blows out would be called glare (not tested). Low contrast and book mode are still not started.
+
 ## 2026-11-18 — Repeats follow-up: the scanner's memo keeps only the scan in progress (Claude)
 
 A review of `f67252f` found that `ScanQualityMemo.shared` lives as long as the app and never forgot: every capture was compared (about 80 ms a pair in a debug build) with every page measured since launch, and memory grew with each. Now `measure(_:among:)` takes the scan's pages, compares with those only, and forgets every other page and pair (an earlier scan's, a deleted page, an old crop). `ScannerThumbnail`'s `pages` is required, so no caller can empty the memo by leaving it out. The pending capture is drawn from its own preview, not through the memo.

@@ -50,6 +50,18 @@ public enum ScanQualityAnalyzer {
     /// blank sheet's corners differ by more than a blurred page's faint print
     /// differs from the paper beside it.
     static let leastMarkDepth = 0.025
+    /// A pixel at or above this (of 255) is blown out to white.
+    static let blownOut: UInt8 = 250
+    /// The side of the cells glare is looked for in, in pixels at `longSide`
+    /// (about 5 mm on a sheet of A4).
+    static let glareCell = 16
+    /// A cell is blown out when at least this share of its pixels is: ink
+    /// under a reflection is washed out too, but not always to white.
+    static let blownShare = 0.5
+    /// Glare stands out from the paper around it: the page's typical paper
+    /// (the median of its cells' paper levels) is at most this. A page whose
+    /// paper is nearly white all over is exposed brightly, not reflecting.
+    static let glarePaperAtMost = 0.9
 
     /// The report for `page`, the captured page cropped to its corners.
     /// `corners` are shares of the photo it was cropped from, `photoSize`
@@ -73,7 +85,60 @@ public enum ScanQualityAnalyzer {
         let sharpness = markDepth(plane, width: picture.width, height: picture.height) < leastMarkDepth
             ? nil : self.sharpness(of: plane, width: picture.width, height: picture.height)
         let stretch = photoSize.flatMap { ScanQualityReport.stretch(of: corners, photoSize: $0) }
-        return (ScanQualityReport(sharpness: sharpness, paperBrightness: paper, stretch: stretch), fingerprint)
+        return (ScanQualityReport(sharpness: sharpness, paperBrightness: paper, stretch: stretch, glare: glare(of: picture)),
+                fingerprint)
+    }
+
+    /// The share of the page in its largest patch of blown-out cells
+    /// (touching side by side), or 0 when the page's paper is itself nearly
+    /// white, so nothing stands out. One patch and not all of them: scattered
+    /// white specks are not a reflection.
+    static func glare(of picture: GrayPicture) -> Double {
+        let cell = max(4, glareCell * max(picture.width, picture.height) / longSide)
+        let columns = picture.width / cell, rows = picture.height / cell
+        guard columns > 0, rows > 0 else { return 0 }
+        var blown = [Bool](repeating: false, count: columns * rows)
+        var paperLevels: [UInt8] = []
+        var values: [UInt8] = []
+        values.reserveCapacity(cell * cell)
+        for row in 0..<rows {
+            for column in 0..<columns {
+                values.removeAll(keepingCapacity: true)
+                var white = 0
+                for y in (row * cell)..<((row + 1) * cell) {
+                    let start = y * picture.width
+                    for x in (column * cell)..<((column + 1) * cell) {
+                        let value = picture.pixels[start + x]
+                        values.append(value)
+                        if value >= blownOut { white += 1 }
+                    }
+                }
+                values.sort()
+                // The cell's paper: a level most of it is at or below, past its ink.
+                paperLevels.append(values[values.count * 3 / 4])
+                blown[row * columns + column] = Double(white) >= blownShare * Double(values.count)
+            }
+        }
+        let typicalPaper = Double(paperLevels.sorted()[paperLevels.count / 2]) / 255
+        guard typicalPaper <= glarePaperAtMost else { return 0 }
+        var seen = [Bool](repeating: false, count: blown.count)
+        var largest = 0
+        for start in blown.indices where blown[start] && !seen[start] {
+            var stack = [start], size = 0
+            seen[start] = true
+            while let index = stack.popLast() {
+                size += 1
+                let row = index / columns, column = index % columns
+                for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    let r = row + dr, c = column + dc
+                    guard (0..<rows).contains(r), (0..<columns).contains(c) else { continue }
+                    let neighbour = r * columns + c
+                    if blown[neighbour] && !seen[neighbour] { seen[neighbour] = true; stack.append(neighbour) }
+                }
+            }
+            largest = max(largest, size)
+        }
+        return Double(largest) / Double(blown.count)
     }
 
     /// The size of the photo in `data` as it is shown, its orientation

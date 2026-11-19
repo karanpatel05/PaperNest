@@ -115,6 +115,7 @@ extension ScanQualityIssue {
         case .blurry: L10n.scannerQualityBlurry
         case .steepAngle: L10n.scannerQualitySteepAngle
         case .tooDark: L10n.scannerQualityTooDark
+        case .glare: L10n.scannerQualityGlare
         }
     }
 }

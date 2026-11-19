@@ -1326,3 +1326,4 @@
 "scanner.quality.steepAngle" = "Tomado muy en ángulo";
 "scanner.quality.tooDark" = "Demasiado oscuro";
 "scanner.quality.sameAs" = "Igual que la página %d";
+"scanner.quality.glare" = "Reflejo en la página";

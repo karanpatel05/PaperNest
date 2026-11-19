@@ -166,6 +166,82 @@ import PaperNestCore
         #expect(dense.issues.isEmpty, "\(dense)")
     }
 
+    /// `image` with a reflection on it: light of `strength` (0…1) added at
+    /// `center` (shares of the page), falling off as a Gaussian `spread` (a
+    /// share of the width) wide, washing out paper and ink alike.
+    static func glared(_ image: CGImage, center: CGPoint = CGPoint(x: 0.6, y: 0.4), spread: Double = 0.05,
+                       strength: Double = 0.6) -> CGImage {
+        let picture = DocumentComparer.gray(image)!
+        let width = picture.width, height = picture.height
+        let x0 = Double(center.x) * Double(width), y0 = Double(center.y) * Double(height), sigma = spread * Double(width)
+        var pixels = picture.pixels
+        for y in 0..<height {
+            for x in 0..<width {
+                let r2 = (Double(x) - x0) * (Double(x) - x0) + (Double(y) - y0) * (Double(y) - y0)
+                let added = strength * 255 * exp(-r2 / (2 * sigma * sigma))
+                pixels[y * width + x] = UInt8(min(255, Double(pixels[y * width + x]) + added))
+            }
+        }
+        return grey(pixels, width: width, height: height)
+    }
+
+    /// A reflection on a page of print, about 2% of the page blown out,
+    /// is glare. Measured: 1.6%.
+    @Test func aReflectionIsGlare() throws {
+        let measured = try report(Self.glared(Self.page(width: 2000, height: 2600, paper: 0.85)))
+        #expect(measured.issues == [.glare], "\(measured)")
+        #expect(measured.glare > 2 * ScanQualityReport.glareAtLeast, "\(measured)")
+    }
+
+    /// A glint, about 0.1% of the page (measured), is not worth a word.
+    @Test func aGlintIsNotGlare() throws {
+        let measured = try report(Self.glared(Self.page(width: 2000, height: 2600, paper: 0.85), spread: 0.012))
+        #expect(measured.issues.isEmpty, "\(measured)")
+    }
+
+    /// Paper exposed to white all over has nothing standing out: bright,
+    /// not reflecting — with a reflection on it too, it cannot show.
+    @Test func aPageExposedBrightAllOverIsNotGlare() throws {
+        let bright = Self.page(width: 2000, height: 2600, paper: 1)
+        #expect(try report(bright).glare == 0)
+        #expect(try report(bright).issues.isEmpty)
+        #expect(try report(Self.glared(bright)).glare == 0)
+    }
+
+    /// Hundreds of small white specks blow out more of the page than a
+    /// reflection does, but no patch of them is a reflection: the largest
+    /// measured 0.03%.
+    @Test func scatteredWhiteSpecksAreNotGlare() throws {
+        let context = try #require(CGContext(data: nil, width: 2000, height: 2600, bitsPerComponent: 8, bytesPerRow: 2000,
+                                             space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue))
+        context.draw(Self.page(width: 2000, height: 2600, paper: 0.85), in: CGRect(x: 0, y: 0, width: 2000, height: 2600))
+        context.setFillColor(gray: 1, alpha: 1)
+        for y in stride(from: 60, to: 2600, by: 120) {
+            for x in stride(from: 60, to: 2000, by: 120) { context.fillEllipse(in: CGRect(x: x - 20, y: y - 20, width: 40, height: 40)) }
+        }
+        let measured = try report(try #require(context.makeImage()))
+        #expect(measured.glare < ScanQualityReport.glareAtLeast, "\(measured)")
+        #expect(!measured.issues.contains(.glare))
+    }
+
+    /// The same reflection on the same page at half or twice the pixels
+    /// covers the same share of it (measured: 1.58% both).
+    @Test func glareReadsTheSameAtAnyResolution() throws {
+        let small = try report(Self.glared(Self.page(width: 1500, height: 1950, paper: 0.85)))
+        let large = try report(Self.glared(Self.page(width: 3000, height: 3900, paper: 0.85)))
+        #expect(small.issues == [.glare] && large.issues == [.glare], "\(small) / \(large)")
+        #expect(abs(small.glare - large.glare) < 0.25 * large.glare, "\(small.glare) vs \(large.glare)")
+    }
+
+    /// A reflection on dark paper — a flash in a dim room — is both
+    /// (measured: 1.2%). A weaker one blew out too little of dark paper to
+    /// count: there is further to go to white.
+    @Test func aDarkPageCanHaveGlareToo() throws {
+        let measured = try report(Self.glared(Self.page(width: 2000, height: 2600, paper: 0.22, ink: 0.03), spread: 0.08,
+                                              strength: 1.2))
+        #expect(measured.issues == [.tooDark, .glare], "\(measured)")
+    }
+
     /// A black card with one line of white print, cropped to the card, is
     /// "too dark" by a page's measure: its own colour, not the light. So in
     /// Card mode its darkness is not said, and in Photo mode nothing is.
