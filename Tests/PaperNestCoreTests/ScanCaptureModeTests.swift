@@ -76,7 +76,7 @@ import Testing
     @Test func onlyAPhotoKeepsTheWholeFrame() {
         #expect(ScanCaptureMode.photo.detection == nil)
         #expect(!ScanCaptureMode.photo.findsEdges)
-        for mode in [ScanCaptureMode.document, .whiteboard, .card] {
+        for mode in [ScanCaptureMode.document, .whiteboard, .card, .book] {
             #expect(mode.findsEdges, "\(mode)")
         }
     }
@@ -90,6 +90,7 @@ import Testing
     @Test func aNewCaptureStartsWithItsModesLook() {
         #expect(ScanCaptureMode.document.startingAppearance(defaultPreset: .blackAndWhite) == ScanAppearance(preset: .blackAndWhite))
         #expect(ScanCaptureMode.card.startingAppearance(defaultPreset: .enhanced) == ScanAppearance(preset: .enhanced))
+        #expect(ScanCaptureMode.book.startingAppearance(defaultPreset: .grayscale) == ScanAppearance(preset: .grayscale))
         #expect(ScanCaptureMode.photo.startingAppearance(defaultPreset: .blackAndWhite) == .original)
         let board = ScanCaptureMode.whiteboard.startingAppearance(defaultPreset: .grayscale)
         #expect(board.preset == .highContrast)

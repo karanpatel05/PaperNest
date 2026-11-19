@@ -90,7 +90,7 @@ public struct ScanQualityReport: Equatable, Sendable {
         switch mode {
         case .photo: []
         case .card: issues.filter { $0 != .tooDark }
-        case .document, .whiteboard: issues
+        case .document, .whiteboard, .book: issues
         }
     }
 

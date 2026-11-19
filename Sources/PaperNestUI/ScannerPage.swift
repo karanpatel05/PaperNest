@@ -19,6 +19,11 @@ struct ScannerPage: Identifiable, Sendable {
     /// may say (`ScanQualityReport.issues(in:)`). A page brought in from
     /// Photos or Files is taken for a document, as the scanner's pages are.
     var mode = ScanCaptureMode.document
+    /// Where a book capture folds, a share across its straightened spread:
+    /// set only when it was taken in Book mode and its outline is wider than
+    /// tall (`spreadGutter(_:corners:)`). Kept, it becomes two pages
+    /// (`spreadPages()`); until then it is shown whole, its fold marked.
+    var spreadGutter: Double?
 
     static let wholeFrame = [CGPoint(x: 0, y: 0), CGPoint(x: 1, y: 0), CGPoint(x: 1, y: 1), CGPoint(x: 0, y: 1)]
 
@@ -27,7 +32,8 @@ struct ScannerPage: Identifiable, Sendable {
 
     /// A second page of the same capture with the same edits.
     func copy() -> ScannerPage {
-        ScannerPage(original: original, quarterTurns: quarterTurns, appearance: appearance, corners: corners, mode: mode)
+        ScannerPage(original: original, quarterTurns: quarterTurns, appearance: appearance, corners: corners, mode: mode,
+                    spreadGutter: spreadGutter)
     }
 
     /// Back to the capture as it was taken: no turn, no look, the whole frame.
@@ -93,6 +99,43 @@ struct ScannerPage: Identifiable, Sendable {
             ci = ci.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         }
         return ci
+    }
+
+    /// A book capture's two pages, left then right: the same photo, each
+    /// cropped to its half of the outline. Any other page is itself.
+    func spreadPages() -> [ScannerPage] {
+        guard let spreadGutter else { return [self] }
+        return ScanSpread.halves(of: corners, at: spreadGutter).map {
+            ScannerPage(original: original, appearance: appearance, corners: $0, mode: mode)
+        }
+    }
+
+    /// Where a capture taken in Book mode folds, or nil when it is to stay
+    /// one page: its outline was not found (the whole frame) or is not
+    /// plainly wider than tall. Cutting one page in half is the costly
+    /// mistake; keeping a spread whole costs a retake.
+    static func spreadGutter(_ data: Data, corners: [CGPoint]) -> Double? {
+        guard corners != wholeFrame, let size = ScanQualityAnalyzer.photoSize(of: data),
+              ScanSpread.isSpread(corners, photoSize: size) else { return nil }
+        guard let spread = ScannerPage(original: data, corners: corners).base(maxDimension: 1200) else { return 0.5 }
+        return ScanGutter.find(in: spread)
+    }
+
+    /// The capture as shown before it is kept: a book's spread with its fold
+    /// marked, so the two pages it will become can be seen.
+    func reviewPicture(maxDimension: CGFloat) -> UIImage? {
+        guard let picture = rendered(maxDimension: maxDimension) else { return nil }
+        guard let spreadGutter else { return picture }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: picture.size, format: format).image { context in
+            picture.draw(at: .zero)
+            let x = picture.size.width * spreadGutter, line = max(2, picture.size.width / 300)
+            UIColor.white.setFill()
+            context.fill(CGRect(x: x - line * 1.5, y: 0, width: line * 3, height: picture.size.height))
+            UIColor(red: 0.455, green: 0.220, blue: 0.961, alpha: 1).setFill()
+            context.fill(CGRect(x: x - line / 2, y: 0, width: line, height: picture.size.height))
+        }
     }
 
     /// Detection only: preserve raw still bytes so crop/reset can recover edges.

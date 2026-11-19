@@ -21,6 +21,7 @@ extension ScanCaptureMode {
         case .whiteboard: L10n.scannerWhiteboard
         case .photo: L10n.scannerKindPhoto
         case .card: L10n.scannerCard
+        case .book: L10n.scannerBook
         }
     }
 }
@@ -34,7 +35,10 @@ struct ScannerKindSelector: View {
     var body: some View {
         ViewThatFits(in: .horizontal) {
             modes
-            ScrollView(.horizontal, showsIndicators: false) { modes }
+            // One mode per swipe: a flick does not carry the strip past the
+            // mode wanted to its far end, where the first modes are hidden.
+            ScrollView(.horizontal, showsIndicators: false) { modes.scrollTargetLayout() }
+                .modifier(OneModeAtATime())
         }
         .background(.black.opacity(0.6), in: Capsule())
         .foregroundStyle(.white)
@@ -57,6 +61,18 @@ struct ScannerKindSelector: View {
             }
         }
         .padding(4)
+    }
+}
+
+/// Snaps the mode strip to a mode's edge, moving one mode per swipe where
+/// the system can (iOS 18); iOS 17 snaps to edges but may move further.
+private struct OneModeAtATime: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 18, *) {
+            content.scrollTargetBehavior(.viewAligned(limitBehavior: .alwaysByOne))
+        } else {
+            content.scrollTargetBehavior(.viewAligned)
+        }
     }
 }
 

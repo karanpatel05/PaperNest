@@ -1327,3 +1327,7 @@
 "scanner.quality.tooDark" = "Trop sombre";
 "scanner.quality.sameAs" = "Identique à la page %d";
 "scanner.quality.glare" = "Reflet sur la page";
+
+/* Book mode */
+"scanner.mode.book" = "Livre";
+"scanner.book.twoPages" = "Deux pages";

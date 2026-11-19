@@ -32,6 +32,43 @@ struct ScanQualityMemoTests {
         return ScannerPage(original: UIImage(cgImage: drawn).pngData()!)
     }
 
+    /// An open book photographed: two pages of different print side by
+    /// side, 1200 × 780; `shift` moves both, as a second photograph would sit.
+    private func spread(shift: CGFloat = 0) -> Data {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let words = ["report", "growth", "region", "costs", "orders", "spring", "summer", "teams", "stores", "north"]
+        return UIGraphicsImageRenderer(size: CGSize(width: 1200, height: 780), format: format).image { context in
+            UIColor(white: shift > 0 ? 0.95 : 1, alpha: 1).setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 1200, height: 780))
+            let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.black]
+            for (seed, left) in [(1, 40.0), (2, 640.0)] {
+                for line in 0..<40 {
+                    let text = (0..<9).map { words[(seed * 7 + line * 3 + $0 * ($0 + seed)) % words.count] }.joined(separator: " ")
+                    (text as NSString).draw(at: CGPoint(x: left + shift, y: 30 + shift + CGFloat(line) * 18), withAttributes: attributes)
+                }
+            }
+        }.pngData()!
+    }
+
+    private let leftHalf = [CGPoint(x: 0, y: 0), CGPoint(x: 0.5, y: 0), CGPoint(x: 0.5, y: 1), CGPoint(x: 0, y: 1)]
+    private let rightHalf = [CGPoint(x: 0.5, y: 0), CGPoint(x: 1, y: 0), CGPoint(x: 1, y: 1), CGPoint(x: 0.5, y: 1)]
+
+    /// Both pages of a book capture come from one photo, so they share its
+    /// bytes; a page is a copy made on purpose only when its bytes **and**
+    /// its crop match an earlier page's. Otherwise a spread taken again
+    /// could never have its right page named as a repeat: the first version
+    /// silenced it, because its left page had the same bytes.
+    @Test func aRetakenSpreadsRightPageNamesTheFirstRightPage() async {
+        let first = spread(), second = spread(shift: 6)
+        let pages = [ScannerPage(original: first, corners: leftHalf), ScannerPage(original: first, corners: rightHalf),
+                     ScannerPage(original: second, corners: leftHalf), ScannerPage(original: second, corners: rightHalf)]
+        let memo = await measured(pages)
+        #expect(memo.repeated(pages[1], among: pages) == nil, "a spread's two pages are different pages")
+        #expect(memo.repeated(pages[2], among: pages) == 0)
+        #expect(memo.repeated(pages[3], among: pages) == 1, "the second right page should name the first right page")
+    }
+
     private func measured(_ pages: [ScannerPage]) async -> ScanQualityMemo {
         let memo = ScanQualityMemo()
         for each in pages { await memo.measure(each, among: pages) }

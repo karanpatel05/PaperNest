@@ -15,6 +15,10 @@ public enum ScanCaptureMode: String, Sendable, CaseIterable {
     case photo
     /// A card: a small rectangle of a card's proportions, front and then back.
     case card
+    /// An open book: the two-page spread is found as one outline and, when
+    /// it is wider than tall, kept as two pages split at the fold
+    /// (`ScanSpread`). The curve of the paper near the fold is not flattened.
+    case book
 
     /// How edges are looked for. Nil when the whole frame is kept.
     public var detection: ScanDetection? {
@@ -34,6 +38,14 @@ public enum ScanCaptureMode: String, Sendable, CaseIterable {
             // 85.6 by 54 mm. A card fills less of the frame than a page does.
             ScanDetection(minimumSize: 0.1, minimumConfidence: 0.6, candidates: 6, aspectRatios: 0.5...0.8,
                           quadratureTolerance: nil, preference: .aspectRatio(54 / 85.6), readyArea: 0.03)
+        case .book:
+            // Measured on drawn spreads through the real detector: the whole
+            // spread is found, fold shadow, dark fold line and a curl of the
+            // page edges toward the fold included, with corners within 2% of
+            // the picture; a strong curl in a portrait photo can leave only
+            // one page found, which is then kept whole, not split.
+            ScanDetection(minimumSize: 0.3, minimumConfidence: 0.5, candidates: 8, aspectRatios: 0.4...1,
+                          quadratureTolerance: 35, preference: .largest, readyArea: 0.25)
         case .photo:
             nil
         }
@@ -51,7 +63,7 @@ public enum ScanCaptureMode: String, Sendable, CaseIterable {
     /// a board keeps the look that makes it a board scan.
     public func startingAppearance(defaultPreset: ScanPreset) -> ScanAppearance {
         switch self {
-        case .document, .card: ScanAppearance(preset: defaultPreset)
+        case .document, .card, .book: ScanAppearance(preset: defaultPreset)
         case .photo: .original
         case .whiteboard: ScanAppearance(preset: .highContrast,
                                          cleanup: ScanCleanup(removeShadows: 1, whitenBackground: 0.6, sharpenText: 0.2))

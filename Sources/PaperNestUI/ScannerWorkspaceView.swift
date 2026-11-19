@@ -199,13 +199,13 @@ struct ScannerWorkspaceView: View {
                 .foregroundStyle(ScannerChrome.secondaryText).multilineTextAlignment(.center).padding(.horizontal)
             Group {
                 if let image = pendingPreview {
-                    ScannerZoomPreview(image: image, accessibilityValue: "")
+                    ScannerZoomPreview(image: image, accessibilityValue: page.spreadGutter == nil ? "" : L10n.scannerBookTwoPages)
                 } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
             }
             .task(id: page.id) {
                 pendingPreview = nil
                 let data = await Task.detached(priority: .userInitiated) {
-                    page.rendered(maxDimension: 1600)?.jpegData(compressionQuality: 0.85)
+                    page.reviewPicture(maxDimension: 1600)?.jpegData(compressionQuality: 0.85)
                 }.value
                 guard !Task.isCancelled, captureReview.pending?.id == page.id else { return }
                 pendingPreview = data.flatMap { UIImage(data: $0) }
@@ -241,8 +241,12 @@ struct ScannerWorkspaceView: View {
         guard captureReview.pending != nil else { return }
         captureGeneration = UUID()
         if keep, let page = captureReview.keep() {
+            // A book's spread becomes its two pages, left then right; the left one is shown.
+            if page.spreadGutter != nil {
+                pages.append(contentsOf: page.spreadPages())
+                selected = pages.count - 2
             // A card's back goes straight after its front, wherever that is by now.
-            if kind.pairsSides, let front = cards.keep(page.id).front, let index = pages.firstIndex(where: { $0.id == front }) {
+            } else if kind.pairsSides, let front = cards.keep(page.id).front, let index = pages.firstIndex(where: { $0.id == front }) {
                 pages.insert(page, at: index + 1)
                 selected = index + 1
             } else {
@@ -897,19 +901,22 @@ struct ScannerWorkspaceView: View {
         // mode's as it was when the shutter was pressed.
         let detection = kind.detection
         let look = kind.startingAppearance(defaultPreset: settings.preset)
-        let corners = await Task.detached(priority: .userInitiated) { () -> [CGPoint]? in
-            if let detection { return ScannerPage.detectedCorners(data, detection: detection) }
-            return UIImage(data: data) == nil ? nil : ScannerPage.wholeFrame
+        let book = kind == .book
+        let found = await Task.detached(priority: .userInitiated) { () -> (corners: [CGPoint], gutter: Double?)? in
+            let corners = detection.map { ScannerPage.detectedCorners(data, detection: $0) }
+                ?? (UIImage(data: data) == nil ? nil : ScannerPage.wholeFrame)
+            // A book's spread is split at its fold when kept; where, is decided now, from the mode at the shutter.
+            return corners.map { ($0, book ? ScannerPage.spreadGutter(data, corners: $0) : nil) }
         }.value
         guard !completed, !native, !reviewing, generation == captureGeneration else { return }
-        guard let corners else {
+        guard let (corners, gutter) = found else {
             busy = false; failed = true
             if canRunCamera && scenePhase == .active { camera.start() }
             return
         }
         // On iPhone as on iPad, a capture is not kept until the person says
         // so: it is staged, shown, and joins the queue only on Keep.
-        _ = captureReview.stage(ScannerPage(original: data, appearance: look, corners: corners, mode: kind))
+        _ = captureReview.stage(ScannerPage(original: data, appearance: look, corners: corners, mode: kind, spreadGutter: gutter))
         busy = false
     }
 

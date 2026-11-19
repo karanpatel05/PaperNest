@@ -44,7 +44,7 @@ import PaperNestCore
     @Test func aStoredValueFromAnotherVersionDoesNotStopTheScannerOpening() throws {
         let (defaults, name) = try scratch()
         defer { defaults.removePersistentDomain(forName: name) }
-        defaults.set("book", forKey: "scanner.defaultMode")
+        defaults.set("hologram", forKey: "scanner.defaultMode")
         defaults.set(7, forKey: "scanner.defaultPreset")
         #expect(ScanSettingsStore.load(from: defaults) == .standard)
     }

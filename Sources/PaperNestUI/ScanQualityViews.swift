@@ -39,15 +39,17 @@ import PaperNestRender
     /// good retake, and the retake is left alone: marking the retake, as the
     /// first version did, invited deleting the good page.
     ///
-    /// A page with the very same bytes as an earlier one is a copy made on
-    /// purpose (Duplicate, or one file brought in twice), never a second
-    /// photograph, so it says nothing.
+    /// A page with the very same bytes and crop as an earlier one is a copy
+    /// made on purpose (Duplicate, or one file brought in twice), never a
+    /// second photograph, so it says nothing. Bytes alone are not enough: a
+    /// book's two pages come from one photo.
     func repeated(_ page: ScannerPage, among pages: [ScannerPage]) -> Int? {
         func current(_ page: ScannerPage) -> (key: String, print: ScanFingerprint, digest: Data)? {
             prints[page.id].flatMap { $0.key == Self.key(of: page) ? $0 : nil }
         }
         guard let index = pages.firstIndex(where: { $0.id == page.id }), let mine = current(page) else { return nil }
-        guard !pages[..<index].contains(where: { current($0)?.digest == mine.digest }) else { return nil }
+        guard !pages[..<index].contains(where: { current($0)?.digest == mine.digest && $0.corners == page.corners })
+        else { return nil }
         let flawed = !issues(for: page).isEmpty
         return pages.indices.first { other in
             guard other != index, let theirs = current(pages[other]), alike[Self.pair(mine.key, theirs.key)] == true

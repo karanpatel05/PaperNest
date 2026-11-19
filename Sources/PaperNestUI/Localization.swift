@@ -1478,4 +1478,9 @@ extension L10n {
     static var scannerQualityTooDark: String { tr("scanner.quality.tooDark") }
     static func scannerQualitySameAs(_ value0: Int) -> String { tr("scanner.quality.sameAs", value0) }
     static var scannerQualityGlare: String { tr("scanner.quality.glare") }
+
+    // MARK: Book mode
+
+    static var scannerBook: String { tr("scanner.mode.book") }
+    static var scannerBookTwoPages: String { tr("scanner.book.twoPages") }
 }

@@ -11,12 +11,14 @@ import Testing
     /// A value written by a later version, or damaged, must not stop the
     /// scanner opening: each falls back by itself.
     @Test func aValueThisVersionDoesNotKnowFallsBackAlone() {
-        let settings = ScanSettings(storedMode: "book", storedPreset: "grayscale", storedStartsAutomatic: true)
+        let settings = ScanSettings(storedMode: "hologram", storedPreset: "grayscale", storedStartsAutomatic: true)
         #expect(settings.mode == .document)
         #expect(settings.preset == .grayscale)
         #expect(settings.startsAutomatic)
         #expect(ScanSettings(storedMode: "card", storedPreset: "sepia", storedStartsAutomatic: nil)
             == ScanSettings(mode: .card, preset: .original, startsAutomatic: false))
+        // Book was once the example of a mode from another version; it is this version's now.
+        #expect(ScanSettings(storedMode: "book", storedPreset: nil, storedStartsAutomatic: nil).mode == .book)
     }
 
     @Test func whatIsStoredReadsBackTheSame() {
