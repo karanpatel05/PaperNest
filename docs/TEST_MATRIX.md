@@ -1,3 +1,17 @@
+## 2026-11-19 — UI verification: this session's scanner surfaces at the largest text size, and Book's one-page fallbacks (Claude, owner's queue item 4)
+
+Owner: "Move on" (to the remaining UI verification). Scoped to what no one else is checking — the after-capture notes, the repeat note and Book mode, added this session — at Accessibility XXXL in en/fr/es, and Book's failure states. Codex's active claim (the export sheet) left alone. Mac interaction stays blocked (screen access declined); VoiceOver is not claimed (labels are asserted by XCUITest only); dark mode does not apply (the scanner's chrome is fixed dark).
+
+| Check | Result |
+|---|---|
+| New `ScannerLargeTextUITests.testTheAdviceNotesAtTheLargestTextSize` (AX XXXL; a retake and a dark page with a reflection) | **iPhone 17 pass (46.6 s), iPad Air 13 pass (47.6 s)**, en/fr/es: the filmstrip labels name the repeat and both issues; the notes say all of "Same as page 1" and "Too dark · Glare on the page" (fr "Trop sombre · Reflet sur la page", es "Demasiado oscuro · Reflejo en la página") and sit within the screen side to side. Screenshots looked at: **iPad fr** — the note on one line under the page, the page visible. **iPhone es and fr — layout gap:** the text is complete (Spanish wraps to three lines), but at this size the review screen leaves the page preview about 120 pt tall, and **the note covers nearly all of it, zoom controls included**. Not fixed here: the review layout is the design lane's; options are a row of its own for the note outside the preview, or a capped type size for it. |
+| New `BookCaptureUITests.testAnUprightPageInBookModeStaysOnePage` | **iPhone pass (17.6 s), iPad pass (18.0 s)**: one upright page captured in Book mode is not offered as two and is kept as one. |
+| New `BookCaptureUITests.testABookPhotoWithNoOutlineStaysOnePage` | **iPhone pass (17.8 s), iPad pass (18.4 s)**: a photo with no outline in it keeps the whole frame, one page. |
+| New `BookCaptureUITests.testABookCaptureAtTheLargestTextSize` (fr, es) | **iPhone pass (51.9 s), iPad pass (47.3 s)**: Book reached in the strip, the capture shown as "Deux pages" / "Dos páginas", kept as two. The first iPhone run failed on the test's own swipe — the chip it swiped on moved off with the one-mode-per-swipe strip; it now drags along the strip. Screenshots looked at: iPhone fr, Livre chosen at the strip's end; iPhone es, three pages in review, the preview small. |
+| `BookCaptureUITests` (existing two), iPhone rerun | **Pass** (26.0 s, 26.1 s). |
+
+**Not verified:** VoiceOver itself, Mac, a real camera. **Open:** the iPhone XXXL note covering the page preview (above).
+
 ## 2026-11-18 — Book mode follow-up: its "Move closer" can be said; repeats rechecked in the app (Claude)
 
 A review of `d244a1b`: Book's ready size (25% of the frame) had not been measured against what the detector finds, as every other mode's has (`ScanDetection.readyArea`). Two cases added to `ScanFeedbackDetectionTests`, on drawn spreads through the real detector and the guide: **a spread covering 18% of the frame is found and told "Move closer"**; one filling the frame is told "Hold steady". **Pass** (8 in the suite). And since the copy rule changed (same bytes **and** crop), the app-level repeat checks were rerun on **iPhone 17: `ScanRepeatUITests` both pass** (49.8 s, 15.5 s; the byte copy still shows no note), **`ScanQualityUITests` pass** (65.3 s). Test-only; no product change.

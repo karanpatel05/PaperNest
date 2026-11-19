@@ -48,15 +48,72 @@ import UIKit
 
     /// The scanner with `photo` waiting for Keep or Delete; the shutter then
     /// delivers the same photo, as a camera still would.
-    private func launchCapture(_ photo: URL, language: String = "en") -> XCUIApplication {
+    private func launchCapture(_ photo: URL, language: String = "en", largestText: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-PaperNestLibraryPath", "/tmp/papernest-book-library-\(UUID().uuidString)",
                                "-PaperNestDebugSkipWelcome", "YES",
                                "-AppleLanguages", "(\(language))", "-AppleLocale", language == "en" ? "en_US" : language,
                                "-PaperNestDebugScannerImages", photo.path, "-PaperNestDebugScannerPendingCapture", "YES",
                                "-scanner.defaultMode", "document", "-scanner.defaultPreset", "original", "-scanner.autoOnEntry", "NO"]
+        if largestText { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
         app.launch()
         return app
+    }
+
+    /// A photo, 1200 × 1600, of one upright page of print on a dark table.
+    private func uprightPagePhoto() throws -> URL {
+        let url = URL(fileURLWithPath: "/tmp/papernest-book-page-\(UUID().uuidString).png")
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let size = CGSize(width: 1200, height: 1600), sheet = CGRect(x: 240, y: 160, width: 720, height: 1280)
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor(white: 0.2, alpha: 1).setFill(); context.fill(CGRect(origin: .zero, size: size))
+            UIColor(white: 0.93, alpha: 1).setFill(); context.fill(sheet)
+            let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 14),
+                                                             .foregroundColor: UIColor(white: 0.1, alpha: 1)]
+            var y = sheet.minY + 50
+            while y < sheet.maxY - 50 {
+                ("The quarterly report shows steady growth." as NSString).draw(at: CGPoint(x: sheet.minX + 50, y: y), withAttributes: attributes)
+                y += 24
+            }
+        }
+        try XCTUnwrap(image.pngData()).write(to: url)
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        return url
+    }
+
+    /// A photo with no outline in it at all: a smooth shade from dark to light.
+    private func featurelessPhoto() throws -> URL {
+        let url = URL(fileURLWithPath: "/tmp/papernest-book-none-\(UUID().uuidString).png")
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let size = CGSize(width: 1600, height: 1200)
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            let colours = [UIColor(white: 0.3, alpha: 1).cgColor, UIColor(white: 0.7, alpha: 1).cgColor] as CFArray
+            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colours, locations: [0, 1])!
+            context.cgContext.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
+        }
+        try XCTUnwrap(image.pngData()).write(to: url)
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        return url
+    }
+
+    /// Takes a Book capture of the debug camera's photo and keeps it, then
+    /// says how many pages the scan has and what the capture's preview said.
+    private func captureInBook(_ app: XCUIApplication) -> (pages: String, preview: String) {
+        app.buttons["scanner.shutter"].tap()
+        let keep = app.buttons["scanner.capture-keep"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 25))
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: keep)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 20), .completed)
+        let preview = app.descendants(matching: .any)["scanner.preview"].firstMatch.value as? String ?? ""
+        keep.tap()
+        let review = app.buttons["scanner.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 15))
+        // The seeded page made it 1; wait for what Keep added.
+        let grown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", "1"), object: review)
+        _ = XCTWaiter.wait(for: [grown], timeout: 15)
+        return (review.value as? String ?? "", preview)
     }
 
     private func keepCapture(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
@@ -71,7 +128,13 @@ import UIKit
     private func chooseBook(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let book = app.buttons["scanner.kind.book"]
         XCTAssertTrue(book.waitForExistence(timeout: 10), "Book is offered", file: file, line: line)
-        for _ in 0..<4 where !book.isHittable { app.buttons["scanner.kind.document"].swipeLeft() }
+        // Drag along the strip itself: a chip swiped on moves off with it.
+        for _ in 0..<5 where !(book.isHittable && book.frame.maxX <= app.frame.maxX) {
+            let y = book.frame.midY
+            app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width * 0.85, dy: y))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: app.frame.width * 0.15, dy: y)))
+        }
         book.tap()
         XCTAssertTrue(book.isSelected, "Book is chosen", file: file, line: line)
     }
@@ -134,6 +197,48 @@ import UIKit
             keepCapture(app)
             chooseBook(app)
             snap(app, "capture-\(language)")
+            app.terminate()
+        }
+    }
+
+    /// One upright page in Book mode stays one page: cutting a page in half
+    /// is the costly mistake.
+    func testAnUprightPageInBookModeStaysOnePage() throws {
+        let app = launchCapture(try uprightPagePhoto())
+        defer { app.terminate() }
+        keepCapture(app)
+        chooseBook(app)
+        let (pages, preview) = captureInBook(app)
+        XCTAssertFalse(preview.hasPrefix("Two pages"), "an upright page was offered as two: \(preview)")
+        XCTAssertEqual(pages, "2", "one seeded page and the page just kept")
+    }
+
+    /// A photo with no outline found keeps the whole frame, one page.
+    func testABookPhotoWithNoOutlineStaysOnePage() throws {
+        let app = launchCapture(try featurelessPhoto())
+        defer { app.terminate() }
+        keepCapture(app)
+        chooseBook(app)
+        let (pages, preview) = captureInBook(app)
+        XCTAssertFalse(preview.hasPrefix("Two pages"), "a photo with no outline was offered as two: \(preview)")
+        XCTAssertEqual(pages, "2")
+    }
+
+    /// At the largest text size, in French and Spanish: Book reached in the
+    /// mode strip, the capture shown as two pages, kept as two.
+    func testABookCaptureAtTheLargestTextSize() throws {
+        let photo = try bookPhoto()
+        for (language, two) in [("fr", "Deux pages"), ("es", "Dos páginas")] {
+            let app = launchCapture(photo, language: language, largestText: true)
+            keepCapture(app)
+            chooseBook(app)
+            snap(app, "xxxl-capture-\(language)")
+            let (pages, preview) = captureInBook(app)
+            XCTAssertTrue(preview.hasPrefix(two), "\(language): \(preview)")
+            XCTAssertEqual(pages, "3", "\(language): one seeded page and the spread's two")
+            app.buttons["scanner.review"].tap()
+            XCTAssertTrue(app.buttons["scanner.page.2"].waitForExistence(timeout: 15), "\(language): no third page")
+            snap(app, "xxxl-review-\(language)")
             app.terminate()
         }
     }
