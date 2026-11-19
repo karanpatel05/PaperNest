@@ -70,4 +70,20 @@ import PaperNestCore
         #expect(found == nil)
         #expect(said == nil)
     }
+
+    /// A spread a fifth of the frame — half the width by 0.36 of the height
+    /// of a landscape photo, 18% — under Book's 25%: found, and told to
+    /// come closer, so the advice can be given.
+    @Test func aSmallSpreadIsFoundAndToldToComeCloser() throws {
+        let outline = Scenes.corners((0.25, 0.32), (0.75, 0.32), (0.75, 0.68), (0.25, 0.68))
+        let (found, said) = try advice(.book, ScanBookTests.photo(width: 1600, height: 1200, outline: outline))
+        #expect(found != nil, "the detector does not find it, so the advice could never be given")
+        #expect(said == .moveCloser)
+    }
+
+    @Test func aSpreadFillingTheFrameWellIsNotToldAnything() throws {
+        let (found, said) = try advice(.book, ScanBookTests.photo(width: 1600, height: 1200, outline: ScanBookTests.landscape))
+        #expect(found != nil)
+        #expect(said == .holdSteady)
+    }
 }

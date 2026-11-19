@@ -1,3 +1,7 @@
+## 2026-11-18 — Book mode follow-up: its "Move closer" can be said; repeats rechecked in the app (Claude)
+
+A review of `d244a1b`: Book's ready size (25% of the frame) had not been measured against what the detector finds, as every other mode's has (`ScanDetection.readyArea`). Two cases added to `ScanFeedbackDetectionTests`, on drawn spreads through the real detector and the guide: **a spread covering 18% of the frame is found and told "Move closer"**; one filling the frame is told "Hold steady". **Pass** (8 in the suite). And since the copy rule changed (same bytes **and** crop), the app-level repeat checks were rerun on **iPhone 17: `ScanRepeatUITests` both pass** (49.8 s, 15.5 s; the byte copy still shows no note), **`ScanQualityUITests` pass** (65.3 s). Test-only; no product change.
+
 ## 2026-11-18 — Book mode: an open book captured once becomes its two pages (Claude, roadmap order item 2)
 
 Owner: "Go ahead with book mode". Book is a fifth capture mode ("Book" / "Livre" / "Libro", last in the pill). It finds the whole two-page spread and, when the outline is plainly wider than tall, shows the capture with its fold marked ("Two pages" to VoiceOver); Keep makes it two ordinary pages, left then right, each the same photo cropped to its half. **No curvature flattening** (the paper's curve near the fold stays), no curvature guides; pages from Photos or Files are not split.
