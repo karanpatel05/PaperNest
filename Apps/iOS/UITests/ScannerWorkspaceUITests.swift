@@ -759,11 +759,23 @@ import UIKit
             item.tap()
             XCTAssertTrue(app.buttons["scanner.settings.done"].waitForExistence(timeout: 10))
         }
+        /// A row of the sheet, scrolled clear of Done first. Done stays put
+        /// below the list, so a row lying under it is tapped through Done,
+        /// which closes the sheet: on an iPad the filter rows lie there
+        /// since Book made the mode list a row longer (2026-11-19).
+        func row(_ id: String) -> XCUIElement {
+            let row = app.buttons["scanner.settings.\(id)"], done = app.buttons["scanner.settings.done"]
+            for _ in 0..<3 where !row.exists || !row.isHittable || row.frame.maxY > done.frame.minY - 8 { app.swipeUp() }
+            XCTAssertLessThanOrEqual(row.frame.maxY, done.frame.minY, "\(id) scrolls clear of Done")
+            return row
+        }
         func choose(mode: String, preset: String, automatic: Bool) {
-            app.buttons["scanner.settings.mode.\(mode)"].tap()
-            app.buttons["scanner.settings.preset.\(preset)"].tap()
-            XCTAssertEqual(app.buttons["scanner.settings.mode.\(mode)"].value as? String, "Selected")
-            XCTAssertEqual(app.buttons["scanner.settings.preset.\(preset)"].value as? String, "Selected")
+            // The mode first: the modes are at the top, and scrolling to a
+            // filter can take them out of the list.
+            row("mode.\(mode)").tap()
+            XCTAssertEqual(row("mode.\(mode)").value as? String, "Selected")
+            row("preset.\(preset)").tap()
+            XCTAssertEqual(row("preset.\(preset)").value as? String, "Selected")
             // The list makes its rows as they come into view, so on a sheet
             // shorter than the list the last row does not exist until it is
             // scrolled to, and then it can still be lying under Done, which
