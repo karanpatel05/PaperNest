@@ -415,6 +415,97 @@ final class DocumentModel {
         session.didChange()
     }
 
+    // MARK: - Handwriting to text
+
+    /// What reading a selection of handwriting found: the pen strokes read,
+    /// exactly as they were, the lines Vision made of them, and any language
+    /// the reader chose that this device cannot read, so a screen can say so.
+    struct HandwritingReading: Equatable {
+        let strokes: [PageObject]
+        let lines: [HandwritingRecognizer.Line]
+        let unreadLanguages: [String]
+        var text: String { lines.map(\.text).joined(separator: "\n") }
+    }
+
+    /// The pen strokes among `objects`. Highlighter marks, text boxes and
+    /// images are not handwriting, and are left out of the reading.
+    nonisolated static func handwriting(in objects: [PageObject]) -> [PageObject] {
+        objects.filter { object in
+            guard case .ink(let stroke) = object.payload else { return false }
+            return stroke.tool == .pen && !stroke.points.isEmpty
+        }
+    }
+
+    /// Reads the handwriting among `objects` on this device, in the reader's
+    /// recognition languages. Nothing is written. Recognition is Pro, as OCR is.
+    func readHandwriting(_ objects: [PageObject]) async throws -> HandwritingReading {
+        try SubscriptionStore.shared.require(.textRecognition)
+        let strokes = Self.handwriting(in: objects)
+        let choice = RecognitionLanguagePreference.choice()
+        let ink = strokes.compactMap { object -> InkStroke? in
+            if case .ink(let stroke) = object.payload { return stroke }
+            return nil
+        }
+        let lines = try await HandwritingRecognizer(languages: choice.using).recognize(ink)
+        return HandwritingReading(strokes: strokes, lines: lines, unreadLanguages: choice.unavailable)
+    }
+
+    /// Where the words go and how large. Kept, the handwriting stays where it
+    /// is and the words go just below it (above it when there is no room
+    /// below); replaced, the words take its place. The size follows the
+    /// writing: Vision's line boxes, or the ink's height shared between the
+    /// lines when there are none. Always wholly on the page.
+    nonisolated static func handwritingTextLayout(text: String, lines: [HandwritingRecognizer.Line], ink: CGRect,
+                                                 keepingInk: Bool, pageSize: CGSize) -> (frame: CGRect, fontSize: Double) {
+        let rows = Double(max(1, text.split(separator: "\n", omittingEmptySubsequences: false).count))
+        let heights: [Double] = lines.map { Double($0.bounds.height) }.sorted()
+        let measured: Double = heights.isEmpty ? Double(ink.height) / rows * 0.7 : heights[heights.count / 2] * 0.8
+        let fontSize = min(max(measured, 9), 60)
+        let longest = Double(text.split(separator: "\n").map(\.count).max() ?? 0)
+        let pageWidth = Double(pageSize.width), pageHeight = Double(pageSize.height)
+        let width = min(max(Double(ink.width), longest * fontSize * 0.56) + fontSize, pageWidth)
+        let height = min(rows * fontSize * 1.35 + fontSize * 0.6, pageHeight)
+        let gap = fontSize * 0.5
+        var y = keepingInk ? Double(ink.maxY) + gap : Double(ink.minY)
+        if keepingInk, y + height > pageHeight { y = Double(ink.minY) - gap - height }
+        y = min(max(y, 0), pageHeight - height)
+        let x = min(max(Double(ink.minX), 0), pageWidth - width)
+        return (CGRect(x: x, y: y, width: width, height: height), fontSize)
+    }
+
+    /// Puts the reviewed `text` on the page as a text box in the writing's
+    /// colour, keeping the handwriting or taking it away, as one undo step.
+    /// Refused, with nothing written, when the strokes changed after they were
+    /// read.
+    @discardableResult
+    func convertHandwriting(_ reading: HandwritingReading, to text: String, keepingInk: Bool,
+                            undoManager: UndoManager?) async throws -> PageObject {
+        await finishPendingHistory()
+        guard let store, let pageID = reading.strokes.first?.pageID,
+              let page = pages.first(where: { $0.id == pageID }) else { throw StoreError.pageNotFound }
+        let ink = reading.strokes.compactMap { object -> InkStroke? in
+            if case .ink(let stroke) = object.payload { return stroke }
+            return nil
+        }
+        guard let bounds = HandwritingRecognizer.bounds(of: ink) else { throw StoreError.invalidOrder }
+        let layout = Self.handwritingTextLayout(text: text, lines: reading.lines, ink: bounds, keepingInk: keepingInk,
+                                                pageSize: page.sourceSize)
+        do {
+            let result = try await store.convertHandwriting(on: pageID, strokes: reading.strokes, text: text,
+                                                            frame: layout.frame, fontSize: layout.fontSize,
+                                                            color: ink.first?.color ?? .black, keepingInk: keepingInk)
+            replace(result.page)
+            let change = InkChange(pageID: pageID, saved: [result.text], replaced: [], deleted: result.removed)
+            registerInkUndo(change.inverse, undoManager: undoManager, actionName: L10n.handwritingConvert)
+            await loadSelectedPageObjects()
+            session.didChange()
+            return result.text
+        } catch StoreError.pageObjectsChanged {
+            await loadSelectedPageObjects()
+            throw StoreError.pageObjectsChanged
+        }
+    }
+
     /// A text stamp on `page` as it is shown, in `placement`'s corner: an
     /// ordinary text box with a stamp style, so it moves, edits, undoes and
     /// exports like one. Its words and date are written in now, in the

@@ -30,6 +30,8 @@ struct PageSelectionOverlay: View {
     @State private var isSaving = false
     @State private var preview: CGImage?
     @State private var movingPreview: CGImage?
+    /// Handwriting in the selection that is being turned into text.
+    @State private var handwriting: HandwritingRequest?
 
     private var objects: [PageObject] {
         model.selectedPageObjects.filter { object in
@@ -129,6 +131,9 @@ struct PageSelectionOverlay: View {
         // Narrowing what the lasso may hold lets go of anything it no longer may.
         .onChange(of: allowed) { _, _ in reset(); clearSelection() }
         .onDisappear { hiddenIDs = [] }
+        .sheet(item: $handwriting) { request in
+            HandwritingSheet(model: model, request: request, undoManager: undoManager) { clearSelection() }
+        }
     }
 
     private func closedPath(_ points: [CGPoint]) -> Path {
@@ -171,6 +176,14 @@ struct PageSelectionOverlay: View {
                 }
             }
             Menu {
+                // Offered only for pen ink: highlighter marks, text and images
+                // are not handwriting, and stay as they are.
+                if !DocumentModel.handwriting(in: selected).isEmpty {
+                    Button { handwriting = HandwritingRequest(objects: selected) } label: {
+                        Label(L10n.handwritingConvert, systemImage: "character.cursor.ibeam")
+                    }
+                    .accessibilityIdentifier("selection-convert-text")
+                }
                 Button(L10n.selectAll) { selectAll() }.accessibilityIdentifier("selection-all")
                 Button(L10n.inlineMoveLeft) { nudge(-10, 0) }.accessibilityIdentifier("selection-left")
                 Button(L10n.inlineMoveRight) { nudge(10, 0) }.accessibilityIdentifier("selection-right")

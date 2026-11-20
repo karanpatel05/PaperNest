@@ -1344,3 +1344,16 @@
 "speakerNotes.title" = "Notas del orador";
 "speakerNotes.none" = "No hay notas para esta página.";
 "speakerNotes.placeholder" = "Notas que solo ves tú al presentar";
+
+/* Handwriting to text */
+"handwriting.convert" = "Convertir en texto";
+"handwriting.title" = "Escritura a texto";
+"handwriting.reading" = "Leyendo tu escritura…";
+"handwriting.nothing" = "No se pudo leer ninguna palabra en esta escritura. Escribe más grande o con más claridad y vuelve a seleccionarla.";
+"handwriting.failed" = "No se pudo leer esta escritura.";
+"handwriting.review" = "Revisa y corrige las palabras antes de insertarlas. Leído en este dispositivo.";
+"handwriting.keep" = "Mantener la escritura";
+"handwriting.keep.on" = "El texto va debajo de tu escritura.";
+"handwriting.keep.off" = "El texto ocupa el lugar de tu escritura. Deshacer la recupera.";
+"handwriting.insert" = "Insertar";
+"handwriting.unread" = "No leído en: %@";

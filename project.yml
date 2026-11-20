@@ -63,6 +63,7 @@ targets:
     sources:
       - path: Apps/iOS/UITests
       - path: Tests/Support/SyntheticDocuments.swift
+      - path: Tests/Support/SyntheticHandwriting.swift
     dependencies:
       - target: PaperNest-iOS
       - package: PaperNestKit
@@ -102,6 +103,8 @@ targets:
       - path: Tests/PaperNestUITests/ScannerPageTests.swift
       - path: Tests/PaperNestUITests/ScanQualityMemoTests.swift
       - path: Tests/PaperNestUITests/WatermarkLogoTests.swift
+      - path: Tests/PaperNestImportTests/HandwritingRecognitionTests.swift
+      - path: Tests/Support/SyntheticHandwriting.swift
     dependencies:
       - target: PaperNest-iOS
       - package: PaperNestKit

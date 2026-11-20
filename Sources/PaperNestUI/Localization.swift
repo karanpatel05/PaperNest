@@ -1498,4 +1498,17 @@ extension L10n {
     static var speakerNotes: String { tr("speakerNotes.title") }
     static var speakerNotesNone: String { tr("speakerNotes.none") }
     static var speakerNotesPlaceholder: String { tr("speakerNotes.placeholder") }
+
+    // Handwriting to text
+    static var handwritingConvert: String { tr("handwriting.convert") }
+    static var handwritingTitle: String { tr("handwriting.title") }
+    static var handwritingReading: String { tr("handwriting.reading") }
+    static var handwritingNothing: String { tr("handwriting.nothing") }
+    static var handwritingFailed: String { tr("handwriting.failed") }
+    static var handwritingReview: String { tr("handwriting.review") }
+    static var handwritingKeep: String { tr("handwriting.keep") }
+    static var handwritingKeepOn: String { tr("handwriting.keep.on") }
+    static var handwritingKeepOff: String { tr("handwriting.keep.off") }
+    static var handwritingInsert: String { tr("handwriting.insert") }
+    static func handwritingUnread(_ languages: String) -> String { tr("handwriting.unread", languages) }
 }
