@@ -1,3 +1,43 @@
+## 2026-11-20 — Handwriting to text: pen ink read on the device, corrected, then put on the page as a text box (Claude, roadmap P2 #13)
+
+Owner: "yes go back feature roadmap". Items 1–12 and 15 are done. #9 (review links) waits on real iCloud sync. #16 (audio) and #17 (assistant) need approval first, and audio is outside the documents-and-images scope. So the next was **#13, handwriting to text**.
+
+The brief defers "advanced handwriting conversion". This is the basic, reviewed conversion the roadmap lists: genuine recognition, a correction preview, the ink kept and undo.
+
+**What it does.**
+
+1. With the lasso, select writing, then ⋯ → **Convert to Text**. The item is offered only when the selection holds pen ink.
+2. The pen strokes are read on this device by Vision, in the reader's recognition languages. Highlighter, text boxes and images are left out.
+3. The sheet shows the words to be corrected, with a **Keep Handwriting** switch, on by default.
+4. **Insert** puts the corrected words on the page as an ordinary text box, in the writing's colour:
+   - kept, the words go just below the writing, or above when there is no room;
+   - replaced, they take its place, sized from Vision's line height.
+5. One undo takes it back. A stroke changed while the sheet was open refuses the whole change.
+6. Nothing readable gives "No words could be read…" with Insert off.
+
+Recognition is Pro (`textRecognition`, as OCR) under the approved Free/Pro list. The paywall is not live until product IDs exist.
+
+**The writing tested is synthetic**: printed single-stroke letters with a seeded wobble, slant and uneven baseline (`Tests/Support/SyntheticHandwriting.swift`). It is nobody's real handwriting; no Apple Pencil and no device were used. What passes says this kind of writing is read, and that nothing is made up when it is not.
+
+| Check | Result |
+|---|---|
+| Recognition first, before any UI: new `HandwritingRecognitionTests` (9) | **Mac: 9/9 pass. iOS Simulator (`PaperNest-Canvas`, iPhone 17): 9/9 pass.**<br>• A word, and two lines in reading order.<br>• A line's box lies over its strokes in source space.<br>• Writing at 9 and 40 points.<br>• No strokes reads nothing.<br>• Highlighter ink is not read, and does not disturb pen writing beside it.<br>• A scribble is not read as a word.<br>• The picture is black on white.<br>• French "café" and Spanish "año" were read exactly, accents included, on both platforms. |
+| Mutation: the picture drawn upside down (the one flip removed) | 7 of 9 fail; restored. |
+| New `HandwritingConversionTests` (5, Store) | **Pass.**<br>• The reviewed words are saved (trimmed), with the frame, size and colour given.<br>• Ink kept, or removed, in one write with one revision bump.<br>• On disk when the call returns, and found by search.<br>• A moved or erased stroke refuses the whole change, with nothing written.<br>• Only ink and real words are accepted. |
+| Mutation: the stale-stroke check removed | The refusal test fails (3 issues); restored. |
+| New `HandwritingModelTests` (8, `DocumentModel`, Mac) | **Pass.**<br>• Reading writes nothing.<br>• Only pen ink is read.<br>• Kept: the words go below the writing, in its colour; one undo removes them, redo restores them.<br>• Replaced: one undo brings the exact strokes back.<br>• A stroke erased after reading is refused.<br>• Layout: the size comes from the line height, the words go above when there is no room below, and always stay on the page. |
+| New `HandwritingUITests` (4), iPhone 17 and iPad Air 13, iOS 26.5 | **iPhone 4/4, iPad 4/4.**<br>• Lasso → Select All → ⋯ → Convert to Text; "hello" read; corrected to "Hello Ana"; Insert; **read back from the library**: the text box plus every stroke; Undo removes it.<br>• French and Spanish: "café" and "año" read exactly, Keep turned off, the handwriting replaced, one Undo brings every stroke back.<br>• A scribble: "No words could be read…", Insert off, Cancel leaves the page unchanged.<br>• French XXXL: the words, Insérer, Annuler and the switch all reachable; Cancel changes nothing. |
+| iPhone rerun with the final test file | **4/4 pass** (the position-tap fallback and the panel scroll added for the iPad changed nothing on iPhone). |
+| `LocalizationTests` | **Pass**, on the tree that is committed: HEAD plus these changes, with Codex's uncommitted string edits left out. The first run failed on French typography: a plain space before ":" in "Non lu en : %@". It now uses the narrow no-break space the other French strings use. |
+| `./scripts/test.sh`, the same tree | **1,630 tests, 0 failures, 0 warnings** (432 + 49 + 278 + 292 + 269 + 310): the 1,608 from before plus these 22. |
+| `./scripts/build-mac-app.sh` (the lasso overlay and the sheet are shared with the Mac) | **Built, 0 warnings.** |
+
+**Found while testing, for Codex.** At French XXXL on an iPad, a notebook opens with the library sidebar (466 points) and Document Tools both beside it. That leaves the editor a column about 240 points wide. An element of that layout covers the tool bar's hit test, so the Lasso cannot be tapped there: neither XCTest nor a tap at its position reached it. With the sidebar hidden and the panel closed it works, and at that size the Lasso's panel is a small scrolling popover with Select All below what it shows. The UI test puts both away first, as a person would; the cramped layout is not fixed here. Also, the sheet's French title truncates to "Écriture en te…" at XXXL, which is the system's inline title behaviour.
+
+**Not verified:** real handwriting; an Apple Pencil; a device; VoiceOver; using the sheet on the Mac (built, not driven); cursive or joined-up writing, which the synthetic letters do not cover.
+
+**Not built:** handwriting search (#14). Raw ink is still not searchable; only the inserted text box is.
+
 ## 2026-11-20 — ⌘D on the iPad Air simulator: the first modifier key never reaches the app (Claude)
 
 Owner: "Yes, dig into ⌘D". `ReaderNightAndBookmarksUITests.testCommandDBookmarksThePageFromAHardwareKeyboard` passed on the iPad Pro 13 and failed on the iPad Air 13 with the same build. The entry below left it unresolved.
