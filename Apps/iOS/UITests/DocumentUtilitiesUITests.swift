@@ -60,6 +60,46 @@ import PaperNestStore
         XCTAssertTrue(Self.inView(element, list), "\(element) cannot be reached in the panel", file: file, line: line)
     }
 
+    /// Closing the panel, and opening it again, keeps the page being read.
+    /// Every page refits to the new width, so the same scroll offset shows
+    /// another page; on 2026-11-20 closing the panel on page 3 of 3 left the
+    /// reader on page 2, on both iPads.
+    func testClosingAndOpeningThePanelKeepsThePage() async throws {
+        try XCTSkipUnless(isPad, "the panel sits beside the page only on an iPad")
+        let (app, _, _) = try await open()
+        defer { app.terminate() }
+        let toggle = app.buttons["editor-panels"], panel = app.scrollViews["pdf-tools-list"]
+        let page = app.images["document-page-image"]
+        XCTAssertTrue(page.waitForExistence(timeout: 10))
+        if !panel.exists { toggle.tap() }
+        XCTAssertTrue(panel.waitForExistence(timeout: 5))
+
+        /// The page shown stays `expected` for a while: a refit that moves
+        /// the reader does so within a second.
+        func expectStays(_ expected: String, _ message: String, line: UInt = #line) {
+            for _ in 0..<20 {
+                XCTAssertEqual(page.label, expected, message, line: line)
+                if page.label != expected { return }
+                usleep(100_000)
+            }
+        }
+        for number in [3, 2] {
+            let thumbnail = app.buttons["page-thumbnail-\(number)"]
+            if !panel.exists { toggle.tap(); XCTAssertTrue(panel.waitForExistence(timeout: 5)) }
+            XCTAssertTrue(thumbnail.waitForExistence(timeout: 5))
+            thumbnail.tap()
+            for _ in 0..<30 where (thumbnail.value as? String) != "Selected" { usleep(100_000) }
+            let expected = "Page \(number) of 3"
+            expectStays(expected, "choosing page \(number)")
+            toggle.tap()
+            XCTAssertTrue(panel.waitForNonExistence(timeout: 5))
+            expectStays(expected, "closing the panel on page \(number)")
+            toggle.tap()
+            XCTAssertTrue(panel.waitForExistence(timeout: 5))
+            expectStays(expected, "opening the panel again on page \(number)")
+        }
+    }
+
     func testOneControlShowsAndHidesPagesAndToolsTogether() async throws {
         let (app, store, item) = try await open()
         defer { app.terminate() }

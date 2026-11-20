@@ -60,9 +60,35 @@ import PaperNestStore
 
     /// Scrolls the sheet's form until `element` can be tapped.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<8 where !(element.exists && element.isHittable) {
+        for _ in 0..<8 where !wholly(element, in: app) {
             app.swipeUp(velocity: .slow)
         }
+    }
+
+    /// On screen and wholly inside the sheet's list. A row cut off at the
+    /// sheet's foot counts as hittable, but a tap at its far end lands past
+    /// the sheet, on the page behind, and closes the sheet: on an iPad Pro 13
+    /// that is what tapping the Keep switch did (2026-11-20).
+    private func wholly(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        guard element.exists, element.isHittable else { return false }
+        guard !element.identifier.isEmpty else { return true }
+        let list = app.collectionViews.containing(NSPredicate(format: "identifier == %@", element.identifier)).firstMatch
+        return !list.exists || list.frame.contains(element.frame)
+    }
+
+    /// The preview heads the sheet's list, so bringing a lower row into view
+    /// can take it out of the list altogether. Drags the list back down, a
+    /// little at a time and held at the end: a drag that ran on past the top
+    /// would pull the sheet down instead.
+    private func revealPreview(in app: XCUIApplication) -> XCUIElement {
+        let preview = app.descendants(matching: .any)["text-stamp-preview"].firstMatch
+        let list = app.collectionViews.containing(NSPredicate(format: "identifier BEGINSWITH %@", "text-stamp-")).firstMatch
+        for _ in 0..<12 where !(preview.exists && preview.isHittable) && list.exists {
+            let start = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 160)),
+                        withVelocity: .slow, thenHoldForDuration: 0.15)
+        }
+        return preview
     }
 
     private func stamps(_ store: LibraryStore, _ item: ItemID) async throws -> [TextBox] {
@@ -141,7 +167,9 @@ import PaperNestStore
         let field = app.textFields["text-stamp-custom-text"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
-        field.typeText("Checked by Ana")
+        // Return puts the keyboard away. Left up, on an iPad it shrinks the
+        // sheet to the room above it, and the rows below the words go under.
+        field.typeText("Checked by Ana\n")
         XCTAssertTrue(app.buttons["text-stamp-place"].isEnabled, "Place is off with words typed")
         let keep = app.switches["text-stamp-keep"]
         reveal(keep, in: app)
@@ -162,7 +190,7 @@ import PaperNestStore
         XCTAssertTrue(saved.exists, "the kept stamp is not offered")
         saved.tap()
         XCTAssertEqual(saved.value as? String, "Selected")
-        XCTAssertEqual(app.descendants(matching: .any)["text-stamp-preview"].firstMatch.value as? String, "Checked by Ana")
+        XCTAssertEqual(revealPreview(in: app).value as? String, "Checked by Ana")
         snap(app, "saved-en")
         app.buttons["text-stamp-cancel"].tap()
     }

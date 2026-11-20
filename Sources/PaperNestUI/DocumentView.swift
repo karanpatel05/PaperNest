@@ -370,7 +370,11 @@ struct DocumentView: View {
             .alert(L10n.goToPage, isPresented: $isShowingGoToPage) {
                 TextField(L10n.goToPageField, text: $goToPageText)
                     #if os(iOS)
-                    .keyboardType(.numberPad)
+                    // A phone's number pad sits below the alert. An iPad's
+                    // floats over it, and its first tap anywhere else only
+                    // closes the pad, so Go took two taps (2026-11-20). The
+                    // keyboard on its number keys stays docked.
+                    .keyboardType(UIDevice.current.userInterfaceIdiom == .pad ? .numbersAndPunctuation : .numberPad)
                     #endif
                 Button(L10n.cancel, role: .cancel) {}
                 Button(L10n.goToPageGo) {
@@ -2236,20 +2240,26 @@ private struct PageViewer: View {
         }
         guard isContinuous, hasPositionedInitialPage, !textSession.isSelected, !isSelectingVisiblePage,
               !model.isChangingNotebookPage else { return }
-        if let target = jumpTarget {
-            guard let frame = frames[target], frame.intersects(viewport) else { return }
-            jumpTarget = nil
-            return
-        }
         // Prefer the page with the greatest visible paper area. When two
         // sheets fit completely, keep the earlier one instead of skipping it.
         let visible = model.pages.compactMap { page -> (PageID, CGFloat)? in
             guard let frame = frames[page.id], frame.intersects(viewport) else { return nil }
             return (page.id, frame.intersection(viewport).height)
         }
-        guard let best = visible.max(by: { $0.1 < $1.1 }),
-              let closest = visible.first(where: { $0.1 >= best.1 - 1 })?.0,
-              closest != model.selectedPageID else { return }
+        let closest = visible.max(by: { $0.1 < $1.1 }).flatMap { best in visible.first { $0.1 >= best.1 - 1 }?.0 }
+        if let target = jumpTarget {
+            // Held until the jump has landed: the page across the middle of
+            // the view, or the one most on screen. Merely on screen is not
+            // enough. After a refit the page is often already showing a strip
+            // at an edge; letting go there let the next pass, made before the
+            // recentring scroll, choose the page beside it, and closing
+            // Document Tools on page 3 left the reader on page 2 (2026-11-20).
+            guard let frame = frames[target], frame.minY <= viewport.midY && frame.maxY >= viewport.midY
+                    || closest == target else { return }
+            jumpTarget = nil
+            return
+        }
+        guard let closest, closest != model.selectedPageID else { return }
         activate(closest, fromScroll: true)
     }
 
