@@ -202,7 +202,8 @@ import UIKit
         XCTAssertTrue(document.isSelected)
         XCTAssertTrue(auto.isEnabled)
         XCTAssertFalse(app.buttons["scanner.kind.idcard"].exists, "only modes that do something are offered")
-        XCTAssertFalse(app.buttons["scanner.kind.book"].exists, "only modes that do something are offered")
+        // Book does something since 2026-11-19 (a spread kept as its two pages), so it is offered.
+        XCTAssertTrue(app.buttons["scanner.kind.book"].exists, "Book is a mode that does something")
         auto.tap()
         XCTAssertEqual(auto.value as? String, "On")
         photo.tap()
