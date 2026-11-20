@@ -1,3 +1,58 @@
+## 2026-11-19/20 — App-wide UI verification: the whole iOS UI suite on iPhone and iPad (Claude)
+
+Owner: "App wide UI verification". I ran the whole XCUITest suite (`scripts/ui-test-ios.sh`, 233 tests) on the iPhone 17 and the iPad Air 13 (M4), both iOS 26.5.
+
+**What was tested.** A git-free copy of the working tree as it stood at 19:00 on 11-19:
+
+- `b5b1b52`;
+- Codex's uncommitted edits to `OCRPanel`, `RedactEditor`, `ScannerWorkspaceView`, `Theme`, the en/fr/es strings, and the Export Size, Redact and Scanner Workspace UI tests;
+- the Book assertion fix, later committed as `7fd1bb9`.
+
+Each failure was then sorted by cause. The question that mattered: did this session's slices cause it? Those slices are scan advice, repeats, glare, Book mode, presentation, the pen pointer, speaker notes and schema v16.
+
+| Check | Result |
+|---|---|
+| iPhone 17, whole suite | **209 passed, 15 failed, 9 skipped** (iPad-only tests). The first run had `TEST_RUNNER_PAPERNEST_UITEST_LIBRARY` set, which sent every `AppUITests` launch to the form-workspace library: 29 failures, mostly "home did not open". That was my mistake, not the app's. I reran the 29 without it: 13 passed, 15 failed. The Photo-mode test passed once fixed (next row). |
+| iPad Air 13, whole suite | **207 passed, 19 failed, 7 skipped.** |
+| `7fd1bb9`: `ScannerWorkspaceUITests.testPhotoModeKeepsTheWholeFrameAndTurnsAutoOff` | It still asserted Book is not offered, from before Book mode; it now expects the chip. **iPhone: pass (21.0 s). iPad: pass (whole-suite run).** |
+| Caused by this session: `ScannerWorkspaceUITests.testScanSettingsDecideHowTheScannerOpensNextTime` (iPad) | **Fixed.** Book made the settings sheet's mode list one row longer. On the iPad form sheet the filter rows then lie under Done, which stays fixed below the list. The tap on Grayscale went through Done and closed the sheet, and the next check found no sheet (the hierarchy at the failure shows the scanner with no sheet). It failed in the whole-suite run and again alone. Each row is now scrolled clear of Done before it is tapped, as the test already did for its last row. **iPad: pass (112.5 s). iPhone: pass (111.1 s).** The test is Codex's file; Codex's uncommitted edits in it were left out of the commit. |
+| Any other failure caused by this session's slices? | **None.** On the iPad, the nine failures not seen on iPhone fail **the same way, at the same lines, on a baseline**. The baseline is `e228bb9` (before presentation mode, so no presentation, pen pointer, speaker notes or schema v16) with Codex's same uncommitted edits applied (`/var/folders/b9/6sd7c1bn47d44l1z_mz8g_j00000gn/T/base-doc.log`). On the current copy, run alone, the same nine fail again (`iso-doc.log`), so they are consistent, not flukes. No failure involves the scanner advice, the presentation cover or the speaker-notes sheet. |
+
+**Stale after the studio redesign (Codex's lane).** Codex's commit `13e8daa` stopped placing `compactTools`, the phone's old bottom tool bar. It is still declared in `DocumentView.swift` (around line 1661) but nothing uses it, so `editor-filter`, `editor-crop`, `editor-more` and that bar's Crop and Rotate buttons never appear on a phone. A document now opens with `notebook-tool-bar` and Document Tools (`editor-panels`); the hierarchy at `testFilterStripAndTitleMenu`'s failure shows exactly that.
+
+- On both devices: `testAnnotationSheetsAccessibilityAudit` (:1478), `testAnnotationStyleLayoutInAllLanguages` (:1503), `testSavedMarkupSupportsColorsSelectionRemovalAndRelaunch` (:909), `testRecognizedLinesCanBeMarkedAndKeptAfterRelaunch` (:856) and `testVisibleAnnotationStyleContrast` (:1679). All wait for `editor-more`.
+- iPhone only: `testFilterStripAndTitleMenu` (:422, waits for `editor-filter`), `testDraggingTheTopLeftCornerCropsThePageAndTheCropIsSaved` (:181, "Crop") and `testShapesPlaceCancelUndoRedoAndReopenInAllLanguages` (:1152, `editor-shapes` → `shape-save`).
+- `testLibraryLayoutSwitchStillOpensDocumentsAndEditingTools`: on the iPhone it fails at :244 (`editor-crop`); on the iPad, at :245, more than one button matches "Rotate".
+- An open question for Codex: whether filter, crop, adjustments, shapes and stamps are still reachable on a phone some other way. If any is not, that is a product gap, not just stale tests.
+
+**Already red before this session, per this matrix:**
+
+- `testSettingsShowsTheLibraryAndExportsABackup`: both devices (iPhone :219, iPad :217).
+- `EditorWorkspaceUITests.testPinchZoomWithLassoAndPen` (:41): both devices.
+- `testMixedLassoDefaultsToSelectionAndMovesAllObjectKinds` (:2750, "2 selected" for 3): iPhone; it passed on the iPad.
+
+**Possibly a product bug, on both devices:** `testNotebookToolsAreSideBySide` (:1617). After the last page of a note is deleted, the notebook tool bar is gone ("Empty notes must keep Add Page and Undo available").
+
+**iPhone only, passed on the iPad:**
+
+- `EditorWorkspaceUITests.testFrenchSignatureAtLargestTextSize` (:168): the target is not found in `pdf-tools-list`.
+- `testRecognizeTextMakesAWordOnThePageSearchable` (:761): the search field never took keyboard focus. Probably a Simulator focus flake; not rerun alone.
+
+**iPad only, the same at `e228bb9` (so older than presentation mode):**
+
+- `ReaderNightAndBookmarksUITests.testANotebooksBookmarkMarksItsPageLeadsBackAndShowsAtNight` (:333) and `TwoPageViewUITests.testAnIPadShowsTwoPagesAndTheOneBesideItIsATapAway` (:63). Both fail at the same step: the title menu's Go to Page… alert does not close after Go. In the notebook test the page then stays at 1. One cause is likely.
+- `ReaderNightAndBookmarksUITests.testCommandDBookmarksThePageFromAHardwareKeyboard` (:294): ⌘D saves no bookmark (0 rows on the baseline).
+- `DocumentUtilitiesUITests.testOneControlShowsAndHidesPagesAndToolsTogether` (:140): closing the panel leaves page 2, not page 3.
+- `StampUITests.testOwnWordsAreKeptAndOfferedAgain` (:165): no `text-stamp-preview`.
+- `HomeToolsUITests.testHomeHasOneBrandAndProfileRemainsReachable` (:19): 1 found where the test expects 2.
+- `AppUITests.testExportSaveOpensTheSaveDialogAndClosingItKeepsTheExport` (:368): saving does not close the export sheet.
+- `AppUITests.testInlineTextHandlesMoveResizeAndOutsideTapSaves` (:2264): `inline-text-object` never appears.
+- `AppUITests.testCompactNotebookToolsAndPenControls` (:2117): "the placement sheet for shapes stays in More".
+
+None of these was changed here: they are Codex's screens and tests, and Codex's uncommitted work is in some of the same files. Results: `/var/folders/b9/6sd7c1bn47d44l1z_mz8g_j00000gn/T/` `rerun2-iphone.xcresult`, `full-ipad.xcresult`, `iso-doc.xcresult`, `base-doc.xcresult`.
+
+**Not verified:** VoiceOver itself, Mac interaction, a real device and an external display. This was the iOS Simulator only.
+
 ## 2026-11-19 — Speaker notes: a presenter's private note per page, shown while presenting on iPad (Claude, schema v16)
 
 Owner: "Speaker notes". **Speaker Notes**, in the document's title menu (iPhone and iPad), writes the note for the page being read in a sheet (Cancel / Done; one undo step). While presenting on an iPad, ⋯ → Speaker Notes shows the page's note under the page, "No notes for this page." otherwise; an iPhone presents without them (the sample keeps it a viewer). Notes are private like page comments: **never rendered, exported, searched or synced**; writing one is not editing the page (no revision or date moves). **Schema v16:** `speaker_notes`, one row per page, `ON DELETE CASCADE`, a new table with nothing rebuilt.
