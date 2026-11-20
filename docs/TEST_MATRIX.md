@@ -16,7 +16,7 @@ Each failure was then sorted by cause. The question that mattered: did this sess
 | iPad Air 13, whole suite | **207 passed, 19 failed, 7 skipped.** |
 | `7fd1bb9`: `ScannerWorkspaceUITests.testPhotoModeKeepsTheWholeFrameAndTurnsAutoOff` | It still asserted Book is not offered, from before Book mode; it now expects the chip. **iPhone: pass (21.0 s). iPad: pass (whole-suite run).** |
 | Caused by this session: `ScannerWorkspaceUITests.testScanSettingsDecideHowTheScannerOpensNextTime` (iPad) | **Fixed.** Book made the settings sheet's mode list one row longer. On the iPad form sheet the filter rows then lie under Done, which stays fixed below the list. The tap on Grayscale went through Done and closed the sheet, and the next check found no sheet (the hierarchy at the failure shows the scanner with no sheet). It failed in the whole-suite run and again alone. Each row is now scrolled clear of Done before it is tapped, as the test already did for its last row. **iPad: pass (112.5 s). iPhone: pass (111.1 s).** The test is Codex's file; Codex's uncommitted edits in it were left out of the commit. |
-| Any other failure caused by this session's slices? | **None.** On the iPad, the nine failures not seen on iPhone fail **the same way, at the same lines, on a baseline**. The baseline is `e228bb9` (before presentation mode, so no presentation, pen pointer, speaker notes or schema v16) with Codex's same uncommitted edits applied (`/var/folders/b9/6sd7c1bn47d44l1z_mz8g_j00000gn/T/base-doc.log`). On the current copy, run alone, the same nine fail again (`iso-doc.log`), so they are consistent, not flukes. No failure involves the scanner advice, the presentation cover or the speaker-notes sheet. |
+| Any other failure caused by this session's slices? | **None found.** The evidence differs by slice. **Presentation, the pen pointer, speaker notes and schema v16:** on the iPad, the nine failures not seen on iPhone fail **the same way, at the same lines, on a baseline**: `e228bb9`, before presentation mode, with Codex's same uncommitted edits applied (`/var/folders/b9/6sd7c1bn47d44l1z_mz8g_j00000gn/T/base-doc.log`). Run alone on the current copy, the same nine fail again (`iso-doc.log`), so they are consistent, not flukes. **Scan advice, repeats, glare and Book:** no baseline was run; apart from the two fixed above, none of the failures goes near the scanner. |
 
 **Stale after the studio redesign (Codex's lane).** Codex's commit `13e8daa` stopped placing `compactTools`, the phone's old bottom tool bar. It is still declared in `DocumentView.swift` (around line 1661) but nothing uses it, so `editor-filter`, `editor-crop`, `editor-more` and that bar's Crop and Rotate buttons never appear on a phone. A document now opens with `notebook-tool-bar` and Document Tools (`editor-panels`); the hierarchy at `testFilterStripAndTitleMenu`'s failure shows exactly that.
 
@@ -38,18 +38,21 @@ Each failure was then sorted by cause. The question that mattered: did this sess
 - `EditorWorkspaceUITests.testFrenchSignatureAtLargestTextSize` (:168): the target is not found in `pdf-tools-list`.
 - `testRecognizeTextMakesAWordOnThePageSearchable` (:761): the search field never took keyboard focus. Probably a Simulator focus flake; not rerun alone.
 
-**iPad only, the same at `e228bb9` (so older than presentation mode):**
+**iPad only, the same at `e228bb9`, in Claude's earlier slices (not this session's).** These are Claude's to fix, not Codex's.
 
-- `ReaderNightAndBookmarksUITests.testANotebooksBookmarkMarksItsPageLeadsBackAndShowsAtNight` (:333) and `TwoPageViewUITests.testAnIPadShowsTwoPagesAndTheOneBesideItIsATapAway` (:63). Both fail at the same step: the title menu's Go to Page… alert does not close after Go. In the notebook test the page then stays at 1. One cause is likely.
+- `StampUITests.testOwnWordsAreKeptAndOfferedAgain` (:165): no `text-stamp-preview`. At the failure the stamp sheet is scrolled down to the kept stamp, and the preview at its top has left the list. Image stamps (`1f679a6`, 11-17) added Add Photo and Add File rows to that sheet, and after that `StampUITests` ran on iPhone only. Before image stamps it was 4/4 on this iPad. Most likely the same longer-list pattern as the settings test.
+- `ReaderNightAndBookmarksUITests.testANotebooksBookmarkMarksItsPageLeadsBackAndShowsAtNight` (:333, bookmarks `35b9a93`) and `TwoPageViewUITests.testAnIPadShowsTwoPagesAndTheOneBesideItIsATapAway` (:63, two pages `db0e3a9`). Both fail at the same step: the title menu's Go to Page… alert does not close after Go. In the notebook test the page then stays at 1. One cause is likely; not yet found.
 - `ReaderNightAndBookmarksUITests.testCommandDBookmarksThePageFromAHardwareKeyboard` (:294): ⌘D saves no bookmark (0 rows on the baseline).
-- `DocumentUtilitiesUITests.testOneControlShowsAndHidesPagesAndToolsTogether` (:140): closing the panel leaves page 2, not page 3.
-- `StampUITests.testOwnWordsAreKeptAndOfferedAgain` (:165): no `text-stamp-preview`.
+- `DocumentUtilitiesUITests.testOneControlShowsAndHidesPagesAndToolsTogether` (:140, Document Tools Option 6, `1e7fdda`): closing the panel leaves page 2, not page 3.
+
+**iPad only, the same at `e228bb9`, in Codex's screens:**
+
 - `HomeToolsUITests.testHomeHasOneBrandAndProfileRemainsReachable` (:19): 1 found where the test expects 2.
-- `AppUITests.testExportSaveOpensTheSaveDialogAndClosingItKeepsTheExport` (:368): saving does not close the export sheet.
 - `AppUITests.testInlineTextHandlesMoveResizeAndOutsideTapSaves` (:2264): `inline-text-object` never appears.
 - `AppUITests.testCompactNotebookToolsAndPenControls` (:2117): "the placement sheet for shapes stays in More".
+- `AppUITests.testExportSaveOpensTheSaveDialogAndClosingItKeepsTheExport` (:368): saving does not close the export sheet. The export sheet's redesign (`a270361`, 10-21) predates the split of work; its owner was not checked.
 
-None of these was changed here: they are Codex's screens and tests, and Codex's uncommitted work is in some of the same files. Results: `/var/folders/b9/6sd7c1bn47d44l1z_mz8g_j00000gn/T/` `rerun2-iphone.xcresult`, `full-ipad.xcresult`, `iso-doc.xcresult`, `base-doc.xcresult`.
+None of these was changed here. Codex's uncommitted work is in some of the same files. Results: `/var/folders/b9/6sd7c1bn47d44l1z_mz8g_j00000gn/T/` `rerun2-iphone.xcresult`, `full-ipad.xcresult`, `iso-doc.xcresult`, `base-doc.xcresult`.
 
 **Not verified:** VoiceOver itself, Mac interaction, a real device and an external display. This was the iOS Simulator only.
 
