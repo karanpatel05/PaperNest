@@ -1,3 +1,28 @@
+## 2026-11-20 — ⌘D on the iPad Air simulator: the first modifier key never reaches the app (Claude)
+
+Owner: "Yes, dig into ⌘D". `ReaderNightAndBookmarksUITests.testCommandDBookmarksThePageFromAHardwareKeyboard` passed on the iPad Pro 13 and failed on the iPad Air 13 with the same build. The entry below left it unresolved.
+
+**How it was found.** Only a git-free copy was instrumented, and that instrumentation has since been removed:
+
+- a log of when the Page menu's state is worked out, and when the ⌘D action and its `run` fire;
+- then a log in a swizzled `UIApplication.sendEvent` of every key press the app receives, with the app's and window's state.
+
+| Run (iPad Air 13) | What the logs showed |
+|---|---|
+| ⌘D test alone, simulator just booted | **Pass.** The command is off for about 2 s after the page appears: the document's current page is not yet set. The test's press came later. |
+| After `BookmarksUITests` and the notebook bookmark test, the order of the failing runs | **Fail, twice in a row.** The menu was on (document, bookmarks and current page all present) 3.7 s before the first press, yet the action never ran. The second press, 20 s later, ran it. The simulator's system log looked the same for both presses. |
+| Same order, with the `sendEvent` log | **The first ⌘D reached the app as a plain "d", modifiers 0, and no ⌘ key events at all.** The second arrived whole: ⌘ down, then d with ⌘. The app was active and its window was key both times. A plain "d" correctly does nothing. |
+| Same order, a lone ⌘ press sent first | **Pass.** The lone ⌘ never reached the app; the ⌘D after it arrived whole and bookmarked the page. |
+
+**Cause.** On the iPad Air 13 simulator, after earlier tests have relaunched the app, the first modifier key the test sends is dropped before it reaches the app. The log sits at the app's entry point, so this is below PaperNest, in the simulator or XCUITest. The app's ⌘D was never at fault. A real iPad was not tried.
+
+**Change.** The test presses ⌘ once on its own before ⌘D. That does nothing in the app, and the comment records the evidence. The earlier retry (press again if nothing was saved) was the wrong idea: it pressed after the loss rather than before it, so it is not used.
+
+| Check | Result |
+|---|---|
+| Lone ⌘ first, failing order, iPad Air (instrumented copy) | **Pass** (16.9 s). |
+| Without instrumentation: `BookmarksUITests` and `ReaderNightAndBookmarksUITests`, iPad Air 13 and iPad Pro 13 in one run | **iPad Air: 9/9 pass; iPad Pro: 9/9 pass.** On the iPad Air the ⌘D test ran after the bookmark tests, the order that failed before. | |
+
 ## 2026-11-20 — Five iPad UI failures in Claude's earlier slices: two app bugs fixed, the stamp test made sound, ⌘D on the iPad Air simulator unresolved (Claude)
 
 Owner: "Yes, fix them". These are the five iPad-only failures that the app-wide run (entry below) put in Claude's earlier slices. For each one the cause was found before anything changed: screen recordings, failure hierarchies, a run on the iPad Pro 13 (M5), where all of these had passed on 11-14, and, for Document Tools, a log of the page tracker.

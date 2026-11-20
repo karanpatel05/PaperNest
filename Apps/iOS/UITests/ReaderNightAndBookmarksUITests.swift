@@ -289,6 +289,12 @@ import PaperNestStore
         let ribbon = app.descendants(matching: .any).matching(identifier: "page-bookmark-ribbon").firstMatch
         XCTAssertFalse(ribbon.exists)
 
+        // ⌘ once on its own first, which does nothing. On the iPad Air 13
+        // simulator, after other tests, the first modifier key sent to a
+        // relaunched app never reaches it: a log in `UIApplication.sendEvent`
+        // saw a plain "d" for the first ⌘D, and no ⌘ at all, while the next
+        // ⌘D arrived whole (2026-11-20). The app is right to ignore "d".
+        app.typeKey(XCUIKeyboardKey.command.rawValue, modifierFlags: [])
         app.typeKey("d", modifierFlags: .command)
 
         XCTAssertTrue(ribbon.waitForExistence(timeout: 5), "⌘D did not bookmark the page")
