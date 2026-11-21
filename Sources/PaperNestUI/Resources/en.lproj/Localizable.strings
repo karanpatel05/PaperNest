@@ -1347,13 +1347,16 @@
 
 /* Handwriting to text */
 "handwriting.convert" = "Convert to Text";
-"handwriting.title" = "Handwriting to Text";
+"handwriting.title" = "Convert Handwriting";
 "handwriting.reading" = "Reading your handwriting…";
 "handwriting.nothing" = "No words could be read in this handwriting. Try writing larger or more clearly, then select it again.";
 "handwriting.failed" = "This handwriting couldn’t be read.";
 "handwriting.review" = "Check and correct the words before inserting them. Read on this device.";
-"handwriting.keep" = "Keep Handwriting";
+"handwriting.keep" = "Keep Original Ink";
 "handwriting.keep.on" = "The text goes below your handwriting.";
 "handwriting.keep.off" = "The text takes your handwriting’s place. Undo brings the handwriting back.";
-"handwriting.insert" = "Insert";
+"handwriting.insert" = "Insert Text";
 "handwriting.unread" = "Not read in: %@";
+"handwriting.replace" = "Replace Selection";
+"handwriting.recognized" = "Recognized Text";
+"handwriting.preview" = "Selected handwriting";

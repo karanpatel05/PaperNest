@@ -1,3 +1,26 @@
+## 2026-11-20 — Handwriting to text matched to the owner's sample §12 (Claude)
+
+Owner: "GO AHEAD WITH IT", after the report listed where the conversion sheet differed from `docs/FEATURE_UI_SAMPLES.md` §12.
+
+The sheet now follows the sample, titled **Convert Handwriting**:
+- the **selected ink** at the top, drawn as Vision is shown it;
+- **Recognized Text**, editable;
+- **Keep Original Ink** and **Replace Selection** as two inline choice rows, with a note on what each does;
+- **Cancel** and **Insert Text** at the foot, one above the other when the text is too large for them side by side.
+
+On an iPad, the default form sheet was too short: Replace Selection sat below its foot. The sheet is now page-sized there (iOS 18 and later; on iOS 17 it keeps the form size and scrolls).
+
+**Left out on purpose:** the sample's Done at the top. Beside Cancel and Insert Text it would be a third way to close, and it is not clear which of the two it would mean.
+
+| Check | Result |
+|---|---|
+| `HandwritingUITests` (4), iPhone 17 and iPad Air 13 in one run | **8/8 pass.** The ink preview is shown, including for a scribble that reads nothing. Keep Original Ink is chosen by default. Replace Selection is chosen in French and Spanish (checked by the selected trait, since the rows' values are in the app's language). On iPad, both choices show without scrolling. At French XXXL, Insérer le texte, Annuler and Remplacer la sélection are all reachable. |
+| Earlier runs of the same tests | One run failed, for two reasons in the tests themselves. The French and Spanish rows were compared against English "Selected", which is fixed. On iPhone the Lasso's panel once did not open on the first tap (1 run in 4); the test now taps again only when the panel has not appeared. |
+| `LocalizationTests` + `HandwritingModelTests` on the committed tree (HEAD plus this change, Codex's string edits left out) | **13/13 pass.** |
+| `./scripts/build-mac-app.sh` | **Built, 0 warnings.** |
+
+**Not verified:** a real device, VoiceOver, the sheet on the Mac (built, not driven), and an iOS 17 iPad.
+
 ## 2026-11-20 — Handwriting to text: pen ink read on the device, corrected, then put on the page as a text box (Claude, roadmap P2 #13)
 
 Owner: "yes go back feature roadmap". Items 1–12 and 15 are done. #9 (review links) waits on real iCloud sync. #16 (audio) and #17 (assistant) need approval first, and audio is outside the documents-and-images scope. So the next was **#13, handwriting to text**.

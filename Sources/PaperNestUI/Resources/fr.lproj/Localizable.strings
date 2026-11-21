@@ -1347,13 +1347,16 @@
 
 /* Handwriting to text */
 "handwriting.convert" = "Convertir en texte";
-"handwriting.title" = "Écriture en texte";
+"handwriting.title" = "Convertir l’écriture";
 "handwriting.reading" = "Lecture de votre écriture…";
 "handwriting.nothing" = "Aucun mot n’a pu être lu dans cette écriture. Écrivez plus grand ou plus lisiblement, puis sélectionnez-la de nouveau.";
 "handwriting.failed" = "Cette écriture n’a pas pu être lue.";
 "handwriting.review" = "Vérifiez et corrigez les mots avant de les insérer. Lu sur cet appareil.";
-"handwriting.keep" = "Garder l’écriture";
+"handwriting.keep" = "Garder l’encre d’origine";
 "handwriting.keep.on" = "Le texte est placé sous votre écriture.";
 "handwriting.keep.off" = "Le texte remplace votre écriture. Annuler la fait revenir.";
-"handwriting.insert" = "Insérer";
+"handwriting.insert" = "Insérer le texte";
 "handwriting.unread" = "Non lu en : %@";
+"handwriting.replace" = "Remplacer la sélection";
+"handwriting.recognized" = "Texte reconnu";
+"handwriting.preview" = "Écriture sélectionnée";

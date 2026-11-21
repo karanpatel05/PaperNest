@@ -59,7 +59,11 @@ import PaperNestStore
         XCTAssertTrue(lasso.waitForExistence(timeout: 30), "the notebook did not open", file: file, line: line)
         press(lasso)
         let selectAll = app.buttons["studio-lasso-select-all"]
-        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), file: file, line: line)
+        // Once in four iPhone runs (2026-11-20) the Lasso's panel did not open
+        // on the first tap, though the Lasso showed as chosen; tapped again
+        // only when the panel has not appeared.
+        if !selectAll.waitForExistence(timeout: 5) { press(lasso) }
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "the Lasso's panel did not open", file: file, line: line)
         // At the largest text size the Lasso's panel is a small scrolling
         // popover, and Select All is below what it shows.
         let panel = app.scrollViews.containing(NSPredicate(format: "identifier == %@", "studio-lasso-select-all")).firstMatch
@@ -119,8 +123,14 @@ import PaperNestStore
         let editor = app.textViews["handwriting-text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 30), "the reading did not finish")
         XCTAssertEqual(Self.letters(editor.value as? String ?? ""), "hello", "read: \(editor.value ?? "")")
-        let keep = app.switches["handwriting-keep"]
-        XCTAssertEqual(keep.value as? String, "1", "the handwriting is kept unless asked")
+        XCTAssertTrue(app.images["handwriting-preview"].exists, "the selected ink is shown above the words")
+        XCTAssertTrue(app.buttons["handwriting-keep"].isSelected, "the original ink is kept unless asked")
+        XCTAssertFalse(app.buttons["handwriting-replace"].isSelected)
+        if isPad {
+            // Page-sized on an iPad: the ink, the words and both choices show
+            // without scrolling, with Cancel and Insert Text at the foot.
+            XCTAssertTrue(app.buttons["handwriting-replace"].isHittable, "Replace selection is below the sheet's foot")
+        }
         snap(app, "read-en")
         retype(editor, "Hello Ana")
         app.buttons["handwriting-insert"].tap()
@@ -151,9 +161,12 @@ import PaperNestStore
             let read = editor.value as? String ?? ""
             XCTAssertEqual(Self.letters(read), Self.letters(word), "\(language): read \(read)")
             print("HANDWRITING-UI \(language) wrote \(word) read \(read)")
-            let keep = app.switches["handwriting-keep"]
-            keep.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
-            XCTAssertEqual(keep.value as? String, "0", "\(language): the switch did not turn off")
+            let replace = app.buttons["handwriting-replace"]
+            for _ in 0..<3 where !replace.isHittable { app.swipeUp() }
+            replace.tap()
+            // The rows' values are in the app's language; the selected trait is not.
+            XCTAssertTrue(replace.isSelected, "\(language): Replace selection is not chosen")
+            XCTAssertFalse(app.buttons["handwriting-keep"].isSelected, "\(language): Keep original ink is still chosen")
             snap(app, "replace-\(language)")
             app.buttons["handwriting-insert"].tap()
             XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
@@ -179,6 +192,7 @@ import PaperNestStore
         let nothing = app.descendants(matching: .any)["handwriting-nothing"]
         XCTAssertTrue(nothing.waitForExistence(timeout: 30), "no 'nothing read' message")
         XCTAssertFalse(app.buttons["handwriting-insert"].isEnabled)
+        XCTAssertTrue(app.images["handwriting-preview"].exists, "the scribble is still shown, so it can be seen why")
         snap(app, "nothing-en")
         app.buttons["handwriting-cancel"].tap()
         let after = try await store.objects(on: page)
@@ -186,7 +200,7 @@ import PaperNestStore
     }
 
     /// At the largest text size, in French: the words, the switch and both
-    /// buttons can all be reached, and Cancel leaves the page as it was.
+    /// buttons at the foot can all be reached, and Cancel leaves the page as it was.
     func testTheSheetAtTheLargestTextSize() async throws {
         let (directory, store, page, _) = try await seed("hello")
         let before = try await store.objects(on: page)
@@ -207,12 +221,15 @@ import PaperNestStore
         openConversion(app, convert: "Convertir en texte")
         let editor = app.textViews["handwriting-text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 30))
-        XCTAssertTrue(app.buttons["handwriting-insert"].isHittable, "Insérer cannot be reached")
+        XCTAssertTrue(app.buttons["handwriting-insert"].isHittable, "Insérer le texte cannot be reached")
         XCTAssertTrue(app.buttons["handwriting-cancel"].isHittable, "Annuler cannot be reached")
+        let insertFrame = app.buttons["handwriting-insert"].frame
+        XCTAssertLessThanOrEqual(insertFrame.maxX, app.frame.maxX, "Insérer le texte runs off the right: \(insertFrame)")
         snap(app, "xxxl-fr")
-        let keep = app.switches["handwriting-keep"]
-        for _ in 0..<4 where !(keep.exists && keep.isHittable) { app.swipeUp() }
-        XCTAssertTrue(keep.isHittable, "the switch cannot be reached")
+        let replace = app.buttons["handwriting-replace"]
+        for _ in 0..<5 where !(replace.exists && replace.isHittable) { app.swipeUp() }
+        XCTAssertTrue(replace.isHittable, "Remplacer la sélection cannot be reached")
+        XCTAssertTrue(app.buttons["handwriting-cancel"].isHittable, "Annuler is lost when the list is scrolled")
         snap(app, "xxxl-fr-switch")
         app.buttons["handwriting-cancel"].tap()
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))

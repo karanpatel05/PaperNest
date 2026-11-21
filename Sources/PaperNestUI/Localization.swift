@@ -1511,4 +1511,7 @@ extension L10n {
     static var handwritingKeepOff: String { tr("handwriting.keep.off") }
     static var handwritingInsert: String { tr("handwriting.insert") }
     static func handwritingUnread(_ languages: String) -> String { tr("handwriting.unread", languages) }
+    static var handwritingReplace: String { tr("handwriting.replace") }
+    static var handwritingRecognized: String { tr("handwriting.recognized") }
+    static var handwritingPreview: String { tr("handwriting.preview") }
 }
