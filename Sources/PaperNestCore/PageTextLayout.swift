@@ -24,6 +24,9 @@ public struct PageTextLayout: Hashable, Sendable {
         case recognized
         /// Typed onto the page in a text box.
         case typed
+        /// Read off the page's handwriting. Only in a layout that asked for it
+        /// (find); selection, reading aloud and comparison never see it.
+        case handwritten
     }
 
     public struct Fragment: Hashable, Sendable {

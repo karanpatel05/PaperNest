@@ -13,17 +13,21 @@ import PaperNestStore
 ///    A page that has both says each word once, from the file.
 /// 3. **Text boxes typed onto the page**, always, after whichever came first:
 ///    each box is one fragment holding everything typed in it.
+/// 4. **Handwriting**, only when asked for (find asks; selection, reading
+///    aloud, cleanup and comparison do not), and only a reading of the ink as
+///    it is now, its confident lines alone: a box per word.
 ///
 /// Nothing is stored or cached. The text is read from the asset the page
 /// shows now, so it cannot describe paper the page no longer has.
 extension PageRenderer {
     /// The words on `page` and where they are, less anything a crop hides.
-    public func textLayout(for page: Page) async throws -> PageTextLayout {
+    public func textLayout(for page: Page, includingHandwriting: Bool = false) async throws -> PageTextLayout {
         var pdfPage: PDFPage?
         if case .pdfPage(_, let index) = page.content, let data = try await sourcePDFData(for: page) {
             pdfPage = PDFDocument(data: data)?.page(at: index)
         }
-        return try await layout(of: page, pdfPage: pdfPage, objects: store.objects(on: page.id))
+        let handwriting = includingHandwriting ? try await handwritingLines(of: page) : []
+        return try await layout(of: page, pdfPage: pdfPage, objects: store.objects(on: page.id), handwriting: handwriting)
     }
 
     /// What find matches against, for each of `pages` in turn.
@@ -39,13 +43,14 @@ extension PageRenderer {
     /// is reported as empty too, and the pass carries on: one unreadable page
     /// must not make every page after it unsearchable. Only cancellation
     /// stops it.
-    public func searchTexts(for pages: [Page],
+    public func searchTexts(for pages: [Page], includingHandwriting: Bool = false,
                             each: @Sendable (PageID, PageSearchText) async -> Void) async throws {
         var documents: [AssetID: PDFDocument] = [:]
         for page in pages {
             try Task.checkCancellation()
             do {
-                await each(page.id, try await searchText(for: page, in: &documents))
+                await each(page.id, try await searchText(for: page, in: &documents,
+                                                         includingHandwriting: includingHandwriting))
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -54,7 +59,8 @@ extension PageRenderer {
         }
     }
 
-    private func searchText(for page: Page, in documents: inout [AssetID: PDFDocument]) async throws -> PageSearchText {
+    private func searchText(for page: Page, in documents: inout [AssetID: PDFDocument],
+                            includingHandwriting: Bool) async throws -> PageSearchText {
         var pdfPage: PDFPage?
         if case .pdfPage(let assetID, let index) = page.content {
             if documents[assetID] == nil, let data = try await sourcePDFData(for: page) {
@@ -63,23 +69,50 @@ extension PageRenderer {
             pdfPage = documents[assetID]?.page(at: index)
         }
         let objects = try await store.objects(on: page.id)
-        // The common case — a PDF page nobody has typed on or cropped —
-        // needs no boxes at all: its text is its string.
-        if let raw = pdfPage?.string, page.transform.crop.isApproximately(.full),
+        let handwriting = includingHandwriting ? try await handwritingLines(of: page) : []
+        // The common case — a PDF page nobody has typed or written on, or
+        // cropped — needs no boxes at all: its text is its string.
+        if let raw = pdfPage?.string, page.transform.crop.isApproximately(.full), handwriting.isEmpty,
            !objects.contains(where: { if case .text = $0.payload { true } else { false } }) {
             let text = PageSearchText(pageString: raw)
             if !text.isEmpty { return text }
         }
-        return try await layout(of: page, pdfPage: pdfPage, objects: objects).searchText
+        return try await layout(of: page, pdfPage: pdfPage, objects: objects, handwriting: handwriting).searchText
     }
 
-    private func layout(of page: Page, pdfPage: PDFPage?, objects: [PageObject]) async throws -> PageTextLayout {
+    private func layout(of page: Page, pdfPage: PDFPage?, objects: [PageObject],
+                        handwriting: [PageTextLayout.Line] = []) async throws -> PageTextLayout {
         var lines = pdfPage.map { Self.embeddedLines(of: $0) } ?? []
         if lines.isEmpty {
             lines = Self.lines(from: try await recognizedLines(for: page))
         }
         lines += Self.typedLines(in: objects, sourceSize: page.sourceSize)
+        lines += handwriting
         return PageTextLayout(lines: lines).cropped(to: page.transform.crop)
+    }
+
+    /// The page's handwriting as layout lines: only a reading of its ink as
+    /// it is now, and only the lines confident enough to answer a search, so
+    /// find and library search agree on what is there.
+    private func handwritingLines(of page: Page) async throws -> [PageTextLayout.Line] {
+        guard let reading = try await store.currentHandwriting(on: page.id) else { return [] }
+        return Self.handwritingLines(of: reading, sourceSize: page.sourceSize)
+    }
+
+    /// A reading's searchable lines in shares of the page, through the same
+    /// rule as recognition: word boxes when Vision boxed every word, the
+    /// line's box otherwise (and for readings from before words were kept).
+    static func handwritingLines(of reading: HandwritingRecognitionResult, sourceSize: CGSize) -> [PageTextLayout.Line] {
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return [] }
+        func share(_ rect: CGRect) -> NormalizedRect {
+            .exact(x: rect.minX / sourceSize.width, y: rect.minY / sourceSize.height,
+                   width: rect.width / sourceSize.width, height: rect.height / sourceSize.height)
+        }
+        let recognized = reading.searchableLines.map { line in
+            RecognizedLine(text: line.text, box: share(line.bounds), confidence: line.confidence,
+                           words: line.words.map { RecognizedWord(text: $0.text, box: share($0.bounds)) })
+        }
+        return lines(from: recognized, origin: .handwritten)
     }
 
     /// A box per visible character of a PDF page.
@@ -134,14 +167,14 @@ extension PageRenderer {
     /// box every word of every line. Using a partial list would make the
     /// unboxed words unfindable, so a line whose boxes do not account for all
     /// of its words is one fragment: a hit lights the line, which is true.
-    static func lines(from recognized: [RecognizedLine]) -> [PageTextLayout.Line] {
+    static func lines(from recognized: [RecognizedLine], origin: PageTextLayout.Origin = .recognized) -> [PageTextLayout.Line] {
         recognized.compactMap { line in
             let spoken = line.text.split(whereSeparator: \.isWhitespace).map(String.init)
             guard !spoken.isEmpty else { return nil }
             let fragments = line.words.map(\.text) == spoken
                 ? line.words.map { PageTextLayout.Fragment(text: $0.text, box: $0.box, spaceAfter: true) }
                 : [PageTextLayout.Fragment(text: line.text, box: line.box, spaceAfter: true)]
-            return PageTextLayout.Line(fragments: fragments, origin: .recognized)
+            return PageTextLayout.Line(fragments: fragments, origin: origin)
         }
     }
 

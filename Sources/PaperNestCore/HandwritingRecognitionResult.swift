@@ -17,14 +17,42 @@ public struct HandwritingRecognitionResult: Codable, Equatable, Sendable {
 
     /// A line as read, with how sure Vision was and where it lies (source points).
     public struct Line: Codable, Equatable, Sendable {
+        /// A word of the line and where it lies (source points), where Vision
+        /// boxed it.
+        public struct Word: Codable, Equatable, Sendable {
+            public var text: String
+            public var bounds: CGRect
+
+            public init(text: String, bounds: CGRect) {
+                self.text = text
+                self.bounds = bounds
+            }
+        }
+
         public var text: String
         public var confidence: Double
         public var bounds: CGRect
+        /// Empty for a reading made before words were kept
+        /// (`vision.handwriting.1`): a reader falls back to the line's box.
+        public var words: [Word]
 
-        public init(text: String, confidence: Double, bounds: CGRect) {
+        public init(text: String, confidence: Double, bounds: CGRect, words: [Word] = []) {
             self.text = text
             self.confidence = confidence
             self.bounds = bounds
+            self.words = words
+        }
+
+        private enum CodingKeys: String, CodingKey { case text, confidence, bounds, words }
+
+        /// Readings stored before words were kept have no `words`; they must
+        /// still decode, or one old row would stop library search working.
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            text = try container.decode(String.self, forKey: .text)
+            confidence = try container.decode(Double.self, forKey: .confidence)
+            bounds = try container.decode(CGRect.self, forKey: .bounds)
+            words = try container.decodeIfPresent([Word].self, forKey: .words) ?? []
         }
     }
 

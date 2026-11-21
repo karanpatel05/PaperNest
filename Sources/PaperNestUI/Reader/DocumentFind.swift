@@ -76,10 +76,13 @@ final class DocumentFind {
     private var generation = 0
 
     /// What a page's text was read from. Recognition and typed text change
-    /// with the revision; the file's own text changes with the content.
+    /// with the revision; the file's own text changes with the content; and
+    /// handwriting, read in the background, arrives with a new epoch
+    /// (`LibrarySession.handwritingEpoch`) without either changing.
     private struct Stamp: Hashable, Sendable {
         let content: PageContent
         let revision: Int
+        let handwritingEpoch: Int
     }
 
     var current: Hit? { currentIndex.map { hits[$0] } }
@@ -96,6 +99,11 @@ final class DocumentFind {
     func hits(on pageID: PageID) -> [Hit] {
         (ranges[pageID] ?? []).map { Hit(pageID: pageID, range: $0) }
     }
+
+    /// The handwriting epoch a page's hits were found at. The highlights draw
+    /// boxes only from a layout read at the same one, so a reading that lands
+    /// between finding and drawing cannot put a box on the wrong word.
+    func indexedHandwritingEpoch(of pageID: PageID) -> Int? { texts[pageID]?.stamp.handwritingEpoch }
 
     func next() { move(by: 1) }
     func previous() { move(by: -1) }
@@ -119,12 +127,13 @@ final class DocumentFind {
     ///
     /// Safe to call again while an earlier call is still running: a result
     /// that arrives for a page as it no longer is, is dropped.
-    func index(_ pages: [Page], with renderer: PageRenderer) async {
+    func index(_ pages: [Page], with renderer: PageRenderer, handwritingEpoch: Int = 0) async {
         generation &+= 1
         let pass = generation
         let held = current
         order = pages.map(\.id)
-        expected = Dictionary(pages.map { ($0.id, Stamp(content: $0.content, revision: $0.revision)) },
+        expected = Dictionary(pages.map { ($0.id, Stamp(content: $0.content, revision: $0.revision,
+                                                       handwritingEpoch: handwritingEpoch)) },
                               uniquingKeysWith: { first, _ in first })
         // A page that left the document takes its hits with it. A page that
         // only changed keeps its old ones until it has been read again, so
@@ -139,7 +148,7 @@ final class DocumentFind {
             let stamps = expected
             // Cancelled when the bar closes or the pages change again: what
             // was read so far stays, and the next call reads the rest.
-            try? await renderer.searchTexts(for: stale) { [weak self] id, text in
+            try? await renderer.searchTexts(for: stale, includingHandwriting: true) { [weak self] id, text in
                 guard let stamp = stamps[id] else { return }
                 await self?.record(text, for: id, stamp: stamp)
             }

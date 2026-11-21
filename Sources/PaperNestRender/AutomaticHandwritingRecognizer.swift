@@ -44,8 +44,9 @@ public actor AutomaticHandwritingRecognizer {
                                                           engineVersion: HandwritingRecognizer.engineVersion,
                                                           status: .failed, languages: languages, lines: [])
                 do {
-                    result.lines = try await recognizer.recognize(ink).map {
-                        .init(text: $0.text, confidence: $0.confidence, bounds: $0.bounds)
+                    result.lines = try await recognizer.recognize(ink).map { line in
+                        .init(text: line.text, confidence: line.confidence, bounds: line.bounds,
+                              words: line.words.map { .init(text: $0.text, bounds: $0.bounds) })
                     }
                     result.status = .completed
                 } catch {

@@ -47,7 +47,10 @@ extension PageTextLayout {
     public var comparisonText: ComparisonPageText {
         var words: [ComparisonWord] = []
         var recognized = false, embedded = false
-        for line in lines where line.origin != .typed {
+        // Typed boxes and handwriting are not the page's text to compare;
+        // handwriting is never in a comparison layout, and skipped here too
+        // so it could never be counted as the file's own text.
+        for line in lines where line.origin != .typed && line.origin != .handwritten {
             var text = ""
             var box: NormalizedRect?
             func flush() {

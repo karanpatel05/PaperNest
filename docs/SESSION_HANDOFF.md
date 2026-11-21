@@ -58,6 +58,8 @@ file-preview work has a `FileKind.prepareTemporaryCopy` in it.
 
 ### Current claims
 
+**Claude released — Find highlights handwritten words, 2026-11-21. COMMITTED in the commit that carries this line, not pushed; files free; UI runs may start (the shared `/tmp/papernest-*` libraries are free).** Find in a document now matches and highlights words read off handwriting, a box per word. It is opt-in: selection, Read Aloud, cleanup and comparison are unchanged. Readings keep word boxes (`vision.handwriting.2`; `.1` readings still decode). A session handwriting epoch makes Find re-read when a reading lands. Details: TEST_MATRIX "Find in a document highlights handwritten words".
+
 **Claude released — handwriting to text matched to sample §12 (`af99950`), and handwriting search (roadmap P2 #14), 2026-11-20. COMMITTED in the commits that carry this line, not pushed; files free; UI runs may start (the shared `/tmp/papernest-*` libraries are free).** **Schema v17**: `handwriting_recognition` and `page_ink_generation`, with three triggers on `page_objects` ink rows. The next migration is v18. A background pass reads pen ink a few seconds after the writing pauses, and search finds the words as "Handwriting", with a page preview and "may be misread" when Vision was unsure. **For Codex:**
 - on iPhone the All Documents search field does not take the keyboard (the cause of `testRecognizeTextMakesAWordOnThePageSearchable`'s failure); the new test searches from Home instead;
 - after a search from Home, the large "All Documents" title is drawn over the search text;

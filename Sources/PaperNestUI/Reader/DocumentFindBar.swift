@@ -21,6 +21,11 @@ struct DocumentFindBar: View {
         let content: PageContent
     }
 
+    private struct FindKey: Hashable {
+        let pages: [PageStamp]
+        let handwritingEpoch: Int
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // One row where there is room for it. At phone width in French
@@ -52,9 +57,12 @@ struct DocumentFindBar: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(Theme.surface)
         .overlay(alignment: .bottom) { Divider() }
-        .task(id: model.pages.map { PageStamp(id: $0.id, revision: $0.revision, content: $0.content) }) {
+        // Handwriting read in the background arrives with a new epoch and no
+        // change to any page, so the epoch is part of what asks for a re-read.
+        .task(id: FindKey(pages: model.pages.map { PageStamp(id: $0.id, revision: $0.revision, content: $0.content) },
+                          handwritingEpoch: session.handwritingEpoch)) {
             guard let renderer = session.environment?.renderer else { return }
-            await find.index(model.pages, with: renderer)
+            await find.index(model.pages, with: renderer, handwritingEpoch: session.handwritingEpoch)
         }
         .onChange(of: model.selectedPageID, initial: true) { _, id in find.anchorPageID = id }
         .onChange(of: find.focusRequest) { _, _ in
@@ -257,14 +265,20 @@ struct FindHighlightsOverlay: View {
         let id: PageID
         let revision: Int
         let content: PageContent
+        let handwritingEpoch: Int
     }
 
     private struct LoadKey: Hashable {
         let stamp: LayoutStamp
         let hits: [DocumentFind.Hit]
+        /// When find catches up with a new epoch and finds the same hits, the
+        /// highlights still have to be drawn again.
+        let indexedEpoch: Int?
     }
 
-    private var stamp: LayoutStamp { LayoutStamp(id: page.id, revision: page.revision, content: page.content) }
+    private var stamp: LayoutStamp {
+        LayoutStamp(id: page.id, revision: page.revision, content: page.content, handwritingEpoch: session.handwritingEpoch)
+    }
 
     private static let every = Color(red: 1, green: 0.84, blue: 0.04).opacity(0.5)
     private static let current = Color(red: 1, green: 0.55, blue: 0).opacity(0.62)
@@ -292,7 +306,9 @@ struct FindHighlightsOverlay: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .allowsHitTesting(false)
-        .task(id: LoadKey(stamp: stamp, hits: hits)) { await load(hits) }
+        .task(id: LoadKey(stamp: stamp, hits: hits, indexedEpoch: find.indexedHandwritingEpoch(of: page.id))) {
+            await load(hits)
+        }
         .onChange(of: find.focusRequest) { _, _ in announceCurrentHit() }
     }
 
@@ -328,9 +344,18 @@ struct FindHighlightsOverlay: View {
             boxes = [:]
             return
         }
+        // The hits were found in text read at some handwriting epoch; boxes
+        // from a layout read at another could fall on the wrong words. Draw
+        // nothing until find has caught up (its own task re-reads on the
+        // same change).
+        guard find.indexedHandwritingEpoch(of: page.id) == stamp.handwritingEpoch else {
+            boxes = [:]
+            return
+        }
         if layout?.stamp != stamp {
             guard let renderer = session.environment?.renderer,
-                  let read = try? await renderer.textLayout(for: page), !Task.isCancelled else { return }
+                  let read = try? await renderer.textLayout(for: page, includingHandwriting: true),
+                  !Task.isCancelled else { return }
             layout = (stamp, read)
         }
         guard let layout else { return }

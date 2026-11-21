@@ -75,6 +75,9 @@ public final class LibrarySession {
     private var handwritingWait: Task<Void, Never>?
     private var handwritingNeedsAnotherPass = false
     static let handwritingQuietPeriod: Duration = .seconds(3)
+    /// Moves each time the handwriting pass keeps a reading, which changes
+    /// no page: what find watches to read the open document's text again.
+    private(set) var handwritingEpoch = 0
     let thumbnails = ThumbnailCache()
     /// iCloud sync for this library. Nil until the library is open. In a
     /// build made without an iCloud container it exists and reports exactly
@@ -244,8 +247,9 @@ extension LibrarySession {
         }
         handwritingWork = Task(priority: .utility) { [weak self] in
             let recognizer = HandwritingRecognizer(languages: RecognitionLanguagePreference.choice().using)
-            _ = try? await AutomaticHandwritingRecognizer(store: env.store, recognizer: recognizer).readMissing()
+            let kept = (try? await AutomaticHandwritingRecognizer(store: env.store, recognizer: recognizer).readMissing()) ?? 0
             guard let self else { return }
+            if kept > 0 { handwritingEpoch &+= 1 }
             handwritingWork = nil
             if handwritingNeedsAnotherPass {
                 handwritingNeedsAnotherPass = false

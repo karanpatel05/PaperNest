@@ -1,3 +1,35 @@
+## 2026-11-21 — Find in a document highlights handwritten words (Claude)
+
+Owner: "Start doing another feature". Items 9, 16 and 17 wait on the owner's decisions, so this follows up handwriting search (#14). A search hit already opened the right page, but Find inside the document did not see handwriting.
+
+**What it does.** In a notebook or a PDF with ink, Find now matches words read off the handwriting and highlights the matched **word** (Vision's word box), not the whole line. Details:
+- If Find is open before the background pass has read the page, the match appears on its own when the reading lands, with no retyping.
+- Changed ink drops the old words from Find at once, and the new ones arrive after the next read.
+- Only the lines library search would find count (confidence ≥ 0.5).
+- A crop hides writing outside it, as with any text.
+
+**Opt-in by design.** Text selection, Read Aloud, duplicate cleanup and document comparison read the page exactly as before. A test proves their layout has no handwriting, and comparison skips the new `.handwritten` origin explicitly.
+
+**How it holds together:**
+- Readings now keep word boxes (`vision.handwriting.2`, so pages read by `.1` are read again). Readings from `.1`, with no `words`, still decode and fall back to the line's box: one undecodable row would otherwise have stopped library search.
+- A handwriting epoch on the session moves when a pass keeps a reading. It is part of Find's re-read key and of each page's stamp.
+- The highlights draw boxes only from a layout read at the same epoch as Find's index for that page. A reading landing between finding and drawing cannot put a box on the wrong word.
+- The PDF shortcut (a page's own string) is skipped when the page has a current handwriting reading, so ink on a PDF is found with the file's text.
+
+| Check | Result |
+|---|---|
+| New `HandwritingFindTests` (7, Render) | **Pass.**<br>• Handwriting is in Find's text and nowhere else.<br>• "lunch"'s box lies over its own writing: a word's box, on the right of the line.<br>• Changed ink leaves Find without the old words before the re-read, with the new ones after.<br>• A crop hides the writing outside it.<br>• Only confident lines are found (0.5 in, 0.3 out).<br>• A v1 reading decodes and uses its line box.<br>• Ink on a digital PDF page is found along with the file's own word "Statement". |
+| Mutation: handwriting always included, ignoring the opt-in | The isolation test fails; restored. |
+| `DocumentFindTests`, `DocumentComparisonTests`, `PageTextLayoutTests`, `ReadAloudScriptTests`, `HandwritingSearchTests`, `AutomaticHandwritingRecognizerTests`, `HandwritingRecognitionTests` | **All pass.** |
+| New `HandwritingFindUITests`, iPhone 17 and iPad Air 13 in one run | **Pass on both.** Find is opened before the page is read and "lunch" typed; "1 of 1" and one highlight arrive when the reading does. The screenshot shows the box exactly on the handwritten word. Relaunched with the ink rewritten to "send notes": "lunch" is not found, and "notes" is "1 of 1" after the read. |
+| Existing `DocumentFindUITests` (3) and `HandwritingSearchUITests`, both devices, same run | **All pass.** |
+| `./scripts/test.sh` on the committed tree | **1,649 tests, 0 failures, 0 warnings** (432 + 49 + 287 + 302 + 269 + 310): 1,642 plus these 7. |
+| `./scripts/build-mac-app.sh` | **Built, 0 warnings.** |
+
+**Not verified:** real handwriting, a device, VoiceOver, and Find on the Mac (built, not driven).
+
+**Not done:** selecting or copying handwritten words, Read Aloud of handwriting, and handwriting in searchable PDF, TXT and DOCX exports.
+
 ## 2026-11-20 — Handwriting search: what was written by hand is read in the background and found by search (Claude, roadmap P2 #14, schema v17)
 
 Owner: "GO AHEAD WITH IT". After the sample §12 alignment (entry below, `af99950`) came #14.

@@ -13,21 +13,37 @@ import PaperNestCore
 public struct HandwritingRecognizer: Sendable {
     /// A line of writing as read, with where it lies in source space.
     public struct Line: Equatable, Sendable {
+        /// A word of the line, where Vision could box it. A word it would not
+        /// box is left out rather than given an invented box.
+        public struct Word: Equatable, Sendable {
+            public let text: String
+            public let bounds: CGRect
+
+            public init(text: String, bounds: CGRect) {
+                self.text = text
+                self.bounds = bounds
+            }
+        }
+
         public let text: String
         public let confidence: Double
         public let bounds: CGRect
+        public let words: [Word]
 
-        public init(text: String, confidence: Double, bounds: CGRect) {
+        public init(text: String, confidence: Double, bounds: CGRect, words: [Word] = []) {
             self.text = text
             self.confidence = confidence
             self.bounds = bounds
+            self.words = words
         }
     }
 
     /// Stored with each kept reading. Change it whenever what Vision is shown
     /// changes (`pixelsPerPoint`, `margin`, how strokes are drawn), so pages
     /// read the old way are read again.
-    public static let engineVersion = "vision.handwriting.1"
+    /// `.2` (2026-11-21) keeps each line's word boxes, so Find can highlight a
+    /// handwritten word; pages read by `.1` are read again.
+    public static let engineVersion = "vision.handwriting.2"
 
     /// The languages it reads in, as asked.
     public var languages: [String] { recognizer.languages }
@@ -102,16 +118,17 @@ public struct HandwritingRecognizer: Sendable {
         guard let picture = Self.picture(of: strokes) else { return [] }
         let lines = try await recognizer.recognizeOnADedicatedThread(picture.image)
         let covers = picture.covers
+        // `TextRecognizer` already gives boxes with a top-left origin, as
+        // shares of the picture: back to source space with no further flip.
+        func source(_ box: NormalizedRect) -> CGRect {
+            CGRect(x: covers.minX + box.x * covers.width, y: covers.minY + box.y * covers.height,
+                   width: box.width * covers.width, height: box.height * covers.height)
+        }
         return lines.compactMap { line in
             let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return nil }
-            // `TextRecognizer` already gives boxes with a top-left origin, as
-            // shares of the picture.
-            let bounds = CGRect(x: covers.minX + line.box.x * covers.width,
-                                y: covers.minY + line.box.y * covers.height,
-                                width: line.box.width * covers.width,
-                                height: line.box.height * covers.height)
-            return Line(text: text, confidence: line.confidence, bounds: bounds)
+            return Line(text: text, confidence: line.confidence, bounds: source(line.box),
+                        words: line.words.map { Line.Word(text: $0.text, bounds: source($0.box)) })
         }
     }
 }
