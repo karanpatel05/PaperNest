@@ -1101,6 +1101,8 @@
 "search.source.pageText" = "Texto del PDF";
 "search.source.typed" = "Texto escrito";
 "search.source.title" = "Nombre del documento";
+"search.source.handwritten" = "Escritura a mano";
+"search.source.handwrittenUnsure" = "Escritura a mano · puede estar mal leída";
 
 /* Scanner capture feedback */
 "scanner.feedback.lighting" = "Mejora la iluminación";

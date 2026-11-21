@@ -1237,6 +1237,8 @@ extension L10n {
     static var searchSourcePageText: String { tr("search.source.pageText") }
     static var searchSourceTyped: String { tr("search.source.typed") }
     static var searchSourceTitle: String { tr("search.source.title") }
+    static var searchSourceHandwritten: String { tr("search.source.handwritten") }
+    static var searchSourceHandwrittenUnsure: String { tr("search.source.handwrittenUnsure") }
 }
 
 // Scanner capture feedback: what the camera sees, while it is pointed.

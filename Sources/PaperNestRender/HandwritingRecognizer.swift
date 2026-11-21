@@ -24,6 +24,14 @@ public struct HandwritingRecognizer: Sendable {
         }
     }
 
+    /// Stored with each kept reading. Change it whenever what Vision is shown
+    /// changes (`pixelsPerPoint`, `margin`, how strokes are drawn), so pages
+    /// read the old way are read again.
+    public static let engineVersion = "vision.handwriting.1"
+
+    /// The languages it reads in, as asked.
+    public var languages: [String] { recognizer.languages }
+
     /// Room left around the writing, as a share of its height: Vision misses
     /// letters that touch the edge of the picture.
     static let margin: CGFloat = 0.35

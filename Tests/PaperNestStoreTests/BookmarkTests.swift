@@ -273,7 +273,8 @@ import PaperNestCore
 
         let store = try LibraryStore(directory: dir.url)
 
-        #expect(try await store.testAllTriggerNames() == before)
+        // Later migrations add only v17's handwriting triggers.
+        #expect(try await store.testAllTriggerNames().subtracting(HandwritingSearchTests.handwritingTriggers) == before)
     }
 
     /// The decision, pinned: with sync on, a bookmark queues nothing for

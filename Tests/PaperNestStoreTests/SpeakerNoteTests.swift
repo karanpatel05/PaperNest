@@ -154,8 +154,9 @@ import PaperNestCore
         raw.close()
 
         let store = try LibraryStore(directory: dir.url)
-        #expect(try await store.schemaVersion() == 16)
-        #expect(try await store.testAllTriggerNames() == triggers)
+        #expect(try await store.schemaVersion() == Schema.latestVersion)
+        // v16 rebuilt nothing; v17 added only the handwriting triggers.
+        #expect(try await store.testAllTriggerNames().subtracting(HandwritingSearchTests.handwritingTriggers) == triggers)
         let item = try await document(store)
         let page = try await store.pages(of: item.id)[0]
         try await store.setSpeakerNote("Works", on: page.id)

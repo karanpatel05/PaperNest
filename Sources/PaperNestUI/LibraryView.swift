@@ -161,7 +161,9 @@ struct LibraryView: View {
                     }
                     // While searching: where in those documents it matched.
                     if !model.pageHits.isEmpty {
-                        SearchPageHitsList(hits: model.pageHits) { hit in
+                        SearchPageHitsList(hits: model.pageHits, preview: { hit, size in
+                            await model.pagePreview(for: hit, pixelSize: size)
+                        }) { hit in
                             endSelection()
                             model.open(hit.itemID, at: hit.pageID)
                         }

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Observation
 import PaperNestCore
@@ -37,7 +38,16 @@ public final class LibraryModel {
         let pageNumber: Int
         let source: SearchHit.Source
         let snippet: SearchSnippet
+        /// Handwriting read without full confidence; see `SearchHit.mayBeMisread`.
+        var mayBeMisread = false
         var id: PageID { pageID }
+    }
+
+    /// A small picture of the page a handwriting hit is on, as its tile would
+    /// show it, so the writing can be seen beside the words read off it.
+    func pagePreview(for hit: PageHit, pixelSize: CGFloat) async -> CGImage? {
+        guard let env = session.environment, let page = try? await env.store.page(hit.pageID) else { return nil }
+        return try? await session.thumbnails.image(for: page, pixelSize: pixelSize, renderer: env.renderer)
     }
     /// Folders for the sidebar, by name.
     private(set) var folders: [Folder] = []
@@ -185,7 +195,7 @@ public final class LibraryModel {
         return hits.compactMap { hit -> PageHit? in
             guard let pageID = hit.pageID, let number = hit.pageNumber, let name = names[hit.itemID] else { return nil }
             return PageHit(itemID: hit.itemID, itemName: name, pageID: pageID, pageNumber: number,
-                           source: hit.source, snippet: hit.snippet)
+                           source: hit.source, snippet: hit.snippet, mayBeMisread: hit.mayBeMisread)
         }
         .sorted { (position[$0.itemID] ?? 0, $0.pageNumber) < (position[$1.itemID] ?? 0, $1.pageNumber) }
     }

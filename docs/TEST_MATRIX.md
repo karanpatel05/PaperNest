@@ -1,3 +1,38 @@
+## 2026-11-20 — Handwriting search: what was written by hand is read in the background and found by search (Claude, roadmap P2 #14, schema v17)
+
+Owner: "GO AHEAD WITH IT". After the sample §12 alignment (entry below, `af99950`) came #14.
+
+**What it does.** A few seconds after the writing pauses, a background pass reads the pen ink of pages whose ink has no current reading, on the device, in the reader's recognition languages. A search then finds the words. Under "In Pages" the hit shows the handwriting icon, the words around the match, **"Handwriting"**, and a small preview of the page. It adds **"may be misread"** when Vision was unsure.
+
+Changing the ink (a stroke written, moved, recoloured or erased, by any path: undo, sync, restore) takes the old words out of search at once, and the page is read again after the next pause. A text box or an image changes nothing.
+
+**Not done:**
+- Find inside the document does not highlight handwritten words.
+- Searchable PDF, TXT and DOCX export still leave handwriting out.
+- Results are not synced: each device reads its own, as with OCR.
+
+**The writing tested is synthetic** single-stroke print, nobody's real hand. No device or Apple Pencil was used.
+
+**Confidence, measured before designing the badge.** For the synthetic writing, Vision's confidence came back only as **1.0 or 0.5** ("café" was read correctly at 0.5), and scribbles gave no lines. So no percentage is shown: a percentage would be false precision. Lines at 0.5 or above are findable; those at 0.5 add "may be misread". Anything below 0.5 is treated as noise and is not findable.
+
+| Check | Result |
+|---|---|
+| New `HandwritingSearchTests` (9, Store) | **Pass.**<br>• A page with ink needs reading, and a reading makes it findable as `.handwritten`.<br>• A reading of ink that has since changed is not kept.<br>• A new stroke, a moved stroke (guarded edit path), a recoloured one (`editInk`) and an erased one each take the words out at once.<br>• A text box leaves the reading alone.<br>• A new engine reads again.<br>• Confidence: 0.5 is findable and marked unsure, 0.3 is not findable, and a failure finds nothing and is not retried every pass.<br>• Deleted pages and documents in Recently Deleted are neither read nor found.<br>• A purged page takes its reading and ink count with it.<br>• A v16 library opens at v17 with exactly the three new triggers added. |
+| Mutation: the three triggers made never to fire | **3 tests fail** (12 + 4 issues); restored. |
+| New `AutomaticHandwritingRecognizerTests` (3) | **Pass.**<br>• "plan lunch" becomes findable as handwriting, and a second pass reads nothing.<br>• Changed ink is read again: the old words stop answering at once, the new ones answer after the pass.<br>• A scribble is read once, finds nothing, and is not read again. |
+| `SpeakerNoteTests`, `BookmarkTests` (their migration checks) | Updated: every earlier trigger is still there, and exactly the three handwriting triggers are new. **Pass.** |
+| New `HandwritingSearchUITests` (English and French in one test), iPhone 17 and iPad Air 13 | **iPad: pass. iPhone: pass after one change.** A notebook is seeded with "plan lunch"; the app's own background pass makes it findable (watched from the test, not a fixed wait); the hit for page 1 says "Handwriting" / "Écriture manuscrite"; tapping it opens the notebook. On iPhone the first run failed: All Documents' search field never took the keyboard, the same failure as `testRecognizeTextMakesAWordOnThePageSearchable` in the app-wide run. The test now searches from Home's own search field there, which submits into All Documents. |
+| `HandwritingUITests` (4), both devices, same run | **8/8 pass.** |
+| `./scripts/test.sh` on the committed tree (HEAD plus this change, Codex's string edits left out) | **1,642 tests, 0 failures, 0 warnings** (432 + 49 + 287 + 295 + 269 + 310): the 1,630 from before plus these 12. |
+| `./scripts/build-mac-app.sh` | **Built, 0 warnings.** |
+
+**Found while testing, for Codex:**
+- On iPhone, All Documents' search field does not take the keyboard.
+- After a search from Home, the large "All Documents" title is drawn over the search text.
+- A French document tile's date reads "-5 s".
+
+**Not verified:** real handwriting, a device, VoiceOver, and the Mac (built, not driven).
+
 ## 2026-11-20 — Handwriting to text matched to the owner's sample §12 (Claude)
 
 Owner: "GO AHEAD WITH IT", after the report listed where the conversion sheet differed from `docs/FEATURE_UI_SAMPLES.md` §12.

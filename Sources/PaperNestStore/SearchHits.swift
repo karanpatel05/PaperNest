@@ -21,6 +21,8 @@ public struct SearchHit: Hashable, Sendable {
         case pageText
         /// Someone typed it on the page, in a text box.
         case typed
+        /// Read off the page's handwriting, by on-device recognition.
+        case handwritten
     }
 
     public let itemID: ItemID
@@ -31,6 +33,19 @@ public struct SearchHit: Hashable, Sendable {
     public let pageNumber: Int?
     public let source: Source
     public let snippet: SearchSnippet
+    /// Handwriting Vision read without full confidence: the words may be
+    /// misread. False for every other source.
+    public let mayBeMisread: Bool
+
+    init(itemID: ItemID, pageID: PageID?, pageNumber: Int?, source: Source, snippet: SearchSnippet,
+         mayBeMisread: Bool = false) {
+        self.itemID = itemID
+        self.pageID = pageID
+        self.pageNumber = pageNumber
+        self.source = source
+        self.snippet = snippet
+        self.mayBeMisread = mayBeMisread
+    }
 }
 
 /// A few words of context around a match, with the matching words marked.
@@ -204,8 +219,10 @@ extension LibraryStore {
             }
             for (page, entry) in best.sorted(by: { $0.value.number < $1.value.number }).prefix(perItem) {
                 guard pageHits < limit else { break }
+                var unsure = false
+                if entry.source == .handwritten { unsure = try currentHandwriting(on: page)?.mayBeMisread ?? false }
                 hits.append(SearchHit(itemID: item, pageID: page, pageNumber: entry.number, source: entry.source,
-                                      snippet: SearchSnippet(marked: entry.snippet)))
+                                      snippet: SearchSnippet(marked: entry.snippet), mayBeMisread: unsure))
                 pageHits += 1
             }
             if pageHits >= limit { break }
@@ -219,6 +236,7 @@ extension LibraryStore {
         case "ocr": .recognized
         case embeddedTextField: .pageText
         case typedTextField: .typed
+        case handwritingField: .handwritten
         default: nil
         }
     }
@@ -229,7 +247,8 @@ extension LibraryStore {
         case .pageText: 0
         case .recognized: 1
         case .typed: 2
-        case .title: 3
+        case .handwritten: 3
+        case .title: 4
         }
     }
 }

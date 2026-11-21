@@ -347,5 +347,50 @@ enum Schema {
             modified_at REAL NOT NULL
         );
         """),
+        // Handwriting read off a page's ink (`HandwritingSearch.swift`).
+        // Derived, like OCR: read on each device, not synced, kept in the
+        // backup with the rest of the database.
+        //
+        // `page_ink_generation` counts every change to a page's ink rows, and
+        // a reading records the count it was made at; it is current only
+        // while they match. The count is kept by triggers on `page_objects`,
+        // so every path that writes ink — an edit, undo, sync, a restore, a
+        // purge — moves it, and the same triggers take the page's handwriting
+        // out of the search index at once, so words that may no longer be
+        // there never answer a search. A text box or an image is not ink and
+        // leaves both alone.
+        Migration(version: 17, sql: """
+        CREATE TABLE handwriting_recognition (
+            page_id TEXT PRIMARY KEY NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+            ink_generation INTEGER NOT NULL,
+            engine_version TEXT NOT NULL,
+            result_json TEXT NOT NULL,
+            recognized_at REAL NOT NULL
+        );
+        CREATE TABLE page_ink_generation (
+            page_id TEXT PRIMARY KEY NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+            generation INTEGER NOT NULL
+        );
+        CREATE TRIGGER handwriting_ink_inserted AFTER INSERT ON page_objects WHEN NEW.kind = 'ink' BEGIN
+            INSERT INTO page_ink_generation (page_id, generation) VALUES (NEW.page_id, 1)
+                ON CONFLICT(page_id) DO UPDATE SET generation = generation + 1;
+            DELETE FROM search_index WHERE page_id = NEW.page_id AND field = 'ink';
+        END;
+        CREATE TRIGGER handwriting_ink_updated AFTER UPDATE ON page_objects WHEN NEW.kind = 'ink' OR OLD.kind = 'ink' BEGIN
+            INSERT INTO page_ink_generation (page_id, generation) VALUES (NEW.page_id, 1)
+                ON CONFLICT(page_id) DO UPDATE SET generation = generation + 1;
+            DELETE FROM search_index WHERE page_id = NEW.page_id AND field = 'ink';
+            INSERT INTO page_ink_generation (page_id, generation)
+                SELECT OLD.page_id, 1 WHERE OLD.page_id != NEW.page_id
+                ON CONFLICT(page_id) DO UPDATE SET generation = generation + 1;
+            DELETE FROM search_index WHERE page_id = OLD.page_id AND field = 'ink';
+        END;
+        CREATE TRIGGER handwriting_ink_deleted AFTER DELETE ON page_objects WHEN OLD.kind = 'ink' BEGIN
+            INSERT INTO page_ink_generation (page_id, generation)
+                SELECT OLD.page_id, 1 WHERE EXISTS (SELECT 1 FROM pages WHERE id = OLD.page_id)
+                ON CONFLICT(page_id) DO UPDATE SET generation = generation + 1;
+            DELETE FROM search_index WHERE page_id = OLD.page_id AND field = 'ink';
+        END;
+        """),
     ]
 }

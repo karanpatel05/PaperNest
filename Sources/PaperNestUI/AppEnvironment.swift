@@ -66,6 +66,15 @@ public final class LibrarySession {
     /// pages that carry none. Internal so tests can wait for it.
     private(set) var backgroundTextWork: Task<Void, Never>?
     private var backgroundTextWorkNeedsAnotherPass = false
+    /// The pass that reads handwriting off pages whose ink has no current
+    /// reading (`AutomaticHandwritingRecognizer`). It waits for the writing
+    /// to pause: every change restarts the wait, so a page is not read over
+    /// and over while someone is still writing on it, and the last stroke is
+    /// read once they stop. Internal so tests can wait for it.
+    private(set) var handwritingWork: Task<Void, Never>?
+    private var handwritingWait: Task<Void, Never>?
+    private var handwritingNeedsAnotherPass = false
+    static let handwritingQuietPeriod: Duration = .seconds(3)
     let thumbnails = ThumbnailCache()
     /// iCloud sync for this library. Nil until the library is open. In a
     /// build made without an iCloud container it exists and reports exactly
@@ -187,6 +196,7 @@ public final class LibrarySession {
     func resumeTextRecognition() { startBackgroundTextWork() }
 
     private func startBackgroundTextWork() {
+        scheduleHandwritingWork()
         guard let env = environment else { return }
         guard backgroundTextWork == nil else {
             backgroundTextWorkNeedsAnotherPass = true
@@ -206,6 +216,40 @@ public final class LibrarySession {
             if backgroundTextWorkNeedsAnotherPass {
                 backgroundTextWorkNeedsAnotherPass = false
                 startBackgroundTextWork()
+            }
+        }
+    }
+}
+
+extension LibrarySession {
+    /// Starts the handwriting pass once nothing has changed for
+    /// `handwritingQuietPeriod`. Called on every change, which restarts the wait.
+    fileprivate func scheduleHandwritingWork() {
+        handwritingWait?.cancel()
+        handwritingWait = Task { [weak self] in
+            try? await Task.sleep(for: Self.handwritingQuietPeriod)
+            guard !Task.isCancelled else { return }
+            self?.startHandwritingWork()
+        }
+    }
+
+    /// Reads, in the reader's recognition languages, the handwriting on pages
+    /// that need it. Recognition is Pro, as OCR is. A change during a pass
+    /// asks for one more, after another quiet period.
+    private func startHandwritingWork() {
+        guard let env = environment, SubscriptionStore.shared.allows(.textRecognition) else { return }
+        guard handwritingWork == nil else {
+            handwritingNeedsAnotherPass = true
+            return
+        }
+        handwritingWork = Task(priority: .utility) { [weak self] in
+            let recognizer = HandwritingRecognizer(languages: RecognitionLanguagePreference.choice().using)
+            _ = try? await AutomaticHandwritingRecognizer(store: env.store, recognizer: recognizer).readMissing()
+            guard let self else { return }
+            handwritingWork = nil
+            if handwritingNeedsAnotherPass {
+                handwritingNeedsAnotherPass = false
+                scheduleHandwritingWork()
             }
         }
     }
