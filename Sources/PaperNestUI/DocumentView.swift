@@ -139,8 +139,14 @@ struct DocumentView: View {
         // Only where it will lay out as a column. An inspector that has to
         // overlay swallows the reader's first touch; see
         // `inspectorColumnMinimumWidth`.
+        // Not at the accessibility text sizes: there the library's sidebar is
+        // a column of 420–460 points, and Document Tools beside it left the
+        // page about 240 — too narrow for its tool bar, whose Lasso could not
+        // even be tapped (iPad Air 13, French XXXL, 2026-11-20). The panel
+        // stays one tap away.
         _isShowingPDFTools = State(initialValue: UIDevice.current.userInterfaceIdiom == .pad
-                                   && Self.activeWindowWidth() >= Self.inspectorColumnMinimumWidth)
+                                   && Self.activeWindowWidth() >= Self.inspectorColumnMinimumWidth
+                                   && !UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory)
         #else
         _isShowingPDFTools = State(initialValue: true)
         #endif
@@ -224,7 +230,16 @@ struct DocumentView: View {
                 } description: {
                     Text(L10n.emptyDocumentMessage)
                 } actions: {
-                    Button(L10n.addPages) { openFilePicker(.add) }
+                    // A notebook's page is blank paper, not a file: the same
+                    // Add Page as its tools, not the file picker.
+                    if isNotebook {
+                        Button(L10n.addNotebookPage) {
+                            notebookPageRequest = NotebookPageRequest(after: nil, template: .blank)
+                        }
+                        .accessibilityIdentifier("empty-add-notebook-page")
+                    } else {
+                        Button(L10n.addPages) { openFilePicker(.add) }
+                    }
                 }
             } else if isCompact {
                 VStack(spacing: 0) {
@@ -280,7 +295,10 @@ struct DocumentView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     if let workspaceHeader { workspaceHeader }
-                    if !model.pages.isEmpty { NotebookToolbar(editor: self) }
+                    // A notebook whose last page was deleted keeps its tool bar,
+                    // so Undo and Add Page stay in reach (its page tools turn
+                    // off with no page to act on).
+                    if !model.pages.isEmpty || isNotebook { NotebookToolbar(editor: self) }
                     if find.isPresented && !model.pages.isEmpty {
                         DocumentFindBar(find: find, model: model) { id in
                             Task { if await textSession.finish(undoManager: undoManager) { model.selectedPageID = id } }
@@ -303,6 +321,8 @@ struct DocumentView: View {
                     studioPalette.opacity(textSession.isSelected ? 0 : 1)
                         .allowsHitTesting(!textSession.isSelected)
                         .accessibilityHidden(textSession.isSelected)
+                } else if model.pages.isEmpty && isNotebook && isCompact {
+                    emptyNotebookHistory
                 }
             }
     }
@@ -1374,6 +1394,21 @@ struct DocumentView: View {
     /// tool's own icon as well — a second Lasso button under the first — and
     /// a row of colour swatches; tools and their colours live in the toolbar
     /// above and its panels now.
+    /// On a phone undo and redo live in the palette, whose page controls have
+    /// nothing to act on once a notebook's last page is deleted. Undo must
+    /// still be there to bring that page back (2026-11-21).
+    private var emptyNotebookHistory: some View {
+        HStack(spacing: 8) {
+            NotebookHistoryActions(undoManager: undoManager, busy: model.isChangingNotebookPage,
+                                   historyRevision: model.historyRevision,
+                                   beforeAction: { await textSession.finish(undoManager: undoManager) })
+                .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .background(Theme.canvas)
+    }
+
     private var studioPalette: some View {
         return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {

@@ -1,3 +1,25 @@
+## 2026-11-21 — Four gaps recorded for Codex, fixed: the French date, iPhone search, an emptied note, the squeezed editor at iPad XXXL (Claude)
+
+Owner: "Finish working on codex gaps". These were found during this session's UI runs and recorded for Codex. The owner asked Claude to fix them. Each cause was found before any change.
+
+| Gap | Cause | Fix | Checked |
+|---|---|---|---|
+| A French document tile's date read "-5 s" | Not a wrong date: the abbreviated relative style is CLDR's narrowest, and in French it writes every past age with a minus sign ("-5 s", "-3 j"). Measured on macOS: en "5s ago", fr "-5 s", es "hace 5 s". | `ItemCell.age(of:)` uses the short style: "5 sec. ago", "il y a 5 s", "hace 5 s". | New `ItemAgeTests`, en/fr/es at five ages: words, no sign. **Pass.** |
+| On iPhone, All Documents' search field never took the keyboard, and after a search from Home the large title was drawn over the field | One cause: the large "All Documents" title was laid out at the same height as the search field and on top of it. It hid what was typed and took the tap (field present and "hittable", focus 0, no keyboard). The phone collapses the split view, so the library's stack sits inside the sidebar's. A first hypothesis, the spinner shown before the scroll view, was tested and was wrong. | An inline title on compact width: the title sits in the bar and the search field below it works (focus 1, keyboard up). iPad keeps the large title. | New `LibrarySearchUITests` (en and fr: the title not over the field, the keyboard up, "Crop" typed, the document found). **iPhone and iPad pass.** `testRecognizeTextMakesAWordOnThePageSearchable`, which failed on iPhone for this reason, **now passes on both**. `HandwritingSearchUITests` goes back to the All Documents field; **pass on both**. |
+| Deleting a note's only page left no tool bar, no Undo and only a file picker | The editor hid the notebook tool bar and the bottom palette (Undo and Redo on a phone) whenever a document had no pages. The empty state's button opened the file picker. | An empty notebook keeps its tool bar (page tools off). On a phone a small bar keeps Undo and Redo. The empty state offers **Add Page** for a notebook. | `testNotebookToolsAreSideBySide` (en/fr/es: delete the page, Undo brings it back, Add Page works): **iPhone and iPad pass** (it failed on both in the app-wide run). |
+| At French XXXL on an iPad, the notebook opened with the library sidebar (466 pt) and Document Tools beside it, leaving the editor about 240 pt, and its Lasso could not be tapped | Document Tools opened by default whenever the window was wide enough. That check ignored the sidebar, which at accessibility sizes is a 420–460 pt column. | At accessibility text sizes Document Tools starts closed; it stays one tap away. Other sizes are unchanged. | `HandwritingUITests.testTheSheetAtTheLargestTextSize` now asserts that on iPad at XXXL the panel starts closed and the Lasso can be tapped plainly; the hide-the-sidebar workaround and the tap-by-position fallback for the Lasso are removed. **Pass on both.** All `DocumentUtilitiesUITests` still **pass on both**. |
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh` on the committed tree | **1,650 tests, 0 failures, 0 warnings.** |
+| `./scripts/build-mac-app.sh` | **Built, 0 warnings.** |
+
+**Not verified:** a real device, VoiceOver, and the Mac (built, not driven).
+
+**Still open, next in this pass:**
+- Codex's iPad-only failures (Home's brand count, the inline-text move, the shapes sheet in compact tools, Export Save).
+- The tests that went stale with the studio redesign.
+
 ## 2026-11-21 — Find in a document highlights handwritten words (Claude)
 
 Owner: "Start doing another feature". Items 9, 16 and 17 wait on the owner's decisions, so this follows up handwriting search (#14). A search hit already opened the right page, but Find inside the document did not see handwriting.

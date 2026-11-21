@@ -57,12 +57,12 @@ import PaperNestStore
     private func openConversion(_ app: XCUIApplication, convert: String, file: StaticString = #filePath, line: UInt = #line) {
         let lasso = app.buttons["studio-tool-lasso"]
         XCTAssertTrue(lasso.waitForExistence(timeout: 30), "the notebook did not open", file: file, line: line)
-        press(lasso)
+        lasso.tap()
         let selectAll = app.buttons["studio-lasso-select-all"]
         // Once in four iPhone runs (2026-11-20) the Lasso's panel did not open
         // on the first tap, though the Lasso showed as chosen; tapped again
         // only when the panel has not appeared.
-        if !selectAll.waitForExistence(timeout: 5) { press(lasso) }
+        if !selectAll.waitForExistence(timeout: 5) { lasso.tap() }
         XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "the Lasso's panel did not open", file: file, line: line)
         // At the largest text size the Lasso's panel is a small scrolling
         // popover, and Select All is below what it shows.
@@ -77,11 +77,9 @@ import PaperNestStore
         item.tap()
     }
 
-    /// Taps `element`, at its position when XCTest calls it covered. At the
-    /// largest text size on an iPad (French, 2026-11-20) the library sidebar
-    /// and Document Tools both stay open and squeeze the editor into a narrow
-    /// column; an element of that layout covers the tool bar's hit test,
-    /// though the Lasso shows and works.
+    /// Taps `element`, at its position when XCTest calls it covered. Used
+    /// only for Select All and ⋯, which sit in small popovers at the largest
+    /// text size; the Lasso itself is tapped plainly.
     private func press(_ element: XCUIElement) {
         if element.isHittable { element.tap() } else { element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
     }
@@ -207,16 +205,14 @@ import PaperNestStore
         let app = launch(directory, language: "fr", largest: true)
         defer { app.terminate() }
         if isPad {
-            // At this size an iPad opens the notebook with the library sidebar
-            // and Document Tools both beside it, leaving the editor a column
-            // about 240 points wide whose tool bar the Lasso cannot be tapped
-            // in (2026-11-20, recorded for the studio layout). A person would
-            // put them away first, so the test does.
-            XCTAssertTrue(app.buttons["studio-tool-lasso"].waitForExistence(timeout: 30))
-            let hideSidebar = app.buttons["Masquer la barre latérale"]
-            if hideSidebar.exists { hideSidebar.tap() }
-            let closeTools = app.buttons["pdf-tools-close"]
-            if closeTools.waitForExistence(timeout: 3) { press(closeTools) }
+            // At this size Document Tools no longer opens beside the page: with
+            // the library's wide sidebar it left the page about 240 points and
+            // a Lasso that could not be tapped (2026-11-20). Now it starts
+            // closed and the tool bar has room.
+            let lasso = app.buttons["studio-tool-lasso"]
+            XCTAssertTrue(lasso.waitForExistence(timeout: 30))
+            XCTAssertFalse(app.scrollViews["pdf-tools-list"].exists, "Document Tools opened beside the page at XXXL")
+            XCTAssertTrue(lasso.isHittable, "the Lasso cannot be tapped at XXXL")
         }
         openConversion(app, convert: "Convertir en texte")
         let editor = app.textViews["handwriting-text"]

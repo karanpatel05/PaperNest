@@ -48,16 +48,6 @@ import PaperNestStore
     }
 
     private func search(_ word: String, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        // On a phone, Home's own search field: the All Documents field never
-        // took the keyboard there in this run or in the app-wide one
-        // (`testRecognizeTextMakesAWordOnThePageSearchable`, 2026-11-19).
-        // Return submits it, and the results open in All Documents.
-        let home = app.textFields["home-search"]
-        if !isPad, home.waitForExistence(timeout: 15) {
-            home.tap()
-            home.typeText(word + "\n")
-            return
-        }
         let seeAll = app.buttons["home-see-all"]
         if seeAll.waitForExistence(timeout: 15) {
             for _ in 0..<8 where !seeAll.isHittable { app.swipeUp() }

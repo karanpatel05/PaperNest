@@ -25,6 +25,9 @@ struct LibraryView: View {
     @State private var fileDetails: FileDetailsRequest?
     @State private var filePreview: FilePreviewRequest?
     @State private var creatingNotebook = false
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var widthClass
+    #endif
 
     /// Anything can be kept: a type we cannot make pages from becomes a
     /// file item instead. Pages-only flows use `pageTypes`.
@@ -50,7 +53,12 @@ struct LibraryView: View {
             .navigationSubtitle(model.hasLoaded ? L10n.itemCount(visibleItems.count) : "")
             #endif
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.large)
+            // Inline on a phone. There the split view collapses and this
+            // screen's stack sits inside the sidebar's; a large title then
+            // drew over the search field, hid what was typed and took the tap,
+            // so the field never got the keyboard (2026-11-21). Inline, the
+            // title is in the bar and the field below it works.
+            .navigationBarTitleDisplayMode(widthClass == .compact ? .inline : .large)
             .searchable(text: $model.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: L10n.searchPrompt)
             #else
             .searchable(text: $model.searchText, prompt: L10n.searchPrompt)
@@ -762,9 +770,20 @@ struct ItemCell: View {
         if showsDeletionDate, let deleted = summary.item.deletedAt {
             return L10n.deletedOn(deleted.formatted(date: .abbreviated, time: .omitted))
         }
+        return Self.age(of: summary.item.modifiedAt)
+    }
+
+    /// How long ago a document changed, in the reader's language. The short
+    /// style, not the abbreviated one: abbreviated is CLDR's narrowest form,
+    /// which in French writes every past age with a minus sign ("-5 s",
+    /// "-3 j") where "il y a 5 s" is meant (2026-11-21). Short reads naturally
+    /// in English, French and Spanish ("3 min. ago", "il y a 3 min",
+    /// "hace 3 min").
+    nonisolated static func age(of date: Date, relativeTo now: Date = .now, locale: Locale = .current) -> String {
         let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: summary.item.modifiedAt, relativeTo: .now)
+        formatter.unitsStyle = .short
+        formatter.locale = locale
+        return formatter.localizedString(for: date, relativeTo: now)
     }
 }
 
