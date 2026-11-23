@@ -16,12 +16,17 @@ import Testing
         return try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: String])
     }
 
-    /// Keys referenced from Localization.swift via `tr("…")` / `plural("…")`.
+    /// Keys referenced via `tr("…")` / `plural("…")` from Localization.swift
+    /// and from any `<Feature>Strings.swift` beside it, a feature's own
+    /// `extension L10n` (the app lock's, `AppLockStrings.swift`, is the first).
     static func referencedKeys() throws -> (strings: Set<String>, plurals: Set<String>) {
-        let source = URL(fileURLWithPath: #filePath)
+        let folder = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Sources/PaperNestUI/Localization.swift")
-        let text = try String(contentsOf: source, encoding: .utf8)
+            .appendingPathComponent("Sources/PaperNestUI")
+        let sources = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent == "Localization.swift" || $0.lastPathComponent.hasSuffix("Strings.swift") }
+        #expect(sources.contains { $0.lastPathComponent == "Localization.swift" })
+        let text = try sources.map { try String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
         func keys(_ pattern: String) throws -> Set<String> {
             let regex = try NSRegularExpression(pattern: pattern)
             return Set(regex.matches(in: text, range: NSRange(text.startIndex..., in: text)).compactMap {

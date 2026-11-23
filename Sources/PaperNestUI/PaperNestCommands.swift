@@ -2,13 +2,22 @@ import SwiftUI
 
 /// Menu bar commands (Mac) and hardware-keyboard shortcuts (iPad).
 public struct PaperNestCommands: Commands {
-    @FocusedValue(\.libraryModel) private var library
-    @FocusedValue(\.documentCommands) private var document
-    @FocusedValue(\.documentPrinter) private var printer
-    @FocusedValue(\.readerBookmarks) private var bookmarks
-    @FocusedValue(\.readAloud) private var readAloud
+    @FocusedValue(\.libraryModel) private var focusedLibrary
+    @FocusedValue(\.documentCommands) private var focusedDocument
+    @FocusedValue(\.documentPrinter) private var focusedPrinter
+    @FocusedValue(\.readerBookmarks) private var focusedBookmarks
+    @FocusedValue(\.readAloud) private var focusedReadAloud
+    /// Behind the app lock nothing answers a shortcut: with nothing to act
+    /// on, every command below turns itself off.
+    private let isLocked: Bool
 
-    public init() {}
+    private var library: LibraryModel? { isLocked ? nil : focusedLibrary }
+    private var document: DocumentCommandContext? { isLocked ? nil : focusedDocument }
+    private var printer: DocumentPrinter? { isLocked ? nil : focusedPrinter }
+    private var bookmarks: ReaderBookmarks? { isLocked ? nil : focusedBookmarks }
+    private var readAloud: ReadAloud? { isLocked ? nil : focusedReadAloud }
+
+    public init(isLocked: Bool = false) { self.isLocked = isLocked }
 
     public var body: some Commands {
         CommandGroup(after: .newItem) {

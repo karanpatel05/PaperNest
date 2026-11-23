@@ -58,6 +58,27 @@ file-preview work has a `FileKind.prepareTemporaryCopy` in it.
 
 ### Current claims
 
+**Claude released — app lock, 2026-11-23. COMMITTED in the commit that carries this line, not pushed; files free.** Settings → Privacy → **Require Face ID** (or Touch ID, Optic ID, Passcode) on iPhone and iPad:
+- PaperNest asks the device's own owner check at launch, and after the chosen time in the background.
+- While locked, a window of its own sits over everything the scene shows, sheets included.
+- It hides the library; it does not encrypt it. No passcode is stored.
+
+New: `Sources/PaperNestCore/AppLockPolicy.swift`, `Sources/PaperNestUI/AppLock.swift`, `AppLockCover.swift`, `AppLockStrings.swift`; tests in Core and UI and `Apps/iOS/UITests/AppLockUITests.swift`.
+
+Edited:
+- `SettingsView.swift` (a Privacy section, iOS only);
+- `PaperNestCommands.swift` (`init(isLocked:)`: nothing answers a shortcut while locked);
+- `Apps/iOS/Sources/PaperNestPhoneApp.swift`;
+- `Apps/iOS/Info.plist` and the three `InfoPlist.strings` (`NSFaceIDUsageDescription`);
+- the strings files (block "App lock");
+- `LocalizationTests.swift`, which now also reads `<Feature>Strings.swift`, so a feature's strings can stay out of `Localization.swift`.
+
+**For Codex:** the lock screen is plain on purpose, so restyle it freely. Identifiers: TEST_MATRIX "App lock".
+
+**DEBUG-only test seam:** `-PaperNestDebugAppLock <answers>` replaces only the `LAContext` prompt.
+
+**Still unclaimed in this tree, not mine:** the comment export into PDFs (`PDFComments.swift` and its tests).
+
 **Claude released — lasso editing, 2026-11-22. COMMITTED in the commit that carries this line, not pushed; files free.** Owner: "just dive in, start with the lasso". The lasso now deletes, cuts, copies, pastes (onto any page of any document), duplicates, recolors ink, resizes (corner handle; Make Larger/Smaller) and turns ink (turn handle; Rotate Left/Right). Each edit is one write and one undo step. New: `Sources/PaperNestCore/SelectionEdits.swift`, `Sources/PaperNestStore/PlacedCopies.swift` (`placeCopies`), `Sources/PaperNestUI/MarkupClipboard.swift`, `Sources/PaperNestUI/SelectionHandles.swift`, and tests in three targets. Edited: `PageSelectionOverlay.swift` (Delete in the bar, which is now 300 points wide; new menu items; the handles; a Paste button on the page), `DocumentModel.swift` (the lasso actions; `editInk` takes an optional action name), `Localization.swift` and the en/fr/es strings (a "Lasso editing" block). `SelectionToolPanels.swift` was not needed. **The four new iOS UI tests, appended to `HandwritingUITests.swift`, have not run:** the simulator service was down for this whole session. Unit tests, the Mac build and the iOS builds pass. **For Codex:** the bar, the menu, the two handles and the Paste button have had no design pass; the turn handle sits on the side of the selection away from the bar. Your uncommitted string edits were left out of this commit (blobs built from HEAD). Details: TEST_MATRIX "Lasso editing".
 
 **Claude released — the rest of Codex's gaps, 2026-11-22. COMMITTED in the commit that carries this line, not pushed; files free; UI runs may start (the shared `/tmp/papernest-*` libraries are free).** The four app gaps were fixed in `acdb17f`. This pass:

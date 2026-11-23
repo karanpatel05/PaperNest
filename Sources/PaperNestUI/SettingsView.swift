@@ -96,6 +96,8 @@ public struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     #if os(iOS)
     @Environment(\.openURL) private var openURL
+    /// Present wherever the library is behind the app lock (iPhone, iPad).
+    @Environment(AppLock.self) private var appLock: AppLock?
     #endif
 
     public init(session: LibrarySession) {
@@ -190,6 +192,10 @@ public struct SettingsView: View {
             } footer: {
                 Text(L10n.settingsExportAllFooter)
             }
+
+            #if os(iOS)
+            if let appLock { AppLockSettingsSection(lock: appLock) }
+            #endif
 
             CloudSyncSettingsSections(session: model.session)
 

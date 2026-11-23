@@ -1372,3 +1372,24 @@
 "selection.smaller" = "Make Smaller";
 "selection.resize.handle" = "Resize Selection";
 "selection.rotate.handle" = "Rotate Selection";
+
+/* App lock */
+"applock.section" = "Privacy";
+"applock.require.faceid" = "Require Face ID";
+"applock.require.touchid" = "Require Touch ID";
+"applock.require.opticid" = "Require Optic ID";
+"applock.require.passcode" = "Require Passcode";
+"applock.footer" = "PaperNest asks before showing your library: when it opens, and when you come back after the time chosen below. This hides your library on screen; it does not encrypt it.";
+"applock.unavailable" = "To use this, set a passcode for this device in the Settings app.";
+"applock.unchanged" = "The lock was not changed.";
+"applock.grace.header" = "Ask Again";
+"applock.grace.immediately" = "Immediately";
+"applock.grace.oneminute" = "After 1 Minute";
+"applock.grace.fiveminutes" = "After 5 Minutes";
+"applock.grace.fifteenminutes" = "After 15 Minutes";
+"applock.locked" = "PaperNest Is Locked";
+"applock.unlock" = "Unlock";
+"applock.stilllocked" = "PaperNest is still locked.";
+"applock.reason.unlock" = "Unlock your PaperNest library.";
+"applock.reason.on" = "Turn on the lock for PaperNest.";
+"applock.reason.off" = "Turn off the lock for PaperNest.";

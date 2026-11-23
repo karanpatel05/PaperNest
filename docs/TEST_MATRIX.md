@@ -1,3 +1,54 @@
+## 2026-11-23 — App lock: Face ID, Touch ID or the device passcode before PaperNest shows anything (Claude)
+
+Owner: "Start the next feature". The roadmap's queue is done or waiting on the owner. Its last open Reader item, R6 (notes placed at a spot and exported), is being built right now by another session (uncommitted `PDFComments.swift` and comment-export tests, no claim), so it was left alone. This takes the confirmed scope's F3 "access" item instead: the passcode in reference photo 04, "app lock" in `docs/FEATURE_EXPANSION.md`. iPhone and iPad.
+
+**What it does**
+- **Settings → Privacy → Require Face ID** (or Touch ID, Optic ID, Passcode, named after what the device has). Turning it on or off asks first, so it can never be switched on by a device that cannot open it again.
+- **When it asks.** At launch, and on coming back after the chosen time in the background: Immediately (the default), or after 1, 5 or 15 minutes. These are inline option rows, not a pop-up.
+- **While locked**, the lock screen sits in a window of its own above everything the scene shows, sheets and full-screen views included. That window takes the touches, is the key window (so a hardware keyboard cannot type below it), and is modal for VoiceOver. iPad keyboard shortcuts are off.
+- **A cover while PaperNest is not in front**, so the app switcher's picture shows no documents.
+- **The first frame after launch is already covered**: the setting is read before the window is drawn, and a second copy of the cover is drawn with the window's own content.
+
+**Calls I made (for the owner and Codex)**
+- **The device's own owner check**, `.deviceOwnerAuthentication`: Face ID and the rest, falling back to the device passcode. PaperNest stores no passcode of its own.
+- **Only going to the background starts the clock.** Becoming inactive does not, because the Face ID sheet itself makes the app inactive.
+- **A cancelled or failed prompt waits for a tap on Unlock** and does not ask again by itself, so there is no endless prompt loop.
+- **If the device's passcode is removed later**, the lock cannot be satisfied, so it opens rather than shutting the library for good. Whoever removed the passcode knew it. Settings then says to set a passcode.
+- **It hides; it does not encrypt.** The footer says so. The library stays on disk as before.
+- **A device setting** in `UserDefaults`: not synced, not in a library backup.
+- **Free.** It is not in the owner's Pro list.
+- **Not on the Mac** yet; the section is iOS only.
+- **Files opened into PaperNest while it is locked** are imported underneath the lock.
+- **An iPad window opened while locked** gets its own lock window as it opens.
+
+**For Codex:** the lock screen is plain on purpose: the brand mark, a title, one Unlock button in `EditorChrome.selection` with a white label. Restyle it freely. Identifiers: `app-lock-screen` / `app-lock-cover`, `app-lock-unlock`, `app-lock-failed`; Settings `settings-app-lock` (switch), `settings-app-lock-grace-<seconds>` (value Selected / Not Selected), `settings-app-lock-footer`, `settings-app-lock-unchanged`.
+
+**Test seam, DEBUG builds only:** `-PaperNestDebugAppLock <answers>` stands in for the device's prompt (`LAContext`) and nothing else. In a DEBUG build, UI tests that do not pass it never meet the lock, even if an earlier test left it on.
+
+**`LocalizationTests`** now reads keys from `Localization.swift` and from any `<Feature>Strings.swift` beside it. The app lock's strings are in `AppLockStrings.swift`, so this slice does not touch `Localization.swift`, which another session is editing.
+
+**Results**
+
+All from `~/Library/Caches/PaperNest/applock-verify`, a git-free copy of HEAD `2747469` plus this slice only. The shared tree also holds another session's unfinished comment export.
+
+| Check | Result |
+|---|---|
+| New tests: `AppLockPolicyTests` (13, Core), `AppLockWorkflowTests` (9, UI module, with a stand-in for the device's check) | **22 passed.** `LocalizationTests` caught a plain space before a colon in the French footer; it is now a narrow no-break space. |
+| `./scripts/test.sh`, whole suite | **1,704 tests, 0 failures, 0 warnings**, all six targets including Import. |
+| `./scripts/build-mac-app.sh` | **Built, 0 warnings.** |
+| `xcodebuild -scheme PaperNestUI`, iOS Simulator | **Built, 0 warnings.** |
+| iOS UI tests, `AppLockUITests` (4), iPhone 17 | **4 passed.** The tests: turned on, home and back, locked over the open Settings sheet (which could not be reached), the refused prompt says so, Unlock comes back to the sheet, then turned off; locked at launch in French; a device with no passcode in Spanish; and the Simulator's own answer with no seam. |
+| The same, iPad Pro 13 (M5) | **4 passed, over two runs.** The first run passed 2; the other 2 failed inside XCTest's own queries ("Timed out while fetching snapshot from testmanagerd") at a load average near 340. Both passed when rerun with the load lower. |
+| With no seam, this Simulator's own owner check | Reports Face ID ("Require Face ID", switch enabled). The real prompt was never answered. |
+
+How the UI tests were run: straight through `xcodebuild` on simulators no other session was using, each test making its own library with `LibraryStore`. Two other sessions' UI runs were going at the time, and `ui-test-ios.sh` deletes and reseeds the shared `/tmp/papernest-uitest-library`.
+
+Found on the way:
+- **An app change.** The copy of the lock screen drawn inside the window's own content was still visible to accessibility, so there were two Unlock buttons. It is now a plain backdrop, the paper and the mark only, hidden from accessibility.
+- **A test fix.** A tap on the middle of a SwiftUI toggle's row lands on its label and does not flip it, so the test taps the switch itself.
+
+**Not verified:** a real device, where the real Face ID or passcode prompt has to be answered; that prompt was never answered in the Simulator. Also: VoiceOver, the app switcher's picture, iPad multiple windows, a hardware keyboard while locked, and dark mode.
+
 ## 2026-11-22 — Lasso editing: delete, cut, copy, paste, duplicate, recolor, resize and rotate (Claude)
 
 Owner: "just dive in, start with the lasso", after a review of gaps against Acrobat and GoodNotes found that the lasso could only move a selection and turn handwriting into text.

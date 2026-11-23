@@ -1,3 +1,4 @@
 /* Valeurs localisées d’Info.plist (iOS/iPadOS). */
 "CFBundleDisplayName" = "PaperNest";
 "NSCameraUsageDescription" = "PaperNest utilise l’appareil photo pour numériser des documents et ajouter des photos aux notes. Les captures sont enregistrées dans votre bibliothèque sur cet appareil.";
+"NSFaceIDUsageDescription" = "PaperNest utilise Face ID pour déverrouiller votre bibliothèque lorsque vous activez le verrouillage dans les réglages.";
