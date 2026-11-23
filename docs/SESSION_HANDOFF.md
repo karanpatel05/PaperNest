@@ -58,6 +58,8 @@ file-preview work has a `FileKind.prepareTemporaryCopy` in it.
 
 ### Current claims
 
+**Claude released — comments in exported PDFs, 2026-11-23. COMMITTED in the commit that carries this line, not pushed; files free.** The export sheet's **Include Comments** (PDF only, off by default) writes each page's comments into the file as PDF notes that Preview and Acrobat show. New: `Sources/PaperNestExport/PDFComments.swift`, `Tests/PaperNestExportTests/CommentExportTests.swift`, `Apps/iOS/UITests/CommentExportUITests.swift`. Edited: `ExportOptions.swift` (`includesComments`), `Exporter.swift` (reads the comments, adds the notes once the file is written), `ExportSheet.swift` (the switch and its note, in the PDF section), `Localization.swift` and the en/fr/es strings (a "Comments in exported PDFs" block). **For Codex:** the switch has had no design pass. Your uncommitted string edits and the app-lock session's were left out of this commit (blobs built from HEAD). Details: TEST_MATRIX "Comments in exported PDFs".
+
 **Claude released — app lock, 2026-11-23. COMMITTED in the commit that carries this line, not pushed; files free.** Settings → Privacy → **Require Face ID** (or Touch ID, Optic ID, Passcode) on iPhone and iPad:
 - PaperNest asks the device's own owner check at launch, and after the chosen time in the background.
 - While locked, a window of its own sits over everything the scene shows, sheets included.

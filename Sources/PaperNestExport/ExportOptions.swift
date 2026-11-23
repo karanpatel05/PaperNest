@@ -134,6 +134,10 @@ public struct ExportOptions: Hashable, Sendable {
     public var includesRecognizedText: Bool
     /// Word only: words to edit, or pictures of the pages.
     public var docxLayout: DocxLayout
+    /// PDF only. Writes each page's comments as notes — PDF text annotations,
+    /// the sticky notes other PDF readers show beside the page. Off unless
+    /// asked: a comment stays private until its author chooses to send it.
+    public var includesComments: Bool
     /// A mark drawn over every exported page, or nil for none.
     ///
     /// Nil unless the export sheet sets it, so the backup, printing, the
@@ -155,6 +159,7 @@ public struct ExportOptions: Hashable, Sendable {
         packaging: ImagePackaging = .zip,
         includesRecognizedText: Bool = true,
         docxLayout: DocxLayout = .editableText,
+        includesComments: Bool = false,
         watermark: Watermark? = nil,
         attribution: Watermark? = nil
     ) {
@@ -166,6 +171,7 @@ public struct ExportOptions: Hashable, Sendable {
         self.packaging = packaging
         self.includesRecognizedText = includesRecognizedText
         self.docxLayout = docxLayout
+        self.includesComments = includesComments
         self.watermark = watermark
         self.attribution = attribution
     }

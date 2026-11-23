@@ -1,3 +1,25 @@
+## 2026-11-23 — Comments in exported PDFs, as notes other readers show (Claude)
+
+A gap against Acrobat: PaperNest's page comments never left the app. The export sheet now has **Include Comments** for a PDF, off by default. It writes each page's comments into the file as standard PDF text annotations: the notes Preview and Acrobat show beside a page and open with a click.
+
+**How**
+- `ExportOptions.includesComments` (default false).
+- `Exporter.writePDF` reads each page's comments as it goes. Once the file is finished, `PDFComments.attach` adds them, whichever way the file was written: the untouched original handed back, a rebuild, or pages copied in. Nothing is drawn twice.
+- Notes run in a column down the page's top-left corner, as the page sits on the paper. They are placed through `PageGeometry.pdfToSource`, so a copied page with an offset box or its own `/Rotate` gets them in the same corner.
+- The file is written again under the password and the author's limits it already had, as pass-through does.
+- A document with no comments is exported exactly as before: byte for byte, when it was untouched.
+
+**Not done:** comments already inside an imported PDF do not become PaperNest comments. PDFKit already draws them on the page, so taking them in needs a decision about showing them twice.
+
+| Check | Result |
+|---|---|
+| `CommentExportTests` (8): a note per comment on its own page, not overlapping and on the page; nothing unless asked; no comments means a byte-identical file; a password kept; Letter paper puts the note on the fitted page, not in the margin; long accented text kept whole; a restricted file keeps its limits, handed back or rebuilt; PNG carries none | **8 passed.** With the note-writing call switched off, the four note tests fail, so they test what they claim |
+| `ExportPasswordWorkflowTests`, `ExportFormatOfferTests`, `LocalizationTests` | **Passed** |
+| `CommentExportUITests` (2), iPhone 17 and iPad Pro 13, iOS 27.0: the switch is there for a PDF and starts off, turns on and shows its note, is not offered for PNG, and reads "Inclure les commentaires" / "Incluir comentarios" without running off the screen | **2 passed on each device** (53–68 s) |
+| `swift build --build-tests`; `build-for-testing`, `PaperNest-iOS` | **0 warnings; built** |
+
+**Not verified:** opening an exported file in Preview or Acrobat by hand (the notes were read back with PDFKit only), VoiceOver, Dynamic Type, the Mac export sheet.
+
 ## 2026-11-23 — Lasso editing follow-up: its UI tests run and pass on iPhone and iPad; the turn handle kept clear of the resize handle (Claude)
 
 The four lasso UI tests from `2758da4` could not run on 2026-11-22 (the simulator service was down). After the Mac restarted they ran.

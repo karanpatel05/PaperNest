@@ -1529,4 +1529,8 @@ extension L10n {
     static var selectionSmaller: String { tr("selection.smaller") }
     static var selectionResizeHandle: String { tr("selection.resize.handle") }
     static var selectionRotateHandle: String { tr("selection.rotate.handle") }
+
+    // Comments in exported PDFs
+    static var exportComments: String { tr("export.comments") }
+    static var exportCommentsNote: String { tr("export.comments.note") }
 }

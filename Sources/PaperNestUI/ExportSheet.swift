@@ -596,9 +596,14 @@ struct ExportSheet: View {
                     Text(L10n.qualityCompact).tag(PDFImageQuality.compact)
                 }
                 .choicePickerStyle()
+                // Off unless asked: a comment is private until its author
+                // chooses to send it with the file.
+                Toggle(L10n.exportComments, isOn: $options.includesComments)
+                    .accessibilityIdentifier("export-comments")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     formFateNote
+                    if options.includesComments { Text(L10n.exportCommentsNote) }
                     if options.paperSize != .original { Text(L10n.paperNote) }
                     Text(L10n.exportVectorNote)
                 }

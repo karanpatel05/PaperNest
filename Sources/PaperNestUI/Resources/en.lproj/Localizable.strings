@@ -1393,3 +1393,7 @@
 "applock.reason.unlock" = "Unlock your PaperNest library.";
 "applock.reason.on" = "Turn on the lock for PaperNest.";
 "applock.reason.off" = "Turn off the lock for PaperNest.";
+
+/* Comments in exported PDFs */
+"export.comments" = "Include Comments";
+"export.comments.note" = "Each page’s comments are added as notes that other PDF apps can open.";

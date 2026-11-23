@@ -193,10 +193,18 @@ public struct Exporter: Sendable {
         // The same bytes, kept for the whole-file copy below so the source is
         // read once rather than again at the end.
         var sourceData: [AssetID: Data] = [:]
+        // Each page's comments, when the export asks for them, with the
+        // layout the page is written with. Added as notes once the file is
+        // finished, whichever way each page was written.
+        var comments: [Int: (texts: [String], layout: PaperLayout)] = [:]
         for (index, page) in pages.enumerated() {
             try Task.checkCancellation()
             let pageSize = page.geometry.pageSize
             let layout = PaperLayout(pageSize: pageSize, paper: options.paperSize)
+            if options.includesComments {
+                let texts = try await renderer.store.objects(on: page.id).compactMap(\.commentText)
+                if !texts.isEmpty { comments[index] = (texts, layout) }
+            }
             // The resolution the page will be drawn at, which also decides
             // how large a placed image needs decoding. Same arithmetic as
             // `pdfSource`, which is where the page's own content gets it.
@@ -326,6 +334,7 @@ public struct Exporter: Sendable {
         } else if !untouched.isEmpty {
             try Self.replaceWithSourcePages(untouched, in: url, password: password, protection: protection)
         }
+        try PDFComments.attach(comments, to: url, password: password, protection: protection)
         // The copies are read lazily from the documents they came from, which
         // must therefore outlive the write. Scope alone is not a guarantee
         // once the optimizer is involved, and every run here is Debug.
