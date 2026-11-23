@@ -243,6 +243,9 @@ import PaperNestStore
         let selectAll = app.buttons["studio-lasso-select-all"]
         if !selectAll.waitForExistence(timeout: 5) { lasso.tap() }
         XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "the Lasso's panel did not open", file: file, line: line)
+        // On a phone the panel is a sheet, and Select All sits below its fold.
+        let panel = app.scrollViews.containing(NSPredicate(format: "identifier == %@", "studio-lasso-select-all")).firstMatch
+        for _ in 0..<6 where !selectAll.isHittable && panel.exists { panel.swipeUp(velocity: .slow) }
         press(selectAll)
         XCTAssertTrue(app.buttons["selection-more"].waitForExistence(timeout: 5), "no selection bar", file: file, line: line)
     }

@@ -1,3 +1,23 @@
+## 2026-11-23 — Lasso editing follow-up: its UI tests run and pass on iPhone and iPad; the turn handle kept clear of the resize handle (Claude)
+
+The four lasso UI tests from `2758da4` could not run on 2026-11-22 (the simulator service was down). After the Mac restarted they ran.
+
+- **First run, iPhone 17 (iOS 27.0): all four failed at Select All. The fault was in the test.** The UI hierarchy showed the Lasso panel open with Select All below a phone's fold (y 950 on an 874-point screen). My helper tapped it without scrolling. It now scrolls the panel, as `openConversion` already did.
+- **Found in the same hierarchy:** on a small selection (the word "hello", about 75 × 38 points) the turn handle overlapped the resize handle by about 6 × 14 points. The turn handle now sits at least 46 points left of the selection's right edge (`PageSelectionOverlay.turnHandlePosition`).
+- `testHandwritingIsReadCorrectedInsertedAndUndone` (existing) **fails on iOS 27.0, iPhone and iPad.** The sheet opens from the lasso menu and says "No words could be read" for the synthetic "hello": Vision on that runtime reads nothing from it. On the iOS 26.5 iPhone, under heavy load, it timed out instead ("the reading did not finish"). This change does not touch recognition, but this test was not seen passing on this machine today either.
+
+| Run (from a git-free copy of HEAD plus these changes) | Result |
+|---|---|
+| iPhone 17, iOS 27.0: the four lasso tests | **4 passed** (28–75 s each) |
+| iPad Pro 13 (M5), iOS 27.0: the four lasso tests | **4 passed** (35–57 s each) |
+| iPhone 17, iOS 26.5 | **Not a result.** UI queries timed out ("Timed out while fetching snapshot from testmanagerd") at a load average near 280; tests took 6–20 minutes each |
+| iPad Pro 13, iOS 26.5 | **Did not start.** "Failed to install or launch the test runner": another session's `AppLockUITests` run was using that simulator |
+| `swift build --build-tests`, `LassoEditingWorkflowTests`, `LocalizationTests` | **Built, 0 warnings; passed** |
+
+Screenshots: `/tmp/pn-handwriting-shots/{iphone,ipad}-lasso-*.png` (bar, duplicate, paste, resize, rotate, the menu in French and Spanish). In French the menu scrolls, and "Faire pivoter à gauche" wraps onto two lines.
+
+**Still not verified:** VoiceOver's adjustable actions on the handles, Dynamic Type, night mode, the Mac with a pointer, a real device.
+
 ## 2026-11-23 — App lock: Face ID, Touch ID or the device passcode before PaperNest shows anything (Claude)
 
 Owner: "Start the next feature". The roadmap's queue is done or waiting on the owner. Its last open Reader item, R6 (notes placed at a spot and exported), is being built right now by another session (uncommitted `PDFComments.swift` and comment-export tests, no claim), so it was left alone. This takes the confirmed scope's F3 "access" item instead: the passcode in reference photo 04, "app lock" in `docs/FEATURE_EXPANSION.md`. iPhone and iPad.

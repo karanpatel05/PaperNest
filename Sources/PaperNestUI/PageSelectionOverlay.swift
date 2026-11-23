@@ -405,7 +405,10 @@ struct PageSelectionOverlay: View {
 
     private func turnHandlePosition(around rect: CGRect) -> CGPoint {
         let bar = InlineTextLayout.toolbarFrame(box: rect, visible: visible, size: CGSize(width: 300, height: 52))
-        let below = CGPoint(x: rect.midX, y: rect.maxY + 30), above = CGPoint(x: rect.midX, y: rect.minY - 30)
+        // Clear of the resize handle at the lower right, even on a selection
+        // narrower than the two handles side by side.
+        let x = min(rect.midX, rect.maxX - 46)
+        let below = CGPoint(x: x, y: rect.maxY + 30), above = CGPoint(x: x, y: rect.minY - 30)
         let beside = CGPoint(x: rect.minX - 30, y: rect.midY)
         if bar.midY < rect.midY { return below.y + 22 <= visible.maxY ? below : beside }
         return above.y - 22 >= visible.minY ? above : beside
