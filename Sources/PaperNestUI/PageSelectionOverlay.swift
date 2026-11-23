@@ -32,6 +32,11 @@ struct PageSelectionOverlay: View {
     @State private var movingPreview: CGImage?
     /// Handwriting in the selection that is being turned into text.
     @State private var handwriting: HandwritingRequest?
+    /// A resize or turn in progress from one of the selection's handles, with
+    /// the exact selection and page it started from.
+    @State private var handleDrag: SelectionHandleDrag?
+    @State private var handleObjects: [PageObject] = []
+    @State private var handlePage: Page?
 
     private var objects: [PageObject] {
         model.selectedPageObjects.filter { object in
@@ -55,14 +60,16 @@ struct PageSelectionOverlay: View {
                 if !hiddenIDs.isEmpty, let movingPreview {
                     Image(decorative: movingPreview, scale: 1).resizable()
                         .frame(width: proxy.size.width, height: proxy.size.height)
+                        .transformEffect(handleDrag?.viewTransform ?? .identity)
                         .offset(translation).allowsHitTesting(false)
                 }
                 Canvas { context, _ in
+                    let live = handleDrag?.viewTransform ?? .identity
                     if selectionContour == nil {
                         for object in selected {
                             guard let bounds = PageSelectionGeometry.bounds(of: object) else { continue }
                             let rect = bounds.applying(sourceToView).offsetBy(dx: translation.width, dy: translation.height)
-                            context.stroke(Path(rect), with: .color(Theme.accent.opacity(0.45)), lineWidth: 1)
+                            context.stroke(Path(rect).applying(live), with: .color(Theme.accent.opacity(0.45)), lineWidth: 1)
                         }
                     }
                     if let bounds = PageSelectionGeometry.bounds(of: selected) {
@@ -73,7 +80,7 @@ struct PageSelectionOverlay: View {
                             outline = closedPath(vertices)
                         } else {
                             let rect = bounds.applying(sourceToView).offsetBy(dx: translation.width, dy: translation.height)
-                            outline = Path(roundedRect: rect.insetBy(dx: -3, dy: -3), cornerRadius: 3)
+                            outline = Path(roundedRect: rect.insetBy(dx: -3, dy: -3), cornerRadius: 3).applying(live)
                         }
                         context.stroke(outline, with: .color(Theme.accent), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
                     }
@@ -101,10 +108,17 @@ struct PageSelectionOverlay: View {
                     }
                 }
                 .allowsHitTesting(false)
-                if !selected.isEmpty, moving.isEmpty, !visible.isNull, !visible.isEmpty,
+                if !selected.isEmpty, moving.isEmpty, !isSaving, let bounds = PageSelectionGeometry.bounds(of: selected) {
+                    handles(around: bounds.applying(sourceToView))
+                }
+                if selected.isEmpty, points.isEmpty, MarkupClipboard.shared.hasContent, !visible.isNull, !visible.isEmpty {
+                    pasteButton.nightFilter(isNight)
+                        .position(x: visible.midX, y: visible.minY + 34)
+                }
+                if !selected.isEmpty, moving.isEmpty, handleDrag == nil, !visible.isNull, !visible.isEmpty,
                    let bounds = PageSelectionGeometry.bounds(of: selected) {
                     let frame = InlineTextLayout.toolbarFrame(box: bounds.applying(sourceToView), visible: visible,
-                                                              size: CGSize(width: 260, height: 52))
+                                                              size: CGSize(width: 300, height: 52))
                     selectionToolbar
                         // Controls stay as they are at night; the page's filter is
                         // its own opposite, so applying it again here undoes it.
@@ -113,6 +127,7 @@ struct PageSelectionOverlay: View {
                         .position(x: frame.midX, y: frame.midY)
                 }
             }
+            .coordinateSpace(name: SelectionHandle.space)
             .clipped()
             .task(id: previewKey) {
                 preview = nil
@@ -175,6 +190,8 @@ struct PageSelectionOverlay: View {
                 default: EmptyView()
                 }
             }
+            Button { deleteSelection() } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
+                .accessibilityLabel(L10n.selectionDelete).accessibilityIdentifier("selection-delete")
             Menu {
                 // Offered only for pen ink: highlighter marks, text and images
                 // are not handwriting, and stay as they are.
@@ -184,6 +201,8 @@ struct PageSelectionOverlay: View {
                     }
                     .accessibilityIdentifier("selection-convert-text")
                 }
+                editingItems
+                Divider()
                 Button(L10n.selectAll) { selectAll() }.accessibilityIdentifier("selection-all")
                 Button(L10n.inlineMoveLeft) { nudge(-10, 0) }.accessibilityIdentifier("selection-left")
                 Button(L10n.inlineMoveRight) { nudge(10, 0) }.accessibilityIdentifier("selection-right")
@@ -304,5 +323,203 @@ struct PageSelectionOverlay: View {
 
     private func reset() {
         points = []; moving = []; movingPreview = nil; movePage = nil; translation = .zero; sourceTranslation = .zero; hiddenIDs = []
+        handleDrag = nil; handleObjects = []; handlePage = nil
+    }
+
+    // MARK: - Lasso editing
+
+    /// Cut, copy, duplicate, paste, colour, size and turn — the ⋯ menu's
+    /// editing half. Turning is offered only for ink: a text box or an image
+    /// stores no angle.
+    @ViewBuilder private var editingItems: some View {
+        Button { cutSelection() } label: { Label(L10n.selectionCut, systemImage: "scissors") }
+            .accessibilityIdentifier("selection-cut")
+        Button { copySelection() } label: { Label(L10n.selectionCopy, systemImage: "doc.on.doc") }
+            .accessibilityIdentifier("selection-copy")
+        Button { duplicateSelection() } label: { Label(L10n.selectionDuplicate, systemImage: "plus.square.on.square") }
+            .accessibilityIdentifier("selection-duplicate")
+        if MarkupClipboard.shared.hasContent {
+            Button { paste() } label: { Label(L10n.selectionPaste, systemImage: "doc.on.clipboard") }
+                .accessibilityIdentifier("selection-paste")
+        }
+        if selected.contains(where: { if case .ink = $0.payload { true } else { false } }) {
+            Menu {
+                ForEach(PaletteSwatch.pen) { swatch in
+                    Button(swatch.name) { recolor(swatch.color) }
+                        .accessibilityIdentifier("selection-color-\(swatch.id)")
+                }
+            } label: { Label(L10n.markupColor, systemImage: "paintpalette") }
+                .accessibilityIdentifier("selection-color")
+        }
+        Divider()
+        Button { scaleFromMenu(1.25) } label: { Label(L10n.selectionLarger, systemImage: "plus.magnifyingglass") }
+            .accessibilityIdentifier("selection-larger")
+        Button { scaleFromMenu(0.8) } label: { Label(L10n.selectionSmaller, systemImage: "minus.magnifyingglass") }
+            .accessibilityIdentifier("selection-smaller")
+        if DocumentModel.canRotate(selected) {
+            Button { rotate(by: -.pi / 2) } label: { Label(L10n.rotateLeft, systemImage: "rotate.left") }
+                .accessibilityIdentifier("selection-rotate-left")
+            Button { rotate(by: .pi / 2) } label: { Label(L10n.rotateRight, systemImage: "rotate.right") }
+                .accessibilityIdentifier("selection-rotate-right")
+        }
+    }
+
+    /// Paste, while the lasso holds nothing and something has been copied.
+    private var pasteButton: some View {
+        Button { paste() } label: {
+            Label(L10n.selectionPaste, systemImage: "doc.on.clipboard")
+                .font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(minHeight: 44)
+        }
+        .buttonStyle(.plain).foregroundStyle(Theme.primaryText)
+        .background(Theme.surface, in: Capsule())
+        .overlay { Capsule().strokeBorder(Theme.separator) }
+        .shadow(color: Theme.paperShadow, radius: 5, y: 3)
+        .accessibilityIdentifier("lasso-paste")
+        .disabled(isSaving)
+    }
+
+    /// The corner handle that resizes and, for ink, the handle that turns.
+    /// The turn handle goes on the side of the selection the selection bar is
+    /// not on — the bar sits just above a selection when there is room, and
+    /// would cover it — or at the left edge when that side is out of view.
+    @ViewBuilder private func handles(around rect: CGRect) -> some View {
+        // A held handle rides with the preview, so it stays under the finger.
+        let live = handleDrag?.viewTransform ?? .identity
+        let corner = CGPoint(x: rect.maxX, y: rect.maxY).applying(live)
+        SelectionHandle(symbol: "arrow.up.left.and.arrow.down.right", label: L10n.selectionResizeHandle,
+                        identifier: "selection-resize-handle",
+                        changed: { start, location in dragHandle(.resize, start: start, location: location) },
+                        ended: endHandle, increase: { scaleFromMenu(1.25) }, decrease: { scaleFromMenu(0.8) })
+            .position(corner)
+            .opacity(handleDrag?.kind == .rotate ? 0 : 1)
+        if DocumentModel.canRotate(selected) {
+            let knob = turnHandlePosition(around: rect).applying(live)
+            SelectionHandle(symbol: "arrow.clockwise", label: L10n.selectionRotateHandle,
+                            identifier: "selection-rotate-handle",
+                            changed: { start, location in dragHandle(.rotate, start: start, location: location) },
+                            ended: endHandle, increase: { rotate(by: .pi / 2) }, decrease: { rotate(by: -.pi / 2) })
+                .position(knob)
+                .opacity(handleDrag?.kind == .resize ? 0 : 1)
+        }
+    }
+
+    private func turnHandlePosition(around rect: CGRect) -> CGPoint {
+        let bar = InlineTextLayout.toolbarFrame(box: rect, visible: visible, size: CGSize(width: 300, height: 52))
+        let below = CGPoint(x: rect.midX, y: rect.maxY + 30), above = CGPoint(x: rect.midX, y: rect.minY - 30)
+        let beside = CGPoint(x: rect.minX - 30, y: rect.midY)
+        if bar.midY < rect.midY { return below.y + 22 <= visible.maxY ? below : beside }
+        return above.y - 22 >= visible.minY ? above : beside
+    }
+
+    /// From the page as the reader sees it to the overlay's own space.
+    private var pageToView: CGAffineTransform { page.geometry.pageToSource.concatenating(sourceToView) }
+
+    private func dragHandle(_ kind: SelectionHandleDrag.Kind, start: CGPoint, location: CGPoint) {
+        guard !isSaving else { return }
+        if handleDrag == nil {
+            guard let bounds = SelectionEdits.pageBounds(of: selected, in: page.geometry) else { return }
+            let pageAnchor = kind == .resize ? bounds.origin : CGPoint(x: bounds.midX, y: bounds.midY)
+            handleDrag = SelectionHandleDrag(kind: kind, anchor: pageAnchor.applying(pageToView), start: start)
+            handleObjects = selected; handlePage = page
+            selectionContour = nil
+            movingPreview = preview
+        }
+        guard var drag = handleDrag, let snapshot = handlePage else { return }
+        switch kind {
+        case .resize:
+            guard let bounds = SelectionEdits.pageBounds(of: handleObjects, in: snapshot.geometry) else { return }
+            let raw = SelectionHandleDrag.scale(anchor: drag.anchor, start: drag.start, current: location)
+            drag.scale = SelectionEdits.clampedScale(raw, bounds: bounds, anchor: bounds.origin,
+                                                     page: CGRect(origin: .zero, size: snapshot.geometry.pageSize))
+        case .rotate:
+            drag.angle = SelectionHandleDrag.angle(anchor: drag.anchor, start: drag.start, current: location)
+        }
+        handleDrag = drag
+        hiddenIDs = movingPreview != nil ? Set(handleObjects.map(\.id)) : []
+    }
+
+    private func endHandle() {
+        guard let drag = handleDrag, let snapshot = handlePage else { reset(); return }
+        let expected = handleObjects
+        switch drag.kind {
+        case .resize:
+            guard abs(drag.scale - 1) > 0.005,
+                  let bounds = SelectionEdits.pageBounds(of: expected, in: snapshot.geometry) else { reset(); return }
+            perform { try await model.scaleSelection(expected, on: snapshot, by: drag.scale, about: bounds.origin,
+                                                     undoManager: undoManager) }
+        case .rotate:
+            guard abs(drag.angle) > 0.005 else { reset(); return }
+            perform { try await model.rotateSelection(expected, on: snapshot, by: drag.angle, undoManager: undoManager) }
+        }
+    }
+
+    private func scaleFromMenu(_ factor: Double) {
+        let expected = selected, snapshot = page
+        guard let bounds = SelectionEdits.pageBounds(of: expected, in: snapshot.geometry) else { return }
+        perform { try await model.scaleSelection(expected, on: snapshot, by: factor,
+                                                 about: CGPoint(x: bounds.midX, y: bounds.midY), undoManager: undoManager) }
+    }
+
+    private func rotate(by radians: Double) {
+        let expected = selected, snapshot = page
+        guard DocumentModel.canRotate(expected) else { return }
+        perform { try await model.rotateSelection(expected, on: snapshot, by: radians, undoManager: undoManager) }
+    }
+
+    private func deleteSelection() {
+        let expected = selected, snapshot = page
+        guard !expected.isEmpty else { return }
+        perform {
+            try await model.deleteSelection(expected, on: snapshot, undoManager: undoManager)
+            clearSelection()
+        }
+    }
+
+    private func cutSelection() {
+        let expected = selected, snapshot = page
+        guard !expected.isEmpty else { return }
+        perform {
+            try await model.cutSelection(expected, on: snapshot, undoManager: undoManager)
+            clearSelection()
+        }
+    }
+
+    private func copySelection() {
+        model.copySelection(selected, on: page)
+    }
+
+    private func duplicateSelection() {
+        let expected = selected, snapshot = page
+        guard !expected.isEmpty else { return }
+        perform {
+            let copies = try await model.duplicateSelection(expected, on: snapshot, undoManager: undoManager)
+            selectedIDs = Set(copies.map(\.id)); selectionContour = nil
+        }
+    }
+
+    private func paste() {
+        let snapshot = page
+        perform {
+            let copies = try await model.paste(on: snapshot, undoManager: undoManager)
+            if !copies.isEmpty { selectedIDs = Set(copies.map(\.id)); selectionContour = nil }
+        }
+    }
+
+    private func recolor(_ color: RGBAColor) {
+        let expected = selected, snapshot = page
+        perform { try await model.recolorSelection(expected, to: color, on: snapshot, undoManager: undoManager) }
+    }
+
+    /// Runs one lasso edit at a time, reporting a refusal the way a move does.
+    private func perform(_ work: @escaping @MainActor () async throws -> Void) {
+        guard !isSaving else { return }
+        isSaving = true
+        Task {
+            do { try await work() }
+            catch StoreError.pageObjectsChanged {
+                model.presentedError = PresentedError(title: L10n.genericErrorTitle, message: L10n.markupChanged)
+            } catch { model.presentedError = .saveFailed() }
+            reset(); isSaving = false
+        }
     }
 }

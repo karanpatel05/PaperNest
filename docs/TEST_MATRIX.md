@@ -1,3 +1,49 @@
+## 2026-11-22 — Lasso editing: delete, cut, copy, paste, duplicate, recolor, resize and rotate (Claude)
+
+Owner: "just dive in, start with the lasso", after a review of gaps against Acrobat and GoodNotes found that the lasso could only move a selection and turn handwriting into text.
+
+**What the lasso does now**
+- **Selection bar:** Delete (trash), beside ⋯.
+- **⋯ menu:** Cut, Copy, Duplicate, Paste (once something has been copied), Color (only when the selection holds ink; the pen palette), Make Larger, Make Smaller, Rotate Left / Rotate Right (only for a selection that is all ink).
+- **Handles:** a corner handle resizes uniformly about the opposite corner. A turn handle (ink only) turns the selection about its centre, settling on a multiple of 45° within 4°. The turn handle goes on the side the selection bar is not on, because the bar sits 10 points above a selection when there is room.
+- **Paste button** on the page while the lasso holds nothing and something has been copied (`lasso-paste`).
+- Each edit is one store write and one undo step. Each is refused whole when the marks or the page changed after the lasso picked them up.
+
+**How**
+- `SelectionEdits` (Core): scaling and turning built in page space and carried to source space through `PageGeometry`, so a cropped or turned page behaves as the reader sees it. Ink keeps each point's pressure and timing; its width scales with the writing. A text box's type scales with its frame. Copies get new ids.
+- `LibraryStore.placeCopies` (Store): copies above everything on the page, paint order given inside the write, checked as untrusted input (finite, visible, not blank, a picture's bytes still in the library, at most 5,000 marks and 1,000,000 points).
+- `DocumentModel`: delete, cut, copy, paste, duplicate, recolor, scale, rotate. Delete, cut and recolor go through the existing guarded `editInk`.
+- `MarkupClipboard` (UI): memory only, so there is no second record of page content.
+
+**Calls I made (for the owner and Codex)**
+- **Free, like moving.** These edit marks already on a page. Shapes and signatures are Pro to *place*; copying one that is already there creates nothing new.
+- **Rotate is ink only.** `TextBox` and `PlacedImage` store no angle. Adding one changes the renderer, export, hit-testing and the inline editor, and older builds would draw them unturned.
+- **Pasting onto a page turned differently:** ink reads upright. A text box or picture keeps its size, and its centre lands where it was, so it shows turned with that page, as any box placed there does.
+- **Kept on the page.** A copy larger than the target page is shrunk to fit; one over an edge is moved back. The lasso only picks up what it wholly encloses, so a mark off the page could never be selected again.
+- **No keyboard shortcuts yet.** ⌘D is Bookmark, ⌘C belongs to text selection, and a bare Delete key could race text editing.
+- **Not on the system clipboard.** Other apps cannot paste lassoed marks.
+
+**Results**
+
+All from a git-free copy of the committed tree plus this slice, under `~/Library/Caches/PaperNest/lasso-verify` (HEAD `acdb17f`, then `16b59f0`'s files once that commit landed). The machine's load average was 800–1,000 for most of the session: about 195 processes were stuck in disk wait, with the disk 96% full.
+
+| Check | Result |
+|---|---|
+| New tests: `SelectionEditsTests` (16), `PlacedCopiesTests` (8), `LassoEditingWorkflowTests` (8) | **32 passed.** The first run caught one real bug: a half turn reads as a scale of −1, so a text box could have been turned upside down. It is now refused like any other turn. |
+| `./scripts/test.sh`, whole suite | UI module **441**, Store **295**, Sync **49** passed. Core **269** and Export **326** passed in a second run. **The Import target did not finish** (it also holds the Vision render and recognition tests): its test process sat at 0% CPU for over 80 minutes and was stopped. This slice changes nothing in Import or Render. |
+| `swift build --build-tests` | **0 warnings.** |
+| `xcodebuild -scheme PaperNestUI`, iOS Simulator | **Built, 0 warnings.** |
+| `xcodebuild build-for-testing`, `PaperNest-iOS` (app and UI tests) | **Built.** Its one "warning" is Xcode's App Intents metadata note, printed on every build of this app. |
+| `./scripts/build-mac-app.sh` | **Built, 0 warnings.** |
+| iOS UI tests: four new lasso tests in `HandwritingUITests`, plus `testHandwritingIsReadCorrectedInsertedAndUndone` | **Not run.** `xcodebuild` found no simulators, twice ("Unable to find a device matching the provided destination specifier"), and `simctl` reported "CoreSimulatorService connection interrupted". The `16b59f0` entry above recorded the same failure today. |
+
+**Not verified**
+
+- **Everything on screen:** the Delete button, the menu items, both handles and the Paste button have not been seen or driven in the running app on iPhone, iPad or Mac. The UI tests that drive them are written and compile.
+- The wider bar (300 points) and the longer menu in French and Spanish, at Dynamic Type sizes, and at night.
+- VoiceOver: the handles' adjustable actions (up = larger or a quarter turn clockwise).
+- A real device.
+
 ## 2026-11-22 — The rest of Codex's gaps: the iPhone lasso that scrolled the page, and the UI tests the studio redesign left stale (Claude)
 
 Owner: "Finish working on codex gaps". This follows the entry below, which fixed four app gaps. This pass covers the failures still red on iPhone and iPad, most of them tests that went stale when the studio redesign moved every tool into Document Tools. Each cause was found before any change.

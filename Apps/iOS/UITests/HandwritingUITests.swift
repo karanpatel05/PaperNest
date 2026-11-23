@@ -232,4 +232,155 @@ import PaperNestStore
         let after = try await store.objects(on: page)
         XCTAssertEqual(after, before)
     }
+
+    // MARK: - Lasso editing
+
+    /// Lasso → Select All, leaving the selection bar showing.
+    private func selectAllWithLasso(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let lasso = app.buttons["studio-tool-lasso"]
+        XCTAssertTrue(lasso.waitForExistence(timeout: 30), "the notebook did not open", file: file, line: line)
+        lasso.tap()
+        let selectAll = app.buttons["studio-lasso-select-all"]
+        if !selectAll.waitForExistence(timeout: 5) { lasso.tap() }
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "the Lasso's panel did not open", file: file, line: line)
+        press(selectAll)
+        XCTAssertTrue(app.buttons["selection-more"].waitForExistence(timeout: 5), "no selection bar", file: file, line: line)
+    }
+
+    /// ⋯ on the selection bar, then the item called `title`.
+    private func chooseFromSelectionMenu(_ app: XCUIApplication, _ title: String,
+                                         file: StaticString = #filePath, line: UInt = #line) {
+        press(app.buttons["selection-more"])
+        let item = app.buttons[title].firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 5), "\(title) is not in the selection menu", file: file, line: line)
+        item.tap()
+    }
+
+    private func inkPoints(_ objects: [PageObject]) -> [[CGPoint]] {
+        objects.compactMap { object in
+            guard case .ink(let stroke) = object.payload else { return nil }
+            return stroke.points.map { CGPoint(x: $0.x, y: $0.y) }
+        }
+    }
+
+    /// Delete from the selection bar, then Duplicate from ⋯, each undone with
+    /// one tap of Undo.
+    func testLassoDeletesAndDuplicatesAndEachUndoesInOneStep() async throws {
+        let (directory, store, page, strokes) = try await seed("hi")
+        let original = try await store.objects(on: page)
+        let app = launch(directory)
+        defer { app.terminate() }
+
+        selectAllWithLasso(app)
+        snap(app, "lasso-bar-en")
+        app.buttons["selection-delete"].tap()
+        let deleted = try await objects(store, page) { $0.isEmpty }
+        XCTAssertTrue(deleted.isEmpty, "Delete left \(deleted.count) marks")
+        XCTAssertFalse(app.buttons["selection-more"].exists, "the selection bar stayed for marks that are gone")
+        app.buttons["notebook-undo"].tap()
+        let back = try await objects(store, page) { $0 == original }
+        XCTAssertEqual(back, original, "Undo did not put the handwriting back as it was")
+
+        selectAllWithLasso(app)
+        chooseFromSelectionMenu(app, "Duplicate")
+        let doubled = try await objects(store, page) { inkCount($0) == strokes * 2 }
+        XCTAssertEqual(inkCount(doubled), strokes * 2, "Duplicate did not lay a copy")
+        XCTAssertEqual(Array(doubled.prefix(strokes)), original, "the originals moved")
+        let copies = inkPoints(Array(doubled.suffix(strokes)))
+        let offset = inkPoints(original).map { $0.map { CGPoint(x: $0.x + 20, y: $0.y + 20) } }
+        XCTAssertEqual(copies.count, offset.count)
+        for (copy, expected) in zip(copies, offset) {
+            for (a, b) in zip(copy, expected) { XCTAssertEqual(a.x, b.x, accuracy: 0.01); XCTAssertEqual(a.y, b.y, accuracy: 0.01) }
+        }
+        XCTAssertTrue(app.buttons["selection-more"].exists, "the copies are not held by the lasso")
+        snap(app, "lasso-duplicated-en")
+        app.buttons["notebook-undo"].tap()
+        let undone = try await objects(store, page) { $0 == original }
+        XCTAssertEqual(undone, original, "Undo did not take the copy away")
+    }
+
+    /// Cut from ⋯, then the Paste button that appears while nothing is held:
+    /// the handwriting comes back where it was, as new marks.
+    func testLassoCutAndPaste() async throws {
+        let (directory, store, page, strokes) = try await seed("hi")
+        let original = try await store.objects(on: page)
+        let app = launch(directory)
+        defer { app.terminate() }
+
+        XCTAssertFalse(app.buttons["lasso-paste"].exists, "Paste offered before anything was copied")
+        selectAllWithLasso(app)
+        chooseFromSelectionMenu(app, "Cut")
+        let cut = try await objects(store, page) { $0.isEmpty }
+        XCTAssertTrue(cut.isEmpty, "Cut left \(cut.count) marks")
+        let paste = app.buttons["lasso-paste"]
+        XCTAssertTrue(paste.waitForExistence(timeout: 5), "no Paste button after Cut")
+        snap(app, "lasso-paste-en")
+        paste.tap()
+        let pasted = try await objects(store, page) { inkCount($0) == strokes }
+        XCTAssertEqual(inkCount(pasted), strokes, "Paste did not bring the handwriting back")
+        XCTAssertTrue(Set(pasted.map(\.id)).isDisjoint(with: original.map(\.id)), "a paste must be new marks")
+        XCTAssertEqual(pasted.map(\.payload), original.map(\.payload), "pasted somewhere else, or changed")
+        XCTAssertTrue(app.buttons["selection-more"].waitForExistence(timeout: 5), "the pasted marks are not held")
+        XCTAssertFalse(paste.exists, "Paste still offered while the lasso holds the paste")
+    }
+
+    /// The corner handle makes the selection larger; the turn handle turns
+    /// it; two Undos put it back exactly.
+    func testLassoResizeHandleAndRotate() async throws {
+        let (directory, store, page, _) = try await seed("hi")
+        let original = try await store.objects(on: page)
+        let app = launch(directory)
+        defer { app.terminate() }
+
+        selectAllWithLasso(app)
+        let handle = app.descendants(matching: .any)["selection-resize-handle"]
+        XCTAssertTrue(handle.waitForExistence(timeout: 5), "no resize handle on the selection")
+        XCTAssertTrue(app.descendants(matching: .any)["selection-rotate-handle"].exists,
+                      "no turn handle on a selection of ink")
+        let before = handle.frame
+        let grip = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        grip.press(forDuration: 0.2, thenDragTo: grip.withOffset(CGVector(dx: 50, dy: 50)))
+        let grown = try await objects(store, page) { inkPoints($0) != inkPoints(original) }
+        XCTAssertNotEqual(inkPoints(grown), inkPoints(original), "the handle did not resize the handwriting")
+        XCTAssertEqual(grown.map(\.id), original.map(\.id), "resizing must keep the same marks")
+        guard case .ink(let wider)? = grown.first?.payload, case .ink(let was)? = original.first?.payload else {
+            XCTFail("the handwriting is no longer ink"); return
+        }
+        XCTAssertGreaterThan(wider.width, was.width, "the line did not grow with the writing")
+        XCTAssertTrue(handle.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(handle.frame.maxX, before.maxX, "the handle did not move out with the selection")
+        snap(app, "lasso-resized-en")
+
+        // The turn handle sits off the middle of one side; dragged sideways it
+        // swings round the selection's centre.
+        let knob = app.descendants(matching: .any)["selection-rotate-handle"]
+        XCTAssertTrue(knob.waitForExistence(timeout: 5))
+        let start = knob.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.2, thenDragTo: start.withOffset(CGVector(dx: 80, dy: 0)))
+        let turned = try await objects(store, page) { inkPoints($0) != inkPoints(grown) }
+        XCTAssertNotEqual(inkPoints(turned), inkPoints(grown), "the turn handle did not turn the handwriting")
+        snap(app, "lasso-rotated-en")
+
+        app.buttons["notebook-undo"].tap()
+        _ = try await objects(store, page) { inkPoints($0) == inkPoints(grown) }
+        app.buttons["notebook-undo"].tap()
+        let undone = try await objects(store, page) { $0 == original }
+        XCTAssertEqual(undone, original, "two Undos did not put the handwriting back")
+    }
+
+    /// The menu's new items in French and Spanish, and Duplicate working there.
+    func testLassoMenuInFrenchAndSpanish() async throws {
+        for (language, cut, duplicate) in [("fr", "Couper", "Dupliquer"), ("es", "Cortar", "Duplicar")] {
+            let (directory, store, page, strokes) = try await seed("hi")
+            let app = launch(directory, language: language)
+            selectAllWithLasso(app)
+            press(app.buttons["selection-more"])
+            XCTAssertTrue(app.buttons[cut].waitForExistence(timeout: 5), "\(language): no \(cut)")
+            snap(app, "lasso-menu-\(language)")
+            app.buttons[duplicate].tap()
+            let doubled = try await objects(store, page) { inkCount($0) == strokes * 2 }
+            XCTAssertEqual(inkCount(doubled), strokes * 2, "\(language): \(duplicate) did not lay a copy")
+            app.terminate()
+        }
+    }
 }

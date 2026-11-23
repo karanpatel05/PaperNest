@@ -1013,7 +1013,8 @@ final class DocumentModel {
         session.didChange()
     }
 
-    func editInk(on page: Page, objects: [PageObject], edit: InkEdit, undoManager: UndoManager?) async throws {
+    func editInk(on page: Page, objects: [PageObject], edit: InkEdit, undoManager: UndoManager?,
+                 actionName: String? = nil) async throws {
         await finishPendingHistory()
         guard let store else { throw StoreError.pageNotFound }
         let result = try await store.editInk(on: page.id, expectedRevision: page.revision, objects: objects, edit: edit)
@@ -1023,9 +1024,132 @@ final class DocumentModel {
         let change = InkChange(pageID: page.id, saved: result.saved,
                                replaced: removing ? [] : result.previous, deleted: removing ? result.previous : [])
         registerInkUndo(change.inverse, undoManager: undoManager,
-                        actionName: removing ? L10n.markupRemove : L10n.markupRecolor)
+                        actionName: actionName ?? (removing ? L10n.markupRemove : L10n.markupRecolor))
         await loadSelectedPageObjects()
         session.didChange()
+    }
+
+    // MARK: - Lasso editing
+
+    /// How far a duplicate, or a paste onto the page its originals still lie
+    /// on, is laid from them, in page points: enough to see both.
+    nonisolated static let copyOffset = CGPoint(x: 20, y: 20)
+
+    /// Takes a lassoed selection off the page, as one undo step. Text boxes
+    /// and images go with the ink; undo puts every one back as it was.
+    func deleteSelection(_ objects: [PageObject], on page: Page, undoManager: UndoManager?) async throws {
+        try await editInk(on: page, objects: objects, edit: .remove, undoManager: undoManager,
+                          actionName: L10n.selectionDelete)
+    }
+
+    /// Keeps the selection for pasting, leaving the page as it is.
+    func copySelection(_ objects: [PageObject], on page: Page) {
+        MarkupClipboard.shared.copy(objects, from: page)
+    }
+
+    /// Keeps the selection for pasting and takes it off the page. The
+    /// clipboard is filled only once the removal is saved, so a cut that
+    /// fails leaves both the page and the clipboard as they were.
+    func cutSelection(_ objects: [PageObject], on page: Page, undoManager: UndoManager?) async throws {
+        try await editInk(on: page, objects: objects, edit: .remove, undoManager: undoManager,
+                          actionName: L10n.selectionCut)
+        MarkupClipboard.shared.copy(objects, from: page)
+    }
+
+    /// Gives the ink in a selection a new colour, as one undo step. Text boxes
+    /// and images are left as they are: a picture has no colour, and a text
+    /// box's is set where it is typed.
+    func recolorSelection(_ objects: [PageObject], to color: RGBAColor, on page: Page,
+                          undoManager: UndoManager?) async throws {
+        let ink = objects.filter { if case .ink = $0.payload { true } else { false } }
+        guard !ink.isEmpty else { return }
+        try await editInk(on: page, objects: ink, edit: .recolor(color), undoManager: undoManager,
+                          actionName: L10n.markupRecolor)
+    }
+
+    /// Lays a copy of the selection just below and to the right of it on the
+    /// same page, as one undo step, and returns the copies so the lasso can
+    /// hold them in place of the originals.
+    @discardableResult
+    func duplicateSelection(_ objects: [PageObject], on page: Page,
+                            undoManager: UndoManager?) async throws -> [PageObject] {
+        let copies = try Self.laidOut(SelectionEdits.copies(of: objects, from: page.geometry, onto: page.geometry,
+                                                            pageID: page.id, shiftedBy: Self.copyOffset))
+        return try await placeCopies(copies, on: page, actionName: L10n.selectionDuplicate, undoManager: undoManager)
+    }
+
+    /// Lays what was last copied or cut on `page`, where it sat on its own
+    /// page as the reader saw it — moved aside when its originals are still
+    /// lying exactly there, or the copy would hide under them. Returns the
+    /// copies, or nothing when there is nothing to paste.
+    @discardableResult
+    func paste(on page: Page, undoManager: UndoManager?) async throws -> [PageObject] {
+        guard let content = MarkupClipboard.shared.content, let store else { return [] }
+        let onPage = Set(try await store.objects(on: page.id))
+        let underneath = content.pageID == page.id && content.objects.contains { onPage.contains($0) }
+        let copies = try Self.laidOut(SelectionEdits.copies(of: content.objects, from: content.geometry,
+                                                            onto: page.geometry, pageID: page.id,
+                                                            shiftedBy: underneath ? Self.copyOffset : .zero))
+        return try await placeCopies(copies, on: page, actionName: L10n.selectionPaste, undoManager: undoManager)
+    }
+
+    /// Makes a selection larger or smaller about `anchor`, in page points, as
+    /// one undo step. The factor is held so the selection stays on the page
+    /// and large enough to lasso again.
+    func scaleSelection(_ expected: [PageObject], on page: Page, by factor: Double, about anchor: CGPoint,
+                        undoManager: UndoManager?) async throws {
+        let changed = try Self.laidOut(SelectionEdits.scaled(expected, by: factor, about: anchor, in: page.geometry))
+        try await commitSelectionChange(expected, changed, on: page, actionName: L10n.selectionResize,
+                                        undoManager: undoManager)
+    }
+
+    /// Turns a selection of ink about its centre, clockwise for a positive
+    /// angle as the reader sees it, as one undo step.
+    func rotateSelection(_ expected: [PageObject], on page: Page, by radians: Double,
+                         undoManager: UndoManager?) async throws {
+        let changed = try Self.laidOut(SelectionEdits.rotated(expected, by: radians, in: page.geometry))
+        try await commitSelectionChange(expected, changed, on: page, actionName: L10n.selectionRotate,
+                                        undoManager: undoManager)
+    }
+
+    /// Whether the lasso can turn a selection: only ink stores no frame that
+    /// would have to stay upright.
+    nonisolated static func canRotate(_ objects: [PageObject]) -> Bool {
+        !objects.isEmpty && objects.allSatisfy { if case .ink = $0.payload { true } else { false } }
+    }
+
+    /// A selection edit's result, or the store's own refusal for one that
+    /// cannot be made, so every caller already knows how to report it.
+    private nonisolated static func laidOut(_ result: @autoclosure () throws -> [PageObject]) throws -> [PageObject] {
+        do { return try result() } catch is SelectionEdits.Failure { throw StoreError.invalidPlacement }
+    }
+
+    private func commitSelectionChange(_ expected: [PageObject], _ changed: [PageObject], on page: Page,
+                                       actionName: String, undoManager: UndoManager?) async throws {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        // A handle dragged back to where it started, or held at the page's
+        // edge, changes nothing and leaves no undo step.
+        guard !expected.isEmpty, changed.map(\.payload) != expected.map(\.payload) else { return }
+        replace(try await store.applyInkChanges(on: page.id, saving: changed, replacing: expected,
+                                                deleting: [], expectedPage: page))
+        let change = InkChange(pageID: page.id, saved: changed, replaced: expected, deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: actionName)
+        await loadSelectedPageObjects()
+        session.didChange()
+    }
+
+    private func placeCopies(_ copies: [PageObject], on page: Page, actionName: String,
+                             undoManager: UndoManager?) async throws -> [PageObject] {
+        await finishPendingHistory()
+        guard let store, page.itemID == itemID else { throw StoreError.pageNotFound }
+        let result = try await store.placeCopies(copies, on: page.id, expectedPage: page)
+        replace(result.page)
+        let change = InkChange(pageID: page.id, saved: result.objects, replaced: [], deleted: [])
+        registerInkUndo(change.inverse, undoManager: undoManager, actionName: actionName)
+        await loadSelectedPageObjects()
+        session.didChange()
+        return result.objects
     }
 
     private func registerInkUndo(_ change: InkChange, undoManager: UndoManager?, actionName: String = L10n.undoInk) {

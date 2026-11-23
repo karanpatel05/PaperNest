@@ -1362,3 +1362,13 @@
 "handwriting.replace" = "Replace Selection";
 "handwriting.recognized" = "Recognized Text";
 "handwriting.preview" = "Selected handwriting";
+
+/* Lasso editing */
+"selection.cut" = "Cut";
+"selection.copy" = "Copy";
+"selection.duplicate" = "Duplicate";
+"selection.resize" = "Resize";
+"selection.larger" = "Make Larger";
+"selection.smaller" = "Make Smaller";
+"selection.resize.handle" = "Resize Selection";
+"selection.rotate.handle" = "Rotate Selection";

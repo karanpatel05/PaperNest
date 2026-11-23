@@ -1516,4 +1516,17 @@ extension L10n {
     static var handwritingReplace: String { tr("handwriting.replace") }
     static var handwritingRecognized: String { tr("handwriting.recognized") }
     static var handwritingPreview: String { tr("handwriting.preview") }
+
+    // Lasso editing
+    static var selectionDelete: String { delete }
+    static var selectionPaste: String { paste }
+    static var selectionRotate: String { rotate }
+    static var selectionCut: String { tr("selection.cut") }
+    static var selectionCopy: String { tr("selection.copy") }
+    static var selectionDuplicate: String { tr("selection.duplicate") }
+    static var selectionResize: String { tr("selection.resize") }
+    static var selectionLarger: String { tr("selection.larger") }
+    static var selectionSmaller: String { tr("selection.smaller") }
+    static var selectionResizeHandle: String { tr("selection.resize.handle") }
+    static var selectionRotateHandle: String { tr("selection.rotate.handle") }
 }
