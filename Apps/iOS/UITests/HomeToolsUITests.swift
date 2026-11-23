@@ -13,11 +13,11 @@ import XCTest
         let brand = app.staticTexts.matching(NSPredicate(format: "label == %@", "PaperNest"))
         XCTAssertEqual(brand.allElementsBoundByIndex.filter(\.isHittable).count, 1,
                        "Home should show the brand once across the sidebar and dashboard")
-        // The phone names Home in its bottom bar only. The wide layouts name
-        // it in the sidebar and again as the screen's own title.
+        // Home is named once in navigation on every platform: the phone's
+        // bottom bar, the wide layouts' sidebar. The dashboard's own title is
+        // left blank on purpose (`RootView`, "Home appears once").
         let home = app.staticTexts.matching(NSPredicate(format: "label == %@", "Home"))
-        XCTAssertEqual(home.allElementsBoundByIndex.filter(\.isHittable).count,
-                       UIDevice.current.userInterfaceIdiom == .phone ? 1 : 2)
+        XCTAssertEqual(home.allElementsBoundByIndex.filter(\.isHittable).count, 1)
         app.buttons["home-profile"].tap()
         XCTAssertTrue(app.buttons["profile-done"].waitForExistence(timeout: 5))
         app.buttons["profile-done"].tap()

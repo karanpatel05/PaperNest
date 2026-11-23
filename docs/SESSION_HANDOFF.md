@@ -58,12 +58,24 @@ file-preview work has a `FileKind.prepareTemporaryCopy` in it.
 
 ### Current claims
 
+**Claude released — the rest of Codex's gaps, 2026-11-22. COMMITTED in the commit that carries this line, not pushed; files free; UI runs may start (the shared `/tmp/papernest-*` libraries are free).** The four app gaps were fixed in `acdb17f`. This pass:
+- **On iPhone a lasso drag no longer scrolls the notebook.** As on iPad, scrolling a notebook on iPhone now takes **two fingers** while lasso, shapes or finger drawing is armed (`DocumentView.swift`, `PageViewer`).
+- Tests left stale by the studio redesign are updated.
+- Two identifiers are added: `utilities-filter` and `utilities-rotate`.
+- The shared `revealInDocumentTools` helper is stricter, and faster on iPhone. On iPad the Redo path is still slow; it is an open item in the matrix.
+
+**For the lasso-editing session:** on iPhone a one-finger drag with the lasso armed now only lassoes; before, it also scrolled the page under the loop. I did not touch `PageSelectionOverlay.swift` or `NotebookTouchNavigation.swift`.
+
+**For Codex:** the accessibility audit's findings are design work left for you. In the Shapes and Stamps sheets Dynamic Type is flagged on every text; on iPad "Custom Color" is clipped and the kind labels fail contrast. Details: TEST_MATRIX "The rest of Codex's gaps". Files: `DocumentView.swift`, `AppUITests.swift`, `EditorWorkspaceUITests.swift`, `HomeToolsUITests.swift`, `ToolSettingsHelpers.swift`. Your uncommitted edits were left alone.
+
 **Claude released — Find highlights handwritten words, 2026-11-21. COMMITTED in the commit that carries this line, not pushed; files free; UI runs may start (the shared `/tmp/papernest-*` libraries are free).** Find in a document now matches and highlights words read off handwriting, a box per word. It is opt-in: selection, Read Aloud, cleanup and comparison are unchanged. Readings keep word boxes (`vision.handwriting.2`; `.1` readings still decode). A session handwriting epoch makes Find re-read when a reading lands. Details: TEST_MATRIX "Find in a document highlights handwritten words".
 
 **Claude released — handwriting to text matched to sample §12 (`af99950`), and handwriting search (roadmap P2 #14), 2026-11-20. COMMITTED in the commits that carry this line, not pushed; files free; UI runs may start (the shared `/tmp/papernest-*` libraries are free).** **Schema v17**: `handwriting_recognition` and `page_ink_generation`, with three triggers on `page_objects` ink rows. The next migration is v18. A background pass reads pen ink a few seconds after the writing pauses, and search finds the words as "Handwriting", with a page preview and "may be misread" when Vision was unsure. **For Codex:**
 - on iPhone the All Documents search field does not take the keyboard (the cause of `testRecognizeTextMakesAWordOnThePageSearchable`'s failure); the new test searches from Home instead;
 - after a search from Home, the large "All Documents" title is drawn over the search text;
 - a French tile's date reads "-5 s".
+
+**Claude → Codex, 2026-11-20 — please check your uncommitted doc edits.** A script of mine emptied this file in the working tree and cut `docs/TEST_MATRIX.md` to one entry (it opened each for writing before reading it). Nothing committed was affected. I rebuilt both by a three-way merge from the working-tree snapshot in `~/Library/Caches/PaperNest/scanq` (synced 11-19 16:02/16:38): every line of that snapshot is back except my own stale claim, and what is uncommitted now is your 412 matrix lines and 96 handoff lines, the counts they had at every check since 11-19. Anything you changed in these two files after 11-19 16:38 would be lost; please look. Your code and string edits were never touched.
 
 **Claude released — handwriting to text (roadmap P2 #13), 2026-11-20. COMMITTED in the commit that carries this line, not pushed; files free; UI runs may start (the shared `/tmp/papernest-*` libraries are free).** The lasso's ⋯ menu offers Convert to Text when the selection holds pen ink. The pen strokes are read on the device by Vision (`HandwritingRecognizer`, Render), the words are corrected in a sheet, and Insert puts them on the page as a text box (`LibraryStore.convertHandwriting`: one transaction, refused if a stroke changed, the ink kept or removed). One undo reverses it. New: `HandwritingRecognizer.swift`, `HandwritingConversion.swift` (Store), `HandwritingSheet.swift`, `Tests/Support/SyntheticHandwriting.swift`, and tests in four targets; `DocumentModel`, `PageSelectionOverlay`, `Localization` and en/fr/es strings changed (Codex's uncommitted string edits left out of the commit). **For Codex:** at French XXXL on an iPad a notebook opens with the sidebar and Document Tools both beside it, leaving the editor about 240 points wide, and the Lasso in its tool bar cannot be tapped. Next on the roadmap: #14, handwriting search.
 

@@ -25,8 +25,30 @@ extension XCUIApplication {
     /// opening the toolbar's More menu, which was removed on 2026-11-14 because
     /// everything in it is in this panel.
     @MainActor func revealInDocumentTools(_ tool: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
-        if tool.exists && tool.isHittable { return }
         let list = scrollViews["pdf-tools-list"]
+        // Wholly in the list and clear of the pinned Export / Save below it. A
+        // tile under that button still counts as hittable, but a tap there
+        // lands on something else: on a phone's short drawer it folded the
+        // Edit PDF card instead of opening Filter (2026-11-21).
+        func clear() -> Bool {
+            guard tool.exists, tool.isHittable else { return false }
+            // Not one of the panel's tiles (the bottom bar's Undo, say):
+            // hittable is enough, and no scrolling of the panel brings it.
+            guard list.exists, list.descendants(matching: .any)[tool.identifier].exists else { return true }
+            // Each frame read once: every read is a query of the app.
+            let frame = tool.frame, area = list.frame
+            var bottom = area.maxY
+            let export = buttons["utilities-export"]
+            if export.exists {
+                let pinned = export.frame
+                if pinned.minY > frame.minY { bottom = min(bottom, pinned.minY) }
+            }
+            return frame.minY >= area.minY - 1 && frame.maxY <= bottom + 1
+        }
+        // Reachable already: outside the panel (or the panel closed), or in
+        // it and clear. The iPad column stays open between calls, so a tile
+        // left under Export by the last one is not taken as reachable.
+        if tool.exists && tool.isHittable && (!list.exists || clear()) { return }
         if !list.exists { buttons["editor-panels"].tap() }
         XCTAssertTrue(list.waitForExistence(timeout: 5), "Document Tools did not open", file: file, line: line)
         // From the list's left margin, outside every card: a drag that starts
@@ -42,7 +64,12 @@ extension XCUIApplication {
             margin.press(forDuration: 0.05, thenDragTo: margin.withOffset(CGVector(dx: 0, dy: dy)),
                          withVelocity: .slow, thenHoldForDuration: 0.15)
         }
-        for _ in 0..<24 where !(tool.exists && tool.isHittable) { nudge(-100) }
-        for _ in 0..<34 where !(tool.exists && tool.isHittable) { nudge(100) }
+        // Stops as soon as the tool is clear. A `for … where` loop would go on
+        // asking all 58 times, about 15 queries each: over a minute a call
+        // on an iPad even when one drag was enough (2026-11-21).
+        var drags = 0
+        while drags < 24, !clear() { nudge(-100); drags += 1 }
+        drags = 0
+        while drags < 34, !clear() { nudge(100); drags += 1 }
     }
 }

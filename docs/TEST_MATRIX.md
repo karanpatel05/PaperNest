@@ -1,3 +1,57 @@
+## 2026-11-22 — The rest of Codex's gaps: the iPhone lasso that scrolled the page, and the UI tests the studio redesign left stale (Claude)
+
+Owner: "Finish working on codex gaps". This follows the entry below, which fixed four app gaps. This pass covers the failures still red on iPhone and iPad, most of them tests that went stale when the studio redesign moved every tool into Document Tools. Each cause was found before any change.
+
+**One app change: on iPhone, a lasso drag no longer scrolls the notebook.**
+- **Symptom.** `testMixedLassoDefaultsToSelectionAndMovesAllObjectKinds` failed on iPhone only, and not the same way each time ("0 selected", then "2 selected" for 3).
+- **Cause.** Seen in the run's screen recording, and confirmed by the drag coordinates XCTest recorded: during the drag, the notebook page moved down with the finger and then sprang back. So the loop, drawn in page space, came out short and missed the image.
+  - The lasso's touch surface (`NotebookLassoTouchSurface`) lets its one-finger pan run alongside the scroll view's pan. That is correct only while the scroll view needs two fingers.
+  - `NotebookTouchScrolling`, which applies `PageScrollTouchPolicy` ("two fingers to scroll while lasso, shapes or finger drawing is armed"), was installed only on iPad (`userInterfaceIdiom == .pad`, from the redesign commit `13e8daa`; no recorded reason). On a phone, one finger both lassoed and scrolled.
+- **Fix.** The policy now applies on iPhone too (`DocumentView.swift`, `PageViewer`). The lasso's delegate is unchanged.
+- **Behaviour change on iPhone, for the owner and Codex.** In a notebook, while lasso, shapes or finger drawing is armed, scrolling takes **two fingers**, as on iPad. Lasso is the tool a notebook opens with. With drawing off (`studio-drawing-toggle`), one finger scrolls as before; the notebook scroll tests do exactly that and pass.
+
+**Test changes** (no app behaviour behind them):
+
+| Test(s) | Why it was red | Change |
+|---|---|---|
+| Recognized lines, saved markup, the audit, style layout and contrast tests | Opened tools from the ⋯ menu, removed 2026-11-14 | Open them from Document Tools (`revealEditorTool`) |
+| `testFilterStripAndTitleMenu`, `testLibraryLayoutSwitch…` | Same; Filter and Rotate are menus in Document Tools now | New identifiers `utilities-filter`, `utilities-rotate` on those two menus (`DocumentView.swift`); the filter test checks the saved page filter in the store |
+| `testRecognizedLinesCanBeMarkedAndKeptAfterRelaunch` (iPhone) | Annotate Text's form starts the lines section below a phone's fold and lays out only rows on screen, so Recognize and the first line never existed | Scrolls the sheet until each is there (`revealInAnnotationSheet`), both passes; picks the style first |
+| Settings, crop drag, Export Save (iPad), compact tools, Home's brand | Stale for the redesign | Settings is reached from All Documents; crop reopens from Document Tools; Export Save accepts the system's "Replace" prompt on iPad; the notebook bar no longer holds Shapes (now asserted absent); Home is named once on every device |
+| `EditorWorkspaceUITests` pinch and zoom buttons, French signature | Zoom started from a fitted page it could not shrink; tools reached through the old bar | Fit, shrink, then enlarge; tools from Document Tools |
+| Shared `revealInDocumentTools` | A tile under the pinned Export / Save counted as hittable, so taps landed on the wrong thing | A tile must sit wholly inside the list and above Export. A control outside the panel only needs to be hittable. The loop now stops as soon as the tile is clear: a `for … where` loop kept asking all 58 times, about 15 queries each, over a minute per call on iPad |
+
+`assertMixedSelection` now reports the caller's line, so a failure says which drag it was.
+
+**Results** (all Simulator; one device at a time, because the runs share `/tmp/papernest-*`):
+
+| Run | Result |
+|---|---|
+| iPhone 17, 36 tests: the remaining failures, the notebook/lasso/zoom tests, all of `EditorWorkspaceUITests`, `StampUITests`, `DocumentUtilitiesUITests` | **33 passed, 2 skipped** (iPad-only tests), **1 failed**: `testAnnotationSheetsAccessibilityAudit` (design findings, below) |
+| iPad Pro 13 (M5), the same set less the phone-only tests, 33 | **29 passed, 2 skipped** (compact-only tests), **2 failed**: `testAnnotationSheetsAccessibilityAudit`, `testVisibleAnnotationStyleContrast` (design findings, below) |
+| Follow-up, iPhone 17, 15 tests: the tests that had passed before the helper's last changes, the heaviest Document Tools users, a second lasso run | **15 passed.** The lasso passes twice in a row now; before the fix it failed intermittently. With the loop that stops, style layout took 235 s instead of 623, recognized lines 189 s instead of 473, and the filter test 43 s instead of 89 |
+| Follow-up, iPad Pro 13, the same less the phone-only tests | **8 passed, 2 failed, rest not run.** The two failures came under a load average of 470–600, when a tap took 12–17 s to arrive: the French pass of saved markup (the Annotate Text sheet not up within 10 s), and shapes (Manage Markup not closed within 5 s). **Likely load, but unconfirmed**: the session restarted and stopped the run before its result bundle, with the failure screenshots, was written |
+| Final check: iPad, then iPhone | **Did not start.** `xcodebuild` found no simulator: `simctl list` took 6 minutes at a load average near 480, with another session building and driving two simulators. Not a test result |
+| `./scripts/test.sh` on the committed tree | **1,650 tests, 0 failures, 0 warnings.** |
+| `./scripts/build-mac-app.sh` | **Built, 0 warnings.** |
+
+**Design findings, not fixed (for Codex and the owner).** The audits are left as they are; nothing was narrowed to make them pass.
+- **Dynamic Type "partially unsupported"**, iPhone and iPad:
+  - in the Shapes and Stamps sheets, every text: the kind labels, Position, the Style header, the drag hint, and Add/Cancel;
+  - in Comments and Manage Markup, only Done.
+  - Bar buttons are capped by UIKit itself, so the bar-button findings may be system behaviour. The sheets' own text is not, and no code was found that caps it. The cause was not found.
+- **iPad only, once the Style section is scrolled into view:**
+  - "Custom Color" is clipped;
+  - the kind labels (Rectangle, Ellipse, Line, Arrow; Checkmark, Star) fail contrast, in light mode, as dark text on white or lavender.
+  - This looks wrong for those colors and needs a look at the audit's screenshot. Codex's uncommitted `Theme.filledAction` work was left alone.
+
+**Open, in the shared helper:** on iPad, Redo sits at the end of the toolbar's horizontal scroll and XCUITest reports it not hittable. `revealInDocumentTools` then drags the panel 58 times before the tap scrolls the toolbar itself, so `testNotebookToolsAreSideBySide` took 658 s. This was slow before this pass too. A one-line fix was written but never run, so it was left out: return at once when the control exists and is not one of the panel's tiles (`list.descendants(matching: .any)[tool.identifier]` does not exist). Whether Redo is really cut off at that width was not looked at.
+
+**Not verified:**
+- two-finger scrolling on iPhone (XCUITest cannot make a two-finger pan, so only one-finger lasso was tested);
+- saved markup and shapes on iPad with the committed helper (both failed under load);
+- a real device, VoiceOver, and the Mac (built, not driven).
+
 ## 2026-11-21 — Four gaps recorded for Codex, fixed: the French date, iPhone search, an emptied note, the squeezed editor at iPad XXXL (Claude)
 
 Owner: "Finish working on codex gaps". These were found during this session's UI runs and recorded for Codex. The owner asked Claude to fix them. Each cause was found before any change.

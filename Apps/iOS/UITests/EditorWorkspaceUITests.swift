@@ -28,17 +28,27 @@ import PaperNestStore
         // (100% -> 100%) or overflows (150% -> 150%), while pinching the paper
         // shrinks it in both states (100% -> 50%, 150% -> 75%). An opening
         // pinch starts centred, which is why only the shrink half ever failed.
+        //
+        // Closed first, while the paper still fits, then open. Since the studio
+        // redesign the page column is narrower (a phone's width, or an iPad's
+        // beside Document Tools), so paper enlarged to 150% overflows it, and a
+        // closing pinch on it then starts off screen and never registers —
+        // the same trap as the scroll view's, measured 2026-11-21. Back to
+        // fit between tools, so each starts from a page that fits.
         for tool in ["studio-tool-lasso", "studio-tool-pen"] {
             if app.buttons[tool].value as? String != "Selected" { app.buttons[tool].tap() }
+            app.buttons["editor-zoom-fit"].tap()
+            try await Task.sleep(for: .milliseconds(300))
             let before = page.frame.width
-            if pinch { page.pinch(withScale: 1.5, velocity: 1) }
-            else { app.buttons["editor-zoom-in"].tap() }
-            XCTAssertGreaterThan(page.frame.width, before * 1.1, "Pinch must enlarge paper with \(tool)")
-            let enlarged = page.frame.width
             if pinch { page.pinch(withScale: 0.7, velocity: -1) }
             else { app.buttons["editor-zoom-out"].tap() }
-            for _ in 0..<30 where page.frame.width >= enlarged * 0.95 { try await Task.sleep(for: .milliseconds(100)) }
-            XCTAssertLessThan(page.frame.width, enlarged * 0.95, "Pinch must shrink paper with \(tool)")
+            for _ in 0..<30 where page.frame.width >= before * 0.95 { try await Task.sleep(for: .milliseconds(100)) }
+            XCTAssertLessThan(page.frame.width, before * 0.95, "Pinch must shrink paper with \(tool)")
+            let shrunk = page.frame.width
+            if pinch { page.pinch(withScale: 1.5, velocity: 1) }
+            else { app.buttons["editor-zoom-in"].tap() }
+            for _ in 0..<30 where page.frame.width <= shrunk * 1.1 { try await Task.sleep(for: .milliseconds(100)) }
+            XCTAssertGreaterThan(page.frame.width, shrunk * 1.1, "Pinch must enlarge paper with \(tool)")
         }
         app.buttons["editor-zoom-fit"].tap()
         XCTAssertEqual(app.buttons["editor-zoom-fit"].value as? String, "100%")
@@ -150,20 +160,13 @@ import PaperNestStore
 
     private func revealTool(_ identifier: String, in app: XCUIApplication, isPad: Bool) -> XCUIElement {
         let target = app.buttons[identifier]
-        if isPad {
-            let sidebar = app.scrollViews["pdf-tools-list"]
-            XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
-            for _ in 0..<10 where !target.isHittable { sidebar.swipeUp() }
-        } else {
-            // A phone reaches the same tools in the same Document Utilities
-            // panel, drawn as a drawer (owner's 2026-11-12 redesign). This
-            // used to scroll the native More menu, which on a short screen
-            // shows too few rows to drag between.
-            let sidebar = app.scrollViews["pdf-tools-list"]
-            if !sidebar.exists { app.buttons["editor-panels"].tap() }
-            XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
-            for _ in 0..<10 where !(target.exists && target.isHittable) { sidebar.swipeUp() }
-        }
+        // Both devices reach the tools in Document Tools: an iPad's column, a
+        // phone's drawer (owner's 2026-11-12 redesign). The shared helper
+        // opens it when it is closed — at the largest text sizes an iPad no
+        // longer opens it beside the page — and scrolls in small held drags;
+        // whole swipes carried the target past at XXXL.
+        _ = isPad
+        app.revealInDocumentTools(target)
         XCTAssertTrue(target.waitForExistence(timeout: 5))
         XCTAssertTrue(target.isHittable)
         return target

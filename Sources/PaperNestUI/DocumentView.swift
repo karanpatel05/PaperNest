@@ -1827,6 +1827,7 @@ struct DocumentView: View {
             Label(L10n.rotate, systemImage: "rotate.right")
         }
         .disabled(model.selectedPage == nil)
+        .accessibilityIdentifier("utilities-rotate")
     }
 
     private var rotateLeftButton: some View {
@@ -1875,6 +1876,7 @@ struct DocumentView: View {
             Label(L10n.filter, systemImage: "camera.filters")
         }
         .disabled(model.selectedPage == nil)
+        .accessibilityIdentifier("utilities-filter")
         .popover(isPresented: $isShowingAdjustments) {
             AdjustmentsPanel(model: model, undoManager: undoManager)
                 .presentationCompactAdaptation(.sheet)
@@ -2157,7 +2159,11 @@ private struct PageViewer: View {
                     #if os(iOS)
                     .background { PagePinchZoom(zoom: $zoom) }
                     .background {
-                        if isContinuous && UIDevice.current.userInterfaceIdiom == .pad {
+                        // On a phone too: without it the one finger that
+                        // lassoes also scrolled the notebook, so the page
+                        // moved under the loop and it caught too little
+                        // (2026-11-21). See `PageScrollTouchPolicy`.
+                        if isContinuous {
                             NotebookTouchScrolling(requiresTwoFingers: pageNeedsTwoFingers)
                         }
                     }

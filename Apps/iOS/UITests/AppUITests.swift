@@ -177,8 +177,10 @@ final class AppUITests: XCTestCase {
         app.buttons["crop-done"].tap()
         XCTAssertTrue(area.waitForNonExistence(timeout: 10), "crop editor did not close")
 
-        // Reopening shows the saved crop, not the full page.
-        app.buttons["Crop"].tap()
+        // Reopening shows the saved crop, not the full page. Crop is in
+        // Document Tools' Edit PDF card since the studio redesign.
+        revealEditorTool(app, identifier: "editor-crop")
+        app.buttons["editor-crop"].tap()
         let reopened = app.descendants(matching: .any)["crop-area"]
         XCTAssertTrue(reopened.waitForExistence(timeout: 10))
         let saved = try keptPercentages(reopened.value)
@@ -215,7 +217,9 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         let app = launch([])
         XCTAssertTrue(app.descendants(matching: .any)["Crop target, 1 page"].waitForExistence(timeout: 15))
-
+        // The gear is in All Documents' tool bar; Home has the profile instead.
+        showAllDocuments(app)
+        XCTAssertTrue(app.buttons["library-settings"].waitForExistence(timeout: 10))
         app.buttons["library-settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Documents"].exists)
@@ -241,9 +245,13 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(layouts.buttons["Grid"].isSelected)
         layouts.buttons["List"].tap()
         document.tap()
-        XCTAssertTrue(app.buttons["editor-crop"].waitForExistence(timeout: 5))
-        app.buttons["Rotate"].tap()
+        // Since the studio redesign Rotate and Crop are in Document Tools'
+        // Edit PDF card (and "Rotate" alone matched two buttons on an iPad).
+        XCTAssertTrue(app.buttons["editor-panels"].waitForExistence(timeout: 10))
+        revealEditorTool(app, identifier: "utilities-rotate")
+        app.buttons["utilities-rotate"].tap()
         app.buttons["Rotate Right"].tap()
+        revealEditorTool(app, identifier: "editor-crop")
         app.buttons["editor-crop"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["crop-area"].waitForExistence(timeout: 5))
         app.buttons["crop-done"].tap()
@@ -365,6 +373,11 @@ final class AppUITests: XCTestCase {
             // test, so this side checks the other path: saving closes the
             // export sheet. The phone checks closing without saving.
             dialogSave.tap()
+            // A run before this one may have left the same file in On My
+            // iPad. The system then asks whether to replace it, and the save
+            // waits for the answer (seen 2026-11-21).
+            let replace = app.buttons["Replace"]
+            if replace.waitForExistence(timeout: 3) { replace.tap() }
             XCTAssertTrue(save.waitForNonExistence(timeout: 20), "saving did not close the export sheet")
             return
         }
@@ -411,25 +424,36 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(share.waitForNonExistence(timeout: 15), "sharing did not close the export sheet")
     }
 
-    /// Design pass 4 (iPhone): the filter strip applies a filter, and the
-    /// title's menu adds and removes the document from Favorites. Leaves
-    /// the page and the favorite as they were for the other tests.
-    func testFilterStripAndTitleMenu() throws {
+    /// Design pass 4 (iPhone): a filter applies, and the title's menu adds
+    /// and removes the document from Favorites. Leaves the page and the
+    /// favorite as they were for the other tests. Since the studio redesign
+    /// the phone has no filter strip: Filter is a menu in Document Tools'
+    /// Edit PDF card, and the page's filter is read back from the library.
+    func testFilterStripAndTitleMenu() async throws {
         continueAfterFailure = false
         let app = launch(["-PaperNestDebugOpenItem", "Crop target"])
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("compact-width behaviour") }
-        let filterButton = app.buttons["editor-filter"]
-        XCTAssertTrue(filterButton.waitForExistence(timeout: 15), "document did not open")
-        filterButton.tap()
-        let original = app.buttons["filter-original"], gray = app.buttons["filter-grayscale"]
-        XCTAssertTrue(gray.waitForExistence(timeout: 5), "no filter strip")
-        XCTAssertTrue(original.isSelected)
-        gray.tap()
-        let selected = NSPredicate(format: "isSelected == true")
-        wait(for: [expectation(for: selected, evaluatedWith: gray)], timeout: 5)
-        XCTAssertFalse(original.isSelected)
-        original.tap()
-        wait(for: [expectation(for: selected, evaluatedWith: original)], timeout: 5)
+        XCTAssertTrue(app.buttons["editor-panels"].waitForExistence(timeout: 15), "document did not open")
+        let store = try LibraryStore(directory: URL(fileURLWithPath: AppUITests.libraryPath))
+        func filter() async throws -> PageFilter? {
+            let item = try await store.items(in: .all).first { $0.item.name == "Crop target" }
+            guard let item else { return nil }
+            return try await store.pages(of: item.id).first?.transform.filter
+        }
+        func choose(_ name: String, expecting expected: PageFilter) async throws {
+            revealEditorTool(app, identifier: "utilities-filter")
+            app.buttons["utilities-filter"].tap()
+            let item = app.buttons[name]
+            XCTAssertTrue(item.waitForExistence(timeout: 5), "\(name) is not in the Filter menu")
+            item.tap()
+            for _ in 0..<50 where try await filter() != expected { try await Task.sleep(for: .milliseconds(100)) }
+            let saved = try await filter()
+            XCTAssertEqual(saved, expected, "the page's filter after choosing \(name)")
+        }
+        try await choose("Grayscale", expecting: .grayscale)
+        try await choose("Original", expecting: .original)
+        // Back on the page for the title menu.
+        if app.buttons["pdf-tools-close"].exists { app.buttons["pdf-tools-close"].tap() }
 
         // The title menu's button is labelled "<name>, Actions Menu", so an
         // exact match misses it and the StaticText fallback is not always
@@ -849,22 +873,31 @@ final class AppUITests: XCTestCase {
             let page = app.descendants(matching: .any)["document-page-image"].firstMatch
             XCTAssertTrue(page.waitForExistence(timeout: 15))
             func openAnnotations(_ app: XCUIApplication) {
-                let more = UIDevice.current.userInterfaceIdiom == .phone
-                    ? app.buttons.matching(identifier: "editor-more").firstMatch : app.buttons["editor-more"]
-                // Compact layout's overflow has a localized label; identify
-                // its shared action entry through the supplied identifier.
-                more.tap()
-                app.buttons[title].tap()
+                // The studio redesign moved text markup from the ⋯ menu to
+                // Document Tools' Annotate card; the sheet still offers every
+                // style, so the test chooses one below as before.
+                _ = title
+                revealEditorTool(app, identifier: "editor-annotate")
+                app.buttons["editor-annotate"].tap()
             }
             openAnnotations(app)
             let apply = app.buttons["annotation-apply"]
             XCTAssertTrue(apply.waitForExistence(timeout: 5))
             XCTAssertFalse(apply.isEnabled)
-            let recognize = app.buttons["annotation-recognize"]
-            if recognize.waitForExistence(timeout: 2) { recognize.tap() }
-            let line = app.buttons["annotation-line-0"]
-            XCTAssertTrue(line.waitForExistence(timeout: 30), "real OCR should provide a line")
+            // The style first, while its rows are at the top of the sheet.
             app.buttons["annotation-style-" + style].tap()
+            let recognize = app.buttons["annotation-recognize"]
+            let line = app.buttons["annotation-line-0"]
+            // On a phone the lines section starts below the sheet's fold, and
+            // the form lays out only the rows on screen: Recognize, then the
+            // lines it reads, have to be scrolled to.
+            revealInAnnotationSheet(app, until: { line.exists || recognize.exists })
+            if recognize.exists {
+                revealInAnnotationSheet(app, until: { recognize.isHittable })
+                recognize.tap()
+            }
+            revealInAnnotationSheet(app, until: { line.exists && line.isHittable }, seconds: 40)
+            XCTAssertTrue(line.exists && line.isHittable, "real OCR should provide a line")
             line.tap()
             XCTAssertTrue(apply.isEnabled)
             let choice = XCTAttachment(screenshot: app.screenshot())
@@ -883,8 +916,9 @@ final class AppUITests: XCTestCase {
             add(saved)
             // Cancellation never adds a mark.
             openAnnotations(app)
-            XCTAssertTrue(app.buttons["annotation-line-0"].waitForExistence(timeout: 10))
-            app.buttons["annotation-line-0"].tap()
+            let again = app.buttons["annotation-line-0"]
+            revealInAnnotationSheet(app, until: { again.exists && again.isHittable }, seconds: 10)
+            again.tap()
             app.buttons["annotation-cancel"].tap()
             expectation(for: count, evaluatedWith: page)
             waitForExpectations(timeout: 5)
@@ -898,6 +932,23 @@ final class AppUITests: XCTestCase {
         }
     }
 
+    /// Scrolls Annotate Text's form in short, held drags from below its
+    /// Cancel button (in the sheet's own bar, so there in every language and
+    /// on every device) until `until` holds or `seconds` pass. While the
+    /// sheet is busy reading the page it waits instead of dragging.
+    private func revealInAnnotationSheet(_ app: XCUIApplication, until done: () -> Bool, seconds: TimeInterval = 8) {
+        let cancel = app.buttons["annotation-cancel"]
+        let deadline = Date().addingTimeInterval(seconds)
+        while !done(), Date() < deadline {
+            if app.descendants(matching: .any)["annotation-progress"].exists || !cancel.exists {
+                usleep(500_000); continue
+            }
+            let start = cancel.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 40, dy: 320))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -180)),
+                        withVelocity: .slow, thenHoldForDuration: 0.2)
+        }
+    }
+
     func testSavedMarkupSupportsColorsSelectionRemovalAndRelaunch() throws {
         continueAfterFailure = false
         for (language, annotate, manage) in [("en", "Annotate Text", "Manage Markup"),
@@ -905,10 +956,13 @@ final class AppUITests: XCTestCase {
                                              ("es", "Anotar texto", "Gestionar anotaciones")] {
             let library = "/tmp/papernest-markup-controls-\(language)"
             var app = launch(["-PaperNestDebugOpenItem", "Markup target"], libraryPath: library, language: language)
+            // Annotate Text and Manage Markup are in Document Tools since the
+            // studio redesign, not the ⋯ menu.
             func open(_ title: String) {
-                XCTAssertTrue(app.buttons["editor-more"].waitForExistence(timeout: 15))
-                app.buttons["editor-more"].tap()
-                app.buttons[title].tap()
+                let identifier = title == annotate ? "editor-annotate" : "editor-manage-markup"
+                XCTAssertTrue(app.buttons["editor-panels"].waitForExistence(timeout: 15))
+                revealEditorTool(app, identifier: identifier)
+                app.buttons[identifier].tap()
             }
             func reveal(_ element: XCUIElement) {
                 for _ in 0..<6 where !element.isHittable { app.swipeUp() }
@@ -1475,12 +1529,13 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = true
         let app = launch(["-PaperNestDebugOpenItem", "Markup target"],
                          libraryPath: "/tmp/papernest-text-markup-library")
-        XCTAssertTrue(app.buttons["editor-more"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["editor-panels"].waitForExistence(timeout: 15))
         for (entry, close) in [("editor-shapes", "shape-cancel"),
                                ("editor-stamps", "stamp-cancel"),
                                ("editor-comments", "comments-done"),
                                ("editor-manage-markup", "markup-done")] {
-            app.buttons["editor-more"].tap()
+            // In Document Tools since the studio redesign.
+            revealEditorTool(app, identifier: entry)
             app.buttons[entry].tap()
             XCTAssertTrue(app.buttons[close].waitForExistence(timeout: 10))
             let shot = XCTAttachment(screenshot: app.screenshot())
@@ -1500,9 +1555,9 @@ final class AppUITests: XCTestCase {
         for language in ["en", "fr", "es"] {
             let app = launch(["-PaperNestDebugOpenItem", "Markup target"],
                              libraryPath: "/tmp/papernest-text-markup-library", language: language)
-            XCTAssertTrue(app.buttons["editor-more"].waitForExistence(timeout: 15))
+            XCTAssertTrue(app.buttons["editor-panels"].waitForExistence(timeout: 15))
             for (entry, prefix) in [("editor-shapes", "shape"), ("editor-stamps", "stamp")] {
-                app.buttons["editor-more"].tap()
+                revealEditorTool(app, identifier: entry)
                 app.buttons[entry].tap()
                 XCTAssertTrue(app.buttons["\(prefix)-save"].waitForExistence(timeout: 5))
                 let first = app.buttons[prefix == "shape" ? "shape-kind-rectangle" : "stamp-kind-checkmark"]
@@ -1676,9 +1731,9 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = true
         let app = launch(["-PaperNestDebugOpenItem", "Markup target"],
                          libraryPath: "/tmp/papernest-text-markup-library")
-        XCTAssertTrue(app.buttons["editor-more"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["editor-panels"].waitForExistence(timeout: 15))
         for (entry, prefix) in [("editor-shapes", "shape"), ("editor-stamps", "stamp")] {
-            app.buttons["editor-more"].tap()
+            revealEditorTool(app, identifier: entry)
             app.buttons[entry].tap()
             XCTAssertTrue(app.buttons["\(prefix)-cancel"].waitForExistence(timeout: 5))
             let form = app.collectionViews.matching(
@@ -2114,7 +2169,10 @@ extension AppUITests {
             XCTAssertFalse(pen.staticTexts["Pen"].exists, "A phone's toolbar is icon-only")
         }
         XCTAssertLessThan(highlight.frame.minX, eraser.frame.minX, "Highlighter sits directly after Pen")
-        XCTAssertFalse(app.buttons["editor-shapes"].exists, "The placement sheet for shapes stays in More")
+        // Not in the primary tool bar. (On an iPad Document Tools is open
+        // beside the page, and the sheet's button is there, where it belongs.)
+        XCTAssertFalse(app.scrollViews["notebook-tool-bar"].buttons["editor-shapes"].exists,
+                       "The placement sheet for shapes stays in More")
         XCTAssertTrue(app.buttons["studio-tool-shape"].exists, "Drag-to-draw Shapes is a primary tool")
         pen.tap(); pen.tap()
         let width = app.sliders["studio-width-slider"]
@@ -2742,12 +2800,13 @@ extension AppUITests {
         XCTAssertEqual(reopened, moved)
     }
 
-    private func assertMixedSelection(_ canvas: XCUIElement, count: Int) async {
+    private func assertMixedSelection(_ canvas: XCUIElement, count: Int,
+                                      file: StaticString = #filePath, line: UInt = #line) async {
         for _ in 0..<50 {
             if canvas.value as? String == "\(count) selected" { break }
             try? await Task.sleep(for: .milliseconds(100))
         }
-        XCTAssertEqual(canvas.value as? String, "\(count) selected")
+        XCTAssertEqual(canvas.value as? String, "\(count) selected", file: file, line: line)
     }
 
     private func anchor(_ object: PageObject) -> CGPoint {
