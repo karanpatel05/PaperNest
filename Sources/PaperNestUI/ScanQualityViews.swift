@@ -142,7 +142,7 @@ struct ScanQualityBadge: View {
             if !ScanQualityMemo.shared.notes(for: page, among: pages).isEmpty {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .symbolRenderingMode(.palette).foregroundStyle(.black, .yellow)
-                    .font(.caption.weight(.bold))
+                    .font(.app(.caption).weight(.bold))
                     .padding(3)
                     .background(Circle().fill(Color.black.opacity(0.55)))
                     .padding(2)
@@ -178,7 +178,7 @@ struct ScanQualityNote: View {
             Text(notes.joined(separator: " · "))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .font(.footnote.weight(.semibold)).foregroundStyle(.white)
+        .font(.app(.footnote).weight(.semibold)).foregroundStyle(.white)
         .padding(.horizontal, 12).padding(.vertical, 6)
         .background(Color.black.opacity(0.75), in: Capsule())
         .accessibilityElement(children: .combine)
@@ -214,7 +214,7 @@ struct ScanQualityNote: View {
                             }
                         }
                     }
-                    .font(.body.weight(.semibold))
+                    .font(.app(.body).weight(.semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
                     .accessibilityElement(children: .combine)

@@ -141,7 +141,7 @@ struct DocumentWorkspace: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "square.on.square").font(.system(size: 20))
-                        Text(verbatim: String(tabs.entries.count)).font(.subheadline.monospacedDigit())
+                        Text(verbatim: String(tabs.entries.count)).font(.app(.subheadline).monospacedDigit())
                     }
                     .padding(.horizontal, 8).frame(minHeight: 44).contentShape(Rectangle())
                 }
@@ -156,7 +156,7 @@ struct DocumentWorkspace: View {
                                 Button { choose(entry.id) } label: {
                                     Label(entry.model.item?.name ?? L10n.loadingLibrary,
                                           systemImage: entry.model.item?.kind == .notebook ? "book.closed" : "doc.text")
-                                        .font(.subheadline).lineLimit(1).frame(maxWidth: 210)
+                                        .font(.app(.subheadline)).lineLimit(1).frame(maxWidth: 210)
                                         .padding(.horizontal, 12).frame(minHeight: 44)
                                         .contentShape(Rectangle())
                                 }

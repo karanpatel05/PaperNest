@@ -17,26 +17,24 @@ struct FolderCard: View {
     let rename: () -> Void
     let delete: () -> Void
     var homeStyle = false
+    @ScaledMetric(relativeTo: .title2) private var glyphSize: CGFloat = 28
 
     var body: some View {
         Button(action: open) {
             HStack(spacing: 12) {
-                Image(systemName: homeStyle ? "folder" : "folder.fill").font(.title2).foregroundStyle(homeStyle ? Theme.accent : tint)
-                    .accessibilityHidden(true)
+                TwoToneIcon(glyph: .folder, palette: .slate, size: glyphSize)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(folder.name).font(.subheadline.weight(.semibold))
+                    Text(folder.name).font(.app(.subheadline).weight(.medium))
                         .foregroundStyle(Theme.navy).lineLimit(2).multilineTextAlignment(.leading)
-                    if !homeStyle { Text(L10n.itemCount(count)).font(.caption).foregroundStyle(Theme.secondaryText) }
+                    if !homeStyle { Text(L10n.itemCount(count)).font(.app(.caption)).foregroundStyle(Theme.secondaryText) }
                 }
                 Spacer(minLength: 0)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: homeStyle ? 48 : 64, alignment: .leading)
-            .background(Theme.surface.opacity(homeStyle ? 0 : 0.7), in: RoundedRectangle(cornerRadius: homeStyle ? 10 : Theme.radius))
-            .background(tint.opacity(homeStyle ? 0.12 : 0.10), in: RoundedRectangle(cornerRadius: homeStyle ? 10 : Theme.radius))
-            .overlay { RoundedRectangle(cornerRadius: homeStyle ? 10 : Theme.radius).strokeBorder(Theme.border, lineWidth: homeStyle ? 0 : 1) }
-            .shadow(color: .black.opacity(homeStyle ? 0 : 0.04), radius: 8, y: 3)
-            .contentShape(RoundedRectangle(cornerRadius: homeStyle ? 10 : Theme.radius))
+            .frame(maxWidth: .infinity, minHeight: homeStyle ? 56 : 64, alignment: .leading)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+            .overlay { RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.border, lineWidth: 1) }
+            .contentShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
         }
         .buttonStyle(PremiumButtonStyle())
         .contextMenu {
@@ -70,8 +68,7 @@ struct FoldersView: View {
                     VStack(alignment: .leading, spacing: 8) { title; create }
                 }
                 if model.folders.isEmpty {
-                    ContentUnavailableView(L10n.foldersEmpty, systemImage: "folder",
-                                           description: Text(L10n.foldersEmptyDetail))
+                    AppEmptyState(title: L10n.foldersEmpty, systemImage: "folder", description: L10n.foldersEmptyDetail)
                         .frame(maxWidth: .infinity).padding(.top, 40)
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 190),
@@ -95,14 +92,19 @@ struct FoldersView: View {
     }
 
     private var title: some View {
-        Text(L10n.folders).font(.largeTitle.bold()).foregroundStyle(Theme.navy)
+        Text(L10n.folders).font(.app(.largeTitle).weight(.semibold)).foregroundStyle(Theme.navy)
             .accessibilityAddTraits(.isHeader)
             .accessibilityIdentifier("folders-title")
     }
 
     private var create: some View {
         Button(action: newFolder) {
-            Label(L10n.newFolder, systemImage: "folder.badge.plus").frame(minHeight: 44)
+            Label {
+                Text(L10n.newFolder)
+            } icon: {
+                TwoToneIcon(glyph: .newFolder, palette: .slate, size: 22)
+            }
+            .frame(minHeight: 44)
         }
         .accessibilityIdentifier("folders-new")
     }

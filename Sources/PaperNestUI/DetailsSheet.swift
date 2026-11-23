@@ -233,12 +233,12 @@ struct DetailsSheet: View {
         Section {
             ForEach(model.kind.fields, id: \.self) { field in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: model.label(field)).font(.caption).foregroundStyle(.secondary)
+                    Text(verbatim: model.label(field)).font(.app(.caption)).foregroundStyle(.secondary)
                     TextField(model.label(field), text: Binding(get: { model.texts[field] ?? "" },
                                                                 set: { model.texts[field] = $0 }))
                         .accessibilityIdentifier("details-field-\(field.rawValue)")
                     if model.needsCheck(field) {
-                        Label(L10n.detailsCheck, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
+                        Label(L10n.detailsCheck, systemImage: "exclamationmark.triangle").font(.app(.caption)).foregroundStyle(.orange)
                             .accessibilityIdentifier("details-check-\(field.rawValue)")
                     }
                 }

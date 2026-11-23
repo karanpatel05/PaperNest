@@ -120,6 +120,8 @@ public struct SettingsView: View {
         form
             .frame(width: 480)
             .fixedSize(horizontal: false, vertical: true)
+            // The Mac's Settings window is a scene of its own, outside RootView.
+            .modifier(AppTypography())
         #endif
     }
 
@@ -217,7 +219,7 @@ public struct SettingsView: View {
             Section(L10n.settingsAbout) {
                 LabeledContent(L10n.settingsVersion, value: Self.version)
                 Text(L10n.settingsPrivacy)
-                    .font(.footnote)
+                    .font(.app(.footnote))
                     .foregroundStyle(.secondary)
             }
         }
@@ -240,7 +242,7 @@ public struct SettingsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ProgressView(value: progress.fraction) {
                     Text(L10n.exportProgress(min(progress.completedPages + 1, max(progress.totalPages, 1)), max(progress.totalPages, 1)))
-                        .font(.caption)
+                        .font(.app(.caption))
                 }
                 Button(L10n.cancel, role: .cancel) { model.cancelBackup() }
             }

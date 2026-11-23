@@ -1375,7 +1375,7 @@ struct DocumentView: View {
 
         func makeBody(configuration: Configuration) -> some View {
             configuration.label
-                .font(.body)
+                .font(.app(.body))
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .padding(.horizontal, 12).padding(.vertical, 3)
@@ -1495,7 +1495,7 @@ struct DocumentView: View {
             .accessibilityIdentifier("editor-page-previous")
             .help(L10n.pagePrevious)
             Text(verbatim: L10n.pageCounter(index + 1, max(count, 1)))
-                .font(.subheadline.weight(.medium).monospacedDigit())
+                .font(.app(.subheadline).weight(.medium).monospacedDigit())
                 .lineLimit(1).fixedSize()
                 .frame(minWidth: 44)
                 .accessibilityLabel(L10n.pageLabel(index + 1, of: max(count, 1)))
@@ -1781,7 +1781,7 @@ struct DocumentView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .font(.caption.weight(.medium))
+                .font(.app(.caption).weight(.medium))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -1806,7 +1806,7 @@ struct DocumentView: View {
                             .strokeBorder(isSelected ? Theme.accent : .clear, lineWidth: 2)
                     }
                 Text(filter.title)
-                    .font(.caption2.weight(isSelected ? .semibold : .regular))
+                    .font(.app(.caption2).weight(isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? Theme.accent : .primary)
                     .fixedSize()
             }
@@ -1999,8 +1999,8 @@ private struct EditorToolLabelStyle: LabelStyle {
     var minimumWidth: CGFloat = 60
     func makeBody(configuration: Configuration) -> some View {
         VStack(spacing: 6) {
-            configuration.icon.font(.title3).frame(height: 24)
-            configuration.title.font(.caption2.weight(.medium)).fixedSize(horizontal: true, vertical: false)
+            configuration.icon.font(.app(.title3)).frame(height: 24)
+            configuration.title.font(.app(.caption2).weight(.medium)).fixedSize(horizontal: true, vertical: false)
         }
         .frame(minWidth: minimumWidth, minHeight: 48)
         .frame(maxWidth: .infinity)
@@ -2141,7 +2141,7 @@ private struct PageViewer: View {
                                 Image(systemName: "plus.circle")
                                 Text(L10n.notebookScrollAdd).multilineTextAlignment(.center)
                             }
-                            .font(.callout).padding(16)
+                            .font(.app(.callout)).padding(16)
                             .frame(maxWidth: .infinity, minHeight: 112)
                             .contentShape(Rectangle())
                         }

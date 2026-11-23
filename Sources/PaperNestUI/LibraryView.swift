@@ -148,8 +148,8 @@ struct LibraryView: View {
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    topBar
                     if model.scope != .recentlyDeleted, model.contentKind != .notes, model.searchText.isEmpty {
-                        if model.scope == .all || model.scope == .favorites { documentFilters }
                         folderNavigation
                     }
                     if visibleItems.isEmpty {
@@ -186,31 +186,58 @@ struct LibraryView: View {
         }
     }
 
+    private var showsFilters: Bool {
+        model.contentKind != .notes && model.searchText.isEmpty && (model.scope == .all || model.scope == .favorites)
+    }
+
+    private var showsActions: Bool { showsImport && !visibleItems.isEmpty }
+
+    /// Recent / Favorites and New Note / Import share one row on wider
+    /// screens; on a phone the buttons take the width and the switch sits under them.
+    @ViewBuilder private var topBar: some View {
+        if isCompactWidth {
+            if showsActions { documentActions(fillsWidth: true) }
+            if showsFilters { documentFilters }
+        } else if showsFilters || showsActions {
+            HStack(spacing: 12) {
+                if showsFilters { documentFilters.frame(maxWidth: 320) }
+                Spacer(minLength: 0)
+                if showsActions { documentActions(fillsWidth: false) }
+            }
+        }
+    }
+
     private var documentFilters: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             scopeButton(L10n.homeRecent, symbol: "clock", scope: .all, identifier: "library-filter-recent")
             scopeButton(L10n.favorites, symbol: "star", scope: .favorites, identifier: "library-filter-favorites")
-        }.padding(4).modifier(PremiumCard())
+        }
+        .padding(4)
+        .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.controlRadius))
     }
 
     private func scopeButton(_ title: String, symbol: String, scope: LibraryStore.Scope, identifier: String) -> some View {
-        Button {
+        let selected = model.scope == scope
+        return Button {
             if scope == .all { model.sortOrder = .dateModified }
             model.sidebarSelection = scope
         } label: {
-            Label(title, systemImage: symbol).font(.subheadline.weight(.medium))
-                .frame(maxWidth: .infinity, minHeight: 40)
-                .background(model.scope == scope ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 10))
+            Label(title, systemImage: symbol).font(.app(.subheadline).weight(.medium))
+                .foregroundStyle(selected ? Theme.navy : Theme.secondaryText)
+                .frame(maxWidth: .infinity, minHeight: 36)
+                .background(selected ? Theme.surface : .clear, in: RoundedRectangle(cornerRadius: Theme.controlRadius - 4))
+                .shadow(color: .black.opacity(selected ? 0.06 : 0), radius: 1, y: 1)
+                .contentShape(Rectangle())
         }.buttonStyle(.plain)
             .accessibilityIdentifier(identifier)
-            .accessibilityValue(model.scope == scope ? L10n.selectionOn : L10n.selectionOff)
+            .accessibilityValue(selected ? L10n.selectionOn : L10n.selectionOff)
     }
 
     private var newNotebookTile: some View {
         Button { creatingNotebook = true } label: {
             VStack(spacing: 12) {
                 Image(systemName: "plus").font(.title)
-                Text(L10n.newNotebook).font(.subheadline).multilineTextAlignment(.center)
+                Text(L10n.newNotebook).font(.app(.subheadline)).multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity, minHeight: 218)
             .background(Theme.surface.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
@@ -229,7 +256,7 @@ struct LibraryView: View {
                     model.sidebarSelection = current.parentID.map { .folder($0) } ?? .all
                 } label: {
                     Label(current.name, systemImage: "chevron.left")
-                        .font(.subheadline).frame(minHeight: 44)
+                        .font(.app(.subheadline)).frame(minHeight: 44)
                 }.accessibilityIdentifier("library-folder-parent")
             }
             if !children.isEmpty {
@@ -237,13 +264,15 @@ struct LibraryView: View {
                     HStack(spacing: 10) {
                         ForEach(children) { folder in
                             Button { model.sidebarSelection = .folder(folder.id) } label: {
-                                VStack(spacing: 5) {
-                                    Image(systemName: "folder.fill").font(.title2).foregroundStyle(Theme.accent)
-                                    Text(folder.name).font(.subheadline.weight(.semibold)).lineLimit(2)
+                                VStack(spacing: 4) {
+                                    TwoToneIcon(glyph: .folder, palette: .slate, size: 26)
+                                    Text(folder.name).font(.app(.subheadline).weight(.medium)).lineLimit(2)
                                     Text(L10n.itemCount(model.counts.folders[folder.id, default: 0]))
-                                        .font(.caption).foregroundStyle(.secondary)
+                                        .font(.app(.caption)).foregroundStyle(Theme.secondaryText)
                                 }.frame(width: dynamicTypeSize.isAccessibilitySize ? 180 : 100).frame(minHeight: 76)
-                                    .padding(10).background(Theme.selection.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+                                    .padding(12)
+                                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                                    .overlay { RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.border, lineWidth: 1) }
                             }.buttonStyle(.plain)
                                 .accessibilityIdentifier("library-folder-\(folder.id)")
                                 .accessibilityValue(L10n.itemCount(model.counts.folders[folder.id, default: 0]))
@@ -261,7 +290,7 @@ struct LibraryView: View {
     private var collectionHeader: some View {
         HStack(alignment: .center, spacing: 12) {
             Text(L10n.itemCount(visibleItems.count))
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("library-count")
             Spacer(minLength: 0)
@@ -321,7 +350,7 @@ struct LibraryView: View {
                              cloud: cloudState(summary))
                         .overlay(alignment: .topTrailing) {
                             Image(systemName: selection.contains(summary.id) ? "checkmark.circle.fill" : "circle")
-                                .font(.title2)
+                                .font(.app(.title2))
                                 .foregroundStyle(Theme.accent)
                                 .background(.background, in: Circle()).padding(8)
                         }
@@ -351,7 +380,7 @@ struct LibraryView: View {
                 itemActions(for: summary)
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
+                    .font(.app(.body).weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 36, height: 36)
                     .contentShape(Rectangle())
@@ -430,14 +459,10 @@ struct LibraryView: View {
     @ViewBuilder
     private var emptyState: some View {
         if !model.searchText.isEmpty, model.scope != .recentlyDeleted {
-            ContentUnavailableView(L10n.noResultsTitle, systemImage: "magnifyingglass",
-                                   description: Text(L10n.noResultsMessage(model.searchText)))
+            AppEmptyState(title: L10n.noResultsTitle, systemImage: "magnifyingglass",
+                          description: L10n.noResultsMessage(model.searchText))
         } else if model.contentKind == .notes {
-            ContentUnavailableView {
-                Label(L10n.emptyNotesTitle, systemImage: "book.closed")
-            } description: {
-                Text(L10n.emptyNotesMessage)
-            } actions: {
+            AppEmptyState(title: L10n.emptyNotesTitle, systemImage: "book.closed", description: L10n.emptyNotesMessage) {
                 Button(L10n.newNotebook) { creatingNotebook = true }
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("notes-create-empty")
@@ -445,52 +470,60 @@ struct LibraryView: View {
         } else {
             switch model.scope {
             case .favorites:
-                ContentUnavailableView(L10n.emptyFavoritesTitle, systemImage: "star", description: Text(L10n.emptyFavoritesMessage))
+                AppEmptyState(title: L10n.emptyFavoritesTitle, systemImage: "star", description: L10n.emptyFavoritesMessage) {
+                    documentActions(fillsWidth: false)
+                }
             case .recentlyDeleted:
-                ContentUnavailableView(L10n.emptyDeletedTitle, systemImage: "trash",
-                                       description: Text(L10n.emptyDeletedMessage(days: RetentionPolicy.recentlyDeletedDays)))
+                AppEmptyState(title: L10n.emptyDeletedTitle, systemImage: "trash",
+                              description: L10n.emptyDeletedMessage(days: RetentionPolicy.recentlyDeletedDays))
             case .folder(.some):
-                ContentUnavailableView {
-                    Label(L10n.emptyFolderTitle, systemImage: "folder")
-                } description: {
-                    Text(L10n.emptyFolderMessage)
-                } actions: {
-                    Button(L10n.importFiles) { model.isShowingFileImporter = true }
-                        .buttonStyle(.borderedProminent)
+                AppEmptyState(title: L10n.emptyFolderTitle, systemImage: "folder", description: L10n.emptyFolderMessage) {
                     // A note made here goes in this folder (owner, 2026-11-15).
-                    Button(L10n.homeNewNote) { creatingNotebook = true }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("folder-new-note")
+                    documentActions(fillsWidth: false, newNoteID: "folder-new-note")
                 }
             case .all, .folder(nil):
-                ContentUnavailableView {
-                    Label(L10n.emptyLibraryTitle, systemImage: "doc.viewfinder")
-                } description: {
-                    #if os(macOS)
-                    Text(L10n.emptyLibraryMessageMac)
-                    #else
-                    Text(L10n.emptyLibraryMessageTouch)
-                    #endif
-                } actions: {
-                    Button(L10n.importFiles) { model.isShowingFileImporter = true }
-                        .buttonStyle(.borderedProminent)
+                AppEmptyState(title: L10n.emptyLibraryTitle, systemImage: "doc.viewfinder", description: emptyLibraryMessage) {
+                    documentActions(fillsWidth: false)
                 }
             }
         }
     }
 
-    /// Inside a folder, a new note sits beside Import, and is made in that folder.
-    private var showsFolderNewNote: Bool {
-        guard case .folder(.some) = model.scope else { return false }
-        return model.contentKind != .notes
+    private var emptyLibraryMessage: String {
+        #if os(macOS)
+        L10n.emptyLibraryMessageMac
+        #else
+        L10n.emptyLibraryMessageTouch
+        #endif
     }
 
-    private var folderNewNoteButton: some View {
-        Button { creatingNotebook = true } label: {
-            Label(L10n.homeNewNote, systemImage: "pencil.line")
+    /// New Note sits beside Import in All Documents and in folders (owner,
+    /// 2026-11-15 for folders, 2026-11-22 for All Documents). A note made in
+    /// a folder goes in that folder.
+    private var showsNewNote: Bool {
+        guard model.contentKind != .notes else { return false }
+        switch model.scope {
+        case .all, .folder: return true
+        case .favorites, .recentlyDeleted: return false
         }
-        .accessibilityIdentifier("library-new-note")
-        .disabled(isSelecting || isComposing)
+    }
+
+    private var showsImport: Bool { model.contentKind != .notes && model.scope != .recentlyDeleted }
+
+    private func documentActions(fillsWidth: Bool, newNoteID: String = "library-new-note") -> some View {
+        DocumentActionButtons(showsNewNote: showsNewNote, showsImport: showsImport, fillsWidth: fillsWidth,
+                              newNoteID: newNoteID,
+                              newNote: { creatingNotebook = true },
+                              importFiles: { model.isShowingFileImporter = true })
+            .disabled(isSelecting || isComposing)
+    }
+
+    private var isCompactWidth: Bool {
+        #if os(iOS)
+        widthClass == .compact
+        #else
+        false
+        #endif
     }
 
     @ToolbarContentBuilder
@@ -513,30 +546,8 @@ struct LibraryView: View {
                 .disabled(isComposing)
             }
         }
-        #if os(macOS)
-        ToolbarItemGroup(placement: .primaryAction) {
-            if model.contentKind != .notes {
-                Button {
-                    model.isShowingFileImporter = true
-                } label: {
-                    Label(L10n.importFiles, systemImage: "square.and.arrow.down")
-                }
-                .disabled(model.scope == .recentlyDeleted)
-            }
-            if showsFolderNewNote { folderNewNoteButton }
-        }
-        #endif
+        // New Note and Import live above the collection (DocumentActionButtons).
         #if os(iOS)
-        ToolbarItem(placement: .primaryAction) {
-            if showsFolderNewNote { folderNewNoteButton }
-        }
-        ToolbarItem(placement: .primaryAction) {
-            if model.contentKind != .notes, model.scope != .recentlyDeleted {
-                Button { model.isShowingFileImporter = true } label: {
-                    Label(L10n.importFiles, systemImage: "square.and.arrow.down")
-                }.accessibilityIdentifier("library-import")
-            }
-        }
         // The Mac uses the standard Settings window (⌘,) instead.
         ToolbarItem(placement: .primaryAction) {
             Button {
@@ -581,7 +592,7 @@ struct LibraryView: View {
     }
 
     private var selectionSummary: some View {
-        Text(L10n.selectionCount(selection.count)).font(.subheadline)
+        Text(L10n.selectionCount(selection.count)).font(.app(.subheadline))
             .accessibilityIdentifier("selection-count")
     }
 
@@ -679,7 +690,7 @@ struct ItemCell: View {
     /// Leaves room for the ⋯ button that `LibraryView` overlays.
     var reservesMenuSpace = true
     /// Gray on the white library; white on the gray iPhone home.
-    var tileBackground = Theme.preview
+    var tileBackground = Theme.raised
     /// Whether what this document shows is on this device.
     enum CloudState { case local, cloudOnly, downloading }
     var cloud: CloudState = .local
@@ -713,7 +724,7 @@ struct ItemCell: View {
                 .padding(10)
                 .padding(.trailing, 36)
                 .background(isSelected ? Theme.selection : .clear, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(alignment: .bottom) { Divider().padding(.leading, 64) }
+                .overlay(alignment: .bottom) { Theme.separator.frame(height: 0.5).padding(.leading, 64) }
                 .overlay {
                     if isSelected { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent, lineWidth: 2) }
                 }
@@ -734,11 +745,12 @@ struct ItemCell: View {
             tileBackground
             if let cover = summary.coverPage {
                 PageImageView(page: cover, pixelSize: 560)
+                    .paperStack(pages: layout == .grid ? summary.pageCount : 1)
                     .padding(layout == .grid ? 16 : 6)
             } else if let file = summary.file {
                 Image(systemName: FileKind.symbol(for: file.uti))
                     .font(.system(size: layout == .grid ? 44 : 28))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.secondaryText)
             } else {
                 Image(systemName: "doc.text").font(.largeTitle).foregroundStyle(.secondary)
             }
@@ -750,7 +762,7 @@ struct ItemCell: View {
     private var metadata: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(summary.item.name).font(.subheadline.weight(.semibold))
+                Text(summary.item.name).font(.app(.subheadline).weight(.medium))
                     .foregroundStyle(.primary).lineLimit(2)
                 if summary.item.isFavorite {
                     Image(systemName: "star.fill").font(.caption).foregroundStyle(Theme.accent)
@@ -762,7 +774,7 @@ struct ItemCell: View {
                 if cloud != .local { DocumentCloudBadge(isDownloading: cloud == .downloading) }
             }
             Text(verbatim: "\(secondaryText) · \(summary.file.map { FileKind.size($0.byteCount) } ?? L10n.pageCount(summary.pageCount))")
-                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                .font(.app(.caption)).foregroundStyle(.secondary).lineLimit(2)
         }
     }
 
@@ -840,7 +852,7 @@ struct CaptureActions: View {
         #if os(iOS)
         Button { model.isShowingScanner = true } label: {
             Label(L10n.scan, systemImage: "doc.viewfinder")
-                .font(.headline).frame(maxWidth: .infinity, minHeight: 28)
+                .font(.app(.headline)).frame(maxWidth: .infinity, minHeight: 28)
         }
         .buttonStyle(.borderedProminent)
         .disabled(!DocumentCameraView.isSupported)
@@ -850,7 +862,7 @@ struct CaptureActions: View {
 
         Button { model.isShowingFileImporter = true } label: {
             Label(L10n.importFiles, systemImage: "square.and.arrow.down")
-                .font(.headline).frame(maxWidth: .infinity, minHeight: 28)
+                .font(.app(.headline)).frame(maxWidth: .infinity, minHeight: 28)
                 .foregroundStyle(.primary)
         }
         .buttonStyle(.bordered)

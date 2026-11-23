@@ -1,3 +1,15 @@
+## Plus Jakarta Sans, quiet chrome, Documents buttons — owner, 2026-11-22
+
+Owner choices from the Subframe samples ("PaperNest Home — fonts & icons", option B), then from a design audit the same day ("Full direction", "600 semibold", "Slate, violet on select"). They supersede "native fonts", "Keep SF" and the lavender surfaces above for UI chrome.
+
+- **Direction:** calm, papery, exact. The pages carry the colour; the chrome is quiet. Violet marks only the primary action (Import File), the selection, links, favourites and the logo.
+- **Typeface:** Plus Jakarta Sans in every view of the app ("Whole app"). The variable font ships in `PaperNestUI/Resources/Fonts` under the SIL Open Font License. Use `.font(.app(.headline))` and friends (`Typography.swift`). Each size is relative to a system text style, so Dynamic Type still applies. On iPhone and iPad sizes are scaled to 95%, because the face is about 6% wider than SF. On the Mac they are not scaled and nothing is under 11 points. Titles are semibold at most, labels medium, body regular. Page content (text boxes, stamps, watermarks, exports) keeps its own fonts. iOS navigation bar titles use the face through `UINavigationBar` appearance. Mac window titles, alerts and system menus stay SF. SF Symbols keep their system sizing. `AppEmptyState` replaces `ContentUnavailableView`, whose title otherwise stays SF.
+- **Surfaces:** a paper-white page (`homeBackground`/`libraryBackground` #F7F7F5, graphite #141415 in dark), white cards with hairline borders, `Theme.raised` for inputs, icon tiles and thumbnail wells. Lavender only behind the selected tab and row. Corner radii: `Theme.controlRadius` 10 for buttons, inputs and rows; `Theme.cardRadius` 14 for cards. No coloured shadows, no hover lift.
+- **Icons:** filled two-tone glyphs (`TwoToneIcon.swift`) on Home's quick actions, the profile button, the sidebar, the phone's tab bar, folder cards and the Documents buttons: slate by default, violet for the selected place, white on a filled system selection (`SidebarGlyph`). Toolbars and editor tools keep SF Symbols.
+- **Signature:** documents of several pages show one or two sheet edges behind the first page on Home's cards and in the Documents grid (`PaperStack.swift`).
+- **Layout:** unchanged, except that the Documents screens put the Recent/Favorites switch and the two buttons in one row on wider screens.
+- **Documents buttons:** New Note is a white button with a slate icon tile; Import File is the filled primary. They sit above the collection: side by side across the width on iPhone (labels wrap to two lines in French rather than truncating), at the trailing edge on iPad and Mac. They appear in All Documents as well as in folders (New Note was folder-only before) and in the empty library, empty folders and empty Favorites. They are no longer toolbar items.
+
 ## Spacious Home — approved samples, 2026-11-15
 
 Owner approved building the Home samples on all three devices. Codex stated Option A (spacious) as the implementation choice. References: `docs/design/mockups/home-options-approved-2026-11-15.png` and `ipad-home-options-approved-2026-11-15.png` (left/top A).

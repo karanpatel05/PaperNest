@@ -43,7 +43,7 @@ struct ScannerPresetStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L10n.scannerPresets)
-                .font(.caption.weight(.semibold))
+                .font(.app(.caption).weight(.semibold))
                 .foregroundStyle(ScannerChrome.secondaryText)
                 .padding(.horizontal, 2)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -68,11 +68,11 @@ struct ScannerPresetStrip: View {
                         .fill(ScannerChrome.raised)
                         .frame(width: 58, height: 42)
                     Image(systemName: symbol)
-                        .font(.title3)
+                        .font(.app(.title3))
                         .foregroundStyle(isOn ? Theme.accent : .white)
                 }
                 Text(title)
-                    .font(.caption2)
+                    .font(.app(.caption2))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .frame(width: 64, height: 28, alignment: .top)
@@ -112,7 +112,7 @@ struct ScannerBatchToolbar: View {
                 .accessibilityLabel(L10n.done)
                 .accessibilityIdentifier("scanner.batch.close")
             Text(L10n.scannerSelectedCount(count))
-                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .font(.app(.subheadline).weight(.semibold).monospacedDigit())
                 .lineLimit(1)
                 .accessibilityIdentifier("scanner.batch.count")
                 .accessibilityValue(String(count))

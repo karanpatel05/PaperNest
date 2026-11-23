@@ -293,7 +293,7 @@ private struct PrintPreparingCard: View {
         VStack(spacing: 14) {
             ProgressView()
             Text(L10n.printPreparing)
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .multilineTextAlignment(.center)
             Button(L10n.cancel, role: .cancel, action: cancel)
                 .accessibilityIdentifier("print-preparing-cancel")

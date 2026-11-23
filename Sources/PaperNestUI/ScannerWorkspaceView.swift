@@ -194,8 +194,8 @@ struct ScannerWorkspaceView: View {
     /// The accepted queue remains untouched until the explicit Keep action.
     private func captureDecision(_ page: ScannerPage) -> some View {
         VStack(spacing: 12) {
-            Text(L10n.scannerReviewCapture).font(.headline).padding(.top, 12)
-            Text(L10n.scannerReviewCaptureHint).font(.subheadline)
+            Text(L10n.scannerReviewCapture).font(.app(.headline)).padding(.top, 12)
+            Text(L10n.scannerReviewCaptureHint).font(.app(.subheadline))
                 .foregroundStyle(ScannerChrome.secondaryText).multilineTextAlignment(.center).padding(.horizontal)
             Group {
                 if let image = pendingPreview {
@@ -264,7 +264,7 @@ struct ScannerWorkspaceView: View {
     /// the middle of the page and of the shutter. Ready is in the accent.
     private func feedbackLabel(_ feedback: ScanCaptureFeedback) -> some View {
         Label(Self.feedbackText(feedback), systemImage: Self.feedbackSymbol(feedback))
-            .font(.subheadline.weight(.semibold))
+            .font(.app(.subheadline).weight(.semibold))
             .foregroundStyle(.white)
             .padding(.horizontal, 14).padding(.vertical, 8)
             .background(feedback == .ready ? ScannerChrome.purple : Color.black.opacity(0.65), in: Capsule())
@@ -330,7 +330,7 @@ struct ScannerWorkspaceView: View {
             VStack(spacing: 0) {
                 HStack(spacing: 4) {
                     icon("xmark", label: L10n.cancel) { completed = true; onFinish(.cancelled) }
-                    Text(L10n.scan).font(.headline).accessibilityAddTraits(.isHeader)
+                    Text(L10n.scan).font(.app(.headline)).accessibilityAddTraits(.isHeader)
                     Spacer()
                     if hasTorch {
                         icon(torch ? "bolt.fill" : "bolt.slash", label: L10n.scannerFlash) { torch.toggle(); camera.torch(torch) }
@@ -372,7 +372,7 @@ struct ScannerWorkspaceView: View {
                     Spacer(minLength: 0)
                     Button { automatic.toggle() } label: {
                         Text(automatic ? L10n.scannerAuto : L10n.scannerManual)
-                            .font(.footnote.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                            .font(.app(.footnote).weight(.semibold)).lineLimit(1).minimumScaleFactor(0.8)
                             .padding(.horizontal, 12).frame(minWidth: 64, minHeight: 44)
                             .background(automatic ? ScannerChrome.purple : ScannerChrome.raised, in: Capsule())
                             .overlay { Capsule().strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
@@ -394,7 +394,7 @@ struct ScannerWorkspaceView: View {
     /// Which side of the card the next capture will be.
     private var cardSideLabel: some View {
         let side = cards.nextSide == .front ? L10n.scannerCardFront : L10n.scannerCardBack
-        return Text(side).font(.footnote.weight(.semibold))
+        return Text(side).font(.app(.footnote).weight(.semibold))
             .padding(.horizontal, 12).padding(.vertical, 5)
             .background(ScannerChrome.raised, in: Capsule())
             .accessibilityIdentifier("scanner.card.side")
@@ -404,8 +404,8 @@ struct ScannerWorkspaceView: View {
     /// answering starts another card.
     private var cardBackOffer: some View {
         VStack(spacing: 10) {
-            Text(L10n.scannerCardFrontSaved).font(.subheadline.weight(.semibold))
-            Text(L10n.scannerCardBackPrompt).font(.footnote).multilineTextAlignment(.center)
+            Text(L10n.scannerCardFrontSaved).font(.app(.subheadline).weight(.semibold))
+            Text(L10n.scannerCardBackPrompt).font(.app(.footnote)).multilineTextAlignment(.center)
                 .foregroundStyle(ScannerChrome.secondaryText)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) { cardBackOfferButtons }
@@ -445,7 +445,7 @@ struct ScannerWorkspaceView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(ScannerChrome.stroke, lineWidth: 1) }
                 if !pages.isEmpty {
-                    Text(verbatim: String(pages.count)).font(.caption2.weight(.bold).monospacedDigit())
+                    Text(verbatim: String(pages.count)).font(.app(.caption2).weight(.bold).monospacedDigit())
                         .padding(.horizontal, 5).frame(minWidth: 20, minHeight: 20)
                         .background(ScannerChrome.purple, in: Capsule())
                         .offset(x: 8, y: -8)
@@ -510,7 +510,7 @@ struct ScannerWorkspaceView: View {
             HStack {
                 backToCamera
                 Spacer()
-                Text(L10n.scannerEdit).font(.headline).accessibilityAddTraits(.isHeader)
+                Text(L10n.scannerEdit).font(.app(.headline)).accessibilityAddTraits(.isHeader)
                 Spacer()
                 saveButton
             }.padding(.horizontal, 8)
@@ -547,7 +547,7 @@ struct ScannerWorkspaceView: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 backToCamera
-                Text(L10n.scannerEdit).font(.headline).accessibilityAddTraits(.isHeader)
+                Text(L10n.scannerEdit).font(.app(.headline)).accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 12)
                 nameField.frame(maxWidth: 360)
             }
@@ -602,7 +602,7 @@ struct ScannerWorkspaceView: View {
 
     private var saveButton: some View {
         Button { finish() } label: {
-            Text(L10n.exportSave).font(.subheadline.weight(.semibold))
+            Text(L10n.exportSave).font(.app(.subheadline).weight(.semibold))
                 .padding(.horizontal, 20).frame(minHeight: 44)
                 .background(ScannerChrome.purple, in: Capsule())
         }
@@ -658,9 +658,9 @@ struct ScannerWorkspaceView: View {
         return VStack(spacing: 4) {
             ScannerThumbnail(page: page, pages: pages).frame(width: 56, height: 70)
                 .overlay(alignment: .topTrailing) { if selecting { pickMark(marked) } }
-            Text(verbatim: String(number)).font(.caption.monospacedDigit())
+            Text(verbatim: String(number)).font(.app(.caption).monospacedDigit())
             // A card's two sides are two pages; this is what says they belong together.
-            if let side = sideName(of: page) { Text(side).font(.caption2).foregroundStyle(ScannerChrome.secondaryText) }
+            if let side = sideName(of: page) { Text(side).font(.app(.caption2)).foregroundStyle(ScannerChrome.secondaryText) }
         }
         .padding(5)
         .background(fill, in: RoundedRectangle(cornerRadius: 8))
@@ -687,7 +687,7 @@ struct ScannerWorkspaceView: View {
 
     private func pickMark(_ marked: Bool) -> some View {
         Image(systemName: marked ? "checkmark.circle.fill" : "circle")
-            .font(.body.weight(.semibold))
+            .font(.app(.body).weight(.semibold))
             .foregroundStyle(marked ? Theme.accent : Color.white)
             .background(Circle().fill(Color.black.opacity(0.55)))
             .padding(2)

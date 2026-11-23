@@ -102,7 +102,7 @@ struct PresentationView: View {
         let note = notes[pages[deck.index].id]
         return ScrollView {
             Text(note ?? L10n.speakerNotesNone)
-                .font(.title3)
+                .font(.app(.title3))
                 .foregroundStyle(note == nil ? Color.white.opacity(0.6) : Color.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
@@ -283,7 +283,7 @@ struct PresentationView: View {
                     }
                 }
             } else {
-                Text(verbatim: "\(deck.index + 1) / \(pages.count)").font(.headline.monospacedDigit())
+                Text(verbatim: "\(deck.index + 1) / \(pages.count)").font(.app(.headline).monospacedDigit())
             }
         }
         .accessibilityElement(children: .ignore)

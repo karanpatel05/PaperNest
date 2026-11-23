@@ -248,7 +248,7 @@ struct CompareSheet: View {
                 pageBody(page)
                 navigation(count: comparison.pages.count)
             }
-            Text(L10n.compareLimits).font(.footnote).foregroundStyle(.secondary)
+            Text(L10n.compareLimits).font(.app(.footnote)).foregroundStyle(.secondary)
                 .accessibilityIdentifier("compare-limits")
         }
     }
@@ -259,7 +259,7 @@ struct CompareSheet: View {
             Text(L10n.compareSummaryPicture(comparison.pictureDifferenceCount))
             Text(L10n.compareSummaryPages(comparison.addedPageCount, comparison.removedPageCount, comparison.movedPageCount))
         }
-        .font(.subheadline)
+        .font(.app(.subheadline))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("compare-summary")
         .accessibilityValue(summaryValue(comparison))
@@ -274,23 +274,23 @@ struct CompareSheet: View {
     private func pageHeader(_ page: PageComparison, count: Int) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(L10n.comparePosition(model.position + 1, count)).font(.headline)
+                Text(L10n.comparePosition(model.position + 1, count)).font(.app(.headline))
                     .accessibilityIdentifier("compare-position")
                     .accessibilityValue(String(model.position + 1) + "/" + String(count))
                 Spacer()
-                Text(verbatim: status(page)).font(.subheadline.weight(.semibold))
+                Text(verbatim: status(page)).font(.app(.subheadline).weight(.semibold))
                     .foregroundStyle(page.kind == .same && !page.moved ? Color.secondary : Color.primary)
                     .accessibilityIdentifier("compare-page-status")
                     .accessibilityValue(page.kind.rawValue + (page.moved ? ",moved" : ""))
             }
-            Text(verbatim: pageNumbers(page)).font(.footnote).foregroundStyle(.secondary)
+            Text(verbatim: pageNumbers(page)).font(.app(.footnote)).foregroundStyle(.secondary)
             if let method = page.method {
-                Text(verbatim: describe(method)).font(.footnote)
+                Text(verbatim: describe(method)).font(.app(.footnote))
                     .accessibilityIdentifier("compare-method")
                     .accessibilityValue(methodValue(method))
             }
             if page.sizesDiffer {
-                Text(L10n.compareSizesDiffer).font(.footnote).foregroundStyle(.secondary)
+                Text(L10n.compareSizesDiffer).font(.app(.footnote)).foregroundStyle(.secondary)
             }
         }
     }
@@ -367,7 +367,7 @@ struct CompareSheet: View {
             legendItem(L10n.compareLegendAdded, .green)
             legendItem(L10n.compareLegendPicture, .orange)
         }
-        .font(.caption)
+        .font(.app(.caption))
     }
 
     private func legendItem(_ title: String, _ color: Color) -> some View {
@@ -375,7 +375,7 @@ struct CompareSheet: View {
             RoundedRectangle(cornerRadius: 2).fill(color.opacity(0.35))
                 .overlay(RoundedRectangle(cornerRadius: 2).stroke(color, lineWidth: 1.5)).frame(width: 14, height: 10)
         }
-        .font(.caption)
+        .font(.app(.caption))
     }
 
     private func navigation(count: Int) -> some View {
@@ -449,7 +449,7 @@ private struct ComparePageView: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Text(verbatim: title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text(verbatim: title).font(.app(.caption).weight(.semibold)).foregroundStyle(.secondary)
             content
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(verbatim: title))
@@ -478,7 +478,7 @@ private struct ComparePageView: View {
                 .background(Color.white)
                 .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
         } else if page == nil {
-            Text(L10n.compareMissing).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Text(L10n.compareMissing).font(.app(.footnote)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, minHeight: 160)
                 .background(RoundedRectangle(cornerRadius: 6).strokeBorder(.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [4])))
         } else {

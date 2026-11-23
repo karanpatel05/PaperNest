@@ -62,7 +62,7 @@ struct ScannerSettingsSheet: View {
             // scrolls, and the last setting is only reached by scrolling.
             .safeAreaInset(edge: .bottom) {
                 Button { dismiss() } label: {
-                    Text(L10n.done).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, minHeight: 30)
+                    Text(L10n.done).font(.app(.subheadline).weight(.semibold)).frame(maxWidth: .infinity, minHeight: 30)
                 }
                 .buttonStyle(.borderedProminent).tint(ScannerChrome.purple)
                 .accessibilityIdentifier("scanner.settings.done")

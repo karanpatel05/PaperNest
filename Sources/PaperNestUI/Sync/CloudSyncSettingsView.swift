@@ -21,7 +21,7 @@ struct CloudSyncSettingsSections: View {
             if sync.availability == .notConfigured {
                 Section {
                     Text(L10n.syncSettingsNotConfigured)
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("sync-not-configured")
                 } header: {
@@ -48,8 +48,8 @@ struct CloudSyncSettingsSections: View {
 
             if sync.availability == .accountChanged {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(L10n.syncAccountChangedTitle).font(.subheadline.weight(.semibold))
-                    Text(L10n.syncAccountChangedMessage).font(.footnote).foregroundStyle(.secondary)
+                    Text(L10n.syncAccountChangedTitle).font(.app(.subheadline).weight(.semibold))
+                    Text(L10n.syncAccountChangedMessage).font(.app(.footnote)).foregroundStyle(.secondary)
                     HStack {
                         Button(L10n.syncAccountUseCurrent) { isConfirmingAccount = true }
                         Spacer()
@@ -91,14 +91,14 @@ struct CloudSyncSettingsSections: View {
 
             if let issue = issueText(sync) {
                 Label {
-                    Text(issue).font(.footnote)
+                    Text(issue).font(.app(.footnote))
                 } icon: {
                     Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
                 }
                 .accessibilityIdentifier("sync-issue")
             }
             if let errorMessage {
-                Text(errorMessage).font(.footnote).foregroundStyle(.red)
+                Text(errorMessage).font(.app(.footnote)).foregroundStyle(.red)
             }
         } header: {
             Text(L10n.syncSettingsTitle)
@@ -130,7 +130,7 @@ struct CloudSyncSettingsSections: View {
                 VStack(alignment: .leading, spacing: 8) {
                     let name = conflict.itemName ?? L10n.syncConflictSomeDocument
                     Text(conflict.kind == .pageVersion ? L10n.syncConflictPage(name) : L10n.syncConflictObject(name))
-                        .font(.footnote)
+                        .font(.app(.footnote))
                     HStack {
                         Button(L10n.syncConflictKeepBoth) {
                             Task { await sync.resolveConflict(conflict.id, keepingCopy: true) }
@@ -149,7 +149,7 @@ struct CloudSyncSettingsSections: View {
 
     private func troubleshooting(_ sync: CloudSyncController) -> some View {
         Section {
-            Text(L10n.syncTroubleText).font(.footnote).foregroundStyle(.secondary)
+            Text(L10n.syncTroubleText).font(.app(.footnote)).foregroundStyle(.secondary)
             if sync.isEnabled {
                 Button(L10n.syncDeleteCloud, role: .destructive) { isConfirmingCloudDelete = true }
                     .disabled(sync.isChangingState || sync.availability != .ready)

@@ -30,7 +30,7 @@ struct SpeakerNotesSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 8) {
                 Text(L10n.pageLabel(request.pageNumber, of: request.pageCount))
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.app(.subheadline)).foregroundStyle(.secondary)
                 TextEditor(text: $text)
                     .focused($focused)
                     .scrollContentBackground(.hidden)

@@ -50,7 +50,7 @@ struct ScannerKindSelector: View {
         HStack(spacing: 4) {
             ForEach(ScanCaptureMode.allCases, id: \.self) { option in
                 Button { kind = option } label: {
-                    Text(option.title).font(.footnote.weight(.semibold)).lineLimit(1)
+                    Text(option.title).font(.app(.footnote).weight(.semibold)).lineLimit(1)
                         .padding(.horizontal, 10).frame(minHeight: 44)
                         .background(kind == option ? ScannerChrome.purple : .clear, in: Capsule())
                         .contentShape(Capsule())
@@ -101,7 +101,7 @@ struct ScannerToolLabel: View {
             if vertical {
                 HStack(spacing: 10) {
                     Image(systemName: symbol).frame(width: 24)
-                    Text(title).font(.subheadline.weight(.medium))
+                    Text(title).font(.app(.subheadline).weight(.medium))
                         .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }
@@ -111,7 +111,7 @@ struct ScannerToolLabel: View {
             } else {
                 VStack(spacing: 5) {
                     Image(systemName: symbol)
-                    Text(title).font(.caption)
+                    Text(title).font(.app(.caption))
                 }
                 .foregroundStyle(active ? Theme.accent : .white)
                 .frame(minWidth: 44, minHeight: 44)

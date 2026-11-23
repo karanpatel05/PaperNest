@@ -69,8 +69,8 @@ struct DocumentUtilitiesSidebar<PagesRow: View, Sections: View, Footer: View>: V
                     .frame(width: 38, height: 38)
                     .background(EditorChrome.selection, in: Circle())
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(L10n.documentUtilities).font(.headline).accessibilityAddTraits(.isHeader)
-                    Text(L10n.documentUtilitiesSubtitle).font(.caption).foregroundStyle(EditorChrome.purple)
+                    Text(L10n.documentUtilities).font(.app(.headline)).accessibilityAddTraits(.isHeader)
+                    Text(L10n.documentUtilitiesSubtitle).font(.app(.caption)).foregroundStyle(EditorChrome.purple)
                 }
                 Spacer(minLength: 4)
                 Button(action: close) {
@@ -139,7 +139,7 @@ struct UtilitiesExportButton: View {
     var body: some View {
         Button(action: action) {
             Label { Text(L10n.toolsExportSave) } icon: { Image(systemName: "square.and.arrow.up") }
-                .font(.subheadline.weight(.semibold))
+                .font(.app(.subheadline).weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 46)
                 .foregroundStyle(Color.white)
                 .background(EditorChrome.selection, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
@@ -166,7 +166,7 @@ struct UtilitiesSection<Content: View>: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: systemImage).frame(width: 22).foregroundStyle(EditorChrome.purple)
-                    Text(verbatim: title).font(.subheadline.weight(.semibold))
+                    Text(verbatim: title).font(.app(.subheadline).weight(.semibold))
                     Spacer(minLength: 4)
                     Image(systemName: "chevron.up").font(.caption.weight(.semibold))
                         .rotationEffect(.degrees(isExpanded ? 0 : 180))
@@ -257,7 +257,7 @@ struct PageThumbnailGallery: View {
                         .strokeBorder(selected ? EditorChrome.purple : EditorChrome.border, lineWidth: selected ? 2 : 0.75)
                 }
             Text(verbatim: "\(index + 1)")
-                .font(.caption2.monospacedDigit().weight(selected ? .bold : .regular))
+                .font(.app(.caption2).monospacedDigit().weight(selected ? .bold : .regular))
                 .foregroundStyle(selected ? EditorChrome.purple : EditorChrome.secondaryText)
         }
         .contentShape(Rectangle())
@@ -371,12 +371,12 @@ struct UtilityTileLabelStyle: LabelStyle {
         // the mockup fits four or five tools across the panel.
         VStack(spacing: 4) {
             configuration.icon.font(.system(size: 15)).frame(height: 18)
-            configuration.title.font(.caption2).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85)
+            configuration.title.font(.app(.caption2)).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85)
         }
         #else
         VStack(spacing: 6) {
             configuration.icon.font(.system(size: 19)).frame(height: 24)
-            configuration.title.font(.caption).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
+            configuration.title.font(.app(.caption)).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
         }
         #endif
     }
@@ -451,7 +451,7 @@ struct UtilityRowStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.subheadline)
+            .font(.app(.subheadline))
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.horizontal, 12).padding(.vertical, 2)
@@ -470,10 +470,10 @@ struct UtilityRowStyle: ButtonStyle {
 struct UtilityToggleTile: View {
     #if os(macOS)
     private static let spacing: CGFloat = 4, iconSize: CGFloat = 15, height: CGFloat = 50
-    private static var titleFont: Font { .caption2 }
+    private static var titleFont: Font { .app(.caption2) }
     #else
     private static let spacing: CGFloat = 6, iconSize: CGFloat = 19, height: CGFloat = 68
-    private static var titleFont: Font { .caption }
+    private static var titleFont: Font { .app(.caption) }
     #endif
     let title: String
     let systemImage: String
@@ -644,7 +644,7 @@ struct DisplaySettingsPopover: View {
     private var settings: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(L10n.displaySettings).font(.headline).accessibilityAddTraits(.isHeader)
+                Text(L10n.displaySettings).font(.app(.headline)).accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button(action: close) {
                     Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
@@ -684,7 +684,7 @@ struct DisplaySettingsPopover: View {
     private func fitButton(_ title: String, symbol: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label { Text(verbatim: title) } icon: { Image(systemName: symbol) }
-                .font(.subheadline.weight(.medium))
+                .font(.app(.subheadline).weight(.medium))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .contentShape(Rectangle())

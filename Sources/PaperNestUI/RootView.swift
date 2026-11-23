@@ -10,6 +10,12 @@ import UIKit
 /// to iPad and Mac (side by side).
 public struct RootView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    #if os(macOS)
+    @ScaledMetric(relativeTo: .body) private var sidebarGlyphSize: CGFloat = 18
+    #else
+    @ScaledMetric(relativeTo: .body) private var sidebarGlyphSize: CGFloat = 24
+    #endif
+    @ScaledMetric(relativeTo: .title3) private var tabGlyphSize: CGFloat = 24
     @AppStorage("PaperNestWelcomeCompleted") private var welcomeCompleted = false
     @State private var editingGuard = DocumentEditingGuard()
     @State private var documentTabs = DocumentTabs()
@@ -57,6 +63,7 @@ public struct RootView: View {
     }
 
     public init(session: LibrarySession) {
+        AppFont.prepare()
         #if DEBUG
         // Isolate first-launch persistence checks from the user's app settings.
         if let key = UserDefaults.standard.string(forKey: "PaperNestDebugWelcomeKey") {
@@ -98,7 +105,7 @@ public struct RootView: View {
                 ProgressView(L10n.loadingLibrary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let title, let message):
-                ContentUnavailableView(title, systemImage: "exclamationmark.triangle", description: Text(message))
+                AppEmptyState(title: title, systemImage: "exclamationmark.triangle", description: message)
             case .ready:
                 if shouldShowWelcome {
                     WelcomeView {
@@ -132,6 +139,7 @@ public struct RootView: View {
             if hasAccess { model.session.resumeTextRecognition() }
         }
         .onChange(of: showsHome, initial: true) { _, compact in model.usesCompactNavigation = compact }
+        .modifier(AppTypography())
     }
 
     private func presentFirstProOfferIfEligible() async {
@@ -255,24 +263,24 @@ public struct RootView: View {
     /// iPad and Mac: the brand, then the six places the library has.
     @ViewBuilder private var wideSidebarRows: some View {
         Section {
-            sidebarDestination(L10n.homeTitle, symbol: "house.fill", destination: .home)
+            sidebarDestination(L10n.homeTitle, glyph: .home, destination: .home)
                 .tag(SidebarDestination.home)
                 .accessibilityIdentifier("sidebar-home")
-            sidebarDestination(L10n.premiumNotes, symbol: "pencil.tip", destination: .notes)
+            sidebarDestination(L10n.premiumNotes, glyph: .notes, destination: .notes)
                 .tag(SidebarDestination.notes)
                 .accessibilityIdentifier("sidebar-notes")
-            sidebarDestination(L10n.allDocuments, symbol: "doc.on.doc", destination: .library(.all))
+            sidebarDestination(L10n.allDocuments, glyph: .allDocuments, destination: .library(.all))
                 .tag(SidebarDestination.library(.all))
                 .accessibilityIdentifier("sidebar-documents")
-            sidebarDestination(L10n.folders, symbol: "folder", destination: .folders)
+            sidebarDestination(L10n.folders, glyph: .folder, destination: .folders)
                 .badge(usesLargeSidebar ? 0 : model.folders.count)
                 .tag(SidebarDestination.folders)
                 .accessibilityIdentifier("sidebar-folders")
-            sidebarDestination(L10n.favorites, symbol: "star", destination: .library(.favorites))
+            sidebarDestination(L10n.favorites, glyph: .favorites, destination: .library(.favorites))
                 .badge(usesLargeSidebar ? 0 : model.counts.favorites)
                 .tag(SidebarDestination.library(.favorites))
                 .accessibilityIdentifier("sidebar-favorites")
-            sidebarDestination(L10n.recentlyDeleted, symbol: "trash", destination: .library(.recentlyDeleted))
+            sidebarDestination(L10n.recentlyDeleted, glyph: .trash, destination: .library(.recentlyDeleted))
                 .badge(usesLargeSidebar ? 0 : model.counts.recentlyDeleted)
                 .tag(SidebarDestination.library(.recentlyDeleted))
                 .accessibilityIdentifier("sidebar-recently-deleted")
@@ -282,7 +290,7 @@ public struct RootView: View {
                 // The mark is hidden from accessibility, so the name is the
                 // one element here. Combining the row left the name in the
                 // tree a second time.
-                Text(verbatim: Brand.displayName).font(.title3.bold()).foregroundStyle(Theme.navy)
+                Text(verbatim: Brand.displayName).font(.app(.title3).weight(.semibold)).foregroundStyle(Theme.navy)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("sidebar-brand")
             }
@@ -295,26 +303,26 @@ public struct RootView: View {
     /// the folders with their own management.
     @ViewBuilder private var compactFilesRows: some View {
         Section {
-            sidebarDestination(L10n.allDocuments, symbol: "doc.on.doc", destination: .library(.all))
+            sidebarDestination(L10n.allDocuments, glyph: .allDocuments, destination: .library(.all))
                 .tag(SidebarDestination.library(.all))
                 .accessibilityIdentifier("files-documents")
-            sidebarDestination(L10n.favorites, symbol: "star", destination: .library(.favorites))
+            sidebarDestination(L10n.favorites, glyph: .favorites, destination: .library(.favorites))
                 .badge(model.counts.favorites)
                 .tag(SidebarDestination.library(.favorites))
                 .accessibilityIdentifier("files-favorites")
-            sidebarDestination(L10n.recentlyDeleted, symbol: "trash", destination: .library(.recentlyDeleted))
+            sidebarDestination(L10n.recentlyDeleted, glyph: .trash, destination: .library(.recentlyDeleted))
                 .badge(model.counts.recentlyDeleted)
                 .tag(SidebarDestination.library(.recentlyDeleted))
                 .accessibilityIdentifier("files-recently-deleted")
         } header: {
-            Text(L10n.homeFiles).font(.largeTitle.bold()).foregroundStyle(Theme.navy)
+            Text(L10n.homeFiles).font(.app(.largeTitle).weight(.semibold)).foregroundStyle(Theme.navy)
                 .textCase(nil).padding(.bottom, 6)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("files-title")
         }
         Section {
             ForEach(model.folders) { folder in
-                sidebarDestination(folder.name, symbol: "folder", destination: .library(.folder(folder.id)))
+                sidebarDestination(folder.name, glyph: .folder, destination: .library(.folder(folder.id)))
                     .badge(model.counts.folders[folder.id, default: 0])
                     .tag(SidebarDestination.library(.folder(folder.id)))
                     .contextMenu {
@@ -324,7 +332,11 @@ public struct RootView: View {
                     .accessibilityIdentifier("sidebar-folder")
             }
             Button(action: promptNewFolder) {
-                Label(L10n.newFolder, systemImage: "folder.badge.plus")
+                Label {
+                    Text(L10n.newFolder)
+                } icon: {
+                    TwoToneIcon(glyph: .newFolder, size: sidebarGlyphSize)
+                }
             }
             .buttonStyle(.plain)
             .foregroundStyle(Theme.accent)
@@ -411,7 +423,7 @@ public struct RootView: View {
                         .accessibilityIdentifier("home-files")
                 } label: {
                     Label(L10n.sidebarLibrary, systemImage: "line.3.horizontal")
-                        .font(.body).frame(maxWidth: .infinity, minHeight: 44)
+                        .font(.app(.body)).frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .foregroundStyle(Theme.accent)
                 .accessibilityIdentifier("home-navigation-menu")
@@ -428,25 +440,25 @@ public struct RootView: View {
     private var navigationButtons: some View {
         HStack(spacing: 4) {
             Button(action: showCompactHome) {
-                tabLabel(L10n.homeTitle, symbol: "house.fill", selected: compactHomeSelected)
+                tabLabel(L10n.homeTitle, glyph: .home, selected: compactHomeSelected)
             }
             .accessibilityIdentifier("home-tab")
             .accessibilityAddTraits(compactHomeSelected ? .isSelected : [])
             Button(action: showCompactNotes) {
-                tabLabel(L10n.premiumNotes, symbol: "pencil.tip", selected: compactNotesSelected)
+                tabLabel(L10n.premiumNotes, glyph: .notes, selected: compactNotesSelected)
             }
             .accessibilityIdentifier("home-notes")
             .accessibilityAddTraits(compactNotesSelected ? .isSelected : [])
             #if os(iOS)
             Button { model.isShowingScanner = true } label: {
-                tabLabel(L10n.premiumScan, symbol: "doc.viewfinder", selected: false)
+                tabLabel(L10n.premiumScan, glyph: .scan, selected: false)
             }
             .disabled(!DocumentCameraView.isSupported)
             .accessibilityHint(DocumentCameraView.isSupported ? "" : L10n.scanUnsupported)
             .accessibilityIdentifier("library-scan")
             #endif
             Button(action: showCompactFiles) {
-                tabLabel(L10n.homeFiles, symbol: "folder", selected: compactFilesSelected)
+                tabLabel(L10n.homeFiles, glyph: .folder, selected: compactFilesSelected)
             }
             .accessibilityIdentifier("home-files")
             .accessibilityAddTraits(compactFilesSelected ? .isSelected : [])
@@ -505,10 +517,10 @@ public struct RootView: View {
         })
     }
 
-    private func tabLabel(_ title: String, symbol: String, selected: Bool) -> some View {
+    private func tabLabel(_ title: String, glyph: TwoToneGlyph, selected: Bool) -> some View {
         VStack(spacing: 4) {
-            Image(systemName: symbol).font(.title3)
-            Text(title).font(.caption2.weight(selected ? .semibold : .regular))
+            TwoToneIcon(glyph: glyph, palette: selected ? .accent : .inactive, size: tabGlyphSize)
+            Text(title).font(.app(.caption2).weight(selected ? .semibold : .regular))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(selected ? Theme.accent : Theme.secondaryText)
@@ -532,17 +544,17 @@ public struct RootView: View {
     private var usesLargeSidebar: Bool { dynamicTypeSize.isAccessibilitySize && !showsHome }
 
     @ViewBuilder
-    private func sidebarDestination(_ title: String, symbol: String, destination: SidebarDestination) -> some View {
+    private func sidebarDestination(_ title: String, glyph: TwoToneGlyph, destination: SidebarDestination) -> some View {
         #if os(iOS)
         if showsHome {
-            sidebarLabel(title, symbol: symbol)
+            sidebarLabel(title, glyph: glyph, destination: destination)
         } else {
             // Let List own selection and keyboard focus together. A custom row
             // background makes iPadOS draw a separate rectangular focus halo.
             Button {
                 sidebarBinding.wrappedValue = destination
             } label: {
-                sidebarLabel(title, symbol: symbol)
+                sidebarLabel(title, glyph: glyph, destination: destination)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
@@ -552,7 +564,7 @@ public struct RootView: View {
         Button {
             sidebarBinding.wrappedValue = destination
         } label: {
-            sidebarLabel(title, symbol: symbol)
+            sidebarLabel(title, glyph: glyph, destination: destination)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
         }
@@ -561,11 +573,16 @@ public struct RootView: View {
     }
 
     @ViewBuilder
-    private func sidebarLabel(_ title: String, symbol: String) -> some View {
+    private func sidebarLabel(_ title: String, glyph: TwoToneGlyph, destination: SidebarDestination) -> some View {
         if usesLargeSidebar {
             Text(title).fixedSize(horizontal: false, vertical: true)
         } else {
-            Label(title, systemImage: symbol)
+            Label {
+                Text(title)
+            } icon: {
+                // The selected place is violet, the rest grey (owner's samples, 2026-11-22).
+                SidebarGlyph(glyph: glyph, selected: sidebarBinding.wrappedValue == destination, size: sidebarGlyphSize)
+            }
         }
     }
 

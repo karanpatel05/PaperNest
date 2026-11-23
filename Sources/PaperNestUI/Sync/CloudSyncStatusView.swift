@@ -65,10 +65,10 @@ struct CloudSyncStatusView: View {
                     } icon: {
                         Image(systemName: status.symbol)
                     }
-                    .font(.caption.weight(.medium))
+                    .font(.app(.caption).weight(.medium))
                 case .compact:
                     Image(systemName: status.symbol)
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .help(status.title)
                 }
             }

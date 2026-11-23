@@ -26,13 +26,13 @@ struct NotebookCover: View {
                 }.accessibilityHidden(true)
             }.frame(height: dynamicTypeSize.isAccessibilitySize ? 100 : 112).clipped()
             VStack(alignment: .leading, spacing: 10) {
-                Text(summary.item.name).font(.headline).lineLimit(3)
+                Text(summary.item.name).font(.app(.headline)).lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 4) {
                     Image(systemName: "doc")
                     Text(L10n.pageCount(summary.pageCount))
                     if summary.item.isFavorite { Image(systemName: "star.fill").foregroundStyle(Theme.accent) }
-                }.font(.caption).foregroundStyle(.secondary)
+                }.font(.app(.caption)).foregroundStyle(.secondary)
             }.padding(.leading, 22).padding(.trailing, 12).padding(.vertical, 14)
                 .frame(maxWidth: .infinity, minHeight: 106, alignment: .topLeading)
         }

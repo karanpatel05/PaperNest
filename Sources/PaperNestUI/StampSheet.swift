@@ -349,7 +349,7 @@ struct StampSheet: View {
                         .scaledToFit()
                         .frame(maxWidth: 280, maxHeight: 96)
                 } else {
-                    Text(L10n.textStampMissing).font(.callout).foregroundStyle(.secondary)
+                    Text(L10n.textStampMissing).font(.app(.callout)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
             }
@@ -480,12 +480,12 @@ struct StampSheet: View {
                 Toggle(L10n.textStampDate, isOn: $model.includesDate)
                     .accessibilityIdentifier("text-stamp-date")
             }
-            Text(L10n.textStampSize).font(.headline).accessibilityAddTraits(.isHeader)
+            Text(L10n.textStampSize).font(.app(.headline)).accessibilityAddTraits(.isHeader)
             ForEach(StampSize.allCases, id: \.self) { size in
                 optionRow(StampModel.name(of: size), selected: model.size == size,
                           id: "text-stamp-size-\(size.rawValue)", swatch: nil) { model.size = size }
             }
-            Text(L10n.textStampPlacement).font(.headline).accessibilityAddTraits(.isHeader)
+            Text(L10n.textStampPlacement).font(.app(.headline)).accessibilityAddTraits(.isHeader)
             ForEach(StampPlacement.allCases, id: \.self) { placement in
                 optionRow(StampModel.name(of: placement), selected: model.placement == placement,
                           id: "text-stamp-placement-\(placement.rawValue)", swatch: nil) { model.placement = placement }

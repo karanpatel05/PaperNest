@@ -9,23 +9,31 @@ import AppKit
 enum Theme {
     static let accent = adaptive(0x7545F8, 0xC5AEFF)
     static let violet = adaptive(0xB9A5FF, 0xB9A5FF)
-    static let libraryBackground = adaptive(0xFAF9FF, 0x171522)
-    static let sidebar = adaptive(0xF4EFFF, 0x211C30)
+    static let libraryBackground = adaptive(0xF7F7F5, 0x141415)
+    static let sidebar = adaptive(0xF1F1EF, 0x0F0F10)
     static let canvas = adaptive(0xFAF9FF, 0x11101A)
-    static let surface = adaptive(0xFFFFFF, 0x25293C)
+    static let surface = adaptive(0xFFFFFF, 0x1C1C1F)
     static let preview = adaptive(0xEEF0FA, 0x1C2031)
     static let paperShadow = Color.black.opacity(0.12)
-    static let separator = adaptive(0xEAE6F2, 0x494256)
+    static let separator = adaptive(0xE6E6E3, 0x2E2E33)
     static let selection = adaptive(0xE4DAFF, 0x443361)
     static let primaryText = adaptive(0x17172B, 0xF6F2FF)
-    static let secondaryText = adaptive(0x77768C, 0xBAB6CB)
+    static let secondaryText = adaptive(0x62636E, 0xA1A1A6)
     static let radius: CGFloat = 18
+    // Calm, papery surfaces (owner, 2026-11-22): neutral chrome, violet only
+    // for the primary action, the selection and links; the pages carry colour.
+    /// Inputs, icon tiles and thumbnail wells: one step above the page.
+    static let raised = adaptive(0xF0F0ED, 0x232326)
+    /// Buttons, inputs and rows.
+    static let controlRadius: CGFloat = 10
+    /// Cards.
+    static let cardRadius: CGFloat = 14
     // Home dashboard, owner palette of 2026-11-13. The dark values are this
     // app's own: the brief gives light colours and asks for native dark mode.
     static let deepAccent = adaptive(0x5521CB, 0x9A7BFF)
     static let lavender = adaptive(0xF2EDFF, 0x2A2440)
-    static let homeBackground = adaptive(0xF8F9FD, 0x141320)
-    static let border = adaptive(0xE7E5F0, 0x3A3550)
+    static let homeBackground = adaptive(0xF7F7F5, 0x141415)
+    static let border = adaptive(0xE6E6E3, 0x2E2E33)
     static let navy = adaptive(0x172347, 0xF6F2FF)
     // Filled actions retain contrast with their existing white labels in both appearances.
     static let gradient = LinearGradient(colors: [adaptive(0x7545F8, 0x6839D8), adaptive(0x6737DA, 0x7545F8)], startPoint: .leading, endPoint: .trailing)
@@ -57,10 +65,9 @@ struct PremiumCard: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(Theme.surface.opacity(reduceTransparency ? 1 : 0.92), in: RoundedRectangle(cornerRadius: Theme.radius))
-            .overlay { RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.separator.opacity(0.65), lineWidth: 0.5) }
-            .shadow(color: .black.opacity(hovered ? 0.07 : 0.035), radius: hovered ? 16 : 12, y: 4)
-            .offset(y: hovered && !reduceMotion ? -2 : 0)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: hovered)
+            .overlay { RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.separator.opacity(hovered ? 1 : 0.65), lineWidth: hovered ? 1 : 0.5) }
+            .shadow(color: .black.opacity(0.035), radius: 12, y: 4)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: hovered)
             .onHover { hovered = $0 }
     }
 }

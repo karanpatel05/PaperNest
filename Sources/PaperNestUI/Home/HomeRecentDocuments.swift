@@ -37,16 +37,19 @@ enum HomeRecentText {
 struct HomeThumbnail: View {
     let summary: LibraryStore.ItemSummary
     var pixelSize: CGFloat = 180
+    /// Shows the sheets behind a document of several pages (`PaperStack`).
+    var stacksPages = false
 
     var body: some View {
         Group {
             if let page = summary.coverPage {
                 PageImageView(page: page, pixelSize: pixelSize)
+                    .paperStack(pages: stacksPages ? summary.pageCount : 1)
             } else {
                 Image(systemName: summary.file.map { FileKind.symbol(for: $0.uti) }
                       ?? (summary.item.kind == .notebook ? "pencil.tip" : "doc.text"))
-                    .font(.title2)
-                    .foregroundStyle(Theme.accent)
+                    .font(.app(.title2))
+                    .foregroundStyle(Theme.secondaryText)
             }
         }
         .accessibilityHidden(true)
@@ -75,8 +78,8 @@ struct HomeRecentList<Actions: View>: View {
                     .accessibilityLabel(L10n.more)
                 }
                 .padding(4)
-                .background(Theme.lavender.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
-                .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.border, lineWidth: 1) }
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                .overlay { RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.border, lineWidth: 1) }
                 .contextMenu { actions(summary) }
             }
         }
@@ -86,12 +89,12 @@ struct HomeRecentList<Actions: View>: View {
         HStack(spacing: 12) {
             HomeThumbnail(summary: summary)
                 .frame(width: 36, height: 44)
-                .background(Theme.lavender, in: RoundedRectangle(cornerRadius: 8))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(Theme.raised, in: RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 3) {
-                Text(summary.item.name).font(.subheadline.weight(.semibold))
+                Text(summary.item.name).font(.app(.subheadline).weight(.medium))
                     .foregroundStyle(Theme.navy).lineLimit(2)
-                Text(HomeRecentText.modified(summary.item.modifiedAt)).font(.caption)
+                Text(HomeRecentText.modified(summary.item.modifiedAt)).font(.app(.caption))
                     .foregroundStyle(Theme.secondaryText).lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -122,7 +125,7 @@ struct HomeRecentCards<Actions: View>: View {
                         .buttonStyle(.plain)
                     HStack(spacing: 4) {
                         Text(HomeRecentText.modified(summary.item.modifiedAt))
-                            .font(.caption).foregroundStyle(Theme.secondaryText)
+                            .font(.app(.caption)).foregroundStyle(Theme.secondaryText)
                             .lineLimit(2)
                         Spacer(minLength: 0)
                         Menu { actions(summary) } label: {
@@ -130,11 +133,13 @@ struct HomeRecentCards<Actions: View>: View {
                         }
                         .menuStyle(.borderlessButton).fixedSize()
                         .accessibilityLabel(L10n.more + ", " + summary.item.name)
-                    }.padding(.horizontal, 12)
+                    }
+                    .padding(.leading, 12).padding(.trailing, 4).padding(.bottom, 4)
+                    .frame(minHeight: 40)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .background(Theme.lavender.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
-                .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.border, lineWidth: 1) }
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                .overlay { RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.border, lineWidth: 1) }
                 .contextMenu { actions(summary) }
             }
         }
@@ -142,21 +147,24 @@ struct HomeRecentCards<Actions: View>: View {
 
     private func card(_ summary: LibraryStore.ItemSummary) -> some View {
         VStack(alignment: .leading, spacing: 6) {
+            // The page is the moment: a real sheet on a quiet well.
             ZStack(alignment: .topTrailing) {
-                HomeThumbnail(summary: summary, pixelSize: 180)
-                    .frame(width: 60, height: 78)
-                    .shadow(color: Theme.paperShadow.opacity(0.5), radius: 3, y: 2)
-                    .frame(maxWidth: .infinity)
+                HomeThumbnail(summary: summary, pixelSize: 180, stacksPages: true)
+                    .frame(width: 64, height: 84)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if summary.item.isFavorite {
                     Image(systemName: "star.fill").font(.caption)
                         .foregroundStyle(Theme.accent)
+                        .padding(8)
                 }
             }
-            .frame(height: 84)
-            Text(summary.item.name).font(.footnote.weight(.semibold))
+            .frame(height: 112)
+            .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.cardRadius - 8))
+            Text(summary.item.name).font(.app(.subheadline).weight(.medium))
                 .foregroundStyle(Theme.navy).lineLimit(2).multilineTextAlignment(.leading)
+                .padding(.horizontal, 4)
         }
-        .padding(12)
+        .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)

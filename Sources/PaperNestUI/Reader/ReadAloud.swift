@@ -587,7 +587,7 @@ struct ReadAloudBar: View {
                 .foregroundStyle(Theme.accent)
                 .accessibilityHidden(true)
             Text(status)
-                .font(.subheadline)
+                .font(.app(.subheadline))
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -595,7 +595,7 @@ struct ReadAloudBar: View {
             if readAloud.state != .noText {
                 Button { readAloud.cycleSpeed() } label: {
                     Text(verbatim: readAloud.speed.label)
-                        .font(.subheadline.monospacedDigit().weight(.semibold))
+                        .font(.app(.subheadline).monospacedDigit().weight(.semibold))
                         .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
@@ -616,7 +616,7 @@ struct ReadAloudBar: View {
             }
             Button { readAloud.stop() } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.title3)
+                    .font(.app(.title3))
                     .foregroundStyle(.secondary)
                     .frame(minWidth: 44, minHeight: 44)
             }

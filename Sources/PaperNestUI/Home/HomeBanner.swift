@@ -21,13 +21,13 @@ struct HomeBanner: View {
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 VStack(alignment: .leading, spacing: 6) {
                     Text(HomeGreeting.text(at: context.date))
-                        .font(.title2.bold())
+                        .font(.app(.title2).bold())
                         .foregroundStyle(Theme.navy)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
                         .accessibilityIdentifier("home-greeting")
                     Text(L10n.homeSubtitle)
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                         .foregroundStyle(Theme.navy.opacity(0.75))
                         .fixedSize(horizontal: false, vertical: true)
                 }

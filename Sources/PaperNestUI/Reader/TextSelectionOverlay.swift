@@ -177,7 +177,7 @@ struct TextSelectionOverlay: View {
             markButton(.underline, symbol: "underline", name: L10n.annotationUnderline)
             markButton(.strikethrough, symbol: "strikethrough", name: L10n.annotationStrikethrough)
         }
-        .font(.subheadline.weight(.medium))
+        .font(.app(.subheadline).weight(.medium))
         .foregroundStyle(EditorChrome.navy)
         .buttonStyle(.plain)
         .padding(.horizontal, 6).padding(.vertical, 4)

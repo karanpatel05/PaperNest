@@ -35,7 +35,7 @@ struct NotebookPageSheet: View {
                                     .frame(width: 40, height: 44)
                                     .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 8))
                                     .accessibilityHidden(true)
-                                Text(paper.notebookTitle).font(.body.weight(.medium))
+                                Text(paper.notebookTitle).font(.app(.body).weight(.medium))
                                 Spacer()
                                 Image(systemName: template == paper ? "checkmark.circle.fill" : "circle")
                                     .foregroundStyle(Theme.accent)

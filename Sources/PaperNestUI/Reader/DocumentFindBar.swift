@@ -49,7 +49,7 @@ struct DocumentFindBar: View {
             .buttonStyle(.borderless)
             if find.status == .noText {
                 Text(L10n.findNoTextDetail)
-                    .font(.caption).foregroundStyle(EditorChrome.secondaryText)
+                    .font(.app(.caption)).foregroundStyle(EditorChrome.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("find-no-text-detail")
             }
@@ -157,7 +157,7 @@ struct DocumentFindBar: View {
 
     private func statusText(_ text: String) -> some View {
         Text(verbatim: text)
-            .font(.subheadline).monospacedDigit()
+            .font(.app(.subheadline)).monospacedDigit()
             .foregroundStyle(EditorChrome.secondaryText)
             .lineLimit(1).fixedSize()
             .accessibilityIdentifier("find-status")

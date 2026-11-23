@@ -146,7 +146,7 @@ struct AppLockScreen: View {
                     .accessibilityHidden(true)
                 if lock.isLocked {
                     Text(L10n.appLockLocked)
-                        .font(.title2.weight(.semibold))
+                        .font(.app(.title2).weight(.semibold))
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
@@ -159,7 +159,7 @@ struct AppLockScreen: View {
                     }
                     Button { Task { await lock.unlock() } } label: {
                         Label(L10n.appLockUnlock, systemImage: Self.symbol(lock.availability.biometry))
-                            .font(.headline)
+                            .font(.app(.headline))
                             .foregroundStyle(Color.white)
                             .padding(.horizontal, 28)
                             .frame(minWidth: 180, minHeight: 50)

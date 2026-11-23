@@ -209,7 +209,7 @@ struct CleanupSheet: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(verbatim: model.describe(suggestion)).foregroundStyle(.primary)
                             ForEach(model.losses(suggestion), id: \.self) { loss in
-                                Text(verbatim: loss).font(.caption).foregroundStyle(.orange)
+                                Text(verbatim: loss).font(.app(.caption)).foregroundStyle(.orange)
                             }
                         }
                         Spacer(minLength: 0)
@@ -245,7 +245,7 @@ struct CleanupSheet: View {
                     Text(verbatim: copy.name)
                     Spacer()
                     Button(L10n.cleanupMoveCopy) { movingCopy = copy }
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .accessibilityIdentifier("cleanup-move-copy")
                 }
             }

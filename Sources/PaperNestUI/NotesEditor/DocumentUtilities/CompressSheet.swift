@@ -64,11 +64,11 @@ struct CompressSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
                 Image(systemName: "arrow.down.right.and.arrow.up.left")
-                    .font(.title3.weight(.medium)).foregroundStyle(EditorChrome.purple)
+                    .font(.app(.title3).weight(.medium)).foregroundStyle(EditorChrome.purple)
                     .frame(width: 38, height: 38)
                     .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12))
                     .accessibilityHidden(true)
-                Text(L10n.compressTitle).font(.headline).accessibilityAddTraits(.isHeader)
+                Text(L10n.compressTitle).font(.app(.headline)).accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button { task?.cancel(); close() } label: {
                     Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
@@ -83,12 +83,12 @@ struct CompressSheet: View {
             if let loaded {
                 HStack(spacing: 12) {
                     Image(systemName: "doc.richtext")
-                        .font(.title2).foregroundStyle(EditorChrome.purple)
+                        .font(.app(.title2)).foregroundStyle(EditorChrome.purple)
                         .frame(width: 44, height: 56)
                         .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 10))
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(verbatim: loaded.name).font(.subheadline.weight(.semibold))
+                        Text(verbatim: loaded.name).font(.app(.subheadline).weight(.semibold))
                         note(L10n.compressCurrentSize(size(loaded.bytes)))
                     }
                     Spacer(minLength: 0)
@@ -159,7 +159,7 @@ struct CompressSheet: View {
     /// the sheet on its spinner for good. A plain wrapping line has no loop.
     private func note(_ text: String) -> some View {
         Text(verbatim: text)
-            .font(.caption)
+            .font(.app(.caption))
             .foregroundStyle(EditorChrome.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -176,10 +176,10 @@ struct CompressSheet: View {
                 if result.isSmaller {
                     Text(L10n.compressResult(size(result.originalByteCount), size(result.compressedByteCount),
                                              (result.savedFraction ?? 0).formatted(.percent.precision(.fractionLength(0)))))
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline).weight(.semibold))
                 } else {
                     Text(lastCopyMarked ? L10n.exportWatermarkCompressNoGainMarked : L10n.compressNoGain)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.app(.subheadline).weight(.semibold))
                 }
             }
             .padding(14)
@@ -198,7 +198,7 @@ struct CompressSheet: View {
         if result == nil {
             Button { start(loaded) } label: {
                 Label { Text(L10n.compressAction) } icon: { Image(systemName: "arrow.down.right.and.arrow.up.left") }
-                    .font(.subheadline.weight(.semibold))
+                    .font(.app(.subheadline).weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 46)
                     .foregroundStyle(Color.white)
                     .background(EditorChrome.selection, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -220,7 +220,7 @@ struct CompressSheet: View {
     private func secondary(_ title: String, symbol: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label { Text(verbatim: title) } icon: { Image(systemName: symbol) }
-                .font(.subheadline.weight(.medium))
+                .font(.app(.subheadline).weight(.medium))
                 .frame(maxWidth: .infinity, minHeight: 46)
                 .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .contentShape(Rectangle())

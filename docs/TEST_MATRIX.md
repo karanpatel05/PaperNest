@@ -1,3 +1,32 @@
+## 2026-11-23 — Plus Jakarta Sans across the app, quiet chrome, two-tone icons, Documents buttons (Claude)
+
+Owner: "start implementing" (2026-11-22), after approving the Subframe samples; font scope "Whole app". Then, after a design audit, "Full direction", "600 semibold", "Slate, violet on select". Built in a separate worktree on branch `pjs-restyle`, then rebased onto `701e28e` and landed on the shared branch at the owner's word ("Merge it"). The landing merged into the uncommitted edits already in the tree (OCR panel, Redact, scanner, Theme, this file) without conflicts. Details of the choices: `docs/CLEAN_NATIVE_DESIGN.md`, top entry.
+
+**What changed**
+- Plus Jakarta Sans (OFL, bundled) in every view through `Font.app(_:)`. It keeps Dynamic Type, is scaled to 95% on iPhone and iPad, and is never under 11 pt on the Mac. Titles are semibold at most. iOS navigation titles use it too. `AppEmptyState` keeps empty screens in the face.
+- Quiet chrome: paper-white and graphite surfaces, white cards with hairlines, two radii. No coloured glow, no hover lift. Violet only on Import File, the selection, links, favourites and the logo.
+- Two-tone glyphs on Home, the sidebar, the phone tab bar, folder cards and the Documents buttons. They are slate by default, violet when selected, and white on a filled system selection.
+- Documents: New Note (white) and Import File (filled) above the collection. They also appear in All Documents, the empty library, empty folders and empty Favorites, and are no longer in the toolbar. On wide screens they share one row with a compact Recent/Favorites switch.
+- Multi-page documents show sheet edges behind the first page (Home cards, Documents grid).
+- Fixes: Home card dates touching the edge; a Mac list separator drawn as a vertical line through every row; French "Importer un fichi…" truncation (labels wrap).
+
+| Check | Result |
+|---|---|
+| `./scripts/test.sh` after the rebase onto `701e28e` | **1,724 tests, 0 failures.** |
+| `./scripts/build-ios-sim-app.sh` after the rebase | Built, no errors. |
+| `./scripts/test.sh` (worktree, before the rebase) | **1,660 tests: 1,659 pass, 1 fail.** `InlineTextSessionTests.deleteDuringPendingSaveCoalescesConcurrentTerminalRequests` timed out (load average ~400); alone it passes, 12/12. |
+| New tests | `AppFontTests` (6, incl. a source check that no view sets a system text style) and `TwoToneIconTests` (glyphs on their grid, palettes distinct): pass. |
+| `scripts/build-ios-sim-app.sh` | Built, no errors. |
+| iPhone 17 Pro simulator, looked at | Home en/fr, Home es at accessibility XXXL (stacked layout), Files, All Documents en/fr. French buttons wrap instead of truncating. |
+| iPad Pro 13 simulator, looked at | Home, All Documents with a folder shortcut, an empty folder. The sidebar glyph turns white on the filled selection. |
+| Mac, offscreen renders | Home and All Documents in light and dark, the grid with a three-page stack, an empty folder. Rendered through a throwaway test, deleted before commit. |
+| `FolderNoteUITests` (iPhone) | **Pass.** |
+| `ApprovedLibraryUITests.testDocumentFavoritesFilterAndImportRemainReachable` (iPhone) | **Failed once, not confirmed either way.** The attached hierarchy shows the app still on Home 5 s after the Files tap; load average was ~300. Three re-runs never started: the runner twice "Timed out while loading Accessibility", once "crashed with signal abrt while preparing to run tests". The same path (Files → All Documents → Import File) works by hand on the simulator. |
+
+**Not verified:** the whole iOS UI suite, the Mac app driven by hand, VoiceOver, a real device, and Spanish on iPad/Mac. Mac window titles, alerts and system menus stay SF (apps cannot restyle them).
+
+**For whoever merges:** the shared tree has uncommitted Codex edits in `DocumentView.swift`, `OCRPanel.swift`, `RedactEditor.swift`, `ScannerWorkspaceView.swift`, `Theme.swift` and the strings. This branch rewrote font calls in those files, so expect line conflicts there. `Theme.filledAction` (Codex, uncommitted) and `DocumentActionButtons.filledAction` are the same colour.
+
 ## 2026-11-23 — Comments in exported PDFs, as notes other readers show (Claude)
 
 A gap against Acrobat: PaperNest's page comments never left the app. The export sheet now has **Include Comments** for a PDF, off by default. It writes each page's comments into the file as standard PDF text annotations: the notes Preview and Acrobat show beside a page and open with a click.

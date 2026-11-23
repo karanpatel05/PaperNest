@@ -19,7 +19,7 @@ struct SearchPageHitsList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L10n.searchInPages)
-                .font(.headline)
+                .font(.app(.headline))
                 .accessibilityAddTraits(.isHeader)
             VStack(spacing: 0) {
                 ForEach(Array(hits.enumerated()), id: \.element.id) { index, hit in
@@ -43,21 +43,21 @@ struct SearchPageHitsList: View {
     private func row(_ hit: LibraryModel.PageHit) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: Self.symbol(for: hit.source))
-                .font(.body)
+                .font(.app(.body))
                 .foregroundStyle(Theme.accent)
                 .frame(width: 24)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.searchHitPlace(hit.itemName, hit.pageNumber))
-                    .font(.subheadline.weight(.semibold))
+                    .font(.app(.subheadline).weight(.semibold))
                     .foregroundStyle(Color.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(Self.attributed(hit.snippet))
-                    .font(.callout)
+                    .font(.app(.callout))
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
                 Text(Self.sourceName(hit.source, mayBeMisread: hit.mayBeMisread))
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.tertiary)
             }
             Spacer(minLength: 0)
@@ -65,7 +65,7 @@ struct SearchPageHitsList: View {
                 HitPagePreview(hit: hit, load: preview)
             }
             Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
+                .font(.app(.footnote).weight(.semibold))
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }

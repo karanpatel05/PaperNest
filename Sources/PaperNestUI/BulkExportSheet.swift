@@ -113,13 +113,13 @@ struct BulkExportSheet: View {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 12) {
                         Image(systemName: "doc.zipper")
-                            .font(.title2.weight(.medium))
+                            .font(.app(.title2).weight(.medium))
                             .foregroundStyle(EditorChrome.purple)
                             .frame(width: 48, height: 56)
                             .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 14))
                             .accessibilityHidden(true)
                         Text(L10n.selectionCount(request.ids.count))
-                            .font(.headline)
+                            .font(.app(.headline))
                             .accessibilityAddTraits(.isHeader)
                     }
                     VStack(alignment: .leading, spacing: 14) {
@@ -129,12 +129,12 @@ struct BulkExportSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(EditorChrome.surface, in: RoundedRectangle(cornerRadius: 16))
                     Text(L10n.exportZipFooter)
-                        .font(.footnote)
+                        .font(.app(.footnote))
                         .foregroundStyle(EditorChrome.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                     if !SubscriptionStore.shared.allows(.removeWatermark) {
                         Text(L10n.exportWatermarkFreeRedrawNote)
-                            .font(.footnote)
+                            .font(.app(.footnote))
                             .foregroundStyle(EditorChrome.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("export-zip-mark-note")
@@ -177,7 +177,7 @@ struct BulkExportSheet: View {
                 ProgressView(value: progress.fraction) {
                     Text(L10n.exportProgress(min(progress.completedPages + 1, max(progress.totalPages, 1)),
                                              max(progress.totalPages, 1)))
-                        .font(.caption)
+                        .font(.app(.caption))
                 }
                 Button(L10n.cancel, role: .cancel) { close() }
             }

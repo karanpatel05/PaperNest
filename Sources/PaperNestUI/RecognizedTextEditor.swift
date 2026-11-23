@@ -68,7 +68,7 @@ struct RecognizedTextEditor: View {
         #else
         VStack(spacing: 0) {
             HStack {
-                Text(L10n.ocrCorrectTitle).font(.headline).accessibilityAddTraits(.isHeader)
+                Text(L10n.ocrCorrectTitle).font(.app(.headline)).accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button(L10n.cancel) { cancel() }
                     .keyboardShortcut(.cancelAction)
@@ -145,7 +145,7 @@ struct RecognizedTextEditor: View {
         let changed = texts[index] != line.text
         return HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(verbatim: "\(index + 1)")
-                .font(.caption.monospacedDigit())
+                .font(.app(.caption).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 22, alignment: .trailing)
                 .accessibilityHidden(true)
@@ -175,14 +175,14 @@ struct RecognizedTextEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             if let problem {
                 Text(verbatim: problem)
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("ocr-correct-problem")
             }
             HStack(spacing: 12) {
                 Text(L10n.ocrCorrectChangedCount(changedCount))
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("ocr-correct-count")
                     .accessibilityValue(String(changedCount))

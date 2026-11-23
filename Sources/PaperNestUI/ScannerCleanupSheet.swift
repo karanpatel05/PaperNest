@@ -132,10 +132,10 @@ struct ScannerCleanupSheet: View {
     private func amount(_ title: String, value: Binding<Double>, id: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(title).font(.subheadline.weight(.medium))
+                Text(title).font(.app(.subheadline).weight(.medium))
                 Spacer()
                 Text(verbatim: "\(Int((value.wrappedValue * 100).rounded()))%")
-                    .font(.caption.monospacedDigit())
+                    .font(.app(.caption).monospacedDigit())
                     .foregroundStyle(ScannerChrome.secondaryText)
                     .accessibilityHidden(true)
             }
@@ -164,7 +164,7 @@ struct ScannerCleanupSheet: View {
             onApply(draft, target)
             dismiss()
         } label: {
-            Text(title).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, minHeight: 30)
+            Text(title).font(.app(.subheadline).weight(.semibold)).frame(maxWidth: .infinity, minHeight: 30)
         }
         .accessibilityIdentifier("scanner.cleanup.\(id)")
         if prominent { button.buttonStyle(.borderedProminent).tint(ScannerChrome.purple) }

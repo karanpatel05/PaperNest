@@ -59,7 +59,7 @@ struct DocumentToolsSheet: View {
                         ForEach(Array(orderedItems.enumerated()), id: \.element.id) { index, summary in
                             HStack(spacing: 12) {
                                 Text(verbatim: "\(index + 1)")
-                                    .font(.caption.weight(.semibold)).monospacedDigit()
+                                    .font(.app(.caption).weight(.semibold)).monospacedDigit()
                                     .foregroundStyle(EditorChrome.purple)
                                     .frame(width: 30, height: 30)
                                     .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 9))
@@ -69,7 +69,7 @@ struct DocumentToolsSheet: View {
                                     // which stays visible in an iPad form sheet.
                                     Text(summary.item.name)
                                         .accessibilityIdentifier("merge-row-\(index)")
-                                    Text(L10n.pageCount(summary.pageCount)).font(.caption).foregroundStyle(.secondary)
+                                    Text(L10n.pageCount(summary.pageCount)).font(.app(.caption)).foregroundStyle(.secondary)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                 Button { orderedItems.swapAt(index, index - 1) } label: {
                                     Image(systemName: "arrow.up")

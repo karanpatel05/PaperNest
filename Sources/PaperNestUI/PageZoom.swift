@@ -32,7 +32,7 @@ struct ViewportZoomControls: View {
             .disabled(zoom <= PageZoom.steps[0])
             Button(action: showSettings) {
                 Text(verbatim: percent)
-                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .font(.app(.subheadline).weight(.medium).monospacedDigit())
                     .lineLimit(1).fixedSize()
                     .padding(.horizontal, 10).frame(minWidth: 58, minHeight: 32)
                     .background(EditorChrome.lavender, in: Capsule())

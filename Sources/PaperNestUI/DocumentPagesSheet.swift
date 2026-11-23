@@ -34,7 +34,7 @@ struct DocumentPagesSheet: View {
                                         .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(EditorChrome.border, lineWidth: 0.75) }
                                         .accessibilityHidden(true)
                                     Text(L10n.pageLabel(index + 1, of: model.pages.count))
-                                        .font(.body).multilineTextAlignment(.leading)
+                                        .font(.app(.body)).multilineTextAlignment(.leading)
                                     Spacer(minLength: 4)
                                     if model.selectedPageID == page.id {
                                         Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
@@ -112,7 +112,7 @@ struct DocumentPagesSheet: View {
                 if isEmbedded {
                     VStack(spacing: 8) {
                         HStack {
-                            Text(L10n.pages).font(.headline)
+                            Text(L10n.pages).font(.app(.headline))
                             Spacer()
                             doneButton
                         }

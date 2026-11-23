@@ -223,7 +223,7 @@ private struct InlineTextToolbar: View {
         }
         .disabled(session.isFinishing)
         .buttonStyle(.plain)
-        .font(.body)
+        .font(.app(.body))
         .foregroundStyle(Theme.primaryText)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.separator) }
@@ -271,7 +271,7 @@ struct InlineTextRecoveryBar: View {
 
     var body: some View {
         HStack {
-            Text(L10n.saveFailed).font(.caption).lineLimit(2)
+            Text(L10n.saveFailed).font(.app(.caption)).lineLimit(2)
             Button(L10n.inlineRetry) { Task { await session.flush(undoManager: undoManager) } }
                 .accessibilityIdentifier("inline-text-retry")
             Menu {

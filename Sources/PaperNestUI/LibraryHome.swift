@@ -19,6 +19,7 @@ struct DashboardView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Matches the `.title2` the name beside it is set in, and grows with it.
     @ScaledMetric(relativeTo: .title2) private var headerMarkSize: CGFloat = 29
+    @ScaledMetric(relativeTo: .title2) private var profileGlyphSize: CGFloat = 26
     @State private var showProfile = false
     @State private var homeSearch = ""
     @State private var creatingNotebook = false
@@ -92,7 +93,7 @@ struct DashboardView: View {
                         Spacer(minLength: 12)
                         headerControls
                     }
-                    Text(verbatim: Brand.displayName).font(.title2.bold())
+                    Text(verbatim: Brand.displayName).font(.app(.title2).weight(.semibold))
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("home-brand")
                 }
@@ -100,7 +101,7 @@ struct DashboardView: View {
                 HStack(spacing: 12) {
                     HStack(spacing: 10) {
                         BrandMark.image(size: headerMarkSize).foregroundStyle(Theme.accent)
-                        Text(verbatim: Brand.displayName).font(.title2.bold())
+                        Text(verbatim: Brand.displayName).font(.app(.title2).weight(.semibold))
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("home-brand")
                     }
@@ -149,10 +150,10 @@ struct DashboardView: View {
                 .accessibilityIdentifier("home-search-submit")
             }
         }
-        .font(.body)
-        .padding(.horizontal, 14).frame(minHeight: 48)
-        .background(Theme.lavender.opacity(0.5), in: RoundedRectangle(cornerRadius: 14))
-        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.border, lineWidth: 1) }
+        .font(.app(.body))
+        .padding(.horizontal, 12).frame(minHeight: 44)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.controlRadius))
+        .overlay { RoundedRectangle(cornerRadius: Theme.controlRadius).strokeBorder(Theme.border, lineWidth: 1) }
     }
 
     private func submitSearch() {
@@ -170,10 +171,9 @@ struct DashboardView: View {
             CloudSyncStatusView(session: model.session, style: .compact)
         }
         Button { showProfile = true } label: {
-            Image(systemName: "person")
-                .font(.title2.weight(.regular))
+            TwoToneIcon(glyph: .profile, palette: .slate, size: profileGlyphSize)
                 .frame(minWidth: 44, minHeight: 44)
-                .background(Theme.lavender.opacity(0.65), in: Circle())
+                .background(Theme.raised, in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -188,11 +188,11 @@ struct DashboardView: View {
     private var greeting: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             VStack(alignment: .leading, spacing: 4) {
-                Text(HomeGreeting.text(at: context.date)).font(compact ? .title2.bold() : .title.bold())
+                Text(HomeGreeting.text(at: context.date)).font(compact ? .app(.title2).weight(.semibold) : .app(.title).weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("home-greeting")
-                Text(L10n.homeSubtitle).font(.subheadline).foregroundStyle(Theme.secondaryText)
+                Text(L10n.homeSubtitle).font(.app(.subheadline)).foregroundStyle(Theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -207,20 +207,20 @@ struct DashboardView: View {
         var actions: [HomeQuickAction] = []
         #if os(iOS)
         if !compact {
-            actions.append(HomeQuickAction(id: "home-scan", title: L10n.scan, symbol: "doc.viewfinder",
+            actions.append(HomeQuickAction(id: "home-scan", title: L10n.scan, glyph: .scan,
                                            isEnabled: DocumentCameraView.isSupported,
                                            hint: DocumentCameraView.isSupported ? "" : L10n.scanUnsupported) {
                 model.isShowingScanner = true
             })
         }
         #endif
-        actions.append(HomeQuickAction(id: "home-new-note", title: L10n.homeNewNote, symbol: "doc.badge.plus") {
+        actions.append(HomeQuickAction(id: "home-new-note", title: L10n.homeNewNote, glyph: .newNote) {
             creatingNotebook = true
         })
-        actions.append(HomeQuickAction(id: "home-import", title: L10n.homeImportFile, symbol: "arrow.down.to.line") {
+        actions.append(HomeQuickAction(id: "home-import", title: L10n.homeImportFile, glyph: .importFile) {
             model.isShowingFileImporter = true
         })
-        actions.append(HomeQuickAction(id: "home-new-folder", title: L10n.newFolder, symbol: "folder",
+        actions.append(HomeQuickAction(id: "home-new-folder", title: L10n.newFolder, glyph: .newFolder,
                                        action: newFolder))
         return actions
     }
@@ -245,8 +245,7 @@ struct DashboardView: View {
                     .accessibilityIdentifier("home-see-all")
             }
             if recent.isEmpty {
-                ContentUnavailableView(L10n.premiumEmpty, systemImage: "doc",
-                                       description: Text(L10n.premiumEmptyDetail))
+                AppEmptyState(title: L10n.premiumEmpty, systemImage: "doc", description: L10n.premiumEmptyDetail)
                     .frame(maxWidth: .infinity)
             } else {
                 // A container of its own, so the identifier names the list
@@ -295,10 +294,10 @@ struct DashboardView: View {
     private func sectionHeader<Trailing: View>(_ title: String, identifier: String,
                                                @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+            Text(title).font(.app(.headline)).accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier(identifier)
             Spacer(minLength: 8)
-            trailing().font(.subheadline).frame(minHeight: 44)
+            trailing().font(.app(.subheadline)).frame(minHeight: 44)
         }
     }
 

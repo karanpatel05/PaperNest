@@ -179,7 +179,7 @@ struct PageSelectionOverlay: View {
 
     private var selectionToolbar: some View {
         HStack(spacing: 4) {
-            Text(L10n.selectionCount(selected.count)).font(.caption).lineLimit(1).minimumScaleFactor(0.8)
+            Text(L10n.selectionCount(selected.count)).font(.app(.caption)).lineLimit(1).minimumScaleFactor(0.8)
                 .padding(.leading, 12)
             Spacer(minLength: 0)
             if selected.count == 1, let object = selected.first {
@@ -368,7 +368,7 @@ struct PageSelectionOverlay: View {
     private var pasteButton: some View {
         Button { paste() } label: {
             Label(L10n.selectionPaste, systemImage: "doc.on.clipboard")
-                .font(.subheadline.weight(.medium)).padding(.horizontal, 14).frame(minHeight: 44)
+                .font(.app(.subheadline).weight(.medium)).padding(.horizontal, 14).frame(minHeight: 44)
         }
         .buttonStyle(.plain).foregroundStyle(Theme.primaryText)
         .background(Theme.surface, in: Capsule())

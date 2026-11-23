@@ -18,11 +18,11 @@ struct ProPaywallView: View {
                 VStack(spacing: 24) {
                     if !typeSize.isAccessibilitySize { ProPaperIllustration().accessibilityHidden(true) }
                     VStack(spacing: 8) {
-                        Text(L10n.proHeadline).font(.largeTitle.bold()).accessibilityAddTraits(.isHeader)
+                        Text(L10n.proHeadline).font(.app(.largeTitle).bold()).accessibilityAddTraits(.isHeader)
                         Text(L10n.proSubtitle).foregroundStyle(.secondary)
                         if let feature {
                             Label(L10n.proFeatureLocked(feature.title), systemImage: "lock.fill")
-                                .font(.callout.weight(.semibold)).foregroundStyle(Theme.accent)
+                                .font(.app(.callout).weight(.semibold)).foregroundStyle(Theme.accent)
                                 .padding(.top, 4).fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("pro-locked-feature").accessibilityValue(feature.rawValue)
                         }
@@ -46,26 +46,26 @@ struct ProPaywallView: View {
                     VStack(spacing: 12) {
                         if let product = selected {
                             Text(trial ? L10n.proTrialBilling(product.billingLabel) : product.billingLabel)
-                                .font(.headline).multilineTextAlignment(.center)
-                            Text(L10n.proRenewalTerms).font(.footnote).foregroundStyle(.secondary)
+                                .font(.app(.headline)).multilineTextAlignment(.center)
+                            Text(L10n.proRenewalTerms).font(.app(.footnote)).foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                             Button {
                                 Task { await store.purchase(product); if store.hasProAccess { dismiss() } }
                             } label: {
                                 Text(trial ? L10n.proTrialCTA : L10n.proSubscribe)
-                                    .font(.headline).frame(maxWidth: .infinity, minHeight: 48)
+                                    .font(.app(.headline)).frame(maxWidth: .infinity, minHeight: 48)
                             }.buttonStyle(.borderedProminent)
                                 .disabled(store.isBusy || store.isLoading || !store.configuration.canPurchase || store.hasProAccess)
                                 .accessibilityIdentifier("pro-purchase")
                         }
                         if !store.configuration.canPurchase {
-                            Text(L10n.proLegalUnavailable).font(.footnote).foregroundStyle(.secondary)
+                            Text(L10n.proLegalUnavailable).font(.app(.footnote)).foregroundStyle(.secondary)
                         }
                         if store.isBusy { ProgressView(L10n.proLoading) }
-                        if let message = store.message { Text(message).font(.callout).accessibilityIdentifier("pro-message") }
+                        if let message = store.message { Text(message).font(.app(.callout)).accessibilityIdentifier("pro-message") }
                         Button(L10n.proContinueFree) { dismiss() }.frame(minHeight: 44)
                             .accessibilityIdentifier("pro-continue-free")
-                        Text(L10n.proFreeDetail).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        Text(L10n.proFreeDetail).font(.app(.footnote)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     }
                     SubscriptionLinks(store: store)
                 }.padding(24).frame(maxWidth: 560).frame(maxWidth: .infinity)
@@ -109,8 +109,8 @@ struct ProPaywallView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle").foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(product.isAnnual ? L10n.proYearly : L10n.proMonthly).font(.headline)
-                    Text(product.billingLabel).font(.subheadline).foregroundStyle(.secondary)
+                    Text(product.isAnnual ? L10n.proYearly : L10n.proMonthly).font(.app(.headline))
+                    Text(product.billingLabel).font(.app(.subheadline)).foregroundStyle(.secondary)
                 }.fixedSize(horizontal: false, vertical: true)
             }.padding(18).frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
                 .background(isSelected ? Theme.selection : Theme.surface, in: RoundedRectangle(cornerRadius: 18))
@@ -171,13 +171,13 @@ struct ProfileView: View {
         let kind = state.displayKind(at: now)
         return VStack(alignment: .leading, spacing: 16) {
             Label { Text(L10n.proTitle) } icon: { BrandMark.image(size: proMarkSize) }
-                .font(.title2.bold()).foregroundStyle(Theme.accent)
+                .font(.app(.title2).bold()).foregroundStyle(Theme.accent)
             if !store.hasLoaded { ProgressView(L10n.proLoading) }
             else if !store.lastRefreshSucceeded && state.productID == nil {
                 Text(L10n.proLoadError)
                 Button(L10n.proRetry) { Task { await store.refresh() } }
             } else {
-                Text(kind.title).font(.title3.bold()).accessibilityIdentifier("profile-subscription-state")
+                Text(kind.title).font(.app(.title3).bold()).accessibilityIdentifier("profile-subscription-state")
                     .accessibilityValue(kind.rawValue)
                 if let product = store.products.first(where: { $0.id == state.productID }) {
                     Text(product.isAnnual ? L10n.proYearly : L10n.proMonthly).foregroundStyle(.secondary)
@@ -196,8 +196,8 @@ struct ProfileView: View {
                         .accessibilityIdentifier("profile-upgrade")
                 } else { ManageSubscriptionButton() }
             }
-            Text(L10n.proContentSafe).font(.footnote).foregroundStyle(.secondary)
-            if let message = store.message { Text(message).font(.callout) }
+            Text(L10n.proContentSafe).font(.app(.footnote)).foregroundStyle(.secondary)
+            if let message = store.message { Text(message).font(.app(.callout)) }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(24).modifier(PremiumCard())
     }
 }
@@ -213,7 +213,7 @@ private struct SubscriptionLinks: View {
             if let url = store.configuration.termsURL { Link(L10n.proTerms, destination: url).frame(minHeight: 44) }
             if let url = store.configuration.privacyURL { Link(L10n.proPrivacy, destination: url).frame(minHeight: 44) }
             if let url = store.configuration.supportURL { Link(L10n.proSupport, destination: url).frame(minHeight: 44) }
-        }.font(.callout).frame(maxWidth: .infinity)
+        }.font(.app(.callout)).frame(maxWidth: .infinity)
     }
 }
 

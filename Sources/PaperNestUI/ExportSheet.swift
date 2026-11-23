@@ -189,12 +189,12 @@ struct ExportSheet: View {
     private var panelHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: "square.and.arrow.up")
-                .font(.title3.weight(.medium))
+                .font(.app(.title3).weight(.medium))
                 .foregroundStyle(EditorChrome.purple)
                 .frame(width: 38, height: 38)
                 .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12))
                 .accessibilityHidden(true)
-            Text(L10n.exportTitle).font(.headline).accessibilityAddTraits(.isHeader)
+            Text(L10n.exportTitle).font(.app(.headline)).accessibilityAddTraits(.isHeader)
             Spacer(minLength: 8)
             Button { close() } label: {
                 Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
@@ -268,7 +268,7 @@ struct ExportSheet: View {
                 // Why five formats are missing, said where they would be.
                 if !permissions.allowsCopying {
                     Text(L10n.restrictedExportNote)
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("export-restricted-note")
                 }
@@ -287,7 +287,7 @@ struct ExportSheet: View {
                 // silence. The choice is kept for a format that can.
                 Section {
                     Label(L10n.exportWatermarkNotSupported, systemImage: "info.circle")
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("export-watermark-unsupported")
                 } header: {
@@ -371,8 +371,8 @@ struct ExportSheet: View {
                     .shadow(color: Theme.paperShadow, radius: 5, y: 3)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(itemName).font(.headline).fixedSize(horizontal: false, vertical: true)
-                Text(L10n.pageCount(pages.count)).font(.subheadline).foregroundStyle(.secondary)
+                Text(itemName).font(.app(.headline)).fixedSize(horizontal: false, vertical: true)
+                Text(L10n.pageCount(pages.count)).font(.app(.subheadline)).foregroundStyle(.secondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -470,7 +470,7 @@ struct ExportSheet: View {
 
     private var wordsOnlyNote: some View {
         Text(L10n.exportWordsOnlyNote)
-            .font(.caption)
+            .font(.app(.caption))
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("export-words-only-note")
     }
@@ -497,7 +497,7 @@ struct ExportSheet: View {
                     wordsOnlyNote
                 } else {
                     Text(L10n.exportDocxImagesNote)
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("export-docx-images-note")
                 }
@@ -519,12 +519,12 @@ struct ExportSheet: View {
                     .accessibilityIdentifier("export-password")
                 if let problem = passwordProblem {
                     Text(Self.message(for: problem))
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.red)
                         .accessibilityIdentifier("export-password-problem")
                 } else if Self.passwordIsTruncated(password) {
                     Text(L10n.exportPasswordTruncated)
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.orange)
                         .accessibilityIdentifier("export-password-truncated")
                 }
@@ -532,7 +532,7 @@ struct ExportSheet: View {
                 Text(L10n.exportPasswordTitle)
             } footer: {
                 Text(L10n.exportPasswordFooter)
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.secondary)
             }
         }
@@ -607,7 +607,7 @@ struct ExportSheet: View {
                     if options.paperSize != .original { Text(L10n.paperNote) }
                     Text(L10n.exportVectorNote)
                 }
-                .font(.caption)
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
             }
         } else if options.format == .docx {
@@ -623,7 +623,7 @@ struct ExportSheet: View {
                 }
             } footer: {
                 if options.paperSize != .original {
-                    Text(L10n.paperNote).font(.caption).foregroundStyle(.secondary)
+                    Text(L10n.paperNote).font(.app(.caption)).foregroundStyle(.secondary)
                 }
             }
         } else {
@@ -719,7 +719,7 @@ struct ExportSheet: View {
             } header: {
                 Text(L10n.exportPreviewTitle)
             } footer: {
-                Text(L10n.exportPreviewCaption(number)).font(.caption).foregroundStyle(.secondary)
+                Text(L10n.exportPreviewCaption(number)).font(.app(.caption)).foregroundStyle(.secondary)
             }
         }
     }
@@ -741,14 +741,14 @@ struct ExportSheet: View {
                 .accessibilityIdentifier("export-preview")
         case .words(let words):
             Text(verbatim: words.isEmpty ? L10n.exportPreviewNoWords : words)
-                .font(.caption.monospaced())
+                .font(.app(.caption).monospaced())
                 .foregroundStyle(words.isEmpty ? .secondary : .primary)
                 .lineLimit(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("export-preview")
         case nil:
             Text(L10n.exportPreviewWorking)
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.app(.caption)).foregroundStyle(.secondary)
                 .accessibilityIdentifier("export-preview-working")
         }
     }
@@ -760,12 +760,12 @@ struct ExportSheet: View {
             EmptyView()
         case .working:
             Text(L10n.exportSizeWorking)
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.app(.caption)).foregroundStyle(.secondary)
                 .accessibilityIdentifier("export-size-estimate")
         case .ready(let estimate):
             let size = ByteCountFormatter.string(fromByteCount: estimate.byteCount, countStyle: .file)
             Text(estimate.isExact ? L10n.exportSizeExact(size) : L10n.exportSizeAbout(size))
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.app(.caption)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("export-size-estimate")
         }
@@ -777,16 +777,16 @@ struct ExportSheet: View {
         case .configuring:
             sizeRow
             if !rangeIsValid {
-                Text(L10n.exportInvalidRange).font(.caption).foregroundStyle(.red)
+                Text(L10n.exportInvalidRange).font(.app(.caption)).foregroundStyle(.red)
             }
             if producesArchive {
-                Text(L10n.exportCopyUnavailable).font(.caption).foregroundStyle(.secondary)
+                Text(L10n.exportCopyUnavailable).font(.app(.caption)).foregroundStyle(.secondary)
             }
         case .exporting(let progress):
             HStack {
                 ProgressView(value: progress.fraction) {
                     Text(L10n.exportProgress(min(progress.completedPages + 1, progress.totalPages), progress.totalPages))
-                        .font(.caption)
+                        .font(.app(.caption))
                 }
                 Button(L10n.cancel, role: .cancel) {
                     exportTask?.cancel()
@@ -797,7 +797,7 @@ struct ExportSheet: View {
             // Also where a closed save dialog or share sheet lands: the files
             // are kept, so the same three buttons work without exporting again.
             Text(L10n.exportReady(ByteCountFormatter.string(fromByteCount: output.totalByteCount, countStyle: .file)))
-                .font(.callout)
+                .font(.app(.callout))
                 .accessibilityIdentifier("export-ready")
         case .copied:
             HStack {
@@ -914,7 +914,7 @@ struct ExportSheet: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: systemImage).font(.title3)
-                Text(title).font(.caption.weight(.semibold))
+                Text(title).font(.app(.caption).weight(.semibold))
                     .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
@@ -1084,16 +1084,16 @@ struct ChoiceTile: View {
                         .accessibilityHidden(true)
                 } else if let systemImage {
                     Image(systemName: systemImage)
-                        .font(.title2)
+                        .font(.app(.title2))
                         .foregroundStyle(iconColor)
                 }
                 Text(title)
-                    .font(.subheadline.weight(.medium))
+                    .font(.app(.subheadline).weight(.medium))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 if let subtitle {
                     Text(verbatim: subtitle)
-                        .font(.caption)
+                        .font(.app(.caption))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1108,7 +1108,7 @@ struct ChoiceTile: View {
         .overlay(alignment: .topTrailing) {
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.body)
+                    .font(.app(.body))
                     .foregroundStyle(.white, Theme.accent)
                     .offset(x: 6, y: -6)
                     .accessibilityHidden(true)

@@ -66,11 +66,11 @@ struct ShapeAnnotationSheet: View {
                         positionSlider(L10n.shapeEndY, value: $end.y, id: "end-y")
                     }
                 } footer: { Text(stroke == nil ? (stampsOnly ? L10n.stampInvalid : L10n.shapeInvalid) : (stampsOnly ? L10n.stampDrag : L10n.shapeDrag))
-                    .font(.callout).foregroundStyle(Color.primary)
+                    .font(.app(.callout)).foregroundStyle(Color.primary)
                     .fixedSize(horizontal: false, vertical: true) }
                 Section {
                     if dynamicTypeSize.isAccessibilitySize {
-                        Text(L10n.shapeWidth).font(.headline)
+                        Text(L10n.shapeWidth).font(.app(.headline))
                             .accessibilityAddTraits(.isHeader)
                         ForEach([1.0, 2.0, 4.0], id: \.self) { value in
                             Button { width = value } label: {
@@ -98,7 +98,7 @@ struct ShapeAnnotationSheet: View {
                     MarkupColorPicker(color: $color)
                 } header: { Text(L10n.shapeStyle).foregroundStyle(Color.primary) }
                   footer: { Text(stampsOnly ? L10n.stampHelp : L10n.shapeHelp)
-                      .font(.callout).foregroundStyle(Color.primary)
+                      .font(.app(.callout)).foregroundStyle(Color.primary)
                       .fixedSize(horizontal: false, vertical: true) }
             }
             .formStyle(.grouped)

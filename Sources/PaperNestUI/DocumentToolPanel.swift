@@ -15,7 +15,7 @@ struct DocumentToolPanel<Content: View, Footer: View>: View {
             HStack(spacing: 10) {
                 Image(systemName: symbol).foregroundStyle(EditorChrome.purple).font(.title3)
                     .accessibilityHidden(true)
-                Text(verbatim: title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: title).font(.app(.headline)).fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 4)
                 Button(action: close) {

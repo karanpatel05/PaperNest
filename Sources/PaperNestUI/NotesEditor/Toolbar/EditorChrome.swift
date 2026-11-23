@@ -74,7 +74,7 @@ struct EditorToolButtonFace: View {
             NotebookToolIcon(kind: kind, onAccent: selected)
             if let title {
                 Text(verbatim: title)
-                    .font(.caption2.weight(.medium))
+                    .font(.app(.caption2).weight(.medium))
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }

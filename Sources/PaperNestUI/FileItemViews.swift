@@ -119,9 +119,9 @@ struct FileDetailsSheet: View {
                         HStack(spacing: 14) {
                             FileThumbnailView(url: shareURL, uti: payload.uti)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(request.summary.item.name).font(.headline)
+                                Text(request.summary.item.name).font(.app(.headline))
                                 Text(verbatim: FileKind.size(payload.byteCount))
-                                    .font(.subheadline).foregroundStyle(.secondary)
+                                    .font(.app(.subheadline)).foregroundStyle(.secondary)
                             }
                         }
                         .accessibilityElement(children: .combine)

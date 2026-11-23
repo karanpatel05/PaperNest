@@ -214,7 +214,7 @@ struct SignatureSheet: View {
             if draft.signatures.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "signature").font(.title2).foregroundStyle(Theme.accent).accessibilityHidden(true)
-                    Text(L10n.signatureNoSaved).font(.callout.weight(.medium))
+                    Text(L10n.signatureNoSaved).font(.app(.callout).weight(.medium))
                     PanelNote(text: L10n.signatureHelp)
                 }.frame(maxWidth: .infinity).multilineTextAlignment(.center).padding(.vertical, 8)
             }
@@ -268,7 +268,7 @@ struct SignatureSheet: View {
     private var captureSection: some View {
         PanelSection(title: L10n.signatureNew) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(L10n.signatureName).font(.caption).foregroundStyle(Theme.secondaryText)
+                Text(L10n.signatureName).font(.app(.caption)).foregroundStyle(Theme.secondaryText)
                 TextField(L10n.signatureName, text: $draft.name, prompt: Text(Self.namePrompt))
                     .textFieldStyle(.roundedBorder)
                     .focused($nameFocused)
@@ -276,7 +276,7 @@ struct SignatureSheet: View {
                     .accessibilityIdentifier("signature-name")
                 if draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(L10n.signatureNameRequired)
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.app(.caption)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("signature-name-required")
                 }
@@ -290,7 +290,7 @@ struct SignatureSheet: View {
                     }.stroke(Color.gray.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4, 5]))
                     SignatureInkPreview(strokes: draft.strokes + currentStroke, sourceSize: nil)
                     if draft.strokes.isEmpty && draft.capturePoints.isEmpty {
-                        Text(L10n.signatureDrawHint).font(.callout).foregroundStyle(Color.gray)
+                        Text(L10n.signatureDrawHint).font(.app(.callout)).foregroundStyle(Color.gray)
                             .multilineTextAlignment(.center).padding(20).allowsHitTesting(false)
                     }
                 }

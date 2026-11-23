@@ -152,17 +152,17 @@ struct RedactEditor: View {
         VStack(alignment: .leading, spacing: 10) {
             if restricted {
                 Text(L10n.redactRestricted)
-                    .font(.caption).foregroundStyle(.orange)
+                    .font(.app(.caption)).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("redact-restricted")
             } else {
                 Text(L10n.redactHint)
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.app(.caption)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 12) {
                 Text(L10n.redactAreaCount(areas.count))
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .accessibilityIdentifier("redact-count")
                     .accessibilityValue(String(areas.count))
                 Spacer(minLength: 8)
@@ -280,7 +280,7 @@ struct RedactEditor: View {
         } icon: {
             Image(systemName: symbol).foregroundStyle(tint)
         }
-        .font(.callout)
+        .font(.app(.callout))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(identifier)
     }

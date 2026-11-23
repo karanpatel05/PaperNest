@@ -27,9 +27,9 @@ struct CloudSyncCard: View {
                 Image(systemName: statusSymbol).font(.title3).foregroundStyle(statusTint)
                     .frame(minWidth: 28).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(L10n.syncSettingsTitle).font(.footnote.weight(.semibold))
+                    Text(L10n.syncSettingsTitle).font(.app(.footnote).weight(.semibold))
                         .foregroundStyle(Theme.navy)
-                    Text(statusTitle).font(.caption2).foregroundStyle(statusTint)
+                    Text(statusTitle).font(.app(.caption2)).foregroundStyle(statusTint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)

@@ -226,7 +226,7 @@ struct BookmarksSheet: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if model.session.sync?.isEnabled == true {
                 Text(L10n.bookmarkLocalOnly)
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.app(.footnote)).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 20).padding(.vertical, 10)
                     .frame(maxWidth: .infinity)
@@ -269,9 +269,9 @@ struct BookmarksSheet: View {
             VStack(spacing: 8) {
                 Image(systemName: "bookmark").font(.largeTitle).foregroundStyle(.secondary)
                     .accessibilityHidden(true)
-                Text(L10n.bookmarkEmpty).font(.headline)
+                Text(L10n.bookmarkEmpty).font(.app(.headline))
                 Text(L10n.bookmarkEmptyDetail)
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.app(.subheadline)).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             .padding(24)
@@ -300,7 +300,7 @@ struct BookmarksSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: title).multilineTextAlignment(.leading)
                         if !bookmark.name.isEmpty, let page {
-                            Text(verbatim: page).font(.caption).foregroundStyle(.secondary)
+                            Text(verbatim: page).font(.app(.caption)).foregroundStyle(.secondary)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

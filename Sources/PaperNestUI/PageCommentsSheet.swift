@@ -46,7 +46,7 @@ struct PageCommentsSheet: View {
                                     .multilineTextAlignment(.leading)
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
+                                    .font(.app(.caption).weight(.semibold))
                                     .foregroundStyle(EditorChrome.secondaryText)
                             }
                             .frame(minHeight: 44)

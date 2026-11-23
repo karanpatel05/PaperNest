@@ -60,8 +60,8 @@ struct OCRPanel: View {
             HStack(spacing: 12) {
                 Image(systemName: "doc.text").font(.title2).foregroundStyle(EditorChrome.purple)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(verbatim: model.item?.name ?? "").font(.headline)
-                    Text(L10n.pageCount(model.pages.count)).font(.caption).foregroundStyle(EditorChrome.secondaryText)
+                    Text(verbatim: model.item?.name ?? "").font(.app(.headline))
+                    Text(L10n.pageCount(model.pages.count)).font(.app(.caption)).foregroundStyle(EditorChrome.secondaryText)
                 }
                 Spacer(minLength: 0)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
@@ -88,7 +88,7 @@ struct OCRPanel: View {
                         .accessibilityIdentifier("ocr-range-input")
                     if indices == nil { PanelNote(text: L10n.ocrInvalidRange) }
                 }
-                Text(L10n.ocrSelected(selectedCount)).font(.caption).foregroundStyle(EditorChrome.secondaryText)
+                Text(L10n.ocrSelected(selectedCount)).font(.app(.caption)).foregroundStyle(EditorChrome.secondaryText)
                     .accessibilityIdentifier("ocr-page-count")
                     .accessibilityValue(String(selectedCount))
                 if correctedInSelection > 0 {
@@ -103,7 +103,7 @@ struct OCRPanel: View {
                         VStack(spacing: 4) {
                             PageImageView(page: page, pixelSize: 180).frame(width: 54, height: 72)
                                 .clipped().background(Color.white)
-                            Text(verbatim: "\(index + 1)").font(.caption)
+                            Text(verbatim: "\(index + 1)").font(.app(.caption))
                         }
                         .padding(5)
                         .background((indices ?? []).contains(index) ? EditorChrome.lavender : EditorChrome.surface,
@@ -121,10 +121,10 @@ struct OCRPanel: View {
             if let progress = model.recognitionProgress {
                 ProgressView(value: Double(progress.done), total: Double(max(1, progress.total)))
                 Text(L10n.recognizeProgress(min(progress.done + 1, progress.total), progress.total))
-                    .font(.caption).accessibilityIdentifier("ocr-progress")
+                    .font(.app(.caption)).accessibilityIdentifier("ocr-progress")
             }
             if let result {
-                Text(verbatim: result).font(.callout).fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: result).font(.app(.callout)).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("ocr-result")
             }
             Button { start() } label: {
@@ -159,7 +159,7 @@ struct OCRPanel: View {
     @ViewBuilder private var currentPageStatus: some View {
         let number = (model.selectedIndex ?? 0) + 1
         Text(verbatim: statusText(number))
-            .font(.callout)
+            .font(.app(.callout))
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("ocr-current-status")
             .accessibilityValue(statusValue)
@@ -230,7 +230,7 @@ struct OCRPanel: View {
                 Image(systemName: choice == value ? "largecircle.fill.circle" : "circle").foregroundStyle(EditorChrome.purple)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(verbatim: title).fixedSize(horizontal: false, vertical: true)
-                    if let detail { Text(verbatim: detail).font(.caption).foregroundStyle(EditorChrome.secondaryText) }
+                    if let detail { Text(verbatim: detail).font(.app(.caption)).foregroundStyle(EditorChrome.secondaryText) }
                 }
                 Spacer(minLength: 0)
             }.frame(minHeight: 44).contentShape(Rectangle())

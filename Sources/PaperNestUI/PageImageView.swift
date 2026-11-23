@@ -56,9 +56,9 @@ struct PageImageView: View {
             } else if let failure {
                 VStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle")
-                        .font(.title2)
+                        .font(.app(.title2))
                     Text(failure)
-                        .font(.caption)
+                        .font(.app(.caption))
                         .multilineTextAlignment(.center)
                 }
                 .foregroundStyle(isNight ? AnyShapeStyle(Color.white.opacity(0.7)) : AnyShapeStyle(.secondary))

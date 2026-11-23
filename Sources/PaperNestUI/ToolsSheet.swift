@@ -88,7 +88,7 @@ struct ToolsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text(L10n.toolsCreate).font(.headline)
+                    Text(L10n.toolsCreate).font(.app(.headline))
                         .accessibilityAddTraits(.isHeader)
                     LazyVGrid(columns: columns, spacing: 14) {
                         createActions
@@ -98,7 +98,7 @@ struct ToolsSheet: View {
                         .buttonStyle(PremiumButtonStyle())
                         .accessibilityIdentifier("tool-photos")
                     }
-                    Text(L10n.toolsDocuments).font(.headline)
+                    Text(L10n.toolsDocuments).font(.app(.headline))
                         .accessibilityAddTraits(.isHeader)
                     LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(Tool.allCases) { tool in
@@ -262,7 +262,7 @@ private struct DocumentPicker: View {
                                 .foregroundStyle(usable ? .primary : .secondary)
                             Spacer()
                             Text(L10n.pageCount(summary.pageCount))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.app(.caption)).foregroundStyle(.secondary)
                             Image(systemName: selection.contains(summary.id) ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(selection.contains(summary.id) ? Theme.accent : .secondary)
                         }
@@ -341,18 +341,18 @@ private struct ToolCardLabel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.title2.weight(.medium))
+                .font(.app(.title2).weight(.medium))
                 .foregroundStyle(EditorChrome.purple)
                 .frame(width: 44, height: 44)
                 .background(EditorChrome.lavender, in: RoundedRectangle(cornerRadius: 12))
                 .accessibilityHidden(true)
             Text(title)
-                .font(.headline)
+                .font(.app(.headline))
                 .foregroundStyle(Color.primary)
                 .fixedSize(horizontal: false, vertical: true)
             if let detail {
                 Text(detail)
-                    .font(.subheadline)
+                    .font(.app(.subheadline))
                     .foregroundStyle(Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -183,7 +183,7 @@ struct ExportWatermarkSection: View {
                     Text(L10n.exportWatermarkNote)
                     if isPDF { Text(L10n.exportWatermarkPDFNote) }
                 }
-                .font(.caption)
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("export-watermark-note")
@@ -209,7 +209,7 @@ struct ExportWatermarkSection: View {
             }))
             .accessibilityIdentifier("export-watermark-brand-mark")
             Text(canRemoveBrandMark ? L10n.exportWatermarkMarkPro : L10n.exportWatermarkMarkFree)
-                .font(.caption)
+                .font(.app(.caption))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("export-watermark-brand-mark-note")
@@ -231,7 +231,7 @@ struct ExportWatermarkSection: View {
         } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.exportWatermarkOpacity)
-                Text(verbatim: WatermarkDraft.percent(draft.opacity)).font(.caption).foregroundStyle(.secondary)
+                Text(verbatim: WatermarkDraft.percent(draft.opacity)).font(.app(.caption)).foregroundStyle(.secondary)
             }
         }
 
@@ -245,7 +245,7 @@ struct ExportWatermarkSection: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.exportWatermarkRotation)
                 Text(verbatim: WatermarkDraft.degrees(draft.rotation, width: .narrow))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.app(.caption)).foregroundStyle(.secondary)
             }
         }
 
@@ -265,7 +265,7 @@ struct ExportWatermarkSection: View {
                 .accessibilityIdentifier("export-watermark-text")
             if let problem = draft.problem {
                 Text(problem)
-                    .font(.caption)
+                    .font(.app(.caption))
                     .foregroundStyle(.red)
                     .accessibilityIdentifier("export-watermark-text-missing")
             }
@@ -274,7 +274,7 @@ struct ExportWatermarkSection: View {
 
     private var placementPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L10n.exportWatermarkPlacement).font(.subheadline)
+            Text(L10n.exportWatermarkPlacement).font(.app(.subheadline))
             ForEach(Array(WatermarkDraft.placements.chunked2().enumerated()), id: \.offset) { _, row in
                 WatermarkTileRow(insetRow: false) {
                     ForEach(row, id: \.self) { placement in

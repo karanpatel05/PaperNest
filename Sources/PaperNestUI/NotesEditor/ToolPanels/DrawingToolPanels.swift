@@ -135,9 +135,9 @@ struct PenSettingsPanel: View {
             HStack(spacing: 10) {
                 Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
                     .frame(width: 24).foregroundStyle(EditorChrome.purple).accessibilityHidden(true)
-                Text(L10n.penSmoothing).font(.subheadline)
+                Text(L10n.penSmoothing).font(.app(.subheadline))
                 Spacer()
-                Text(verbatim: text).font(.subheadline.weight(.medium).monospacedDigit()).accessibilityHidden(true)
+                Text(verbatim: text).font(.app(.subheadline).weight(.medium).monospacedDigit()).accessibilityHidden(true)
             }
             Slider(value: store.binding(\.smoothing), in: 0...1) { Text(L10n.penSmoothing) }
                 .accessibilityValue(text)
@@ -228,7 +228,7 @@ struct HighlighterSettingsPanel: View {
                         HStack(spacing: 10) {
                             Image(systemName: "text.viewfinder").frame(width: 24).foregroundStyle(EditorChrome.purple)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(L10n.highlighterSnapToText).font(.subheadline)
+                                Text(L10n.highlighterSnapToText).font(.app(.subheadline))
                                 PanelNote(text: L10n.highlighterSnapToTextDetail)
                             }
                             Spacer(minLength: 4)
@@ -296,7 +296,7 @@ struct EraserSettingsPanel: View {
                         Slider(value: store.binding(\.eraserSize), in: 8...64) { Text(L10n.eraserSize) }
                             .accessibilityValue(sizeText)
                             .accessibilityIdentifier("studio-eraser-size")
-                        Text(verbatim: sizeText).font(.subheadline.weight(.medium).monospacedDigit())
+                        Text(verbatim: sizeText).font(.app(.subheadline).weight(.medium).monospacedDigit())
                             .frame(minWidth: 48, alignment: .trailing).accessibilityHidden(true)
                     }
                     PanelSegmented(options: [

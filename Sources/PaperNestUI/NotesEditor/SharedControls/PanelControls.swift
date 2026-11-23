@@ -34,10 +34,10 @@ struct ToolPanelContainer<Content: View>: View {
                     .frame(width: 36, height: 36)
                     .background(EditorChrome.selection, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: tool.title).font(.headline)
+                    Text(verbatim: tool.title).font(.app(.headline))
                         .accessibilityAddTraits(.isHeader)
                     if let mode {
-                        Text(verbatim: mode).font(.caption).foregroundStyle(EditorChrome.secondaryText)
+                        Text(verbatim: mode).font(.app(.caption)).foregroundStyle(EditorChrome.secondaryText)
                             .accessibilityIdentifier("tool-panel-mode")
                     }
                 }
@@ -64,7 +64,7 @@ struct ToolPanelContainer<Content: View>: View {
                     if let restore {
                         Button(action: restore) {
                             Label { Text(L10n.toolRestoreDefaults) } icon: { Image(systemName: "arrow.counterclockwise") }
-                                .font(.subheadline.weight(.medium))
+                                .font(.app(.subheadline).weight(.medium))
                                 .frame(maxWidth: .infinity, minHeight: 44)
                                 .foregroundStyle(EditorChrome.purple)
                                 .contentShape(Rectangle())
@@ -94,7 +94,7 @@ struct PanelSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(verbatim: title)
-                .font(.footnote.weight(.semibold))
+                .font(.app(.footnote).weight(.semibold))
                 .foregroundStyle(EditorChrome.secondaryText)
                 .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 12) { content() }
@@ -134,7 +134,7 @@ struct PanelSegmented<Value: Hashable>: View {
             let selected = option.value == selection
             Button { selection = option.value } label: {
                 Text(verbatim: option.title)
-                    .font(.subheadline.weight(.medium))
+                    .font(.app(.subheadline).weight(.medium))
                     .fixedSize(horizontal: true, vertical: false)
                     .padding(.horizontal, 10)
                     .frame(maxWidth: .infinity, minHeight: 36)
@@ -186,7 +186,7 @@ struct StrokeWidthControl: View {
                     .accessibilityIdentifier(sliderID)
                 stepButton("plus", by: 1, label: L10n.toolIncrease(title))
                 Text(verbatim: L10n.toolPointsShort(number))
-                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .font(.app(.subheadline).weight(.medium).monospacedDigit())
                     .lineLimit(1)
                     .frame(minWidth: 62, minHeight: 32)
                     .background(EditorChrome.secondaryBackground, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -243,12 +243,12 @@ struct OpacityControl: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "circle.lefthalf.filled").frame(width: 24).accessibilityHidden(true)
-            Text(verbatim: title).font(.subheadline).lineLimit(1).fixedSize(horizontal: true, vertical: false)
+            Text(verbatim: title).font(.app(.subheadline)).lineLimit(1).fixedSize(horizontal: true, vertical: false)
             Slider(value: $value, in: range) { Text(verbatim: title) }
                 .accessibilityValue(valueText)
                 .accessibilityIdentifier(sliderID)
             Text(verbatim: valueText)
-                .font(.subheadline.weight(.medium).monospacedDigit())
+                .font(.app(.subheadline).weight(.medium).monospacedDigit())
                 .frame(minWidth: 48, alignment: .trailing)
                 .accessibilityHidden(true)
         }
@@ -351,7 +351,7 @@ struct EditorColorPalette: View {
                     color = picked
                 }), supportsOpacity: false) {
                     Label { Text(L10n.markupCustomColor) } icon: { Image(systemName: "paintpalette") }
-                        .font(.subheadline)
+                        .font(.app(.subheadline))
                 }
                 .accessibilityIdentifier("markup-custom-color")
                 let favorite = settings.isFavorite(color)
@@ -380,7 +380,7 @@ struct EditorColorPalette: View {
 
     private func row(_ title: String, colors: [RGBAColor], prefix: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(verbatim: title).font(.caption).foregroundStyle(EditorChrome.secondaryText)
+            Text(verbatim: title).font(.app(.caption)).foregroundStyle(EditorChrome.secondaryText)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 2) {
                     ForEach(Array(colors.enumerated()), id: \.offset) { index, value in
@@ -423,7 +423,7 @@ struct ToolPresetCard<Preview: View>: View {
             VStack(spacing: 5) {
                 preview().frame(height: 34).frame(maxWidth: .infinity)
                 Text(verbatim: title)
-                    .font(.caption.weight(selected ? .semibold : .regular))
+                    .font(.app(.caption).weight(selected ? .semibold : .regular))
                     .lineLimit(1).minimumScaleFactor(0.7)
             }
             .padding(.horizontal, 6).padding(.vertical, 8)
@@ -516,9 +516,9 @@ struct PanelToggleRow: View {
                 Image(systemName: systemImage).frame(width: 24).foregroundStyle(EditorChrome.purple)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: title).font(.subheadline)
+                    Text(verbatim: title).font(.app(.subheadline))
                     if let detail {
-                        Text(verbatim: detail).font(.caption).foregroundStyle(EditorChrome.secondaryText)
+                        Text(verbatim: detail).font(.app(.caption)).foregroundStyle(EditorChrome.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -543,7 +543,7 @@ struct PanelTile: View {
             VStack(spacing: 6) {
                 Image(systemName: systemImage).font(.system(size: 20)).frame(height: 26)
                     .foregroundStyle(EditorChrome.purple)
-                Text(verbatim: title).font(.caption).multilineTextAlignment(.center)
+                Text(verbatim: title).font(.app(.caption)).multilineTextAlignment(.center)
                     .lineLimit(2).minimumScaleFactor(0.8)
             }
             .padding(6)
@@ -569,7 +569,7 @@ struct PanelNote: View {
 
     var body: some View {
         Text(verbatim: text)
-            .font(.caption)
+            .font(.app(.caption))
             .foregroundStyle(EditorChrome.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
     }

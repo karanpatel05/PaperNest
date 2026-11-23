@@ -111,8 +111,8 @@ struct FilePreviewSheet: View {
                     QuickLookPreview(copy: preparedCopy, title: request.summary.item.name)
                         .accessibilityIdentifier("file-preview")
                 } else if failed {
-                    ContentUnavailableView(L10n.filePreviewFailed, systemImage: "doc.questionmark",
-                                           description: Text(L10n.filePreviewFailedDescription))
+                    AppEmptyState(title: L10n.filePreviewFailed, systemImage: "doc.questionmark",
+                                  description: L10n.filePreviewFailedDescription)
                         .accessibilityIdentifier("file-preview-error")
                 } else {
                     ProgressView()

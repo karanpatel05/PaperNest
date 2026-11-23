@@ -74,7 +74,7 @@ struct WelcomeView: View {
         VStack(spacing: 12) {
             Button(action: onContinue) {
                 Text(L10n.welcomeContinue)
-                    .font(.headline)
+                    .font(.app(.headline))
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 4)
@@ -85,7 +85,7 @@ struct WelcomeView: View {
             .keyboardShortcut(.defaultAction)
             .accessibilityIdentifier("welcome-continue")
             Text(L10n.welcomeNoAccount)
-                .font(.footnote)
+                .font(.app(.footnote))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
@@ -120,7 +120,7 @@ struct WelcomeView: View {
             BrandMark.image(size: markSize)
             Text(L10n.welcomeBrand)
         }
-        .font(.title2.weight(.bold))
+        .font(.app(.title2).weight(.semibold))
         .foregroundStyle(Theme.accent)
     }
 
@@ -135,12 +135,12 @@ struct WelcomeView: View {
                     .accessibilityHidden(true)
             }
             Text(L10n.welcomeTitle)
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .font(.app(.largeTitle).weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("welcome-title")
             Text(welcomeSubtitle)
-                .font(.body)
+                .font(.app(.body))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -174,8 +174,8 @@ struct WelcomeView: View {
                 .frame(width: 32, height: 32)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
-                Text(title).font(.headline)
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                Text(title).font(.app(.headline))
+                Text(detail).font(.app(.subheadline)).foregroundStyle(.secondary)
             }
             .fixedSize(horizontal: false, vertical: true)
         }

@@ -35,7 +35,7 @@ struct FileThumbnailView: View {
                     .aspectRatio(contentMode: .fit)
             } else {
                 Image(systemName: FileKind.symbol(for: uti))
-                    .font(.largeTitle)
+                    .font(.app(.largeTitle))
                     .foregroundStyle(Theme.accent)
             }
         }

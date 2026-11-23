@@ -69,7 +69,7 @@ struct DocumentOutlineSheet: View {
                         } label: {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
                                 Image(systemName: "text.alignleft")
-                                    .font(.caption).foregroundStyle(EditorChrome.purple)
+                                    .font(.app(.caption)).foregroundStyle(EditorChrome.purple)
                                     .accessibilityHidden(true)
                                 Text(entry.title)
                                 .multilineTextAlignment(.leading)

@@ -144,7 +144,7 @@ struct PDFFormSheet: View {
                                 }
                             }
                         }
-                        Section { Text(L10n.formExportHelp).font(.callout).foregroundStyle(.secondary) }
+                        Section { Text(L10n.formExportHelp).font(.app(.callout)).foregroundStyle(.secondary) }
                         if draft.failed { Section { Label(L10n.saveFailed, systemImage: "exclamationmark.triangle") } }
                     }
                     .formStyle(.grouped)
@@ -161,7 +161,7 @@ struct PDFFormSheet: View {
                 if isEmbedded {
                     VStack(spacing: 8) {
                         HStack {
-                            Text(L10n.formTitle).font(.headline)
+                            Text(L10n.formTitle).font(.app(.headline))
                             Spacer()
                             closeButton
                         }
@@ -212,9 +212,9 @@ struct PDFFormSheet: View {
     @ViewBuilder private func fieldRow(_ field: FormField) -> some View {
         if !draft.editableNames.contains(field.name) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(verbatim: field.name).font(.headline)
+                Text(verbatim: field.name).font(.app(.headline))
                 Text(verbatim: field.value)
-                Text(L10n.formUnsupported).font(.caption).foregroundStyle(.secondary)
+                Text(L10n.formUnsupported).font(.app(.caption)).foregroundStyle(.secondary)
             }.accessibilityIdentifier("form-unsupported-\(field.name)")
         } else if field.isCheckbox {
             Toggle(field.name, isOn: Binding(get: {
@@ -223,7 +223,7 @@ struct PDFFormSheet: View {
             .accessibilityIdentifier("form-field-\(field.name)")
         } else {
             VStack(alignment: .leading) {
-                Text(verbatim: field.name).font(.headline)
+                Text(verbatim: field.name).font(.app(.headline))
                 TextField(field.name, text: Binding(get: {
                     if case .text(let value) = draft.values[field.name] { return value }; return ""
                 }, set: { draft.values[field.name] = .text($0) }), axis: .vertical)

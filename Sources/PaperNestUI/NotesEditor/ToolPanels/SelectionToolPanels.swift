@@ -55,7 +55,7 @@ struct LassoSettingsPanel: View {
             PanelSection(title: L10n.lassoActions) {
                 Button(action: selectAll) {
                     Label { Text(L10n.selectAll) } icon: { Image(systemName: "checkmark.circle") }
-                        .font(.subheadline.weight(.medium))
+                        .font(.app(.subheadline).weight(.medium))
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .foregroundStyle(Color.white)
                         .background(EditorChrome.selection, in: RoundedRectangle(cornerRadius: 12, style: .continuous))

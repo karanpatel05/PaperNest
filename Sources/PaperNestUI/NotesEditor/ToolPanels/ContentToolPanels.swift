@@ -93,7 +93,7 @@ struct TextSettingsPanel: View {
             if !session.isSelected {
                 Button { place(); close() } label: {
                     Label { Text(L10n.textPlace) } icon: { Image(systemName: "plus") }
-                        .font(.subheadline.weight(.medium))
+                        .font(.app(.subheadline).weight(.medium))
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .foregroundStyle(Color.white)
                         .background(EditorChrome.selection, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -108,7 +108,7 @@ struct TextSettingsPanel: View {
     private func styleToggle(_ title: String, symbol: String, isOn: Binding<Bool>, id: String) -> some View {
         Button { isOn.wrappedValue.toggle() } label: {
             Label { Text(verbatim: title) } icon: { Image(systemName: symbol) }
-                .font(.subheadline.weight(.medium))
+                .font(.app(.subheadline).weight(.medium))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .foregroundStyle(isOn.wrappedValue ? Color.white : EditorChrome.navy)
                 .background {
@@ -235,7 +235,7 @@ struct StickerSettingsPanel: View {
                         let selected = candidate == filter
                         Button { filter = candidate } label: {
                             Text(verbatim: candidate.title)
-                                .font(.subheadline.weight(.medium))
+                                .font(.app(.subheadline).weight(.medium))
                                 .padding(.horizontal, 14).frame(minHeight: 36)
                                 .foregroundStyle(selected ? Color.white : EditorChrome.navy)
                                 .background {
