@@ -46,7 +46,8 @@ public struct AppLockState: Hashable, Sendable {
     public private(set) var isCovered: Bool = false
     /// Whether to ask on its own the next time PaperNest is in front. Off
     /// after an attempt, so a cancelled or failed one waits for a tap on
-    /// Unlock instead of asking again and again.
+    /// Unlock instead of asking again and again; on again once PaperNest has
+    /// really been away (in the background) and comes back still locked.
     public private(set) var asksOnActive: Bool
     private var backgroundedAt: ContinuousClock.Instant?
 
@@ -76,6 +77,10 @@ public struct AppLockState: Hashable, Sendable {
             let seconds = Double(away.components.seconds) + Double(away.components.attoseconds) / 1e18
             if !isLocked, policy.locksOnReturn(after: seconds) {
                 isLocked = true
+                asksOnActive = true
+            } else if isLocked {
+                // Left while still locked and come back: ask, as on any
+                // return. Only the prompt's own inactive-and-back is quiet.
                 asksOnActive = true
             }
         }

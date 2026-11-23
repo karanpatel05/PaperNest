@@ -92,6 +92,22 @@ import Testing
         #expect(device.reasons.count == 2)
     }
 
+    /// Cancelled at launch, then left and come back to: asked again without
+    /// a tap, and this time opened.
+    @Test func comingBackAfterACancelAsksAgain() async {
+        let device = Device([.cancelled, .success])
+        let lock = make(defaults(enabled: true), device)
+        lock.scenePhaseChanged(.active)
+        await settle(lock)
+        #expect(lock.isLocked)
+        lock.scenePhaseChanged(.inactive)
+        lock.scenePhaseChanged(.background)
+        lock.scenePhaseChanged(.active)
+        await settle(lock)
+        #expect(!lock.isLocked)
+        #expect(device.reasons.count == 2)
+    }
+
     @Test func turningItOnAsksFirstAndAFailureChangesNothing() async {
         let store = defaults()
         let device = Device([.failed, .success])

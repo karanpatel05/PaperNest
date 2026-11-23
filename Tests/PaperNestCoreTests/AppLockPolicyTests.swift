@@ -114,6 +114,18 @@ import Testing
         #expect(state.isLocked && !state.asksOnActive)
     }
 
+    /// Cancelled, then PaperNest really left and come back to: it asks again
+    /// on its own, as on any return.
+    @Test func aRealReturnAsksAgainAfterACancelledPrompt() {
+        let on = AppLockPolicy(isEnabled: true, grace: .fiveMinutes)
+        var state = AppLockState(policy: on)
+        state.attemptStarted()
+        state.becameInactive(policy: on)
+        state.enteredBackground(at: at(0), policy: on)
+        state.becameActive(at: at(10), policy: on)
+        #expect(state.isLocked && state.asksOnActive && !state.isCovered)
+    }
+
     @Test func turningItOnDoesNotLockWhatIsOpen() {
         var state = AppLockState(policy: AppLockPolicy(isEnabled: false))
         let on = AppLockPolicy(isEnabled: true, grace: .immediately)

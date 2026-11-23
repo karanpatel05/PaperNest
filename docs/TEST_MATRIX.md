@@ -55,7 +55,7 @@ Owner: "Start the next feature". The roadmap's queue is done or waiting on the o
 **Calls I made (for the owner and Codex)**
 - **The device's own owner check**, `.deviceOwnerAuthentication`: Face ID and the rest, falling back to the device passcode. PaperNest stores no passcode of its own.
 - **Only going to the background starts the clock.** Becoming inactive does not, because the Face ID sheet itself makes the app inactive.
-- **A cancelled or failed prompt waits for a tap on Unlock** and does not ask again by itself, so there is no endless prompt loop.
+- **A cancelled or failed prompt waits for a tap on Unlock** while PaperNest stays in front, so the Face ID sheet's own inactive-and-back cannot loop. Once PaperNest has been left and come back to, still locked, it asks again as on any return. That part was added in a follow-up commit, after review.
 - **If the device's passcode is removed later**, the lock cannot be satisfied, so it opens rather than shutting the library for good. Whoever removed the passcode knew it. Settings then says to set a passcode.
 - **It hides; it does not encrypt.** The footer says so. The library stays on disk as before.
 - **A device setting** in `UserDefaults`: not synced, not in a library backup.
@@ -83,6 +83,7 @@ All from `~/Library/Caches/PaperNest/applock-verify`, a git-free copy of HEAD `2
 | iOS UI tests, `AppLockUITests` (4), iPhone 17 | **4 passed.** The tests: turned on, home and back, locked over the open Settings sheet (which could not be reached), the refused prompt says so, Unlock comes back to the sheet, then turned off; locked at launch in French; a device with no passcode in Spanish; and the Simulator's own answer with no seam. |
 | The same, iPad Pro 13 (M5) | **4 passed, over two runs.** The first run passed 2; the other 2 failed inside XCTest's own queries ("Timed out while fetching snapshot from testmanagerd") at a load average near 340. Both passed when rerun with the load lower. |
 | With no seam, this Simulator's own owner check | Reports Face ID ("Require Face ID", switch enabled). The real prompt was never answered. |
+| Follow-up (asks again after a real return): `./scripts/test.sh`, Mac app and iOS module builds, on HEAD `279ffa1` + the fix | **1,714 tests, 0 failures, 0 warnings; both builds 0 warnings.** The UI tests were not run again; the fix changes only what happens on coming back to a lock still shut. |
 
 How the UI tests were run: straight through `xcodebuild` on simulators no other session was using, each test making its own library with `LibraryStore`. Two other sessions' UI runs were going at the time, and `ui-test-ios.sh` deletes and reseeds the shared `/tmp/papernest-uitest-library`.
 
@@ -91,6 +92,11 @@ Found on the way:
 - **A test fix.** A tap on the middle of a SwiftUI toggle's row lands on its label and does not flip it, so the test taps the switch itself.
 
 **Not verified:** a real device, where the real Face ID or passcode prompt has to be answered; that prompt was never answered in the Simulator. Also: VoiceOver, the app switcher's picture, iPad multiple windows, a hardware keyboard while locked, and dark mode.
+
+**To try on a device:**
+- Turn the lock on, then off, with the real prompt. While the prompt is up, the lock's cover window goes key behind it; check that this does not cancel the prompt.
+- Look at the app switcher's picture with the lock on.
+- In a DEBUG build, launching with `-PaperNestLibraryPath` skips the lock on purpose, for UI tests. Try it without that argument, or in a Release build.
 
 ## 2026-11-22 — Lasso editing: delete, cut, copy, paste, duplicate, recolor, resize and rotate (Claude)
 
