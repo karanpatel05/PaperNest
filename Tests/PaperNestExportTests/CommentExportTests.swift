@@ -159,6 +159,46 @@ import PaperNestTestSupport
         #expect(notes(on: pdf.page(at: 0)).map(\.contents) == ["Initial each page"])
     }
 
+    /// The names of a form's fields as another reader sees them: read from
+    /// the file's catalog, after unlocking it with `password`.
+    private func fieldNames(in data: Data, password: String?) -> [String] {
+        guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider) else { return [] }
+        if let password, !document.isUnlocked { _ = document.unlockWithPassword(password) }
+        guard let catalog = document.catalog else { return [] }
+        var form: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(catalog, "AcroForm", &form), let form else { return [] }
+        var fields: CGPDFArrayRef?
+        guard CGPDFDictionaryGetArray(form, "Fields", &fields), let fields else { return [] }
+        return (0..<CGPDFArrayGetCount(fields)).compactMap { index -> String? in
+            var field: CGPDFDictionaryRef?
+            var title: CGPDFStringRef?
+            guard CGPDFArrayGetDictionary(fields, index, &field), let field,
+                  CGPDFDictionaryGetString(field, "T", &title), let title else { return nil }
+            return CGPDFStringCopyTextString(title) as String?
+        }
+    }
+
+    /// An unchanged form stays fillable when its comments are added, with and
+    /// without a password: the export sheet says it will, so the notes must
+    /// not cost the form its catalog (widgets alone look right and are dead).
+    @Test(arguments: [nil, "correct-horse"]) func anUnchangedFormKeepsItsFieldsWithNotes(password: String?) async throws {
+        let fixture = try ExportFixture()
+        let source = SyntheticDocuments.acroFormPDF(fields: [.init(name: "customer"), .init(name: "city")])
+        let item = try await fixture.importer.importItem(.data(source, name: "Agreement"))
+        let pages = try await fixture.store.pages(of: item.id)
+        try await comment("Fill in the city", on: pages[0], fixture)
+
+        let output = try await export(fixture, pages, comments: true, password: password)
+        defer { output.removeTemporaryFiles() }
+        let data = try Data(contentsOf: output.files[0])
+        #expect(fieldNames(in: data, password: password) == ["customer", "city"], "the form's fields were lost")
+        let pdf = try #require(PDFDocument(data: data))
+        if let password { #expect(pdf.unlock(withPassword: password)) }
+        let annotations = pdf.page(at: 0)?.annotations ?? []
+        #expect(annotations.filter { $0.type == "Widget" }.count == 2)
+        #expect(annotations.filter { $0.type == "Text" }.map(\.contents) == ["Fill in the city"])
+    }
+
     @Test func imagesAndWordsCarryNoNotes() async throws {
         let fixture = try ExportFixture()
         let (_, pages) = try await fixture.importPDF(["Page"])

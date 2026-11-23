@@ -14,6 +14,7 @@ A gap against Acrobat: PaperNest's page comments never left the app. The export 
 | Check | Result |
 |---|---|
 | `CommentExportTests` (8): a note per comment on its own page, not overlapping and on the page; nothing unless asked; no comments means a byte-identical file; a password kept; Letter paper puts the note on the fitted page, not in the margin; long accented text kept whole; a restricted file keeps its limits, handed back or rebuilt; PNG carries none | **8 passed.** With the note-writing call switched off, the four note tests fail, so they test what they claim |
+| Follow-up: an unchanged fillable form with a comment, exported with notes, without and with a password | **Passed.** The catalog still lists both fields (`customer`, `city`), and both widgets and the note are on the page. The export sheet's "stays fillable" note holds with Include Comments on. |
 | `ExportPasswordWorkflowTests`, `ExportFormatOfferTests`, `LocalizationTests` | **Passed** |
 | `CommentExportUITests` (2), iPhone 17 and iPad Pro 13, iOS 27.0: the switch is there for a PDF and starts off, turns on and shows its note, is not offered for PNG, and reads "Inclure les commentaires" / "Incluir comentarios" without running off the screen | **2 passed on each device** (53–68 s) |
 | `swift build --build-tests`; `build-for-testing`, `PaperNest-iOS` | **0 warnings; built** |
