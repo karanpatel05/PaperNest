@@ -54,7 +54,7 @@ Owner: "Finish working on codex gaps". This follows the entry below, which fixed
   - The lasso's touch surface (`NotebookLassoTouchSurface`) lets its one-finger pan run alongside the scroll view's pan. That is correct only while the scroll view needs two fingers.
   - `NotebookTouchScrolling`, which applies `PageScrollTouchPolicy` ("two fingers to scroll while lasso, shapes or finger drawing is armed"), was installed only on iPad (`userInterfaceIdiom == .pad`, from the redesign commit `13e8daa`; no recorded reason). On a phone, one finger both lassoed and scrolled.
 - **Fix.** The policy now applies on iPhone too (`DocumentView.swift`, `PageViewer`). The lasso's delegate is unchanged.
-- **Behaviour change on iPhone, for the owner and Codex.** In a notebook, while lasso, shapes or finger drawing is armed, scrolling takes **two fingers**, as on iPad. Lasso is the tool a notebook opens with. With drawing off (`studio-drawing-toggle`), one finger scrolls as before; the notebook scroll tests do exactly that and pass.
+- **Behaviour change on iPhone, for the owner and Codex.** In a notebook, while lasso, shapes or finger drawing is armed, scrolling takes **two fingers**, as on iPad. Lasso is the tool a notebook opens with. With drawing off (`studio-drawing-toggle`), one finger scrolls as before; the notebook scroll tests do exactly that and pass. **The owner chose to keep it on 2026-11-23** ("Keep two fingers").
 
 **Test changes** (no app behaviour behind them):
 
